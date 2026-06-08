@@ -14,5 +14,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
 
+[tool.setuptools.packages.find]
+include = ["dsa_buddy*", "sysd_buddy*"]
+
 [project.scripts]
 dsa-buddy = "dsa_buddy.cli:cli"
+sysd-buddy = "sysd_buddy.cli:cli"
