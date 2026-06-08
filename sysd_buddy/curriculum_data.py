@@ -110,8 +110,8 @@ SYSD_CURRICULUM = {
             "order": 2,
             "categories": [
                 {
-                    "name": "Design Problems",
-                    "slug": "design-problems-core",
+                    "name": "Classic Designs",
+                    "slug": "classic-designs",
                     "order": 1,
                     "topics": [
                         {"name": "Design TinyURL", "slug": "design-tinyurl"},
