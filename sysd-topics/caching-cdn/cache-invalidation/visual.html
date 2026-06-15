@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cache Invalidation &amp; Staleness — Keeping the Notice Board in Sync</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  /* diagram SVG */
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 520px; height: auto; }
+
+  /* box styling for actors */
+  .box-rect { transition: all .4s ease; }
+  .box-label { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 14px; fill: #fff; }
+  .box-sub { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10px; }
+  .wire { stroke: #3a3a5c; stroke-width: 2.5; fill: none; }
+  .arrow-head { fill: #555577; }
+
+  /* value chips inside cache/db */
+  .val-chip { font-family: "SF Mono", Menlo, Consolas, monospace; font-weight: 700; font-size: 13px; transition: all .4s ease; }
+
+  /* travelling packet */
+  #packet { transition: none; }
+  #packet circle { stroke: #1a1a2e; stroke-width: 2; }
+  #packet text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; font-weight: 700; fill: #1a1a2e; }
+
+  /* TTL bar */
+  .ttl-track { fill: #2d2d50; }
+  .ttl-fill { transition: width .4s ease; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  /* scenario tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab {
+    background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8;
+    padding: 8px 14px; font-size: 13px; border-radius: 20px; cursor: pointer; font-family: inherit;
+    transition: all .15s ease;
+  }
+  .tab:hover { background: #2d2d50; color: #e0e0e0; }
+  .tab.active { background: #3b82f6; border-color: #3b82f6; color: #fff; font-weight: 600; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 60px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.consistent { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.consistent h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 22px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.consistent .big { color: #10b981; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cache Invalidation &amp; Staleness</h1>
+  <div class="subtitle">How a fast cache layer is kept in sync with the source-of-truth database — and the <b>staleness window</b> during which readers might still see old data. Watch a request packet travel between <b>Reader</b>, <b>Cache</b>, <b>Writer</b>, and <b>DB</b> across four scenarios.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the canteen notice board</h3>
+    <p>A <b>notice board</b> (the <b>cache</b>) shows the canteen menu so people read it fast — no trip to the kitchen. The real menu lives in the <b>kitchen</b> (the <b>source-of-truth DB</b>). The catch: when the kitchen changes the menu, anyone reading the un-updated board sees a <b>stale</b> menu. Three ways to re-sync: write <i>"valid till 10am"</i> on the board so readers refresh it themselves (<b>TTL</b>), tear the old slip off the moment the kitchen changes (<b>invalidate on write</b>), or have the kitchen pin a fresh slip immediately (<b>write-through</b>). Cache invalidation is the whole game of keeping that board↔kitchen gap small.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">cache read:</span><code>~0.2–2 ms</code> &nbsp; vs &nbsp;<span class="label">DB read:</span><code>~10–50 ms</code></div>
+    <div class="row"><span class="label">goal:</span><code>serve 90–99% of reads from cache</code> without handing back wrong data</div>
+    <div class="row"><span class="label">core knob:</span><code>staleness window  ⇄  backend load</code></div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-sc="ttl">① TTL expiry (passive)</button>
+    <button class="tab" data-sc="inval">② Invalidate-on-write (active)</button>
+    <button class="tab" data-sc="race">③ Cache-aside race</button>
+    <button class="tab" data-sc="herd">④ Thundering herd</button>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 520 360" id="diagram">
+        <!-- wires between boxes (drawn first, behind) -->
+        <g id="g-wires"></g>
+        <!-- TTL bar -->
+        <g id="g-ttl"></g>
+        <!-- actor boxes -->
+        <g id="g-boxes"></g>
+        <!-- value chips -->
+        <g id="g-vals"></g>
+        <!-- travelling packet -->
+        <g id="packet" style="opacity:0"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Cache holds</div><div class="value" id="v-cache">—</div></div>
+        <div class="var"><div class="label">DB (truth)</div><div class="value green" id="v-db">—</div></div>
+        <div class="var"><div class="label">Reader sees</div><div class="value" id="v-sees">—</div></div>
+        <div class="var"><div class="label">Stale?</div><div class="value" id="v-stale">—</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch round" style="background:#94a3b8"></span>Reader (read request)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#3b82f6"></span>Cache (fast layer, Redis / edge)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#ec4899"></span>Writer (update request)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#10b981"></span>DB (source-of-truth)</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Stale value / invalidation</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Wrong data served / hazard</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Pick a scenario above, then press <b>Next</b> to watch the packet flow.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>Delete-then-update DB &nbsp;(wrong order)</h3>
+      <div class="formula">DEL cache &nbsp;→&nbsp; (reader repopulates) &nbsp;→&nbsp; UPDATE db</div>
+      <p>A reader slips in between the delete and the DB write, reads the <b>old</b> DB value, and re-caches it. The cache is now <span class="big">stale until the next write</span> — possibly forever.</p>
+      <p>Result: a <b>silent, long-lived</b> mismatch between cache and source.</p>
+    </div>
+    <div class="cx consistent">
+      <h3>Update DB-then-delete cache &nbsp;(industry standard)</h3>
+      <div class="formula">UPDATE db &nbsp;→&nbsp; DEL cache</div>
+      <p>The next read misses and pulls the <b>fresh</b> value from the DB. The bad window shrinks to <span class="big">~ms</span>, and a short <b>TTL</b> backstops any missed delete.</p>
+      <p>Result: <b>self-healing</b> — even a lost invalidation event expires on its own.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>TTL <i>is</i> the staleness window.</b> <code>TTL = 300s</code> means a reader can see data up to <b>5 minutes</b> old after the source changed. Small TTL → fresher data but more misses &amp; backend QPS; big TTL → less load but more staleness.</li>
+      <li><b>Delete vs update on write.</b> <code>DEL</code> (invalidate) is safer — next read pulls truth — at the cost of one extra miss. <code>SET</code> (overwrite) is faster but concurrent writers can leave a stale value behind.</li>
+      <li><b>Cache-aside ordering.</b> Always <b>update DB, then delete cache</b>. For edge races add a <b>delayed double-delete</b> or rely on a short TTL safety net.</li>
+      <li><b>Thundering herd / stampede.</b> One hot key expiring sends thousands of misses at the DB at once. Fix with <b>single-flight / request coalescing</b>, <b>early probabilistic refresh</b>, or <b>stale-while-revalidate</b>.</li>
+      <li><b>Invalidation is best-effort.</b> Network drops &amp; consumer lag can lose an event — keep TTL as a backstop, never trust invalidation alone.</li>
+      <li><b>CDN: purge vs versioning.</b> <b>Purge</b> tells edge POPs to drop a URL (propagates seconds→minutes, eventually consistent). <b>Versioned URLs</b> (<code>app.abc123.js</code>) are instant &amp; globally consistent since a new name is a brand-new object.</li>
+      <li><b>Used by</b> — Facebook <b>TAO + Memcache</b> (cache-aside), Netflix <b>EVCache</b>, Stack Overflow (Redis + targeted invalidation), CDNs <b>Cloudflare / Akamai / Fastly</b> (Fastly claims ~150ms instant-purge).</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>A cache is only correct if it is <b>invalidated</b> when the source changes; until then there is a <b>staleness window</b>. Pick the smallest acceptable staleness for the data, prefer <b>update-DB-then-delete-cache</b>, and always keep a <b>TTL backstop</b> — because invalidation events are best-effort and concurrency makes a perfect cache→source sync impossible.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- geometry: four actor boxes ----------
+  // layout: Reader (top-left), Cache (top-right), Writer (bottom-left), DB (bottom-right)
+  const BOX = {
+    reader: { x: 30,  y: 40,  w: 150, h: 70, color:"#94a3b8", label:"Reader",  sub:"GET menu" },
+    cache:  { x: 330, y: 40,  w: 160, h: 70, color:"#3b82f6", label:"Cache",   sub:"Redis / edge" },
+    writer: { x: 30,  y: 250, w: 150, h: 70, color:"#ec4899", label:"Writer",  sub:"UPDATE menu" },
+    db:     { x: 330, y: 250, w: 160, h: 70, color:"#10b981", label:"DB",      sub:"source of truth" },
+  };
+  function cx(b){ return BOX[b].x + BOX[b].w/2; }
+  function cy(b){ return BOX[b].y + BOX[b].h/2; }
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs) {
+    const e = document.createElementNS(svgNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  const gWires = document.getElementById("g-wires");
+  const gTtl   = document.getElementById("g-ttl");
+  const gBoxes = document.getElementById("g-boxes");
+  const gVals  = document.getElementById("g-vals");
+  const packet = document.getElementById("packet");
+
+  // ---------- static structure: draw boxes + wires once ----------
+  function drawStatic() {
+    gWires.innerHTML = ""; gBoxes.innerHTML = "";
+    // wires: reader<->cache, cache<->db, writer<->db, writer<->cache
+    const wires = [
+      ["reader","cache"], ["cache","db"], ["writer","db"], ["writer","cache"]
+    ];
+    for (const [a,b] of wires) {
+      gWires.appendChild(el("line", {
+        class:"wire", x1:cx(a), y1:cy(a), x2:cx(b), y2:cy(b)
+      }));
+    }
+    for (const key in BOX) {
+      const b = BOX[key];
+      const g = el("g", {});
+      g.appendChild(el("rect", {
+        class:"box-rect", id:"box-"+key, x:b.x, y:b.y, width:b.w, height:b.h, rx:10,
+        fill:"#24243e", stroke:b.color, "stroke-width":2.5
+      }));
+      const t1 = el("text", { class:"box-label", x:b.x+b.w/2, y:b.y+30, "text-anchor":"middle", fill:b.color });
+      t1.textContent = b.label;
+      const t2 = el("text", { class:"box-sub", x:b.x+b.w/2, y:b.y+50, "text-anchor":"middle", fill:"#8888aa" });
+      t2.textContent = b.sub;
+      g.appendChild(t1); g.appendChild(t2);
+      gBoxes.appendChild(g);
+    }
+  }
+
+  // ---------- value chips (cache + db current value) and TTL ----------
+  // state object rendered each step
+  function renderState(st) {
+    gVals.innerHTML = ""; gTtl.innerHTML = "";
+
+    // cache chip
+    if (st.cache !== undefined) {
+      drawChip("cache", st.cache, st.cacheColor);
+    }
+    // db chip
+    if (st.db !== undefined) {
+      drawChip("db", st.db, st.dbColor || "#10b981");
+    }
+
+    // TTL bar under the cache box
+    if (st.ttl !== undefined && st.ttl !== null) {
+      const b = BOX.cache;
+      const bx = b.x + 14, by = b.y + b.h + 12, bw = b.w - 28, bh = 8;
+      gTtl.appendChild(el("rect", { class:"ttl-track", x:bx, y:by, width:bw, height:bh, rx:4 }));
+      const frac = Math.max(0, Math.min(1, st.ttl));
+      const col = frac > 0.5 ? "#10b981" : frac > 0 ? "#f59e0b" : "#ef4444";
+      gTtl.appendChild(el("rect", { class:"ttl-fill", x:bx, y:by, width:(bw*frac).toFixed(1), height:bh, rx:4, fill:col }));
+      const lbl = el("text", { class:"box-sub", x:b.x+b.w/2, y:by+bh+14, "text-anchor":"middle", fill:"#8888aa" });
+      lbl.textContent = st.ttlLabel || ("TTL " + Math.round(frac*100) + "%");
+      gTtl.appendChild(lbl);
+    }
+
+    // side panel
+    document.getElementById("v-cache").textContent = st.cache ?? "—";
+    document.getElementById("v-db").textContent    = st.db ?? "—";
+    const sees = document.getElementById("v-sees");
+    sees.textContent = st.sees ?? "—";
+    sees.className = "value" + (st.seesStale ? " red" : st.sees ? " green" : "");
+    const stale = document.getElementById("v-stale");
+    stale.textContent = st.staleText ?? "—";
+    stale.className = "value" + (st.seesStale ? " red" : (st.staleText === "no" ? " green" : st.staleText ? " amber" : ""));
+  }
+
+  function drawChip(box, text, color) {
+    const b = BOX[box];
+    const x = b.x + b.w/2, y = b.y - 14;
+    const w = Math.max(54, text.length * 9 + 18);
+    const g = el("g", {});
+    g.appendChild(el("rect", {
+      x: x - w/2, y: y - 14, width: w, height: 22, rx: 11,
+      fill: color || "#3b82f6", opacity: 0.95
+    }));
+    const t = el("text", { class:"val-chip", x:x, y:y+2, "text-anchor":"middle", fill:"#10221a" });
+    t.textContent = text;
+    g.appendChild(t);
+    gVals.appendChild(g);
+  }
+
+  // ---------- packet animation ----------
+  let animTimer = null;
+  function showPacket(from, to, label, color, cb) {
+    if (animTimer) { clearInterval(animTimer); animTimer = null; }
+    packet.innerHTML = "";
+    const c = el("circle", { cx:0, cy:0, r:14, fill: color || "#fbbf24" });
+    const t = el("text", { x:0, y:3, "text-anchor":"middle" });
+    t.textContent = label || "";
+    packet.appendChild(c); packet.appendChild(t);
+    packet.style.opacity = "1";
+    const x1 = cx(from), y1 = cy(from), x2 = cx(to), y2 = cy(to);
+    let f = 0;
+    const steps = 28;
+    animTimer = setInterval(() => {
+      f++;
+      const k = f/steps;
+      const e = k<.5 ? 2*k*k : -1+(4-2*k)*k; // ease in-out
+      const px = x1 + (x2-x1)*e, py = y1 + (y2-y1)*e;
+      packet.setAttribute("transform", `translate(${px.toFixed(1)},${py.toFixed(1)})`);
+      if (f >= steps) {
+        clearInterval(animTimer); animTimer = null;
+        if (cb) cb();
+      }
+    }, 22);
+  }
+  function hidePacket() {
+    if (animTimer) { clearInterval(animTimer); animTimer = null; }
+    packet.style.opacity = "0";
+  }
+
+  // ---------- scenarios ----------
+  // each step: { state, narration, narrClass, anim:{from,to,label,color} | null }
+  // state fields: cache, db, cacheColor, dbColor, ttl(0..1), ttlLabel, sees, seesStale, staleText
+  const SCENARIOS = {
+    ttl: {
+      name:"TTL expiry (passive)",
+      steps: [
+        { state:{ cache:"PANEER", db:"PANEER", ttl:1, ttlLabel:"TTL fresh", sees:null, staleText:"—" },
+          narration:`<b>① TTL-based expiry.</b> Cache holds <code>PANEER</code> with a <code>TTL=60s</code> stamp; DB agrees. A reader's <code>GET</code> arrives and the entry is still fresh — served from cache in <b>~1ms</b>, a <b>hit</b>.`,
+          narrClass:"good", anim:{ from:"reader", to:"cache", label:"GET", color:"#94a3b8" } },
+        { state:{ cache:"PANEER", db:"ALOO", dbColor:"#10b981", ttl:0.55, ttlLabel:"TTL ticking", sees:"PANEER", seesStale:true, staleText:"YES" },
+          narration:`<b>Source changes, cache doesn't know.</b> The kitchen switches the menu to <code>ALOO</code> in the DB, but the cache still serves the old <code>PANEER</code>. <b>This is the staleness window</b> — and it lasts exactly as long as the remaining TTL.`,
+          narrClass:"bad", anim:{ from:"reader", to:"cache", label:"GET", color:"#94a3b8" } },
+        { state:{ cache:"PANEER", db:"ALOO", ttl:0, ttlLabel:"TTL expired", sees:null, staleText:"miss" },
+          narration:`<b>TTL hits zero → the entry is treated as a miss.</b> The next read no longer trusts the cached copy. The cache reaches through to the DB for a fresh value.`,
+          narrClass:"move", anim:{ from:"cache", to:"db", label:"read", color:"#3b82f6" } },
+        { state:{ cache:"ALOO", db:"ALOO", ttl:1, ttlLabel:"TTL fresh", sees:"ALOO", seesStale:false, staleText:"no" },
+          narration:`<b>Refill &amp; re-stamp.</b> DB returns <code>ALOO</code>; the cache stores it with a fresh TTL and serves it. Staleness is healed. <b>Worst-case staleness = the TTL value</b> — smaller TTL means fresher data but more DB misses.`,
+          narrClass:"good", anim:{ from:"db", to:"cache", label:"ALOO", color:"#10b981" } },
+      ]
+    },
+    inval: {
+      name:"Invalidate-on-write (active)",
+      steps: [
+        { state:{ cache:"PANEER", db:"PANEER", ttl:0.8, ttlLabel:"cached", sees:null, staleText:"—" },
+          narration:`<b>② Explicit invalidation on write.</b> Cache and DB both hold <code>PANEER</code>. Now a <b>writer</b> wants to change the menu. The safe order is <b>update DB first</b>.`,
+          narrClass:"", anim:{ from:"writer", to:"db", label:"SET", color:"#ec4899" } },
+        { state:{ cache:"PANEER", db:"ALOO", dbColor:"#10b981", ttl:0.8, ttlLabel:"cached", sees:"PANEER", seesStale:true, staleText:"briefly" },
+          narration:`<b>DB now holds <code>ALOO</code>.</b> For a brief instant the cache is still <code>PANEER</code> — stale. To close the gap, the writer sends an <b>invalidate</b> (<code>DEL</code>) to the cache rather than overwriting it.`,
+          narrClass:"move", anim:{ from:"writer", to:"cache", label:"DEL", color:"#f59e0b" } },
+        { state:{ cache:"∅", cacheColor:"#f59e0b", db:"ALOO", ttl:null, sees:null, staleText:"empty" },
+          narration:`<b>Cache key deleted.</b> The entry is gone, so the cache can no longer serve a stale value. <code>DEL</code> is safer than overwrite — the next read is guaranteed to fetch the latest from the source, with no concurrent-writer race leaving a stale <code>SET</code> behind.`,
+          narrClass:"good", anim:null },
+        { state:{ cache:"∅", cacheColor:"#f59e0b", db:"ALOO", ttl:null, sees:null, staleText:"miss" },
+          narration:`<b>Next reader misses</b> (cache empty) and falls through to the DB to fetch the truth.`,
+          narrClass:"move", anim:{ from:"reader", to:"cache", label:"GET", color:"#94a3b8" } },
+        { state:{ cache:"ALOO", db:"ALOO", ttl:1, ttlLabel:"TTL fresh", sees:"ALOO", seesStale:false, staleText:"no" },
+          narration:`<b>Lazy repopulation.</b> The read pulls <code>ALOO</code> from the DB and re-caches it. Cache and source are consistent again — and the staleness window was just the few ms between DB write and <code>DEL</code>.`,
+          narrClass:"good", anim:{ from:"db", to:"cache", label:"ALOO", color:"#10b981" } },
+      ]
+    },
+    race: {
+      name:"Cache-aside race (wrong order)",
+      steps: [
+        { state:{ cache:"∅", cacheColor:"#f59e0b", db:"PANEER", ttl:null, sees:null, staleText:"—" },
+          narration:`<b>③ The classic cache-aside race.</b> Here a buggy writer does it <b>backwards</b>: <code>DEL cache</code> <b>then</b> <code>UPDATE db</code>. The cache is already empty after the delete; the DB still holds the old <code>PANEER</code>.`,
+          narrClass:"move", anim:{ from:"writer", to:"cache", label:"DEL", color:"#f59e0b" } },
+        { state:{ cache:"∅", cacheColor:"#f59e0b", db:"PANEER", ttl:null, sees:null, staleText:"hazard" },
+          narration:`<b>A reader slips in</b> between the delete and the DB write. It misses (cache empty) and reaches for the DB — which <b>still has the old value</b>.`,
+          narrClass:"bad", anim:{ from:"reader", to:"db", label:"read", color:"#94a3b8" } },
+        { state:{ cache:"PANEER", cacheColor:"#ef4444", db:"PANEER", ttl:0.9, ttlLabel:"re-cached OLD", sees:"PANEER", seesStale:true, staleText:"hazard" },
+          narration:`<b>The reader re-caches the OLD <code>PANEER</code>.</b> Now the cache is repopulated with a value that's about to become wrong.`,
+          narrClass:"bad", anim:{ from:"db", to:"cache", label:"PANEER", color:"#ef4444" } },
+        { state:{ cache:"PANEER", cacheColor:"#ef4444", db:"ALOO", dbColor:"#10b981", ttl:0.9, ttlLabel:"stale until next write", sees:"PANEER", seesStale:true, staleText:"YES" },
+          narration:`<b>Now the writer's <code>UPDATE</code> lands.</b> DB becomes <code>ALOO</code>, but the cache holds <code>PANEER</code> — and no one will delete it. <b>The cache is stale until the next write or TTL.</b> This is why ordering matters.`,
+          narrClass:"bad", anim:{ from:"writer", to:"db", label:"SET", color:"#ec4899" } },
+        { state:{ cache:"PANEER", cacheColor:"#ef4444", db:"ALOO", ttl:0.4, ttlLabel:"TTL backstop saves us", sees:"PANEER", seesStale:true, staleText:"until TTL" },
+          narration:`<b>Fix.</b> Do <b>UPDATE db → DEL cache</b> instead, add a <b>delayed double-delete</b> for edge races, and keep a <b>short TTL</b> as a backstop so even a permanently-stale entry self-heals when the TTL expires.`,
+          narrClass:"good", anim:null },
+      ]
+    },
+    herd: {
+      name:"Thundering herd",
+      steps: [
+        { state:{ cache:"HOT", db:"HOT", ttl:1, ttlLabel:"1 hot key, fresh", sees:"HOT", seesStale:false, staleText:"no" },
+          narration:`<b>④ Thundering herd / cache stampede.</b> One very popular key serves thousands of reads per second straight from cache — all hits, DB barely touched.`,
+          narrClass:"good", anim:{ from:"reader", to:"cache", label:"GET×N", color:"#94a3b8" } },
+        { state:{ cache:"∅", cacheColor:"#f59e0b", db:"HOT", ttl:0, ttlLabel:"expired!", sees:null, staleText:"miss" },
+          narration:`<b>The hot key expires (or is invalidated).</b> Suddenly every one of those concurrent reads is a <b>miss</b> at the same instant.`,
+          narrClass:"move", anim:null },
+        { state:{ cache:"∅", cacheColor:"#f59e0b", db:"HOT", dbColor:"#ef4444", ttl:0, ttlLabel:"DB overloaded", sees:null, staleText:"stampede" },
+          narration:`<b>All N misses slam the DB together.</b> Thousands of identical reads pile onto the backend at once — the DB QPS spikes and can fall over. That's the stampede.`,
+          narrClass:"bad", anim:{ from:"cache", to:"db", label:"N reads", color:"#ef4444" } },
+        { state:{ cache:"∅", cacheColor:"#f59e0b", db:"HOT", dbColor:"#10b981", ttl:0, ttlLabel:"single-flight", sees:null, staleText:"coalesced" },
+          narration:`<b>Fix — single-flight / request coalescing.</b> Let only <b>one</b> request fetch from the DB; the rest wait for its result. Or use <b>early/probabilistic refresh</b> (refresh just before expiry) and <b>stale-while-revalidate</b> (serve the old value while one request refreshes).`,
+          narrClass:"good", anim:{ from:"cache", to:"db", label:"1 read", color:"#10b981" } },
+        { state:{ cache:"HOT", db:"HOT", ttl:1, ttlLabel:"refilled once", sees:"HOT", seesStale:false, staleText:"no" },
+          narration:`<b>One DB read refills the cache</b> and the waiting readers are served from it. The backend saw a single query instead of a flood, and readers barely noticed.`,
+          narrClass:"good", anim:{ from:"db", to:"cache", label:"HOT", color:"#10b981" } },
+      ]
+    },
+  };
+
+  // ---------- controller ----------
+  let scKey = "ttl";
+  let cursor = 0;
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  function steps() { return SCENARIOS[scKey].steps; }
+
+  function render(animate) {
+    const s = steps()[cursor];
+    renderState(s.state);
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+    stepEl.textContent = `step ${cursor} / ${steps().length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps().length - 1;
+
+    if (animate && s.anim) {
+      showPacket(s.anim.from, s.anim.to, s.anim.label, s.anim.color, () => {
+        setTimeout(hidePacket, 450);
+      });
+    } else {
+      hidePacket();
+    }
+  }
+
+  function next() { if (cursor < steps().length - 1) { cursor++; render(true); } }
+  function prev() { if (cursor > 0) { cursor--; render(true); } }
+  function reset() { cursor = 0; render(false); }
+
+  function selectScenario(k) {
+    scKey = k; cursor = 0;
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.sc === k));
+    render(false);
+  }
+
+  document.getElementById("tabs").addEventListener("click", (e) => {
+    const t = e.target.closest(".tab");
+    if (t) selectScenario(t.dataset.sc);
+  });
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  drawStatic();
+  render(false);
+})();
+</script>
+</body>
+</html>

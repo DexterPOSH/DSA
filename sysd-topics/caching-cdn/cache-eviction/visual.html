@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cache Eviction — LRU & LFU Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0 0 8px; color: #d0d0e0; font-size: 15px; }
+  .analogy p:last-child { margin-bottom: 0; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  /* policy toggle */
+  .toggle { display: flex; gap: 0; margin-bottom: 20px; border: 1px solid #3a3a5c; border-radius: 8px; overflow: hidden; width: fit-content; }
+  .toggle button {
+    background: transparent; color: #a0a0b8; border: none; padding: 10px 26px;
+    font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; border-radius: 0;
+    transition: background .15s ease, color .15s ease;
+  }
+  .toggle button.active { background: #3b82f6; color: #fff; }
+  .toggle button:not(.active):hover { background: #2d2d50; color: #e0e0e0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* SVG diagram */
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+  .struct-label { fill: #8888aa; font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; text-transform: uppercase; letter-spacing: 1px; }
+  .hm-row text, .node text, .map-arrow text { font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .node rect, .node text, .ptr { transition: all .45s ease; }
+  .node .box { fill: #2d2d50; stroke: #3b82f6; stroke-width: 2; }
+  .node.head .box { stroke: #10b981; stroke-width: 3; }
+  .node.tail .box { stroke: #f59e0b; stroke-width: 3; }
+  .node.evicting .box { fill: #2a1717; stroke: #ef4444; stroke-width: 3; }
+  .node.moving .box { fill: #332611; stroke: #f59e0b; stroke-width: 3; }
+  .node .key { fill: #fff; font-weight: 700; font-size: 15px; }
+  .node .meta { fill: #94a3b8; font-size: 10px; }
+  .ptr { stroke: #555577; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+
+  /* hash map mini-table */
+  .hm-cell { fill: #1f1f3a; stroke: #3a3a5c; stroke-width: 1; }
+  .hm-cell.lit { fill: #14321f; stroke: #10b981; }
+  .hm-cell.gone { fill: #2a1717; stroke: #ef4444; }
+  .hm-key { fill: #fbbf24; font-size: 11px; }
+  .hm-val { fill: #c8c8d8; font-size: 10px; }
+  .map-arrow line { stroke: #555577; stroke-width: 1.5; stroke-dasharray: 3 3; }
+
+  /* request token */
+  .req circle { fill: #3b82f6; stroke: #93c5fd; stroke-width: 2; }
+  .req text { fill: #fff; font-size: 11px; font-weight: 700; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; border: 2px solid; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.evict { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.lru { background: #14213a; border: 1px solid #3b82f6; }
+  .cx.lfu { background: #2a1f33; border: 1px solid #8b5cf6; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.lru h3 { color: #93c5fd; }
+  .cx.lfu h3 { color: #c4b5fd; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 18px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.lru .big { color: #3b82f6; }
+  .cx.lfu .big { color: #8b5cf6; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cache Eviction — LRU &amp; LFU</h1>
+  <div class="subtitle">A cache is a <b>bounded</b> box of <code>C</code> entries living in RAM (~1&nbsp;ms lookup) in front of a slow origin (50–200&nbsp;ms). When it fills up, the <b>eviction policy</b> decides which entry to throw out to make room: <code>LRU</code> drops the least-<i>recently</i>-used, <code>LFU</code> drops the least-<i>frequently</i>-used.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the study table with 3 book slots</h3>
+    <p>Your desk holds only a few books (the <b>cache capacity</b>). The full library (the <b>origin / DB</b>) is in a slow basement. When the desk is full and you need a new book, you must send one back downstairs.</p>
+    <p><b>LRU librarian:</b> "Return whichever book you haven't touched for the longest." This morning's book stays; the one untouched for two weeks goes first. Bet: recently used → likely used again soon.</p>
+    <p><b>LFU librarian:</b> keeps a tally mark on each book per read and returns the one with the <b>fewest total reads</b>. A dictionary you've opened 50 times survives even if untouched today; a novel read once leaves first.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">capacity:</span><code>C = 3</code> &nbsp;(small, so we can watch every eviction)</div>
+    <div class="row"><span class="label">structures:</span><code>hash map (key → node)</code> + recency/frequency ordering</div>
+    <div class="row"><span class="label">request stream:</span><code>GET a, GET b, GET c, GET a, GET d</code></div>
+    <div class="row"><span class="label">rule:</span><code>hit → fast return + reorder &nbsp;|&nbsp; miss → fetch + insert (evict if full)</code></div>
+  </div>
+
+  <div class="toggle" id="toggle">
+    <button data-policy="lru" class="active">LRU — recency</button>
+    <button data-policy="lfu">LFU — frequency</button>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 560 380" id="diagram">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#555577" />
+          </marker>
+        </defs>
+        <text class="struct-label" id="lbl-top" x="20" y="24">incoming request</text>
+        <g id="g-req"></g>
+        <text class="struct-label" id="lbl-map" x="20" y="92">hash map  key → node</text>
+        <g id="g-map"></g>
+        <text class="struct-label" id="lbl-list" x="20" y="206">doubly linked list  (MRU head → LRU tail)</text>
+        <g id="g-links"></g>
+        <g id="g-nodes"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label" id="vl-1">Capacity C</div><div class="value" id="v-cap">3</div></div>
+        <div class="var"><div class="label">Size</div><div class="value" id="v-size">0</div></div>
+        <div class="var"><div class="label">Hits</div><div class="value green" id="v-hits">0</div></div>
+        <div class="var"><div class="label">Misses</div><div class="value amber" id="v-miss">0</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#2d2d50;border-color:#10b981"></span>Head — most recent / hottest</div>
+        <div class="legend-item"><span class="swatch" style="background:#2d2d50;border-color:#f59e0b"></span>Tail — eviction candidate</div>
+        <div class="legend-item"><span class="swatch" style="background:#332611;border-color:#f59e0b"></span>Node moving / reordering</div>
+        <div class="legend-item"><span class="swatch" style="background:#2a1717;border-color:#ef4444"></span>Victim being evicted</div>
+        <div class="legend-item"><span class="swatch" style="background:#14321f;border-color:#10b981"></span>Hash-map slot just hit</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to start the request stream against an empty cache.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx lru">
+      <h3>LRU — Least Recently Used</h3>
+      <div class="formula">hash map + doubly linked list → O(1)</div>
+      <p><b>Hit:</b> splice node out, move to head. <b>Miss:</b> insert at head; if <code>size &gt; C</code>, drop the <b>tail</b> + delete its map key. Every op is just <span class="big">2–3 pointer updates</span> — microseconds on a 1000-entry cache.</p>
+      <p>Great at <b>temporal locality</b>. Weakness: a one-time <b>scan/flood</b> (full table read) pushes all hot entries to the tail and evicts them — <i>cache pollution</i>.</p>
+    </div>
+    <div class="cx lfu">
+      <h3>LFU — Least Frequently Used</h3>
+      <div class="formula">freq buckets + minFreq pointer → O(1)</div>
+      <p>Each entry carries a <b>counter</b>; access does <code>++</code> and moves it to the next freq bucket. Evict the <b>tail of the <code>minFreq</code> bucket</b>. Naive "scan for lowest count" is <span class="big">O(N)</span> — buckets make it O(1).</p>
+      <p>Captures <b>long-term popularity</b> and resists scans (one-time reads stay at freq <code>1</code>). Weakness: <b>stale</b> once-popular entries get stuck → need <i>aging / decay</i> (W-TinyLFU).</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>"LRU is O(1) — how?"</b> Not a plain hash map. You need <b>hash map + doubly linked list together</b>: map gives <code>key → node</code> in O(1), the <b>doubly</b> linked list makes detach + move-to-head + tail-eviction O(1). A singly linked list would make detach O(N).</li>
+      <li><b>LRU vs LFU.</b> LRU = recency (<i>when</i> last used), LFU = frequency (<i>how often</i>). On a scan workload LRU pollutes, LFU holds; on shifting popularity LFU sticks on stale entries, LRU adapts.</li>
+      <li><b>"Naive LFU is O(1)" is wrong.</b> Finding the lowest count by scanning is O(N). True O(1) LFU = <b>per-frequency buckets + a <code>minFreq</code> pointer</b>; new entries enter at freq <code>1</code>, <code>minFreq = 1</code>.</li>
+      <li><b>Redis isn't exact.</b> <code>allkeys-lru</code> / <code>allkeys-lfu</code> use <b>sampling</b> (<code>maxmemory-samples</code>, default 5) — evict the oldest of N random keys, not the true global oldest. Linux page cache approximates LRU with <b>CLOCK / second-chance</b> (a reference bit).</li>
+      <li><b>Admission control.</b> Modern caches (Caffeine = <b>W-TinyLFU</b>) admit a new item only if a frequency sketch says it's more valuable than the victim — beating plain LRU's hit ratio.</li>
+      <li><b>Don't confuse with stampede.</b> Eviction = making room. <b>Stampede / thundering herd</b> = one hot key expiring and every request hitting origin at once → fixed by request coalescing, not by policy choice.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>A bounded cache must pick a victim when full. <b>LRU</b> bets on recency and gets O(1) from a <b>hash map + doubly linked list</b> (move-to-head on hit, drop the tail on overflow); <b>LFU</b> bets on frequency and gets O(1) from <b>freq buckets + a minFreq pointer</b>. Lifting the hit ratio even from 90%→95% halves origin load — so the policy choice directly drives tail latency and backend cost.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- geometry ----------
+  const NODE_W = 92, NODE_H = 56, NODE_Y = 220, GAP = 30, X0 = 30;
+  function nodeX(i) { return X0 + i * (NODE_W + GAP); }
+
+  // ---------- request stream ----------
+  // each op: key, and whether it ends up hit/miss is computed by the sim
+  const STREAM = ["a", "b", "c", "a", "d"];
+
+  // ====================================================================
+  // Build step lists for each policy by simulating the stream.
+  // A "frame" = a fully-described visual state + narration.
+  // Cache state is captured as an ORDERED array of nodes:
+  //   LRU: index 0 = head (MRU) ... last = tail (LRU)
+  //   LFU: nodes carry freq; ordering grouped by freq, lowest-freq last
+  // Each node: { key, freq }
+  // ====================================================================
+
+  function clone(arr) { return arr.map(n => ({ key: n.key, freq: n.freq })); }
+
+  // ---- LRU simulation ----
+  function buildLRU() {
+    const frames = [];
+    let cache = []; // index 0 = head/MRU
+    let hits = 0, miss = 0;
+
+    frames.push({
+      cache: [], reqKey: null, hits, miss,
+      hl: {}, narr: `<b>Empty cache, capacity C = 3.</b> Hash map and the doubly linked list are both empty. The list keeps entries in <b>recency order</b>: head = most-recently-used, tail = least-recently-used (the next victim).`,
+      cls: ""
+    });
+
+    for (const key of STREAM) {
+      const idx = cache.findIndex(n => n.key === key);
+      if (idx >= 0) {
+        // HIT: show found, then move to head
+        hits++;
+        frames.push({
+          cache: clone(cache), reqKey: key, hits, miss,
+          hl: { hit: key, mapHit: key },
+          narr: `<b>GET ${key} → HIT.</b> Hash map resolves <code>${key}</code> to its node in O(1). It's currently in the list; we just have to promote it to the front.`,
+          cls: "good"
+        });
+        const [node] = cache.splice(idx, 1);
+        cache.unshift(node);
+        frames.push({
+          cache: clone(cache), reqKey: key, hits, miss,
+          hl: { move: key },
+          narr: `<b>Splice &amp; move to head.</b> Detach <code>${key}</code> (fix its neighbours' prev/next) and relink it at the head — now most-recent. That's <b>2–3 pointer updates, O(1)</b>. No origin trip.`,
+          cls: "move"
+        });
+      } else {
+        // MISS
+        miss++;
+        const full = cache.length >= 3;
+        frames.push({
+          cache: clone(cache), reqKey: key, hits, miss,
+          hl: { missReq: key },
+          narr: `<b>GET ${key} → MISS.</b> Not in the hash map. Pay the slow origin trip (50–200&nbsp;ms) to fetch <code>${key}</code>, then insert it at the head.${full ? ` But the cache is <b>full</b> (size = C = 3) — we must evict first.` : ``}`,
+          cls: full ? "evict" : "move"
+        });
+        if (full) {
+          const victim = cache[cache.length - 1];
+          frames.push({
+            cache: clone(cache), reqKey: key, hits, miss,
+            hl: { evict: victim.key },
+            narr: `<b>Evict the tail.</b> <code>${victim.key}</code> is the least-recently-used (untouched longest) → drop it from the list and delete its hash-map key. This is why LRU loves a <b>doubly</b> linked list: tail removal is O(1).`,
+            cls: "evict"
+          });
+          cache.pop();
+        }
+        cache.unshift({ key, freq: 1 });
+        frames.push({
+          cache: clone(cache), reqKey: key, hits, miss,
+          hl: { insert: key, mapHit: key },
+          narr: `<b>Insert ${key} at head.</b> New node added to the front and registered in the hash map. It's now the most-recent entry; whatever sits at the tail becomes the next eviction candidate.`,
+          cls: "move"
+        });
+      }
+    }
+
+    frames.push({
+      cache: clone(cache), reqKey: null, hits, miss,
+      hl: {}, narr: `<b>Done.</b> Final order (head→tail): ${cache.map(n => `<code>${n.key}</code>`).join(" → ")}. Note <code>b</code> got evicted — even though it arrived after… because by the time <code>d</code> came, <code>b</code> was the stalest. <b>${hits} hits / ${miss} misses.</b>`,
+      cls: "good"
+    });
+    return frames;
+  }
+
+  // ---- LFU simulation ----
+  // ordering for display: sort by freq DESC then recency; tail (last) = min-freq victim
+  function lfuOrder(cache) {
+    // stable sort: higher freq first; within freq keep insertion recency (MRU first)
+    return cache.slice().sort((a, b) => b.freq - a.freq || a._r - b._r);
+  }
+  function buildLFU() {
+    const frames = [];
+    let cache = []; let hits = 0, miss = 0, rc = 0;
+
+    function ordered() { return lfuOrder(cache); }
+    function minFreq() { return cache.length ? Math.min(...cache.map(n => n.freq)) : 0; }
+
+    frames.push({
+      cache: [], reqKey: null, hits, miss,
+      hl: {}, lfu: true, minF: 0,
+      narr: `<b>Empty cache, capacity C = 3.</b> Each entry will carry a <b>frequency counter</b>. We display nodes grouped by frequency — highest-freq on the left, the <b>minFreq</b> bucket on the right (its tail is the victim).`,
+      cls: ""
+    });
+
+    for (const key of STREAM) {
+      const node = cache.find(n => n.key === key);
+      if (node) {
+        hits++;
+        frames.push({
+          cache: clone(ordered()), reqKey: key, hits, miss, lfu: true, minF: minFreq(),
+          hl: { hit: key, mapHit: key },
+          narr: `<b>GET ${key} → HIT.</b> Map finds <code>${key}</code> (freq ${node.freq}). On LFU a hit means <b>bump the counter</b> and move the node into the next frequency bucket.`,
+          cls: "good"
+        });
+        node.freq++; node._r = rc++;
+        frames.push({
+          cache: clone(ordered()), reqKey: key, hits, miss, lfu: true, minF: minFreq(),
+          hl: { move: key },
+          narr: `<b>freq++ → bucket move.</b> <code>${key}</code> jumps from bucket <code>${node.freq - 1}</code> to <code>${node.freq}</code>. If it was the only entry at the old minFreq, <code>minFreq</code> advances. All O(1) — no scan.`,
+          cls: "move"
+        });
+      } else {
+        miss++;
+        const full = cache.length >= 3;
+        frames.push({
+          cache: clone(ordered()), reqKey: key, hits, miss, lfu: true, minF: minFreq(),
+          hl: { missReq: key },
+          narr: `<b>GET ${key} → MISS.</b> Fetch <code>${key}</code> from origin.${full ? ` Cache is <b>full</b> — evict from the <b>minFreq</b> bucket first.` : ``}`,
+          cls: full ? "evict" : "move"
+        });
+        if (full) {
+          const mf = minFreq();
+          // victim = tail (least recent) of min-freq bucket
+          const cand = cache.filter(n => n.freq === mf).sort((a, b) => a._r - b._r);
+          const victim = cand[0];
+          frames.push({
+            cache: clone(ordered()), reqKey: key, hits, miss, lfu: true, minF: mf,
+            hl: { evict: victim.key },
+            narr: `<b>Evict minFreq tail.</b> Lowest counter is freq <code>${mf}</code>; its least-recent member <code>${victim.key}</code> loses. A once-read entry sits at freq <code>1</code> forever — that's how LFU <b>resists scans</b>.`,
+            cls: "evict"
+          });
+          cache = cache.filter(n => n.key !== victim.key);
+        }
+        cache.push({ key, freq: 1, _r: rc++ });
+        frames.push({
+          cache: clone(ordered()), reqKey: key, hits, miss, lfu: true, minF: 1,
+          hl: { insert: key, mapHit: key },
+          narr: `<b>Insert ${key} at freq 1.</b> Brand-new entries always start at frequency <code>1</code>, so <code>minFreq</code> resets to <code>1</code>. This is why a freshly-inserted item is itself the most likely next victim.`,
+          cls: "move"
+        });
+      }
+    }
+
+    const fin = ordered();
+    frames.push({
+      cache: clone(fin), reqKey: null, hits, miss, lfu: true, minF: minFreq(),
+      hl: {}, narr: `<b>Done.</b> Final by frequency: ${fin.map(n => `<code>${n.key}</code>:${n.freq}`).join(", ")}. Here <code>a</code> survived (freq 2) while a freq-1 entry was evicted for <code>d</code> — frequency, not recency, decided. <b>${hits} hits / ${miss} misses.</b>`,
+      cls: "good"
+    });
+    return frames;
+  }
+
+  const STEPS = { lru: buildLRU(), lfu: buildLFU() };
+
+  // ---------- DOM ----------
+  const svgNS = "http://www.w3.org/2000/svg";
+  const gReq = document.getElementById("g-req");
+  const gMap = document.getElementById("g-map");
+  const gLinks = document.getElementById("g-links");
+  const gNodes = document.getElementById("g-nodes");
+  const lblList = document.getElementById("lbl-list");
+  const lblMap = document.getElementById("lbl-map");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vCap = document.getElementById("v-cap");
+  const vSize = document.getElementById("v-size");
+  const vHits = document.getElementById("v-hits");
+  const vMiss = document.getElementById("v-miss");
+  const vl1 = document.getElementById("vl-1");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+  const toggle = document.getElementById("toggle");
+
+  function el(tag, attrs, text) {
+    const e = document.createElementNS(svgNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  let policy = "lru";
+  let cursor = 0;
+
+  function render() {
+    const frames = STEPS[policy];
+    const s = frames[cursor];
+    gReq.innerHTML = ""; gMap.innerHTML = ""; gLinks.innerHTML = ""; gNodes.innerHTML = "";
+
+    lblList.textContent = s.lfu
+      ? "frequency buckets  (high-freq ← → minFreq tail = victim)"
+      : "doubly linked list  (MRU head → LRU tail)";
+    lblMap.textContent = "hash map  key → node";
+
+    const hl = s.hl || {};
+
+    // ---- request token ----
+    if (s.reqKey) {
+      const litMap = hl.missReq ? false : true;
+      const g = el("g", { class: "req" });
+      g.appendChild(el("circle", { cx: 70, cy: 44, r: 17 }));
+      g.appendChild(el("text", { x: 70, y: 48, "text-anchor": "middle" }, s.reqKey));
+      const status = hl.hit ? "HIT" : hl.missReq ? "MISS" : "";
+      if (status) {
+        g.appendChild(el("text", {
+          x: 96, y: 48, "font-size": 12, "font-weight": 700,
+          fill: status === "HIT" ? "#10b981" : "#f59e0b",
+          "font-family": '"SF Mono", Menlo, monospace'
+        }, status));
+      }
+      // arrow down toward map
+      gReq.appendChild(g);
+    }
+
+    // ---- hash map (mini) : show one slot per cached key ----
+    const mapY = 100, cellW = 86, cellH = 34, mapX0 = 30, mapGap = 8;
+    s.cache.forEach((n, i) => {
+      const x = mapX0 + i * (cellW + mapGap);
+      let cls = "hm-cell";
+      if (hl.mapHit === n.key || hl.insert === n.key) cls += " lit";
+      if (hl.evict === n.key) cls += " gone";
+      const g = el("g", { class: "hm-row" });
+      g.appendChild(el("rect", { class: cls, x, y: mapY, width: cellW, height: cellH, rx: 5 }));
+      g.appendChild(el("text", { class: "hm-key", x: x + 9, y: mapY + 15 }, n.key));
+      g.appendChild(el("text", { class: "hm-val", x: x + 9, y: mapY + 28 }, "→ node"));
+      gMap.appendChild(g);
+      // dashed link from map slot down to its node (same column)
+      const nx = nodeX(i) + NODE_W / 2;
+      const ml = el("g", { class: "map-arrow" });
+      ml.appendChild(el("line", { x1: x + cellW / 2, y1: mapY + cellH, x2: nx, y2: NODE_Y - 6 }));
+      gMap.appendChild(ml);
+    });
+
+    // ---- nodes (list / buckets) ----
+    s.cache.forEach((n, i) => {
+      const x = nodeX(i);
+      let cls = "node";
+      if (!s.lfu) {
+        if (i === 0) cls += " head";
+        if (i === s.cache.length - 1 && s.cache.length > 1) cls += " tail";
+      } else {
+        // tail = victim candidate (last in ordered list = min freq, least recent)
+        if (i === s.cache.length - 1 && s.cache.length > 1) cls += " tail";
+        if (i === 0 && s.cache.length > 1) cls += " head";
+      }
+      if (hl.move === n.key || hl.insert === n.key) cls += " moving";
+      if (hl.evict === n.key) cls += " evicting";
+
+      const g = el("g", { class: cls });
+      g.appendChild(el("rect", { class: "box", x, y: NODE_Y, width: NODE_W, height: NODE_H, rx: 8 }));
+      g.appendChild(el("text", { class: "key", x: x + NODE_W / 2, y: NODE_Y + 26, "text-anchor": "middle" }, n.key));
+      const meta = s.lfu ? `freq ${n.freq}` : (i === 0 ? "MRU" : (i === s.cache.length - 1 ? "LRU" : ""));
+      g.appendChild(el("text", { class: "meta", x: x + NODE_W / 2, y: NODE_Y + 44, "text-anchor": "middle" }, meta));
+      gNodes.appendChild(g);
+
+      // doubly-linked pointers between adjacent nodes
+      if (i < s.cache.length - 1) {
+        const xr = x + NODE_W, xn = nodeX(i + 1);
+        // next pointer (top)
+        gLinks.appendChild(el("path", { class: "ptr", d: `M ${xr} ${NODE_Y + 20} L ${xn} ${NODE_Y + 20}` }));
+        // prev pointer (bottom)
+        gLinks.appendChild(el("path", { class: "ptr", d: `M ${xn} ${NODE_Y + 38} L ${xr} ${NODE_Y + 38}` }));
+      }
+    });
+
+    // empty hint
+    if (s.cache.length === 0) {
+      gNodes.appendChild(el("text", {
+        x: 200, y: NODE_Y + 32, fill: "#555577", "font-size": 14,
+        "font-family": '"SF Mono", Menlo, monospace'
+      }, "(empty)"));
+    }
+
+    // ---- side stats ----
+    vCap.textContent = 3;
+    vSize.textContent = s.cache.length;
+    vHits.textContent = s.hits;
+    vMiss.textContent = s.miss;
+    vl1.textContent = s.lfu ? "minFreq" : "Capacity C";
+    if (s.lfu) { vCap.textContent = s.minF; vCap.className = "value amber"; }
+    else { vCap.textContent = 3; vCap.className = "value"; }
+
+    // ---- narration ----
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor} / ${frames.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === frames.length - 1;
+  }
+
+  function next() { const f = STEPS[policy]; if (cursor < f.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  toggle.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    policy = b.dataset.policy;
+    [...toggle.children].forEach(c => c.classList.toggle("active", c === b));
+    cursor = 0;
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

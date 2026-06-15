@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Distributed Locks — Lease, Crash &amp; the Fencing Token</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  /* sequence SVG */
+  .seq-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 540px; height: auto; }
+  .lifeline { stroke: #3a3a5c; stroke-width: 2; stroke-dasharray: 4 4; }
+  .actor-box rect { transition: all .3s ease; }
+  .actor-box text { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 13px; fill: #fff; }
+  .actor-sub { fill: #c8c8d8; font-size: 10px; font-weight: 400; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .msg { transition: opacity .4s ease; }
+  .msg-line { stroke-width: 2.5; }
+  .msg-label {
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10.5px; fill: #d0d0e0;
+  }
+  .msg-arrowhead { stroke: none; }
+
+  /* lock state token on the LM lifeline */
+  .lockstate { transition: all .4s ease; }
+  .lockstate text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10px; font-weight: 700; }
+
+  /* crash / pause markers */
+  .crash text { font-size: 18px; }
+  .pausebar { opacity: .9; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+  .var .value.grey { color: #8888aa; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.warn { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.consistent { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.consistent h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 20px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.consistent .big { color: #10b981; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Distributed Locks — Lease, Crash &amp; the Fencing Token</h1>
+  <div class="subtitle">How multiple machines agree that <b>only one of them</b> may touch a shared resource at a time — using an atomic <code>SET NX PX</code> lock, a self-expiring <b>lease (TTL)</b> so a crash can't deadlock forever, and a <b>fencing token</b> that stays safe even when a paused client wrongly thinks it still holds the lock.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the single conference-room key</h3>
+    <p>One office, one conference room, and a <b>single physical key</b> at reception. Any team that wants the room must first grab that key — everyone else waits, no matter how senior. Meeting done, key goes back, next team's turn. The twist: if a team walks out mid-meeting <i>still holding the key</i> (a <b>process crash</b>), the room is locked forever. So the key is stamped <b>"valid for 30 seconds"</b> — a <b>lease</b>. After it expires the key auto-returns to reception, so the system heals itself even when someone vanishes.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">acquire:</span><code>SET order:123 &lt;token&gt; NX PX 30000</code> &nbsp; (atomic: set only if absent, 30s TTL)</div>
+    <div class="row"><span class="label">release:</span><code>if GET == token then DEL</code> &nbsp; (atomic compare-and-delete via Lua)</div>
+    <div class="row"><span class="label">safety:</span><code>resource rejects any write whose fencing token &lt; highest seen</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="seq-holder">
+      <svg viewBox="0 0 540 470" id="seq">
+        <defs>
+          <marker id="ah-blue" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L7,3 L0,6 Z" fill="#3b82f6" class="msg-arrowhead"/>
+          </marker>
+          <marker id="ah-green" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L7,3 L0,6 Z" fill="#10b981" class="msg-arrowhead"/>
+          </marker>
+          <marker id="ah-amber" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L7,3 L0,6 Z" fill="#f59e0b" class="msg-arrowhead"/>
+          </marker>
+          <marker id="ah-red" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L7,3 L0,6 Z" fill="#ef4444" class="msg-arrowhead"/>
+          </marker>
+          <marker id="ah-grey" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L7,3 L0,6 Z" fill="#8888aa" class="msg-arrowhead"/>
+          </marker>
+        </defs>
+
+        <!-- lifelines -->
+        <line class="lifeline" x1="80"  y1="64" x2="80"  y2="450" />
+        <line class="lifeline" x1="270" y1="64" x2="270" y2="450" />
+        <line class="lifeline" x1="460" y1="64" x2="460" y2="450" />
+
+        <!-- actor headers -->
+        <g class="actor-box">
+          <rect x="20" y="30" width="120" height="30" rx="6" fill="#3b82f6" />
+          <text x="80" y="49" text-anchor="middle">Client A</text>
+        </g>
+        <g class="actor-box">
+          <rect x="205" y="30" width="130" height="30" rx="6" fill="#8b5cf6" />
+          <text x="270" y="45" text-anchor="middle">Lock Manager</text>
+          <text x="270" y="56" text-anchor="middle" class="actor-sub">Redis / etcd</text>
+        </g>
+        <g class="actor-box">
+          <rect x="395" y="30" width="130" height="30" rx="6" fill="#06b6d4" />
+          <text x="460" y="45" text-anchor="middle">Shared Resource</text>
+          <text x="460" y="56" text-anchor="middle" class="actor-sub">DB / storage</text>
+        </g>
+
+        <!-- second client appears later -->
+        <g id="clientB" style="display:none">
+          <line class="lifeline" x1="80" y1="300" x2="80" y2="450" stroke="#ec4899" stroke-dasharray="4 4"/>
+          <g class="actor-box">
+            <rect x="20" y="280" width="120" height="26" rx="6" fill="#ec4899" />
+            <text x="80" y="297" text-anchor="middle">Client B</text>
+          </g>
+        </g>
+
+        <!-- dynamic messages, lock-state badge, markers injected here -->
+        <g id="g-msgs"></g>
+        <g id="g-state"></g>
+        <g id="g-marks"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Lock state</div><div class="value grey" id="v-lock">free</div></div>
+        <div class="var"><div class="label">Holder</div><div class="value" id="v-holder">—</div></div>
+        <div class="var"><div class="label">Lease left</div><div class="value amber" id="v-ttl">—</div></div>
+        <div class="var"><div class="label">Fence token</div><div class="value green" id="v-token">—</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch round" style="background:#3b82f6"></span>Acquire / request message</div>
+        <div class="legend-item"><span class="swatch round" style="background:#10b981"></span>Granted / safe outcome</div>
+        <div class="legend-item"><span class="swatch round" style="background:#f59e0b"></span>Lease / TTL event</div>
+        <div class="legend-item"><span class="swatch round" style="background:#ef4444"></span>Crash / pause / rejected write</div>
+        <div class="legend-item"><span class="swatch round" style="background:#ec4899"></span>Second client (contender)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to walk through one lock's full lifecycle — then watch what happens when a holder pauses and a fencing token saves the day.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>Lease alone (no fencing)</h3>
+      <div class="formula">hold lock → assume single writer → write</div>
+      <p>A holder hits a long <b>GC pause</b> or network stall. Its 30s lease silently <b>expires</b>; the Lock Manager hands the lock to Client B. The paused client wakes up still believing it holds the lock and writes — now <span class="big">2 writers</span> clobber the resource. More Redis nodes (Redlock) does <b>not</b> fix this.</p>
+    </div>
+    <div class="cx consistent">
+      <h3>Lease + monotonic fencing token</h3>
+      <div class="formula">every grant carries token++ → resource keeps max(token)</div>
+      <p>A's grant carried <code>token=33</code>; B's grant carried <code>token=34</code>. The resource has already seen <code>34</code>, so A's stale <code>33</code> write is <span class="big">rejected</span>. Correctness no longer depends on clocks or timing — the resource itself enforces single-writer order.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Acquire must be atomic</b> — <code>SET key token NX PX 30000</code> in one round-trip. <code>NX</code> sets only if the key is absent (lock is free); <code>PX 30000</code> attaches a 30s TTL. A same-datacenter Redis acquire is ~sub-ms to 1-2 ms, so a service can do thousands of lock ops/sec.</li>
+      <li><b>Release must be compare-and-delete</b> — never plain <code>GET</code> then <code>DEL</code>. Between the two the lease can expire and pass to someone else, and you'd delete <i>their</i> lock. Use a Lua script: <code>if GET==token then DEL</code>.</li>
+      <li><b>TTL is mandatory</b> — without a lease, a crashed holder deadlocks the resource forever. Too short → a slow client's lease expires mid-work; too long → slow crash recovery. A <b>watchdog</b> thread renews (e.g. every 10s on a 30s TTL) for long jobs.</li>
+      <li><b>Redis (AP) vs ZooKeeper/etcd (CP)</b> — a single Redis node is a SPOF: async replication leaves a tiny window where two clients hold the lock. CP stores give linearizable locks via consensus (ZAB/Raft) at higher latency (single-digit to low double-digit ms). <b>Money/inventory → CP; pure efficiency → Redis is fine.</b></li>
+      <li><b>Fencing tokens beat "more nodes"</b> — Redlock does <i>not</i> guarantee safety under GC pauses or clock skew. The real fix is a monotonically increasing token the resource checks.</li>
+      <li><b>Used by</b> — Redisson (Java) on Redis, Google <b>Chubby</b> &amp; ZooKeeper for leader election, HashiCorp Consul/etcd sessions, Kubernetes <code>Lease</code> objects (its leader election runs on an etcd lease).</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>A distributed lock gives <b>mutual exclusion across machines</b> via an atomic acquire and a token-checked release — but a <b>lease/TTL</b> is what keeps a crash from deadlocking forever, and a <b>monotonic fencing token validated by the resource</b> is what keeps a paused-but-stale holder from corrupting data. Lock ≠ transaction: it only buys you "one writer at a time."</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- geometry ----------
+  const X = { A:80, LM:270, RES:460, B:80 };
+  const svgNS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(svgNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  const COL = { blue:"#3b82f6", green:"#10b981", amber:"#f59e0b", red:"#ef4444", grey:"#8888aa", pink:"#ec4899" };
+  const MARK = { blue:"ah-blue", green:"ah-green", amber:"ah-amber", red:"ah-red", grey:"ah-grey" };
+
+  // draw a horizontal message arrow at y, from fromX to toX, label above
+  function message(g, fromX, toX, y, color, label, dashed) {
+    const dir = toX > fromX ? -1 : 1;
+    el("line", {
+      class:"msg-line", x1:fromX, y1:y, x2:toX, y2:y,
+      stroke:COL[color], "stroke-dasharray": dashed ? "6 4" : "none",
+      "marker-end":`url(#${MARK[color]})`
+    }, g);
+    const midX = (fromX + toX) / 2;
+    const t = el("text", { class:"msg-label", x:midX, y:y-6, "text-anchor":"middle", fill:COL[color] }, g);
+    t.textContent = label;
+  }
+  // self-message loop (e.g. critical section / GC pause) on a lifeline at x, between y1 and y2
+  function selfLoop(g, x, y1, y2, color, label) {
+    const w = 26;
+    el("path", { d:`M ${x} ${y1} L ${x+w} ${y1} L ${x+w} ${y2} L ${x+4} ${y2}`,
+      fill:"none", stroke:COL[color], "stroke-width":2.5, "marker-end":`url(#${MARK[color]})` }, g);
+    const t = el("text", { class:"msg-label", x:x+w+8, y:(y1+y2)/2+3, fill:COL[color] }, g);
+    t.textContent = label;
+  }
+
+  // ---------- step definitions ----------
+  // each step: function that draws the cumulative diagram up to that point,
+  // plus side-panel state + narration.
+  const steps = [
+    {
+      narr:`<b>0. The cast.</b> <b>Client A</b> wants to touch a <b>Shared Resource</b> (a DB row, a file, an external API) that can't tolerate two writers at once. The <b>Lock Manager</b> (Redis or etcd) is the neutral "reception desk" that hands out the single key. Time flows top-to-bottom.`,
+      cls:"", lock:["free","grey"], holder:["—",""], ttl:["—",""], token:["—",""],
+      showB:false, draw(g){ /* just lifelines */ }
+    },
+    {
+      narr:`<b>1. Acquire.</b> A sends <code>SET order:123 &lt;tokenA&gt; NX PX 30000</code> — one atomic round-trip. <code>NX</code> = set only if the key is absent (lock free); <code>PX 30000</code> = a <b>30s lease</b>. <code>&lt;tokenA&gt;</code> is a random UUID only A knows.`,
+      cls:"", lock:["acquiring…","amber"], holder:["—",""], ttl:["—",""], token:["—",""],
+      showB:false,
+      draw(g){ message(g, X.A, X.LM, 100, "blue", "SET …NX PX 30000"); }
+    },
+    {
+      narr:`<b>2. Granted + lease starts.</b> The key was free, so the <code>SET</code> succeeds. The Lock Manager replies <b>OK</b> and starts a 30s countdown. It also hands A a <b>fencing token = 33</b> — a number that only ever increases across grants.`,
+      cls:"good", lock:["held","green"], holder:["A","green"], ttl:["30s","amber"], token:["33","green"],
+      showB:false,
+      draw(g){
+        message(g, X.A, X.LM, 100, "blue", "SET …NX PX 30000");
+        message(g, X.LM, X.A, 128, "green", "OK + token=33");
+      }
+    },
+    {
+      narr:`<b>3. Critical section.</b> A now does its real work — decrement inventory, process a payment — inside a guaranteed single-writer window. When A writes to the resource it stamps the write with its <b>token 33</b>; the resource records <code>max seen = 33</code> and accepts it.`,
+      cls:"good", lock:["held","green"], holder:["A","green"], ttl:["~24s","amber"], token:["33","green"],
+      showB:false,
+      draw(g){
+        message(g, X.A, X.LM, 100, "blue", "SET …NX PX 30000");
+        message(g, X.LM, X.A, 128, "green", "OK + token=33");
+        selfLoop(g, X.A, 150, 184, "blue", "do work (critical section)");
+        message(g, X.A, X.RES, 206, "green", "write [token=33]  ✓ accepted");
+      }
+    },
+    {
+      narr:`<b>4. Happy-path release.</b> Done early, A releases with an <b>atomic compare-and-delete</b>: a Lua script that deletes the key <i>only if</i> its value still equals <code>tokenA</code>. This prevents A from deleting a lock that already expired and passed to someone else.`,
+      cls:"good", lock:["free","grey"], holder:["—",""], ttl:["—",""], token:["33 (last)","green"],
+      showB:false,
+      draw(g){
+        message(g, X.A, X.LM, 100, "blue", "SET …NX PX 30000");
+        message(g, X.LM, X.A, 128, "green", "OK + token=33");
+        selfLoop(g, X.A, 150, 184, "blue", "do work (critical section)");
+        message(g, X.A, X.RES, 206, "green", "write [token=33]  ✓ accepted");
+        message(g, X.A, X.LM, 246, "blue", "if GET==token then DEL");
+        message(g, X.LM, X.A, 270, "green", "released ✓");
+      }
+    },
+    {
+      narr:`<b>5. The danger path: A stalls.</b> Rewind — this time, right after acquiring, A's process freezes in a long <b>GC pause</b> (or a network stall) lasting longer than the lease. A is still convinced it holds the lock, but it isn't running.`,
+      cls:"warn", lock:["held","green"], holder:["A (paused)","amber"], ttl:["expiring…","red"], token:["33","green"],
+      showB:false,
+      draw(g){
+        message(g, X.A, X.LM, 100, "blue", "SET …NX PX 30000");
+        message(g, X.LM, X.A, 128, "green", "OK + token=33");
+        // pause bar on A
+        el("rect", { class:"pausebar", x:X.A-9, y:150, width:18, height:70, rx:4, fill:"#ef4444", opacity:0.85 }, g);
+        const t = el("text", { class:"msg-label", x:X.A+16, y:188, fill:"#fca5a5" }, g); t.textContent="GC pause (long)";
+      }
+    },
+    {
+      narr:`<b>6. Lease expires → B acquires.</b> The 30s TTL elapses while A is frozen, so the Lock Manager auto-releases the key — the safety net against permanent deadlock. <b>Client B</b> acquires cleanly and gets the <b>next token = 34</b>.`,
+      cls:"warn", lock:["held by B","green"], holder:["B","green"], ttl:["30s","amber"], token:["34","green"],
+      showB:true,
+      draw(g){
+        message(g, X.A, X.LM, 100, "blue", "SET …NX PX 30000");
+        message(g, X.LM, X.A, 128, "green", "OK + token=33");
+        el("rect", { class:"pausebar", x:X.A-9, y:150, width:18, height:170, rx:4, fill:"#ef4444", opacity:0.85 }, g);
+        const t = el("text", { class:"msg-label", x:X.A+16, y:170, fill:"#fca5a5" }, g); t.textContent="still paused…";
+        el("line", { x1:X.LM-34, y1:296, x2:X.LM+34, y2:296, stroke:COL.amber, "stroke-width":2, "stroke-dasharray":"3 3" }, g);
+        const e = el("text", { class:"msg-label", x:X.LM, y:289, "text-anchor":"middle", fill:COL.amber }, g);
+        e.textContent="⏰ lease expired → auto-release";
+        message(g, X.B, X.LM, 330, "blue", "SET …NX PX (now free)");
+        message(g, X.LM, X.B, 354, "green", "OK + token=34");
+      }
+    },
+    {
+      narr:`<b>7. The split-brain moment.</b> A finally wakes up, oblivious that its lease expired, and fires a write — believing it's the single writer. So does B. Two clients now think they hold the lock at once. A bigger Redlock cluster would <b>not</b> have prevented this.`,
+      cls:"bad", lock:["held by B","green"], holder:["B (+ stale A)","red"], ttl:["~22s","amber"], token:["A=33, B=34","amber"],
+      showB:true,
+      draw(g){
+        message(g, X.LM, X.A, 128, "green", "OK + token=33");
+        el("rect", { class:"pausebar", x:X.A-9, y:150, width:18, height:200, rx:4, fill:"#ef4444", opacity:0.7 }, g);
+        const e = el("text", { class:"msg-label", x:X.LM, y:289, "text-anchor":"middle", fill:COL.amber }, g);
+        e.textContent="⏰ lease expired";
+        message(g, X.LM, X.B, 354, "green", "OK + token=34");
+        // B writes
+        message(g, X.B, X.RES, 384, "green", "write [token=34]  ✓");
+        // A wakes & writes (stale)
+        message(g, X.A, X.RES, 414, "red", "write [token=33]  (stale!)", true);
+        const w = el("text", { class:"crash", x:X.A, y:148, "text-anchor":"middle" }, g); w.textContent="⚡";
+      }
+    },
+    {
+      narr:`<b>8. Fencing token saves it.</b> The resource already accepted token <b>34</b> from B, so it keeps <code>max seen = 34</code>. A's late write carries the smaller token <b>33</b> → <span style="color:#ef4444"><b>rejected</b></span>. No clock, no timing, no extra Redis nodes — the <b>resource itself</b> enforces single-writer order. This is the only real fix for the GC-pause problem.`,
+      cls:"good", lock:["held by B","green"], holder:["B","green"], ttl:["~22s","amber"], token:["max=34","green"],
+      showB:true,
+      draw(g){
+        message(g, X.LM, X.B, 354, "green", "OK + token=34");
+        message(g, X.B, X.RES, 384, "green", "write [token=34]  ✓ accepted");
+        message(g, X.A, X.RES, 414, "red", "write [token=33]  ✗ REJECTED", true);
+        // big check / cross
+        const ok = el("text", { x:X.RES+4, y:384, fill:COL.green, "font-size":"16px", "font-weight":"700" }, g); ok.textContent="✓";
+        const no = el("text", { x:X.RES+4, y:418, fill:COL.red, "font-size":"16px", "font-weight":"700" }, g); no.textContent="✗";
+        const lbl = el("text", { class:"msg-label", x:X.RES, y:438, "text-anchor":"middle", fill:COL.green }, g);
+        lbl.textContent="resource keeps max(token)=34";
+      }
+    }
+  ];
+
+  // ---------- DOM ----------
+  const gMsgs = document.getElementById("g-msgs");
+  const clientB = document.getElementById("clientB");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vLock = document.getElementById("v-lock");
+  const vHolder = document.getElementById("v-holder");
+  const vTtl = document.getElementById("v-ttl");
+  const vToken = document.getElementById("v-token");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  let cursor = 0;
+  function setVar(node, val, cls) {
+    node.textContent = val;
+    node.className = "value" + (cls ? " " + cls : "");
+  }
+
+  function render() {
+    const s = steps[cursor];
+    gMsgs.innerHTML = "";
+    clientB.style.display = s.showB ? "" : "none";
+    s.draw(gMsgs);
+
+    setVar(vLock, s.lock[0], s.lock[1]);
+    setVar(vHolder, s.holder[0], s.holder[1]);
+    setVar(vTtl, s.ttl[0], s.ttl[1]);
+    setVar(vToken, s.token[0], s.token[1]);
+
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

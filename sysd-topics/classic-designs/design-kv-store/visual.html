@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Distributed Key-Value Store — Quorum Read/Write Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+  .analogy i { color: #c8c8d8; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  /* Ring SVG */
+  .ring-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 500px; height: auto; }
+  .ring-line { fill: none; stroke: #3a3a5c; stroke-width: 6; }
+  .ring-tick { stroke: #2d2d50; stroke-width: 1; }
+  .ring-label { fill: #666680; font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .clock-arrow { fill: #555577; }
+
+  .node circle { transition: all .4s ease; }
+  .node text { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 13px; fill: #fff; }
+  .node .sub { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8px; font-weight: 700; }
+
+  .key circle { transition: all .5s ease; }
+  .key text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #1a1a2e; font-weight: 700; }
+
+  .msg { transition: opacity .3s ease; }
+  .reply-arc { fill: none; stroke-width: 3.5; opacity: .9; }
+
+  .coordinator-ring { fill: none; stroke: #fbbf24; stroke-width: 2.5; stroke-dasharray: 4 4; opacity: .9; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.ring-sw { border-radius: 50%; }
+  .swatch.line { height: 4px; border-radius: 2px; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.warn { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* quorum math panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.strong { background: #14321f; border: 1px solid #10b981; }
+  .cx.fast { background: #2a2410; border: 1px solid #f59e0b; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.strong h3 { color: #6ee7b7; }
+  .cx.fast h3 { color: #fcd34d; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 20px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.strong .big { color: #10b981; }
+  .cx.fast .big { color: #f59e0b; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+  .takeaway code { background: #00000033; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Distributed Key-Value Store — The Quorum Read/Write Path</h1>
+  <div class="subtitle">A peer-to-peer, <b>Dynamo-style</b> store: any node can coordinate, keys live on the next <code>N</code> nodes clockwise on a consistent-hash ring, and a tunable <code>R</code>/<code>W</code> <b>quorum</b> decides how many replicas must answer before the client hears "done". Watch one <code>put</code> and one <code>get</code> travel the ring — including a node failure.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — sending a memo to a committee</h3>
+    <p>You hand a memo to <b>any</b> staff member you bump into — they become the <b>coordinator</b> for your request. The memo is filed in <b>3 identical cabinets</b> (the replicas, <i>N=3</i>) kept in different rooms for safety. You don't wait for all three clerks to confirm; you leave as soon as <b>any 2 of them</b> shout "filed!" (the write quorum, <i>W=2</i>). Later, to read it back, you ask all three and accept the answer once <b>2 reply</b> (<i>R=2</i>). Because the 2 who confirmed your write and the 2 who answer your read must <b>share at least one clerk</b> (<code>2 + 2 &gt; 3</code>), that overlapping clerk is guaranteed to be holding the newest copy — so you never read stale. If a clerk is out sick, a stand-in takes the memo with a sticky note (<b>hinted handoff</b>) and passes it along when they're back.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">ring:</span><code>hash(key) → owner = next node clockwise; replicas = next N-1 too</code></div>
+    <div class="row"><span class="label">config:</span><code>N=3 (replicas)</code> &nbsp; <code>W=2 (write quorum)</code> &nbsp; <code>R=2 (read quorum)</code></div>
+    <div class="row"><span class="label">rule:</span><code>R + W &gt; N  ⇒  read &amp; write quorums overlap ⇒ no stale read</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="ring-holder">
+      <svg viewBox="0 0 400 400" id="ring">
+        <circle class="ring-line" cx="200" cy="200" r="150" />
+        <line class="ring-tick" x1="200" y1="42" x2="200" y2="58" />
+        <text class="ring-label" x="200" y="34" text-anchor="middle">0 / 2³²</text>
+        <text class="ring-label" x="372" y="204" text-anchor="middle">2³⁰</text>
+        <text class="ring-label" x="200" y="378" text-anchor="middle">2³¹</text>
+        <text class="ring-label" x="28" y="204" text-anchor="middle">3·2³⁰</text>
+        <path class="clock-arrow" d="M250 64 l10 -3 l-2 10 z" />
+        <text class="ring-label" x="262" y="78">clockwise →</text>
+
+        <g id="g-arc"></g>
+        <g id="g-msg"></g>
+        <g id="g-keys"></g>
+        <g id="g-nodes"></g>
+        <!-- client sits in the centre -->
+        <g id="g-client"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Replicas N</div><div class="value" id="v-n">3</div></div>
+        <div class="var"><div class="label">Quorum need</div><div class="value amber" id="v-need">—</div></div>
+        <div class="var"><div class="label">Acks got</div><div class="value green" id="v-acks">0</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch ring-sw" style="background:#3b82f6"></span>Storage node (LSM-tree on disk)</div>
+        <div class="legend-item"><span class="swatch ring-sw" style="background:#fbbf24"></span>Coordinator (got the client request)</div>
+        <div class="legend-item"><span class="swatch ring-sw" style="background:#10b981"></span>Replica acked / answered</div>
+        <div class="legend-item"><span class="swatch ring-sw" style="background:#ef4444"></span>Down node (hinted handoff)</div>
+        <div class="legend-item"><span class="swatch line" style="background:#3b82f6"></span>Request fan-out to replicas</div>
+        <div class="legend-item"><span class="swatch line" style="background:#10b981"></span>Reply (ack / value) back</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to begin: a client issues <code>put("cart42", …)</code>.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx strong">
+      <h3>Tuned for consistency &nbsp; N=3, R=2, W=2</h3>
+      <div class="formula">R + W = 2 + 2 = 4 &gt; N = 3 ✓</div>
+      <p>Write and read quorums always share <span class="big">≥1 replica</span>, so a read is guaranteed to touch the freshest copy — <b>read-your-writes</b>. Latency = the 2nd-fastest replica, so one slow/dead node never blocks you. The repo's default.</p>
+    </div>
+    <div class="cx fast">
+      <h3>Tuned for speed &nbsp; W=1, R=1</h3>
+      <div class="formula">R + W = 1 + 1 = 2 &gt; N = 3 ✗</div>
+      <p>Ack after a <span class="big">single</span> replica — lowest possible latency and "always writable", but quorums may <b>not overlap</b>, so a read can return <b>stale</b> data until anti-entropy catches up. This is the AP, eventually-consistent end of the dial.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Why peer-to-peer?</b> No single master = no single bottleneck or SPOF. <b>Any</b> node can coordinate; a smart client hashes the key itself and hits a replica directly, saving a hop.</li>
+      <li><b>Hinted handoff</b> — if a replica is down at write time, the coordinator stores the write on a healthy stand-in <i>with a hint</i>. Writes stay available (the <code>W</code> quorum still completes); the hint is replayed when the node returns.</li>
+      <li><b>Read-repair</b> — when a read finds replicas disagreeing on <code>version</code>, the coordinator pushes the newest value to the stale replicas in the background, so divergence self-heals on the hot path.</li>
+      <li><b>Conflicts</b> — concurrent writes are tracked with <b>vector clocks</b>; causally-ordered ones auto-resolve, truly-concurrent ones are returned to the client (or resolved last-write-wins by timestamp).</li>
+      <li><b>Anti-entropy</b> — replicas periodically compare <b>Merkle trees</b> and stream only the divergent key ranges, reconciling without scanning all data.</li>
+      <li><b>Storage engine</b> — each node persists with an <b>LSM-tree</b> (commit log → memtable → SSTables + compaction), tuned for high write throughput; Bloom filters skip absent keys on reads.</li>
+      <li><b>Used by</b> — Amazon <b>DynamoDB</b>, Apache <b>Cassandra</b>, Riak — all consistent-hash + quorum + gossip membership.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>A distributed KV store places each key on the <b>next N nodes clockwise</b> on a consistent-hash ring, then lets you dial consistency with a quorum: acknowledge a write after <code>W</code> replicas and a read after <code>R</code>. Pick <code>R + W &gt; N</code> (e.g. <code>N=3, R=2, W=2</code>) and the two quorums always overlap, guaranteeing fresh reads — while <b>hinted handoff</b> and <b>read-repair</b> keep the system writable and self-healing when nodes fail.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const CX = 200, CY = 200, R = 150;
+  function pos(angleDeg, radius) {
+    const a = (angleDeg - 90) * Math.PI / 180;
+    return { x: CX + radius * Math.cos(a), y: CY + radius * Math.sin(a) };
+  }
+  function arcPath(fromDeg, toDeg, radius) {
+    let sweep = toDeg - fromDeg;
+    while (sweep < 0) sweep += 360;
+    const large = sweep > 180 ? 1 : 0;
+    const p1 = pos(fromDeg, radius), p2 = pos(toDeg, radius);
+    return `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} A ${radius} ${radius} 0 ${large} 1 ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // ---------- model ----------
+  // 6 storage nodes on the ring
+  const NODES = [
+    { id:"A", deg: 30 },
+    { id:"B", deg: 90 },
+    { id:"C", deg: 150 },
+    { id:"D", deg: 210 },
+    { id:"E", deg: 270 },
+    { id:"F", deg: 330 },
+  ];
+  const byId = Object.fromEntries(NODES.map(n => [n.id, n]));
+
+  // the key we operate on. hash sits just before B clockwise, so:
+  // owner = B; replicas (next N clockwise) = B, C, D.
+  const KEY = { id:"cart42", deg: 72 };
+  const REPLICAS = ["B", "C", "D"];          // top-N clockwise from key
+  // coordinator: any node receives it; let's say A (then forwards to replicas).
+  const COORD = "A";
+
+  // ---------- steps ----------
+  // node "state" per step keyed by id: "idle"|"coord"|"replica"|"acked"|"down"|"stale"
+  // msgs: list of {from,to,kind:"req"|"reply", label}
+  const steps = [];
+
+  steps.push({
+    title: "put",
+    state: { [COORD]:"coord" },
+    showKey: true, showHint: false,
+    need: "—", acks: 0,
+    narr: `<b>1. Client → coordinator.</b> The client sends <code>put("cart42", …)</code> to whatever node it can reach — node <b>A</b>. A becomes the <b>coordinator</b> for this request. A smart client could skip this hop by hashing the key itself, but any node will happily forward.`,
+    cls: ""
+  });
+
+  steps.push({
+    title: "put",
+    state: { [COORD]:"coord", B:"replica", C:"replica", D:"replica" },
+    showKey: true, showHint: false, showReplicaSpan: true,
+    need: "W=2", acks: 0,
+    narr: `<b>2. Find the replicas.</b> A computes <code>hash("cart42")</code> → a point on the ring. The owner is the first node clockwise (<b>B</b>), and the key is replicated on the next <code>N=3</code> nodes clockwise: <b>B, C, D</b>. These are the only nodes that will ever store this key.`,
+    cls: ""
+  });
+
+  steps.push({
+    title: "put",
+    state: { [COORD]:"coord", B:"replica", C:"replica", D:"replica" },
+    showKey: true, showHint: false, showReplicaSpan: true,
+    msgs: REPLICAS.map(id => ({ from: COORD, to: id, kind: "req" })),
+    need: "W=2", acks: 0,
+    narr: `<b>3. Fan out the write.</b> A sends the write to <b>all N=3 replicas in parallel</b>. Each replica appends to its commit log + memtable (LSM-tree) for durability. A is now waiting for acknowledgements — but it will <b>not</b> wait for all three.`,
+    cls: ""
+  });
+
+  steps.push({
+    title: "put",
+    state: { [COORD]:"coord", B:"acked", C:"acked", D:"replica" },
+    showKey: true, showHint: false, showReplicaSpan: true,
+    msgs: ["B","C"].map(id => ({ from: id, to: COORD, kind: "reply" })),
+    need: "W=2", acks: 2,
+    narr: `<b>4. Write quorum reached (W=2).</b> As soon as <b>2 of 3</b> replicas ack (B and C), A returns <b>success</b> to the client. D's ack is still in flight — that's fine, it converges asynchronously. Latency = the 2nd-fastest replica, so one slow node never blocks the write.`,
+    cls: "good"
+  });
+
+  steps.push({
+    title: "get",
+    state: { B:"replica", C:"replica", D:"replica", [COORD]:"coord" },
+    showKey: true, showHint: false, showReplicaSpan: true,
+    need: "R=2", acks: 0,
+    narr: `<b>5. Now a get.</b> Later the client issues <code>get("cart42")</code>, again landing on coordinator A. A finds the same replica set <b>B, C, D</b> and prepares to read with quorum <code>R=2</code>.`,
+    cls: ""
+  });
+
+  steps.push({
+    title: "get",
+    state: { B:"replica", C:"replica", D:"replica", [COORD]:"coord" },
+    showKey: true, showHint: false, showReplicaSpan: true,
+    msgs: REPLICAS.map(id => ({ from: COORD, to: id, kind: "req" })),
+    need: "R=2", acks: 0,
+    narr: `<b>6. Fan out the read.</b> A asks all 3 replicas for the value <i>and its <code>version</code></i> (vector clock). It only needs <code>R=2</code> to reply before answering the client.`,
+    cls: ""
+  });
+
+  steps.push({
+    title: "get",
+    state: { B:"acked", C:"acked", D:"stale", [COORD]:"coord" },
+    showKey: true, showHint: false, showReplicaSpan: true,
+    msgs: ["B","C"].map(id => ({ from: id, to: COORD, kind: "reply" })),
+    need: "R=2", acks: 2,
+    narr: `<b>7. Read quorum + overlap guarantee.</b> B and C answer (R=2 met). Because the write quorum {B,C} and the read quorum {B,C} <b>must overlap</b> (<code>R+W &gt; N</code>), at least one replier holds the <b>newest version</b> — A returns it. No stale read. D happens to lag (orange) — A schedules a background <b>read-repair</b> to update D.`,
+    cls: "good"
+  });
+
+  steps.push({
+    title: "failure",
+    state: { [COORD]:"coord", B:"replica", C:"replica", D:"down" },
+    showKey: true, showHint: false, showReplicaSpan: true,
+    need: "W=2", acks: 0,
+    narr: `<b>8. A replica fails mid-write.</b> Now imagine D is <b>down</b> when the next <code>put</code> arrives. Only 2 of the 3 natural replicas (B, C) are reachable. With <code>W=2</code> the write can still succeed — but the system wants to preserve D's copy too.`,
+    cls: "bad"
+  });
+
+  steps.push({
+    title: "failure",
+    state: { [COORD]:"coord", B:"acked", C:"acked", D:"down", E:"acked" },
+    showKey: true, showHint: true, showReplicaSpan: true,
+    msgs: [
+      { from: "B", to: COORD, kind: "reply" },
+      { from: "C", to: COORD, kind: "reply" },
+      { from: COORD, to: "E", kind: "req" },
+    ],
+    need: "W=2", acks: 2,
+    narr: `<b>9. Hinted handoff.</b> B and C ack → <code>W=2</code> met, client gets success. Meanwhile A stores D's intended write on a healthy stand-in <b>E</b> tagged with a <b>hint</b> ("this really belongs to D"). When D recovers, E replays the hint to D. <b>Writes stay available even with a replica down.</b>`,
+    cls: "warn"
+  });
+
+  steps.push({
+    title: "done",
+    state: { A:"idle", B:"idle", C:"idle", D:"idle", E:"idle", F:"idle" },
+    showKey: false, showHint: false,
+    need: "—", acks: 0,
+    narr: `<b>10. Eventual convergence.</b> In the background: read-repair fixed the stale replica, the hint flowed back to D when it rebooted, and periodic <b>Merkle-tree anti-entropy</b> reconciles any remaining drift by streaming only divergent ranges. The cluster is consistent again — durable, available, and tunable.`,
+    cls: "good"
+  });
+
+  // colors
+  const STATE_FILL = {
+    idle: "#3b82f6", coord: "#fbbf24", replica: "#3b82f6",
+    acked: "#10b981", down: "#ef4444", stale: "#f59e0b"
+  };
+  const STATE_STROKE = {
+    idle: "#1a1a2e", coord: "#fde68a", replica: "#1a1a2e",
+    acked: "#6ee7b7", down: "#fca5a5", stale: "#fcd34d"
+  };
+
+  // ---------- DOM ----------
+  const gNodes = document.getElementById("g-nodes");
+  const gKeys = document.getElementById("g-keys");
+  const gMsg = document.getElementById("g-msg");
+  const gArc = document.getElementById("g-arc");
+  const gClient = document.getElementById("g-client");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vNeed = document.getElementById("v-need");
+  const vAcks = document.getElementById("v-acks");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  let cursor = 0;
+
+  function render() {
+    const s = steps[cursor];
+    gNodes.innerHTML = ""; gKeys.innerHTML = ""; gMsg.innerHTML = "";
+    gArc.innerHTML = ""; gClient.innerHTML = "";
+
+    // ---- replica span arc on the ring (B..D) ----
+    if (s.showReplicaSpan) {
+      const span = svgEl("path", {
+        d: arcPath(byId[REPLICAS[0]].deg, byId[REPLICAS[REPLICAS.length-1]].deg, R),
+        fill: "none", stroke: "#3b82f6", "stroke-width": 7, opacity: 0.28,
+        "stroke-linecap": "round"
+      });
+      gArc.appendChild(span);
+    }
+
+    // ---- client in the centre ----
+    {
+      const g = svgEl("g", {});
+      const c = svgEl("circle", { cx: CX, cy: CY, r: 20, fill: "#2d2d50", stroke: "#8888aa", "stroke-width": 2 });
+      const t = svgEl("text", { x: CX, y: CY + 1, "text-anchor": "middle",
+        fill: "#e0e0e0", "font-size": "10px", "font-weight": "700",
+        "font-family": "-apple-system, sans-serif" });
+      t.textContent = "client";
+      g.appendChild(c); g.appendChild(t);
+      gClient.appendChild(g);
+    }
+
+    // ---- messages (arrows) ----
+    (s.msgs || []).forEach(m => {
+      const from = byId[m.from] || { deg: null };
+      const to = byId[m.to];
+      // client→coord handled implicitly; here all msgs are node↔node
+      const pf = pos(from.deg, R), pt = pos(to.deg, R);
+      const col = m.kind === "reply" ? "#10b981" : "#3b82f6";
+      const line = svgEl("line", {
+        x1: pf.x, y1: pf.y, x2: pt.x, y2: pt.y,
+        stroke: col, "stroke-width": 3, opacity: 0.85,
+        "stroke-dasharray": m.kind === "reply" ? "none" : "5 4",
+        "marker-end": ""
+      });
+      gMsg.appendChild(line);
+      // arrowhead
+      const ang = Math.atan2(pt.y - pf.y, pt.x - pf.x);
+      const ax = pt.x - 20 * Math.cos(ang), ay = pt.y - 20 * Math.sin(ang);
+      const head = svgEl("path", {
+        d: `M ${ax} ${ay} l ${-8*Math.cos(ang-0.4)} ${-8*Math.sin(ang-0.4)} M ${ax} ${ay} l ${-8*Math.cos(ang+0.4)} ${-8*Math.sin(ang+0.4)}`,
+        stroke: col, "stroke-width": 3, fill: "none", opacity: 0.85
+      });
+      gMsg.appendChild(head);
+    });
+
+    // ---- the key dot on the ring ----
+    if (s.showKey) {
+      const pt = pos(KEY.deg, R);
+      const g = svgEl("g", { class: "key" });
+      const c = svgEl("circle", { cx: pt.x, cy: pt.y, r: 9, fill: "#94a3b8",
+        stroke: "#cbd5e1", "stroke-width": 1.5 });
+      const t = svgEl("text", { x: pt.x, y: pt.y + 3, "text-anchor": "middle" });
+      t.textContent = "k";
+      const lbl = svgEl("text", { x: pt.x, y: pt.y - 14, "text-anchor": "middle",
+        fill: "#94a3b8", "font-size": "9px",
+        "font-family": "'SF Mono', Menlo, monospace" });
+      lbl.textContent = `hash("${KEY.id}")`;
+      g.appendChild(c); g.appendChild(t); g.appendChild(lbl);
+      gKeys.appendChild(g);
+    }
+
+    // ---- nodes ----
+    for (const nd of NODES) {
+      const pt = pos(nd.deg, R);
+      const st = (s.state && s.state[nd.id]) || "idle";
+      const fill = STATE_FILL[st], stroke = STATE_STROKE[st];
+      const g = svgEl("g", { class: "node" });
+
+      // coordinator dashed ring halo
+      if (st === "coord") {
+        g.appendChild(svgEl("circle", { class: "coordinator-ring", cx: pt.x, cy: pt.y, r: 23 }));
+      }
+      const r = (st === "coord") ? 17 : 16;
+      const c = svgEl("circle", { cx: pt.x, cy: pt.y, r,
+        fill, stroke, "stroke-width": 3 });
+      const t = svgEl("text", { x: pt.x, y: pt.y + (st==="down"? 1 : 4), "text-anchor": "middle" });
+      t.textContent = nd.id;
+      g.appendChild(c); g.appendChild(t);
+
+      // small role caption under acked/down/stale/hint nodes
+      let cap = null;
+      if (st === "down") cap = "✕ down";
+      else if (st === "stale") cap = "stale";
+      else if (st === "acked" && (s.title === "put" || s.title === "failure")) cap = "✓ ack";
+      else if (st === "acked" && s.title === "get") cap = "✓ value";
+      if (s.showHint && nd.id === "E") cap = "hint→D";
+      if (cap) {
+        const cy = pt.y > CY ? pt.y + 30 : pt.y - 24;
+        const ct = svgEl("text", { x: pt.x, y: cy, "text-anchor": "middle",
+          class: "sub", fill: st === "down" ? "#fca5a5" : st === "stale" ? "#fcd34d" : (s.showHint && nd.id==="E" ? "#fbbf24" : "#6ee7b7") });
+        ct.textContent = cap;
+        g.appendChild(ct);
+      }
+      gNodes.appendChild(g);
+    }
+
+    // ---- side stats ----
+    vNeed.textContent = s.need;
+    vAcks.textContent = s.acks;
+    vAcks.className = "value " + (s.acks >= 2 ? "green" : "amber");
+    vNeed.className = "value amber";
+
+    // ---- narration ----
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

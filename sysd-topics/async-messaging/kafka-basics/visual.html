@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kafka Basics — Topic, Partitions, Offsets &amp; Consumer Groups</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* diagram SVG */
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 600px; height: auto; }
+
+  .lbl { fill: #8888aa; font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .lbl-strong { fill: #cdd; font-size: 12px; font-weight: 700; font-family: -apple-system, sans-serif; }
+  .cell-num { fill: #6b7280; font-size: 9px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .partition-box { fill: #1f1f3a; stroke: #3a3a5c; stroke-width: 1.5; }
+  .cell { transition: all .45s ease; }
+  .cell-empty { fill: #232344; stroke: #2d2d50; stroke-width: 1; }
+  .cell-filled { stroke: #1a1a2e; stroke-width: 1; }
+  .leader-badge { fill: #10b981; font-size: 8px; font-weight: 700; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .replica-box { transition: opacity .4s ease; }
+
+  .producer-box { fill: #2d2d50; stroke: #3b82f6; stroke-width: 2; }
+  .consumer-box { fill: #2d2d50; stroke: #8b5cf6; stroke-width: 2; transition: all .4s ease; }
+  .record { transition: all .55s ease; }
+  .flow-line { stroke: #f59e0b; stroke-width: 2; fill: none; opacity: 0; transition: opacity .3s ease; stroke-dasharray: 5 4; }
+  .flow-line.on { opacity: .9; }
+  .assign-line { stroke-width: 2.5; fill: none; opacity: 0; transition: opacity .4s ease; }
+  .assign-line.on { opacity: .85; }
+  .hash-pill { fill: #332611; stroke: #f59e0b; stroke-width: 1.5; opacity: 0; transition: opacity .35s ease; }
+  .hash-pill.on { opacity: 1; }
+  .hash-text { fill: #fbbf24; font-size: 10px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .offset-pointer { transition: all .5s ease; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.purple { color: #a78bfa; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.purple { border-left-color: #8b5cf6; background: #241a3a; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.queue { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.log { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.queue h3 { color: #fca5a5; }
+  .cx.log h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 20px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.queue .big { color: #ef4444; }
+  .cx.log .big { color: #10b981; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kafka Basics — The Distributed Commit Log</h1>
+  <div class="subtitle">How a <b>topic</b> is split into ordered <b>partitions</b>, how a <b>producer</b> keys records to a partition, how every record gets a permanent <b>offset</b>, how partitions are <b>replicated</b> for durability, and how a <b>consumer group</b> spreads partitions across consumers — so <code>max parallelism = partition count</code>.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the national newspaper</h3>
+    <p>A <b>topic</b> is a newspaper like <i>"Times of India"</i>. One press can't print for the whole country, so it has several <b>partitions</b> — regional editions (Mumbai, Delhi, Chennai). Each edition is an <b>append-only log</b>: today's issue <code>#5001</code>, tomorrow's <code>#5002</code> — new issues only get added at the end, and each issue's number never changes (that's the <b>offset</b>). <b>Producers</b> are reporters: a story tagged <code>city=Mumbai</code> (the <b>key</b>) always lands in the Mumbai edition, keeping that city's news in order. <b>Consumers</b> are subscribers — Kafka never deletes a read paper; the backlog sits on the shelf for the <b>retention</b> window, and each subscriber keeps their own bookmark. Many independent subscribers (analytics, billing, search) read the same edition without disturbing each other: <b>written once, read many times independently.</b></p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">topic:</span><code>orders</code> &nbsp;split into <code>4 partitions (P0..P3)</code>, ordering guaranteed <b>per-partition only</b></div>
+    <div class="row"><span class="label">producer:</span><code>partition = hash(key) % numPartitions</code> &nbsp;→ same key, same partition</div>
+    <div class="row"><span class="label">offset:</span><code>monotonic 64-bit id per partition</code> &nbsp;permanent, append-only</div>
+    <div class="row"><span class="label">group:</span><code>one partition → exactly one consumer in a group</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 600 420" id="diagram">
+        <!-- producer -->
+        <g id="producer-grp" opacity="0">
+          <rect class="producer-box" x="14" y="40" width="86" height="46" rx="8" />
+          <text class="lbl-strong" x="57" y="60" text-anchor="middle">Producer</text>
+          <text class="lbl" x="57" y="76" text-anchor="middle">key=A</text>
+        </g>
+
+        <!-- hash pill -->
+        <g id="hash-grp">
+          <rect class="hash-pill" id="hash-pill" x="118" y="48" width="118" height="30" rx="15" />
+          <text class="hash-text" id="hash-text" x="177" y="67" text-anchor="middle" opacity="0">hash(A)%4 = 1</text>
+        </g>
+
+        <!-- flow line producer -> partition -->
+        <path class="flow-line" id="flow-line" d="" />
+        <!-- the travelling record -->
+        <g class="record" id="record" opacity="0">
+          <rect x="-13" y="-11" width="26" height="22" rx="4" fill="#f59e0b" stroke="#fbbf24" stroke-width="1.5" />
+          <text class="cell-num" x="0" y="4" text-anchor="middle" fill="#1a1a2e" font-weight="700" id="record-key">A</text>
+        </g>
+
+        <!-- topic label -->
+        <text class="lbl-strong" id="topic-label" x="430" y="26" text-anchor="middle" opacity="0">topic "orders"  —  4 partitions</text>
+
+        <!-- partitions get injected here -->
+        <g id="g-partitions"></g>
+        <!-- replica row -->
+        <g id="g-replicas"></g>
+        <!-- consumers -->
+        <g id="g-consumers"></g>
+        <!-- assignment lines consumer<->partition -->
+        <g id="g-assign"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Partitions</div><div class="value" id="v-parts">4</div></div>
+        <div class="var"><div class="label">Records written</div><div class="value amber" id="v-recs">0</div></div>
+        <div class="var"><div class="label">Repl. factor</div><div class="value green" id="v-rf">—</div></div>
+        <div class="var"><div class="label">Consumers</div><div class="value purple" id="v-cons">0</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Record (event) &amp; producer keying</div>
+        <div class="legend-item"><span class="swatch round" style="background:#3b82f6"></span>Producer</div>
+        <div class="legend-item"><span class="swatch" style="background:#1f1f3a;border:1px solid #3a3a5c"></span>Partition (append-only log)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#10b981"></span>Leader / In-Sync Replica (ISR)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#8b5cf6"></span>Consumer in a group</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to lay out the topic's partitions and start writing events.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx queue">
+      <h3>Traditional queue (RabbitMQ / SQS)</h3>
+      <div class="formula">ack a message → it's gone</div>
+      <p>A message is delivered, acked, and <b>deleted</b>. One logical consumer drains the queue; "replay last 3 days" is <span class="big">impossible</span> — the data no longer exists. Great for task-queue routing, not for re-reading history.</p>
+    </div>
+    <div class="cx log">
+      <h3>Kafka — a distributed log</h3>
+      <div class="formula">read advances an offset; data stays</div>
+      <p>Records are <b>not</b> deleted on read — they live for the retention window. Each consumer group keeps its own offset, so N groups read the same data independently and <span class="big">replay</span> is just "seek the offset back". Pub/sub fan-out for free.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Ordering is per-partition, not global.</b> The single most common mistake. Need global order → use <b>one partition</b> (parallelism = 1). In practice, partition by <b>key</b> so related events (same user/order) stay ordered, which covers 99% of cases.</li>
+      <li><b>Max parallelism = partition count.</b> One partition goes to exactly one consumer <i>within a group</i>. 4 partitions, 6 consumers → 2 sit idle. Interviewers love "what's the scaling limit?".</li>
+      <li><b>Multiple groups, same data.</b> Group-A (fraud) and Group-B (warehouse ETL) each read every event with their own offset — that's the pub/sub fan-out.</li>
+      <li><b><code>acks</code> ≠ replication factor.</b> Replication factor (topic-level) is how many replicas <i>exist</i>; <code>acks</code> (producer-level) is how many must <i>confirm</i> a write. <code>acks=all</code> means "all ISR", and <code>min.insync.replicas=2</code> sets the durability floor.</li>
+      <li><b>Default delivery is at-least-once.</b> Exactly-once needs idempotent producer + transactions and only across a Kafka-to-Kafka boundary; most systems prefer at-least-once + idempotent consumers (dedup on a key).</li>
+      <li><b>Retention ≠ consumption.</b> Records expire on the retention window whether consumed or not. A slow consumer that falls behind retention loses data (offset out of range) — that's <b>consumer lag</b>, monitor it.</li>
+      <li><b>Partitions only grow.</b> You can add partitions but not remove them, and adding them changes where future keyed records land (per-key ordering can break). Plan capacity upfront.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Kafka is a <b>distributed, append-only commit log</b>, not a queue. A topic is split into <b>partitions</b> (the unit of ordering and parallelism); a producer routes a record by <code>hash(key) % numPartitions</code> and it gets a permanent <b>offset</b>; partitions are <b>replicated</b> to ISR for durability (<code>acks=all</code>); and a <b>consumer group</b> assigns one partition per consumer — so reads scale up to the partition count, multiple groups read the same data independently, and nothing is deleted on read.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- layout constants ----------
+  const NP = 4;                 // partitions
+  const PART_X = 300;           // left edge of partition logs
+  const PART_W = 220;           // partition width
+  const CELL = 26;              // cell size
+  const ROW_Y0 = 60;            // first partition y
+  const ROW_GAP = 64;
+  const MAX_CELLS = 6;          // visible cells per partition
+
+  const SVG = document.getElementById("diagram");
+  const gParts = document.getElementById("g-partitions");
+  const gReplicas = document.getElementById("g-replicas");
+  const gConsumers = document.getElementById("g-consumers");
+  const gAssign = document.getElementById("g-assign");
+
+  const producerGrp = document.getElementById("producer-grp");
+  const hashPill = document.getElementById("hash-pill");
+  const hashText = document.getElementById("hash-text");
+  const topicLabel = document.getElementById("topic-label");
+  const flowLine = document.getElementById("flow-line");
+  const record = document.getElementById("record");
+  const recordKey = document.getElementById("record-key");
+
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vParts = document.getElementById("v-parts");
+  const vRecs = document.getElementById("v-recs");
+  const vRf = document.getElementById("v-rf");
+  const vCons = document.getElementById("v-cons");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function partY(p) { return ROW_Y0 + p * ROW_GAP; }
+
+  // ---------- the write sequence: which key goes to which partition ----------
+  // partition = hash(key) % 4 (we just hardcode a believable mapping)
+  const writes = [
+    { key:"A", part:1, hash:"hash(A)%4 = 1" },
+    { key:"B", part:3, hash:"hash(B)%4 = 3" },
+    { key:"A", part:1, hash:"hash(A)%4 = 1" },   // same key -> same partition, next offset
+    { key:"C", part:0, hash:"hash(C)%4 = 0" },
+    { key:"A", part:1, hash:"hash(A)%4 = 1" },
+    { key:"D", part:2, hash:"hash(D)%4 = 2" },
+    { key:"B", part:3, hash:"hash(B)%4 = 3" },
+  ];
+  const KEY_COLOR = { A:"#f59e0b", B:"#06b6d4", C:"#ec4899", D:"#a78bfa" };
+
+  // ---------- step definitions ----------
+  // writeCount = how many records from `writes` have landed
+  // showProducer / showHash / highlightWrite (index being animated)
+  // showReplicas / showConsumers (count) / showOffset
+  const steps = [
+    {
+      writeCount: 0, showProducer: false, replicas: false, consumers: 0, offset: false,
+      narration: `<b>1. A topic = N partitions.</b> The topic <code>orders</code> is split into <b>4 partitions</b> (<code>P0..P3</code>). Each partition is an <b>ordered, immutable, append-only log</b>. Ordering is guaranteed <b>only inside one partition</b>, never across the whole topic. More partitions = more parallelism.`,
+      narrClass: "", rf: "—",
+    },
+    {
+      writeCount: 0, showProducer: true, showHash: true, hashIdx: 0, replicas: false, consumers: 0, offset: false,
+      narration: `<b>2. Producer keys the record.</b> A producer sends a record with <b>key = A</b>. Kafka computes <code>partition = hash(key) % numPartitions</code> (default murmur2). Here <code>hash(A)%4 = 1</code>, so this record is destined for <b>P1</b>. The same key always hashes to the same partition → per-key ordering.`,
+      narrClass: "move", rf: "—",
+    },
+    {
+      writeCount: 1, showProducer: true, animateWrite: 0, replicas: false, consumers: 0, offset: true,
+      narration: `<b>3. Append + offset.</b> The record lands at the <b>tail</b> of P1 and is stamped with the next <b>offset</b> for that partition — a monotonic 64-bit id (<code>0, 1, 2…</code>), permanent and unique <i>within the partition</i>. Appends only happen at the end; old records are never edited.`,
+      narrClass: "move", rf: "—",
+    },
+    {
+      writeCount: writes.length, showProducer: true, replicas: false, consumers: 0, offset: true,
+      narration: `<b>4. Keep producing.</b> More records flow in. Notice every <b>key=A</b> record lands in <b>P1</b> in order (offsets 0,1,2 there), while B→P3, C→P0, D→P2. Records are <b>batched</b> (<code>linger.ms</code>) into big produce requests → throughput up to millions of events/sec.`,
+      narrClass: "move", rf: "—",
+    },
+    {
+      writeCount: writes.length, showProducer: false, replicas: true, consumers: 0, offset: true,
+      narration: `<b>5. Replication for durability.</b> Each partition has a <b>leader</b> (green) plus follower replicas (replication factor 3). All reads/writes hit the leader; followers copy from it. Caught-up replicas form the <b>ISR</b>. With <code>acks=all</code> + <code>min.insync.replicas=2</code>, a write is acked only once enough ISR have it — leader dies, an ISR takes over, <b>no data loss</b>.`,
+      narrClass: "good", rf: "3",
+    },
+    {
+      writeCount: writes.length, showProducer: false, replicas: false, consumers: 2, offset: true, assignGroup: "G1",
+      narration: `<b>6. Consumer group scales reads.</b> Group <b>G1</b> has 2 consumers across 4 partitions → each consumer owns 2 partitions, working in <b>parallel</b>. A partition goes to <b>exactly one</b> consumer in a group. Add more consumers and Kafka rebalances — but only up to <b>4</b>; a 5th would sit idle. <b>Max parallelism = partition count.</b>`,
+      narrClass: "purple", rf: "3",
+    },
+    {
+      writeCount: writes.length, showProducer: false, replicas: false, consumers: 4, offset: true, assignGroup: "G1full",
+      narration: `<b>7. One consumer per partition (peak).</b> Scale G1 to <b>4 consumers</b> and each owns exactly one partition — maximum useful parallelism. A 5th consumer would get <b>nothing</b>. Each consumer commits its processed <b>offset</b> to the internal <code>__consumer_offsets</code> topic, so after a restart it resumes exactly where it left off.`,
+      narrClass: "purple", rf: "3",
+    },
+    {
+      writeCount: writes.length, showProducer: false, replicas: false, consumers: 4, secondGroup: true, offset: true, assignGroup: "G1full",
+      narration: `<b>8. Multiple groups, same data.</b> A second group <b>G2</b> (e.g. warehouse ETL) reads the <i>same</i> partitions with its <b>own independent offsets</b> — it doesn't compete with G1. This is Kafka's pub/sub fan-out: one write, many independent readers, and since reads only advance offsets, <b>replay</b> is trivial.`,
+      narrClass: "good", rf: "3",
+    },
+  ];
+
+  // ---------- builders ----------
+  function buildPartitions() {
+    gParts.innerHTML = "";
+    for (let p = 0; p < NP; p++) {
+      const y = partY(p);
+      // label
+      gParts.appendChild(Object.assign(svgEl("text", {
+        class: "lbl-strong", x: PART_X - 16, y: y + CELL/2 + 4, "text-anchor": "end"
+      }), { textContent: "P" + p }));
+      // log frame
+      gParts.appendChild(svgEl("rect", {
+        class: "partition-box", x: PART_X, y: y, width: PART_W, height: CELL, rx: 4
+      }));
+      // empty cells
+      for (let c = 0; c < MAX_CELLS; c++) {
+        const cx = PART_X + 4 + c * (CELL + 2);
+        gParts.appendChild(svgEl("rect", {
+          class: "cell cell-empty", id: `cell-${p}-${c}`,
+          x: cx, y: y + 2, width: CELL - 2, height: CELL - 4, rx: 3
+        }));
+        gParts.appendChild(Object.assign(svgEl("text", {
+          class: "cell-num", id: `cellnum-${p}-${c}`,
+          x: cx + (CELL-2)/2, y: y + CELL + 11, "text-anchor": "middle", opacity: 0
+        }), { textContent: c }));
+      }
+    }
+    // "offset →" hint under partitions
+    gParts.appendChild(Object.assign(svgEl("text", {
+      class: "lbl", id: "offset-hint", x: PART_X + PART_W - 8, y: partY(NP-1) + CELL + 30,
+      "text-anchor": "end", opacity: 0
+    }), { textContent: "offset 0,1,2 …  →  append at tail" }));
+  }
+
+  // compute, for each partition, the ordered list of keys written (first N writes)
+  function partitionContents(writeCount) {
+    const cols = [[], [], [], []];
+    for (let i = 0; i < writeCount; i++) {
+      const w = writes[i];
+      cols[w.part].push(w.key);
+    }
+    return cols;
+  }
+
+  function paintCells(writeCount) {
+    const cols = partitionContents(writeCount);
+    for (let p = 0; p < NP; p++) {
+      for (let c = 0; c < MAX_CELLS; c++) {
+        const cell = document.getElementById(`cell-${p}-${c}`);
+        const num = document.getElementById(`cellnum-${p}-${c}`);
+        const key = cols[p][c];
+        // clear any text label
+        const oldT = document.getElementById(`celltext-${p}-${c}`);
+        if (oldT) oldT.remove();
+        if (key !== undefined) {
+          cell.setAttribute("class", "cell cell-filled");
+          cell.setAttribute("fill", KEY_COLOR[key]);
+          num.setAttribute("opacity", 1);
+          const y = partY(p);
+          const cx = PART_X + 4 + c * (CELL + 2);
+          const t = svgEl("text", {
+            id: `celltext-${p}-${c}`, x: cx + (CELL-2)/2, y: y + CELL/2 + 3,
+            "text-anchor": "middle", "font-size": 11, "font-weight": 700,
+            fill: "#1a1a2e", "font-family": "SF Mono, Menlo, monospace"
+          });
+          t.textContent = key;
+          gParts.appendChild(t);
+        } else {
+          cell.setAttribute("class", "cell cell-empty");
+          cell.removeAttribute("fill");
+          num.setAttribute("opacity", 0);
+        }
+      }
+    }
+  }
+
+  function buildReplicas(show) {
+    gReplicas.innerHTML = "";
+    if (!show) return;
+    // for each partition show leader badge + 2 follower mini-boxes to the right
+    for (let p = 0; p < NP; p++) {
+      const y = partY(p);
+      // leader badge over the partition frame
+      const lg = svgEl("g", { class: "replica-box" });
+      lg.appendChild(svgEl("circle", { cx: PART_X - 16, cy: y - 8, r: 6, fill: "#10b981" }));
+      // followers to the right of partition
+      const fx = PART_X + PART_W + 14;
+      for (let r = 0; r < 2; r++) {
+        const ry = y + r * 11;
+        lg.appendChild(svgEl("rect", {
+          x: fx, y: ry, width: 30, height: 9, rx: 2,
+          fill: "#1f3a2a", stroke: "#10b981", "stroke-width": 1, opacity: 0.85
+        }));
+      }
+      gReplicas.appendChild(lg);
+    }
+    // ISR caption
+    const cap = svgEl("text", {
+      class: "lbl", x: PART_X + PART_W + 14, y: ROW_Y0 - 14, fill: "#6ee7b7"
+    });
+    cap.textContent = "ISR followers";
+    gReplicas.appendChild(cap);
+  }
+
+  function buildConsumers(count, group, secondGroup) {
+    gConsumers.innerHTML = "";
+    gAssign.innerHTML = "";
+    if (!count) return;
+    const CX = 560;          // consumer column x (center)
+    // distribute `count` consumers vertically aligned to partitions
+    // assignment: partition p -> consumer (p % count)
+    const consY = [];
+    for (let i = 0; i < count; i++) {
+      // spread consumers over the 4 partition rows
+      const yc = ROW_Y0 + (i + 0.5) * (NP * ROW_GAP) / count - CELL/2;
+      consY.push(yc);
+    }
+    // assignment lines first (behind)
+    for (let p = 0; p < NP; p++) {
+      const ci = p % count;
+      const py = partY(p) + CELL/2;
+      const cy = consY[ci] + 14;
+      const path = svgEl("path", {
+        class: "assign-line on",
+        d: `M ${PART_X + PART_W + 50} ${py} C ${CX - 30} ${py}, ${CX - 30} ${cy}, ${CX - 12} ${cy}`,
+        stroke: "#8b5cf6"
+      });
+      gAssign.appendChild(path);
+    }
+    // consumer boxes
+    for (let i = 0; i < count; i++) {
+      const g = svgEl("g", {});
+      g.appendChild(svgEl("rect", {
+        class: "consumer-box", x: CX - 12, y: consY[i], width: 60, height: 28, rx: 6
+      }));
+      const t = svgEl("text", { class: "lbl-strong", x: CX + 18, y: consY[i] + 18, "text-anchor": "middle", "font-size": 11 });
+      t.textContent = "C" + (i + 1);
+      g.appendChild(t);
+      gConsumers.appendChild(g);
+    }
+    // group label
+    const gl = svgEl("text", { class: "lbl", x: CX + 18, y: ROW_Y0 - 14, "text-anchor": "middle", fill: "#a78bfa" });
+    gl.textContent = "group G1";
+    gConsumers.appendChild(gl);
+
+    // optional second group sharing the same partitions (independent offsets)
+    if (secondGroup) {
+      const CX2 = 560;
+      // draw a faint extra consumer cluster note
+      const g2 = svgEl("text", { class: "lbl", x: CX + 18, y: partY(NP-1) + CELL + 28, "text-anchor": "middle", fill: "#6ee7b7" });
+      g2.textContent = "+ group G2 (own offsets)";
+      gConsumers.appendChild(g2);
+      // dashed independent lines from partitions to a small G2 marker
+      for (let p = 0; p < NP; p++) {
+        const py = partY(p) + CELL/2;
+        const path = svgEl("path", {
+          class: "assign-line on",
+          d: `M ${PART_X + PART_W + 50} ${py + 4} C ${CX - 20} ${py + 18}, ${CX - 20} 380, ${CX + 4} 388`,
+          stroke: "#10b981", "stroke-dasharray": "4 4", opacity: 0.5
+        });
+        gAssign.appendChild(path);
+      }
+    }
+  }
+
+  // ---------- record fly animation ----------
+  function flyRecord(writeIdx, cb) {
+    const w = writes[writeIdx];
+    const cols = partitionContents(writeIdx); // contents BEFORE this write
+    const col = cols[w.part].length;           // target column index
+    const targetX = PART_X + 4 + col * (CELL + 2) + (CELL - 2) / 2;
+    const targetY = partY(w.part) + CELL / 2;
+    recordKey.textContent = w.key;
+    record.querySelector("rect").setAttribute("fill", KEY_COLOR[w.key]);
+    // start near producer
+    record.setAttribute("opacity", "1");
+    record.setAttribute("transform", `translate(110,63)`);
+    flowLine.setAttribute("d", `M 110 63 L ${targetX} ${targetY}`);
+    flowLine.classList.add("on");
+    // force reflow then move
+    void record.getBBox();
+    requestAnimationFrame(() => {
+      record.setAttribute("transform", `translate(${targetX},${targetY})`);
+    });
+    setTimeout(() => {
+      flowLine.classList.remove("on");
+      record.setAttribute("opacity", "0");
+      record.setAttribute("transform", `translate(110,63)`);
+      if (cb) cb();
+    }, 600);
+  }
+
+  // ---------- render ----------
+  let cursor = 0;
+
+  function render(animate) {
+    const s = steps[cursor];
+
+    producerGrp.setAttribute("opacity", s.showProducer ? "1" : "0");
+    topicLabel.setAttribute("opacity", "1");
+
+    // hash pill
+    if (s.showHash) {
+      const w = writes[s.hashIdx];
+      hashText.textContent = w.hash;
+      hashPill.classList.add("on");
+      hashText.setAttribute("opacity", "1");
+    } else {
+      hashPill.classList.remove("on");
+      hashText.setAttribute("opacity", "0");
+    }
+
+    // offset hint
+    document.getElementById("offset-hint").setAttribute("opacity", s.offset ? "1" : "0");
+
+    buildReplicas(s.replicas);
+    buildConsumers(s.consumers, s.assignGroup, s.secondGroup);
+
+    // paint partition cells (target state)
+    if (s.animateWrite !== undefined && animate) {
+      // paint up to writeCount-1, then fly the last record in
+      paintCells(s.animateWrite);
+      flyRecord(s.animateWrite, () => paintCells(s.writeCount));
+    } else {
+      paintCells(s.writeCount);
+    }
+
+    // side stats
+    vParts.textContent = NP;
+    vRecs.textContent = s.writeCount;
+    vRf.textContent = s.rf;
+    vCons.textContent = s.consumers + (s.secondGroup ? 4 : 0);
+    vCons.textContent = s.consumers > 0 ? (s.secondGroup ? s.consumers + " + G2" : s.consumers) : 0;
+
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(true); } }
+  function prev() { if (cursor > 0) { cursor--; render(false); } }
+  function reset() { cursor = 0; render(false); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  buildPartitions();
+  render(false);
+})();
+</script>
+</body>
+</html>

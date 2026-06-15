@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Design Twitter / News Feed — Fan-out Flow Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+  .analogy i { color: #fbbf24; font-style: normal; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  /* diagram SVG */
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+  .box { transition: all .35s ease; }
+  .box rect { transition: all .35s ease; }
+  .box-label { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 12px; fill: #fff; }
+  .box-sub { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #aab; }
+  .box.dim { opacity: .28; }
+  .box.active rect { stroke: #10b981; stroke-width: 3; filter: drop-shadow(0 0 6px #10b98188); }
+
+  .wire { fill: none; stroke: #3a3a5c; stroke-width: 2; transition: stroke .35s ease; }
+  .wire.hot { stroke: #f59e0b; stroke-width: 3; }
+  .wire-label { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #8888aa; }
+
+  .packet { transition: opacity .3s ease; }
+  .packet circle { fill: #f59e0b; stroke: #fbbf24; stroke-width: 2; }
+  .packet text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #1a1a2e; font-weight: 700; text-anchor: middle; }
+
+  .follower rect { transition: all .35s ease; }
+  .follower text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8px; fill: #cdd; }
+  .follower.filled rect { fill: #14321f; stroke: #10b981; }
+  .follower.filledceleb rect { fill: #2a1717; stroke: #ec4899; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.pink { color: #ec4899; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.rnd { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.hot { border-left-color: #f59e0b; background: #332611; }
+  .narration.celeb { border-left-color: #ec4899; background: #2a1722; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.push { background: #14321f; border: 1px solid #10b981; }
+  .cx.pull { background: #1a2233; border: 1px solid #3b82f6; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.push h3 { color: #6ee7b7; }
+  .cx.pull h3 { color: #93c5fd; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 20px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.push .big { color: #10b981; }
+  .cx.pull .big { color: #3b82f6; }
+  .cx ul { margin: 8px 0 0; padding-left: 18px; }
+  .cx li { font-size: 13px; color: #c8c8d8; margin: 3px 0; }
+  .cx li b { color: #fff; }
+
+  .hybrid-band {
+    margin-top: 16px; background: linear-gradient(135deg, #2a1722 0%, #2a1717 100%);
+    border: 1px solid #ec4899; border-radius: 12px; padding: 18px 22px;
+  }
+  .hybrid-band h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #f9a8d4; }
+  .hybrid-band p { margin: 0; font-size: 14px; color: #e8d0dc; }
+  .hybrid-band b { color: #fff; }
+  .hybrid-band code { background: #00000044; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Design Twitter / News Feed — The Fan-out Flow</h1>
+  <div class="subtitle">How a single tweet reaches millions of home timelines fast. Twitter is <b>read-heavy</b> (~<code>1M reads/sec</code> peak vs ~<code>12K writes/sec</code>), so the home timeline is <b>precomputed on write</b> — except for celebrities, who break the model and get a <b>hybrid push/pull</b> treatment.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the newspaper round vs. the notice board</h3>
+    <p>Think of two ways news reaches you. <b>Push (fan-out on write):</b> a paperboy delivers a fresh copy to every subscriber's doorstep the moment it's printed — when you wake up, your paper is <i>already waiting</i> (instant read). The cost is all the legwork at delivery time, multiplied by every subscriber. <b>Pull (fan-out on read):</b> instead, the news sits on a central notice board and you walk over and read it when you want — cheap to publish, but you do the work every single visit. A celebrity with <i>50 million</i> "subscribers" can't have a paperboy run to all 50M doors for one tweet — that's a stampede. So their tweets stay on the notice board, and you <b>merge</b> them in only when you actually open your feed.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">write:</span><code>tweet → persist → publish TweetCreated to Kafka → async fan-out</code></div>
+    <div class="row"><span class="label">push:</span><code>LPUSH tweet_id into each follower's Redis timeline:{uid} (capped ~800)</code></div>
+    <div class="row"><span class="label">read:</span><code>read Redis list → batch-hydrate content → merge celebrity pulls → page</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 560 420" id="diagram">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#5a5a7c" />
+          </marker>
+          <marker id="arrowhot" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#f59e0b" />
+          </marker>
+        </defs>
+
+        <!-- wires (declared first so boxes paint on top) -->
+        <g id="g-wires">
+          <!-- author -> write svc -->
+          <path id="w-author-write" class="wire" d="M92 60 L196 60" marker-end="url(#arrow)" />
+          <text class="wire-label" x="100" y="50">POST /tweets</text>
+          <!-- write svc -> tweet store -->
+          <path id="w-write-store" class="wire" d="M250 86 L250 132" marker-end="url(#arrow)" />
+          <text class="wire-label" x="256" y="115">persist</text>
+          <!-- write svc -> kafka -->
+          <path id="w-write-kafka" class="wire" d="M304 60 L344 60" marker-end="url(#arrow)" />
+          <text class="wire-label" x="300" y="50">publish</text>
+          <!-- kafka -> fanout -->
+          <path id="w-kafka-fanout" class="wire" d="M398 86 L398 132" marker-end="url(#arrow)" />
+          <text class="wire-label" x="404" y="115">consume</text>
+          <!-- fanout -> redis (follower timelines) -->
+          <path id="w-fanout-redis" class="wire" d="M398 184 L398 222" marker-end="url(#arrow)" />
+          <text class="wire-label" x="404" y="210">LPUSH</text>
+        </g>
+
+        <!-- AUTHOR -->
+        <g class="box" id="b-author" data-cx="50" data-cy="60">
+          <rect x="8" y="38" width="84" height="44" rx="8" fill="#2d2d50" stroke="#3b82f6" stroke-width="2"/>
+          <text class="box-label" x="50" y="58" text-anchor="middle">Author</text>
+          <text class="box-sub" x="50" y="73" text-anchor="middle">posts tweet</text>
+        </g>
+
+        <!-- WRITE SERVICE -->
+        <g class="box" id="b-write" data-cx="250" data-cy="60">
+          <rect x="196" y="34" width="108" height="52" rx="8" fill="#2d2d50" stroke="#3b82f6" stroke-width="2"/>
+          <text class="box-label" x="250" y="55" text-anchor="middle">Tweet Write</text>
+          <text class="box-label" x="250" y="69" text-anchor="middle">Service</text>
+        </g>
+
+        <!-- TWEET STORE -->
+        <g class="box" id="b-store" data-cx="250" data-cy="158">
+          <rect x="200" y="132" width="100" height="50" rx="8" fill="#23233f" stroke="#8b5cf6" stroke-width="2"/>
+          <text class="box-label" x="250" y="153" text-anchor="middle">Tweet Store</text>
+          <text class="box-sub" x="250" y="168" text-anchor="middle">Cassandra</text>
+        </g>
+
+        <!-- KAFKA -->
+        <g class="box" id="b-kafka" data-cx="398" data-cy="60">
+          <rect x="344" y="34" width="108" height="52" rx="8" fill="#2d2d50" stroke="#f59e0b" stroke-width="2"/>
+          <text class="box-label" x="398" y="55" text-anchor="middle">Kafka</text>
+          <text class="box-sub" x="398" y="70" text-anchor="middle">TweetCreated</text>
+        </g>
+
+        <!-- FAN-OUT SERVICE -->
+        <g class="box" id="b-fanout" data-cx="398" data-cy="158">
+          <rect x="338" y="132" width="120" height="52" rx="8" fill="#2d2d50" stroke="#10b981" stroke-width="2"/>
+          <text class="box-label" x="398" y="153" text-anchor="middle">Fan-out Service</text>
+          <text class="box-sub" x="398" y="168" text-anchor="middle">async consumers</text>
+        </g>
+
+        <!-- REDIS TIMELINE CACHE (followers) -->
+        <g class="box" id="b-redis" data-cx="398" data-cy="240">
+          <rect x="300" y="222" width="196" height="34" rx="6" fill="#1f1f3a" stroke="#ef4444" stroke-width="2"/>
+          <text class="box-label" x="398" y="244" text-anchor="middle">Redis — timeline:{uid} lists</text>
+        </g>
+
+        <!-- FOLLOWER timeline cells -->
+        <g id="g-followers"></g>
+
+        <!-- READER -->
+        <g class="box dim" id="b-reader" data-cx="50" data-cy="300">
+          <rect x="8" y="278" width="84" height="44" rx="8" fill="#2d2d50" stroke="#3b82f6" stroke-width="2"/>
+          <text class="box-label" x="50" y="298" text-anchor="middle">Follower</text>
+          <text class="box-sub" x="50" y="313" text-anchor="middle">opens feed</text>
+        </g>
+        <!-- READ SERVICE -->
+        <g class="box dim" id="b-read" data-cx="200" data-cy="300">
+          <rect x="120" y="276" width="116" height="48" rx="8" fill="#2d2d50" stroke="#3b82f6" stroke-width="2"/>
+          <text class="box-label" x="178" y="297" text-anchor="middle">Timeline Read</text>
+          <text class="box-label" x="178" y="311" text-anchor="middle">Service</text>
+        </g>
+        <!-- read wires -->
+        <g id="g-readwires">
+          <path id="w-reader-read" class="wire" d="M92 300 L116 300" marker-end="url(#arrow)" opacity="0.25"/>
+          <path id="w-read-redis" class="wire" d="M236 296 C 300 290, 340 270, 360 258" marker-end="url(#arrow)" opacity="0.25"/>
+          <text class="wire-label" id="lab-read-redis" x="250" y="282" opacity="0.25">read list</text>
+        </g>
+
+        <!-- CELEBRITY (hybrid) -->
+        <g class="box dim" id="b-celeb" data-cx="498" data-cy="330">
+          <rect x="446" y="306" width="106" height="50" rx="8" fill="#2a1717" stroke="#ec4899" stroke-width="2"/>
+          <text class="box-label" x="499" y="327" text-anchor="middle">Celebrity</text>
+          <text class="box-sub" x="499" y="342" text-anchor="middle">50M followers</text>
+        </g>
+        <path id="w-celeb-pull" class="wire" d="M446 330 C 300 360, 200 350, 178 326" marker-end="url(#arrow)" opacity="0" stroke="#ec4899"/>
+        <text class="wire-label" id="lab-celeb-pull" x="280" y="372" opacity="0" fill="#ec4899">pull + merge at read</text>
+
+        <!-- travelling packet -->
+        <g class="packet" id="packet" opacity="0">
+          <circle r="13"/>
+          <text id="packet-text" y="3">T</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Write QPS (peak)</div><div class="value" id="v-write">~12K/s</div></div>
+        <div class="var"><div class="label">Read QPS (peak)</div><div class="value amber" id="v-read">~1M/s</div></div>
+        <div class="var"><div class="label">Followers pushed</div><div class="value green" id="v-pushed">0</div></div>
+        <div class="var"><div class="label">Celeb (pulled)</div><div class="value pink" id="v-pulled">0</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Service / client</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Kafka queue (decouple)</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Fan-out worker (push)</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Redis timeline cache</div>
+        <div class="legend-item"><span class="swatch rnd" style="background:#f59e0b"></span>Tweet travelling the path</div>
+        <div class="legend-item"><span class="swatch" style="background:#ec4899"></span>Celebrity (pull, not push)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to follow a tweet from the author all the way into followers' precomputed timelines.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx push">
+      <h3>Fan-out on write (push)</h3>
+      <div class="formula">on tweet: LPUSH into N follower lists</div>
+      <ul>
+        <li><b>Reads are instant</b> — feed is a ready-made Redis list.</li>
+        <li>Cost: <b>write amplification</b> — 1 tweet × N followers = N writes.</li>
+        <li>Perfect for the <b>~100:1 read:write</b> ratio: make reads cheap.</li>
+      </ul>
+      <p>Default for normal users. Async via Kafka so write latency stays low.</p>
+    </div>
+    <div class="cx pull">
+      <h3>Fan-out on read (pull)</h3>
+      <div class="formula">on read: query + merge followees' tweets</div>
+      <ul>
+        <li><b>Writes are cheap</b> — tweet stored once, nothing fanned out.</li>
+        <li>Cost: <b>heavy compute every read</b> — query &amp; merge each time.</li>
+        <li>Great for <b>high-fanout celebrities</b> (avoid N-million writes).</li>
+      </ul>
+      <p>Too slow as a default at <span class="big">1M reads/sec</span>.</p>
+    </div>
+  </div>
+
+  <div class="hybrid-band">
+    <h3>The hybrid — Twitter's real answer</h3>
+    <p>Normal users → <b>push</b> (precompute, fast reads). Celebrities above a threshold (e.g. <code>&gt;10K–1M</code> followers) → <b>do NOT push</b> — one tweet would mean millions of Redis writes (a "thundering herd"). Their tweets stay put and are <b>pulled and merged at read time</b> into each follower's pushed timeline. This single switch kills the #1 bottleneck: <b>celebrity fan-out / write amplification</b>.</p>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Why async via Kafka?</b> The write returns as soon as the tweet is persisted; fan-out runs in the background. Decoupling keeps write latency low and gives back-pressure + retries so tweets buffer (not lost) when workers lag.</li>
+      <li><b>Capped Redis list</b> — <code>timeline:{uid}</code> holds only ~<code>800</code> recent <b>tweet_ids</b> (not full content). 1M read QPS serves from this cache; content is <b>batch-hydrated</b> separately from the Tweet Cache.</li>
+      <li><b>Active vs inactive users</b> — don't precompute feeds for users dormant for weeks. Push for active users only; lazily pull-compute for inactive ones to save Redis memory.</li>
+      <li><b>Eventual consistency</b> — because push is async, a new tweet can show up <code>1–2s</code> late in a follower's feed. That's an accepted tradeoff for high availability + low read latency (AP-leaning).</li>
+      <li><b>Snowflake IDs</b> — tweet_ids are 64-bit time-sortable (timestamp + machine + sequence) so timelines merge in reverse-chronological order with no central ID bottleneck.</li>
+      <li><b>Cursor pagination</b> — opaque cursor (last tweet_id/timestamp), not offset, so a constantly-changing feed doesn't produce duplicates or skips.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Because Twitter is massively <b>read-heavy</b>, you <b>precompute the home timeline on write</b> (push fan-out via Kafka into capped Redis lists) so reads are a cheap cache lookup. But blind push explodes for <b>celebrities</b>, so you go <b>hybrid</b>: push for normal users, <b>pull-and-merge celebrity tweets at read time</b> — trading a touch of eventual consistency for availability and sub-200ms feeds.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- follower cells under Redis ----------
+  // 8 normal followers + 1 celebrity-feed marker, laid out as small list cells
+  const FOL_X0 = 304, FOL_Y = 264, FOL_W = 44, FOL_H = 26, FOL_GAP = 4;
+  const followers = [];
+  for (let i = 0; i < 4; i++) {
+    followers.push({ id: "f" + (i+1), x: FOL_X0 + i * (FOL_W + FOL_GAP), celeb:false });
+  }
+  // second row
+  for (let i = 0; i < 4; i++) {
+    followers.push({ id: "f" + (i+5), x: FOL_X0 + i * (FOL_W + FOL_GAP), y2:true, celeb:false });
+  }
+
+  const gFollowers = document.getElementById("g-followers");
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  // build follower cells once
+  followers.forEach((f) => {
+    const y = f.y2 ? FOL_Y + FOL_H + 4 : FOL_Y;
+    f._y = y;
+    const g = svgEl("g", { class: "follower", id: "fol-" + f.id });
+    const r = svgEl("rect", { x:f.x, y:y, width:FOL_W, height:FOL_H, rx:4, fill:"#23233f", stroke:"#3a3a5c", "stroke-width":1.5 });
+    const t = svgEl("text", { x:f.x + FOL_W/2, y:y + FOL_H/2 + 3, "text-anchor":"middle" });
+    t.textContent = "—";
+    g.appendChild(r); g.appendChild(t);
+    gFollowers.appendChild(g);
+  });
+  // shift Redis box / followers down a touch is baked into coords above (y=264..)
+
+  // ---------- DOM refs ----------
+  const ids = ["b-author","b-write","b-store","b-kafka","b-fanout","b-redis","b-reader","b-read","b-celeb"];
+  const box = {}; ids.forEach(i => box[i] = document.getElementById(i));
+  const wire = {
+    aw: document.getElementById("w-author-write"),
+    ws: document.getElementById("w-write-store"),
+    wk: document.getElementById("w-write-kafka"),
+    kf: document.getElementById("w-kafka-fanout"),
+    fr: document.getElementById("w-fanout-redis"),
+    rr: document.getElementById("w-reader-read"),
+    rredis: document.getElementById("w-read-redis"),
+    celeb: document.getElementById("w-celeb-pull"),
+  };
+  const labReadRedis = document.getElementById("lab-read-redis");
+  const labCelebPull = document.getElementById("lab-celeb-pull");
+  const packet = document.getElementById("packet");
+  const packetText = document.getElementById("packet-text");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vPushed = document.getElementById("v-pushed");
+  const vPulled = document.getElementById("v-pulled");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+
+  function center(id) {
+    const b = box[id];
+    return { x: +b.dataset.cx, y: +b.dataset.cy };
+  }
+  function setPacket(id, label) {
+    const c = center(id);
+    packet.setAttribute("transform", `translate(${c.x},${c.y})`);
+    packet.setAttribute("opacity", "1");
+    if (label) packetText.textContent = label;
+  }
+  function hidePacket() { packet.setAttribute("opacity", "0"); }
+
+  // ---------- step definitions ----------
+  // active: which boxes glow; dim: which boxes are faded; hot: which wires highlight;
+  // packetAt: box id to park the travelling tweet (or null); fill: how many follower cells filled
+  const steps = [
+    {
+      active: ["b-author"], dim:["b-reader","b-read","b-celeb"], hot:[], packetAt:"b-author", fill:0, celebFill:false,
+      pushed:0, pulled:0, narrClass:"",
+      narr:`<b>1. Author posts a tweet.</b> A normal user fires <code>POST /v1/tweets</code>. The tweet <b>T</b> (text + Snowflake <code>tweet_id</code>) starts its journey. Twitter sees ~<b>4,600 writes/sec</b> average, ~<b>12K/sec</b> peak — modest compared to reads.`
+    },
+    {
+      active: ["b-write","b-store"], dim:["b-reader","b-read","b-celeb"], hot:["ws"], packetAt:"b-store", fill:0, celebFill:false,
+      pushed:0, pulled:0, narrClass:"",
+      narr:`<b>2. Persist first.</b> The <b>Tweet Write Service</b> writes <b>T</b> to the durable <b>Tweet Store</b> (Cassandra, partitioned by <code>tweet_id</code>). The author's request can return <i>now</i> — everything after this is asynchronous, so write latency stays low.`
+    },
+    {
+      active: ["b-write","b-kafka"], dim:["b-reader","b-read","b-celeb"], hot:["wk"], packetAt:"b-kafka", fill:0, celebFill:false,
+      pushed:0, pulled:0, narrClass:"hot",
+      narr:`<b>3. Publish to Kafka.</b> The service emits a <code>TweetCreated</code> event onto <b>Kafka</b>. This <b>decouples</b> the write path from fan-out: if fan-out is slow, events buffer in the queue (back-pressure + retries) instead of blocking the author or getting lost.`
+    },
+    {
+      active: ["b-fanout","b-kafka"], dim:["b-reader","b-read","b-celeb"], hot:["kf"], packetAt:"b-fanout", fill:0, celebFill:false,
+      pushed:0, pulled:0, narrClass:"",
+      narr:`<b>4. Fan-out workers consume.</b> Async <b>Fan-out Service</b> consumers pick up the event. They look up the author's <b>follower list</b> (reverse index: "who follows this author?") and prepare to push <b>T</b> into each follower's precomputed timeline.`
+    },
+    {
+      active: ["b-fanout","b-redis"], dim:["b-reader","b-read","b-celeb"], hot:["fr"], packetAt:"b-redis", fill:0, celebFill:false,
+      pushed:0, pulled:0, narrClass:"good",
+      narr:`<b>5. Push into Redis timelines.</b> For every follower, the worker does <code>LPUSH tweet_id</code> into <code>timeline:{uid}</code> — a <b>capped list of ~800</b> recent tweet_ids. This is <b>fan-out on write</b>: one tweet becomes N small cache writes.`
+    },
+    {
+      active: ["b-redis"], dim:["b-reader","b-read","b-celeb"], hot:["fr"], packetAt:null, fill:8, celebFill:false,
+      pushed:8, pulled:0, narrClass:"good",
+      narr:`<b>6. Timelines now precomputed.</b> Every follower's home timeline already contains <b>T</b> at the top — <i>before they even open the app</i>. We only store <b>tweet_ids</b> here (not content) to save memory and avoid duplicating updates.`
+    },
+    {
+      active: ["b-reader","b-read","b-redis"], dim:["b-celeb"], hot:["rr","rredis"], packetAt:null, fill:8, celebFill:false,
+      pushed:8, pulled:0, narrClass:"",
+      narr:`<b>7. A follower opens their feed.</b> <code>GET /v1/timeline/home</code> hits the <b>Timeline Read Service</b>, which just reads the ready-made Redis list of tweet_ids — a cheap O(1) lookup. This is why ~<b>1M reads/sec</b> is survivable: the heavy work happened at write time. Content is then <b>batch-hydrated</b> from the Tweet Cache.`
+    },
+    {
+      active: ["b-celeb","b-read"], dim:[], hot:[], celebWire:true, packetAt:null, fill:8, celebFill:true,
+      pushed:8, pulled:1, narrClass:"celeb",
+      narr:`<b>8. The celebrity exception (hybrid).</b> A celeb with <b>50M followers</b> is <b>never</b> push-fanned-out — that's 50M Redis writes per tweet (a thundering herd). Instead their tweets are <b>pulled at read time</b> and <b>merged</b> into the pushed timeline. Push for the masses + pull for the few = the hybrid that makes Twitter actually scale.`
+    },
+  ];
+
+  function applyBox(id, state) {
+    const el = box[id];
+    el.classList.remove("active","dim");
+    if (state === "active") el.classList.add("active");
+    else if (state === "dim") el.classList.add("dim");
+  }
+
+  function setWire(w, hot) {
+    if (!w) return;
+    w.classList.toggle("hot", !!hot);
+    w.setAttribute("marker-end", hot ? "url(#arrowhot)" : "url(#arrow)");
+  }
+
+  let cursor = 0;
+
+  function render() {
+    const s = steps[cursor];
+
+    // reset all boxes to neutral, then apply
+    ids.forEach(id => box[id].classList.remove("active","dim"));
+    (s.dim || []).forEach(id => applyBox(id, "dim"));
+    (s.active || []).forEach(id => applyBox(id, "active"));
+
+    // wires
+    const hotSet = new Set(s.hot || []);
+    setWire(wire.aw, hotSet.has("aw"));
+    setWire(wire.ws, hotSet.has("ws"));
+    setWire(wire.wk, hotSet.has("wk"));
+    setWire(wire.kf, hotSet.has("kf"));
+    setWire(wire.fr, hotSet.has("fr"));
+
+    // read wires opacity
+    const showRead = hotSet.has("rr") || hotSet.has("rredis") || (s.active||[]).includes("b-read");
+    [wire.rr, wire.rredis, labReadRedis].forEach(e => e.setAttribute("opacity", showRead ? "1" : "0.25"));
+    setWire(wire.rr, hotSet.has("rr"));
+    setWire(wire.rredis, hotSet.has("rredis"));
+
+    // celebrity pull wire
+    const cw = !!s.celebWire;
+    wire.celeb.setAttribute("opacity", cw ? "1" : "0");
+    labCelebPull.setAttribute("opacity", cw ? "1" : "0");
+
+    // packet
+    if (s.packetAt) {
+      const label = "T";
+      setPacket(s.packetAt, label);
+    } else {
+      hidePacket();
+    }
+
+    // followers fill
+    followers.forEach((f, idx) => {
+      const g = document.getElementById("fol-" + f.id);
+      const txt = g.querySelector("text");
+      g.classList.remove("filled","filledceleb");
+      if (idx < s.fill) {
+        g.classList.add("filled");
+        txt.textContent = "T";
+        txt.setAttribute("fill", "#6ee7b7");
+      } else {
+        txt.textContent = "—";
+        txt.setAttribute("fill", "#667");
+      }
+      // overlay celeb-merge tint on the read step
+      if (s.celebFill && idx < s.fill) {
+        g.classList.remove("filled");
+        g.classList.add("filledceleb");
+        txt.textContent = "T+C";
+        txt.setAttribute("fill", "#f9a8d4");
+      }
+    });
+
+    // side stats
+    vPushed.textContent = s.pushed;
+    vPulled.textContent = s.pulled;
+
+    // narration
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Quorum (R + W &gt; N) — The Overlap Guarantee</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+  .problem .hi { color: #10b981; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 520px; height: auto; }
+
+  /* coordinator + replica boxes */
+  .repl rect { transition: all .4s ease; }
+  .repl .name { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 14px; fill: #fff; }
+  .repl .ver  { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+  .coord rect { transition: all .4s ease; }
+  .coord text { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 12px; fill: #fff; }
+
+  .flow { stroke-width: 3; fill: none; transition: opacity .3s ease; }
+  .flow.write { stroke: #3b82f6; }
+  .flow.read  { stroke: #8b5cf6; }
+  .flow.idle  { stroke: #3a3a5c; stroke-dasharray: 4 6; }
+  .ackdot { transition: all .4s ease; }
+
+  /* travelling packet */
+  .packet { transition: opacity .25s ease; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; text-align:center; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 20px; color: #3b82f6; font-weight: 700; }
+  .var .value.purple { color: #8b5cf6; }
+  .var .value.grey { color: #94a3b8; }
+
+  .formula-box {
+    background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; text-align: center; color: #e0e0e0;
+    transition: all .3s ease;
+  }
+  .formula-box.good { border-color: #10b981; background: #14321f; color: #6ee7b7; }
+  .formula-box.bad  { border-color: #ef4444; background: #2a1717; color: #fca5a5; }
+  .formula-box b { color: #fff; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.dot { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.write { border-left-color: #3b82f6; background: #16213e; }
+  .narration.read  { border-left-color: #8b5cf6; background: #221b3a; }
+  .narration.good  { border-left-color: #10b981; background: #14321f; }
+  .narration.bad   { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.bad { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.good { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.bad h3 { color: #fca5a5; }
+  .cx.good h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 20px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.bad .big { color: #ef4444; }
+  .cx.good .big { color: #10b981; }
+  /* mini node strips */
+  .strip { display: flex; gap: 6px; margin: 12px 0 4px; }
+  .nd { flex: 1; text-align: center; font-size: 10px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .nd .box { height: 34px; border-radius: 5px; display:flex; align-items:center; justify-content:center;
+             font-weight:700; color:#fff; border: 2px solid transparent; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Quorum &mdash; R + W &gt; N</h1>
+  <div class="subtitle">How a leaderless datastore with <code>N</code> replicas guarantees a read sees the latest write &mdash; by forcing the <b>write set</b> and the <b>read set</b> to <b>overlap on at least one replica</b>, without ever waiting for all <code>N</code> nodes.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy &mdash; the group-project friends</h3>
+    <p>You and <b>N = 5</b> friends each keep the latest copy of a group project on your own laptop. An update only counts as <b>"saved"</b> once at least <b>W = 3</b> friends have copied it. When you want the newest version, you don't ask one friend &mdash; you ask any <b>R = 3</b> friends and take the <b>highest version number</b> among them. Since <code>R + W = 6 &gt; 5 = N</code>, the 3 who saved and the 3 you ask <b>cannot all be different people</b> &mdash; at least one friend is in both groups, and that friend hands you the latest copy. Drop to <code>W = 2, R = 2</code> (<code>4 &lt; 5</code>) and the two groups might never touch &mdash; you could read a stale version.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">setup:</span><code>N = 3</code> replicas per key &nbsp;&middot;&nbsp; <code>W = 2</code> write quorum &nbsp;&middot;&nbsp; <code>R = 2</code> read quorum</div>
+    <div class="row"><span class="label">rule:</span>write waits for <code>W</code> acks &middot; read fetches from <code>R</code> &middot; return the <b>highest version</b></div>
+    <div class="row"><span class="label">guarantee:</span><span class="hi">R + W &gt; N  &rArr;  write set &cap; read set &ge; R + W &minus; N = 1 replica</span></div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 520 380" id="diagram">
+        <!-- client -->
+        <g class="coord" id="g-client">
+          <rect x="20" y="160" width="92" height="58" rx="10" fill="#475569" stroke="#1a1a2e" stroke-width="3"/>
+          <text x="66" y="184" text-anchor="middle">Client /</text>
+          <text x="66" y="200" text-anchor="middle">Coordinator</text>
+        </g>
+
+        <!-- flow lines + replicas drawn by JS -->
+        <g id="g-flows"></g>
+        <g id="g-replicas"></g>
+        <g id="g-acks"></g>
+        <g id="g-packets"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">N replicas</div><div class="value grey" id="v-n">3</div></div>
+        <div class="var"><div class="label">W write</div><div class="value" id="v-w">2</div></div>
+        <div class="var"><div class="label">R read</div><div class="value purple" id="v-r">2</div></div>
+      </div>
+      <div class="formula-box" id="formula">R + W = 2 + 2 = 4 &gt; 3 = N&nbsp; ✓</div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Write request / write set</div>
+        <div class="legend-item"><span class="swatch" style="background:#8b5cf6"></span>Read request / read set</div>
+        <div class="legend-item"><span class="swatch dot" style="background:#10b981"></span>Overlap replica (holds latest)</div>
+        <div class="legend-item"><span class="swatch dot" style="background:#fbbf24"></span>ack received (W reached)</div>
+        <div class="legend-item"><span class="swatch dot" style="background:#94a3b8"></span>Stale / not yet written</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to watch a write fan out across the replicas.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx good">
+      <h3>R + W &gt; N&nbsp;&nbsp;(2 + 2 &gt; 3)</h3>
+      <div class="formula">overlap = R + W − N = 1 ≥ 1</div>
+      <p>Write lands on <b>R1, R2</b> (version v7). Read hits <b>R2, R3</b>. They share <b>R2</b>, which carries v7 — so the read <b>always sees the latest value</b>.</p>
+      <div class="strip" id="strip-good"></div>
+      <p>Result: <span class="big">strong-ish</span> consistency — latest write is always visible.</p>
+    </div>
+    <div class="cx bad">
+      <h3>R + W ≤ N&nbsp;&nbsp;(1 + 1 ≤ 3)</h3>
+      <div class="formula">overlap = R + W − N = −1  → can be 0</div>
+      <p>Write lands only on <b>R1</b> (v7). Read hits only <b>R3</b> (still v6). The sets <b>never touch</b> — the read returns a <b>stale value</b>.</p>
+      <div class="strip" id="strip-bad"></div>
+      <p>Result: <span class="big">eventual</span> consistency — faster, but stale reads possible.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Why the overlap (pigeonhole)?</b> Write touches <code>W</code> nodes, read touches <code>R</code> nodes. If <code>R + W &gt; N</code>, two subsets can't fit inside <code>N</code> nodes without sharing — at least <code>R + W − N</code> replicas are common. For <code>N=3, W=2, R=2</code> that's <code>≥ 1</code>.</li>
+      <li><b>Don't wait for all N.</b> With <code>N=3, W=2</code>, if two replicas ack in ~5ms and the third is slow (~40ms), the write returns at <b>5ms</b> — one slow/GC-paused node is ignored, keeping tail latency low.</li>
+      <li><b>Read picks the winner by version</b> — highest timestamp or dominating vector clock among the <code>R</code> responses. Quorum decides <i>how many</i> nodes; it does <b>not</b> resolve concurrent-write conflicts (that's LWW / vector clocks).</li>
+      <li><b>Read repair</b> — if the <code>R</code> responses disagree, the coordinator pushes the latest value to the stale replicas in the <b>background</b>; it does not block the read.</li>
+      <li><b>Tuning knobs.</b> Read-heavy: <code>R=1, W=N</code> (fast reads, fragile writes). Write-heavy: <code>W=1, R=N</code>. Balanced default: majority <code>W=R=N/2+1</code> (<code>N=3→2</code>, <code>N=5→3</code>).</li>
+      <li><b>W = N is NOT "best".</b> It blocks every write if a single replica is down — availability collapses. Production prefers majority, not full <code>N</code>.</li>
+      <li><b>Used by</b> — Amazon <b>Dynamo</b>, Apache <b>Cassandra</b> (incl. <code>LOCAL_QUORUM</code>), <b>Riak</b>, Voldemort. Raft/Paxos use the same idea: any two majorities of <code>N/2+1</code> always overlap.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Confirm each write on <b>W</b> replicas and each read from <b>R</b> replicas; set <b>R + W &gt; N</b> so the write set and read set <b>always share at least one replica</b>. That shared node carries the newest version, so a read is guaranteed to see the latest write — all without ever waiting for every replica.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- geometry ----------
+  const CLIENT = { x: 66, y: 189 };          // attach point (right edge ~x112)
+  const CX = 112;                            // client right edge
+  // three replicas stacked on the right
+  const replicas = [
+    { id: "R1", x: 360, y: 70  },
+    { id: "R2", x: 360, y: 189 },
+    { id: "R3", x: 360, y: 308 },
+  ];
+  const RW = 120, RH = 56;                    // replica box size
+  function replLeft(r) { return { x: r.x, y: r.y }; }      // left-mid attach
+  function replCenter(r) { return { x: r.x + RW/2, y: r.y }; }
+
+  // ---------- model: which replicas are in the write set / read set ----------
+  // version state per replica across the story
+  // baseline: all at v6. write v7 -> goes to R1,R2 (W=2). R3 stays v6 (slow/missed).
+  const W_SET = ["R1", "R2"];
+  const R_SET = ["R2", "R3"];
+
+  // ---------- steps ----------
+  // fields: phase, narration, narrClass, formula{html,cls}, vars{n,w,r}
+  // visual flags computed per step via a 'state' object
+  const steps = [
+    {
+      phase: "intro",
+      versions: { R1:"v6", R2:"v6", R3:"v6" },
+      writeActive: [], reads: [], acks: [], overlap: [], packet: null,
+      narration: `<b>1. Three replicas, all in sync.</b> The key is replicated on <code>N = 3</code> nodes — <code>R1, R2, R3</code> — each currently holding version <b>v6</b>. The client talks to a coordinator that fans requests out to them.`,
+      narrClass: "", formula: { html: "R + W = 2 + 2 = 4 &gt; 3 = N&nbsp; ✓", cls: "good" }, vars: { n:3, w:2, r:2 }
+    },
+    {
+      phase: "write-fanout",
+      versions: { R1:"v6", R2:"v6", R3:"v6" },
+      writeActive: ["R1","R2","R3"], reads: [], acks: [], overlap: [], packet: { kind:"write", t:0.5 },
+      narration: `<b>2. Write v7 fans out.</b> The coordinator sends the new value <b>v7</b> (with a version marker) to <b>all N</b> replicas in parallel — then waits only for <code>W = 2</code> acknowledgements before replying to the client.`,
+      narrClass: "write", formula: { html: "waiting for W = 2 acks…", cls: "" }, vars: { n:3, w:2, r:2 }
+    },
+    {
+      phase: "write-ack",
+      versions: { R1:"v7", R2:"v7", R3:"v6" },
+      writeActive: ["R1","R2"], reads: [], acks: ["R1","R2"], overlap: [], packet: null,
+      narration: `<b>3. W = 2 acks &rarr; write OK.</b> <code>R1</code> and <code>R2</code> store v7 and ack first → the write returns <b>success</b> immediately. <code>R3</code> was slow / briefly down and still holds <b>v6</b> — that's fine, we never waited for it. The <b>write set = {R1, R2}</b>.`,
+      narrClass: "write", formula: { html: "W reached on {R1, R2} ✓", cls: "good" }, vars: { n:3, w:2, r:2 }
+    },
+    {
+      phase: "read-fanout",
+      versions: { R1:"v7", R2:"v7", R3:"v6" },
+      writeActive: [], reads: ["R2","R3"], acks: [], overlap: [], packet: { kind:"read", t:0.5 },
+      narration: `<b>4. A read asks R = 2 replicas.</b> Later a read comes in. The coordinator queries <code>R = 2</code> replicas — here it happens to reach <code>R2</code> and <code>R3</code>. Note <code>R3</code> still thinks the answer is the stale <b>v6</b>. The <b>read set = {R2, R3}</b>.`,
+      narrClass: "read", formula: { html: "reading from {R2, R3}…", cls: "" }, vars: { n:3, w:2, r:2 }
+    },
+    {
+      phase: "overlap",
+      versions: { R1:"v7", R2:"v7", R3:"v6" },
+      writeActive: [], reads: ["R2","R3"], acks: [], overlap: ["R2"], packet: null,
+      narration: `<b>5. The overlap saves us.</b> Write set <b>{R1, R2}</b> and read set <b>{R2, R3}</b> share <code>R2</code> — and <code>R2</code> holds <b>v7</b>. Because <code>R + W &gt; N</code>, this overlap is <b>guaranteed</b> to exist (here ≥ <code>R+W−N = 1</code> node). The read compares versions v7 vs v6 and returns the newest: <b>v7</b>.`,
+      narrClass: "good", formula: { html: "overlap = R+W−N = 1 → R2 has v7 ✓", cls: "good" }, vars: { n:3, w:2, r:2 }
+    },
+    {
+      phase: "repair",
+      versions: { R1:"v7", R2:"v7", R3:"v7" },
+      writeActive: [], reads: ["R2","R3"], acks: [], overlap: ["R2"], packet: { kind:"repair", t:0.5 },
+      narration: `<b>6. Read repair heals the laggard.</b> Having noticed <code>R3</code> returned the stale v6, the coordinator pushes <b>v7</b> to <code>R3</code> in the <b>background</b> — this does not block the read. Replicas converge; future reads see v7 everywhere.`,
+      narrClass: "good", formula: { html: "all replicas converged → v7", cls: "good" }, vars: { n:3, w:2, r:2 }
+    },
+    {
+      phase: "broken",
+      versions: { R1:"v7", R2:"v6", R3:"v6" },
+      writeActive: ["R1"], reads: ["R3"], acks: ["R1"], overlap: [], broken: true, packet: null,
+      narration: `<b>7. Counter-example: R + W ≤ N.</b> Now set <code>W = 1, R = 1</code> (<code>1 + 1 = 2 ≤ 3</code>). The write lands only on <code>R1</code> (v7); a read hits only <code>R3</code> (still v6). The two sets <b>never overlap</b> — the read returns a <b>stale v6</b>. No overlap, no guarantee.`,
+      narrClass: "bad", formula: { html: "R + W = 1 + 1 = 2 ≤ 3 = N&nbsp; ✗", cls: "bad" }, vars: { n:3, w:1, r:1 }
+    },
+  ];
+
+  // ---------- DOM ----------
+  const gFlows = document.getElementById("g-flows");
+  const gRepl  = document.getElementById("g-replicas");
+  const gAcks  = document.getElementById("g-acks");
+  const gPack  = document.getElementById("g-packets");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const fEl    = document.getElementById("formula");
+  const vN = document.getElementById("v-n");
+  const vW = document.getElementById("v-w");
+  const vR = document.getElementById("v-r");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  const VER_COLOR = { latest: "#10b981", stale: "#f59e0b" };
+  const REPL_FILL = "#2d2d50";
+
+  let cursor = 0;
+  let packetTimer = null;
+
+  function clearTimers() { if (packetTimer) { clearInterval(packetTimer); packetTimer = null; } }
+
+  function render() {
+    clearTimers();
+    const s = steps[cursor];
+    gFlows.innerHTML = ""; gRepl.innerHTML = ""; gAcks.innerHTML = ""; gPack.innerHTML = "";
+
+    const writeSetThis = s.broken ? s.writeActive : (s.phase === "intro" ? [] : s.writeActive.length ? s.writeActive : []);
+
+    // ---- flow lines: client -> each replica ----
+    replicas.forEach((r) => {
+      const left = replLeft(r);
+      const inWrite = s.writeActive.includes(r.id);
+      const inRead  = s.reads.includes(r.id);
+      let cls = "flow idle";
+      if (inWrite) cls = "flow write";
+      else if (inRead) cls = "flow read";
+      // gentle curve
+      const midx = (CX + left.x) / 2;
+      const d = `M ${CX} ${CLIENT.y} C ${midx} ${CLIENT.y}, ${midx} ${left.y}, ${left.x} ${left.y}`;
+      const p = svgEl("path", { class: cls, d: d, opacity: (inWrite||inRead) ? 0.95 : 0.5 });
+      gFlows.appendChild(p);
+    });
+
+    // ---- replica boxes ----
+    replicas.forEach((r) => {
+      const ver = s.versions[r.id];
+      const isLatest = ver === "v7";
+      const isOverlap = s.overlap.includes(r.id);
+      const g = svgEl("g", { class: "repl" });
+      const rect = svgEl("rect", {
+        x: r.x, y: r.y - RH/2, width: RW, height: RH, rx: 10,
+        fill: REPL_FILL,
+        stroke: isOverlap ? "#10b981" : (s.acks.includes(r.id) ? "#fbbf24" : "#3a3a5c"),
+        "stroke-width": isOverlap ? 4 : 2.5
+      });
+      g.appendChild(rect);
+      const name = svgEl("text", { class:"name", x: r.x + 14, y: r.y - 6 });
+      name.textContent = r.id;
+      g.appendChild(name);
+      const verT = svgEl("text", { class:"ver", x: r.x + 14, y: r.y + 14,
+        fill: isLatest ? VER_COLOR.latest : VER_COLOR.stale });
+      verT.textContent = isLatest ? "● " + ver + " (latest)" : "● " + ver + " (stale)";
+      g.appendChild(verT);
+      // role tag
+      const roleParts = [];
+      if (s.writeActive.includes(r.id) || (writeSetThis.includes(r.id))) {}
+      let tag = "";
+      const inW = (s.phase.startsWith("write") || s.broken) && s.writeActive.includes(r.id);
+      const inR = (s.phase==="read-fanout"||s.phase==="overlap"||s.phase==="repair"||s.broken) && s.reads.includes(r.id);
+      gRepl.appendChild(g);
+
+      // overlap badge
+      if (isOverlap) {
+        const badge = svgEl("text", { x: r.x + RW/2, y: r.y - RH/2 - 8, "text-anchor":"middle",
+          "font-family":"-apple-system, sans-serif", "font-size":"11px", "font-weight":"700", fill:"#10b981" });
+        badge.textContent = "OVERLAP — in W set ∩ R set";
+        gRepl.appendChild(badge);
+      }
+    });
+
+    // ---- ack dots (write) ----
+    s.acks.forEach((id) => {
+      const r = replicas.find(x => x.id === id);
+      const dot = svgEl("circle", { class:"ackdot", cx: r.x + RW + 12, cy: r.y, r: 7, fill:"#fbbf24" });
+      gAcks.appendChild(dot);
+      const t = svgEl("text", { x: r.x + RW + 12, y: r.y + 22, "text-anchor":"middle",
+        "font-family":"SF Mono, monospace", "font-size":"9px", fill:"#fbbf24" });
+      t.textContent = "ack";
+      gAcks.appendChild(t);
+    });
+
+    // ---- travelling packet animation ----
+    if (s.packet) {
+      const targets = s.packet.kind === "read" ? s.reads
+                    : s.packet.kind === "repair" ? ["R3"]
+                    : s.writeActive;
+      const color = s.packet.kind === "read" ? "#8b5cf6"
+                  : s.packet.kind === "repair" ? "#10b981" : "#3b82f6";
+      const reverse = s.packet.kind === "read"; // reads travel back toward client too; keep outward for clarity
+      const dots = targets.map((id) => {
+        const r = replicas.find(x => x.id === id);
+        const c = svgEl("circle", { class:"packet", r: 6, fill: color, stroke:"#1a1a2e", "stroke-width":1.5, opacity:0 });
+        gPack.appendChild(c);
+        const label = svgEl("text", { class:"packet", "text-anchor":"middle",
+          "font-family":"SF Mono, monospace", "font-size":"8px", fill:"#fff", opacity:0 });
+        label.textContent = s.packet.kind === "read" ? "?" : "v7";
+        gPack.appendChild(label);
+        return { c, label, r };
+      });
+      let t = 0;
+      packetTimer = setInterval(() => {
+        t += 0.025;
+        if (t > 1) t = 0;
+        dots.forEach(({ c, label, r }) => {
+          const left = replLeft(r);
+          // travel client -> replica (outward); read/repair could reverse but outward reads fine
+          const sx = CX, sy = CLIENT.y, ex = left.x - 6, ey = left.y;
+          const x = sx + (ex - sx) * t;
+          const y = sy + (ey - sy) * t;
+          c.setAttribute("cx", x); c.setAttribute("cy", y);
+          label.setAttribute("x", x); label.setAttribute("y", y - 9);
+          const op = t < 0.1 ? t*10 : t > 0.9 ? (1-t)*10 : 1;
+          c.setAttribute("opacity", op); label.setAttribute("opacity", op);
+        });
+      }, 30);
+    }
+
+    // ---- side ----
+    vN.textContent = s.vars.n;
+    vW.textContent = s.vars.w;
+    vR.textContent = s.vars.r;
+    fEl.className = "formula-box" + (s.formula.cls ? " " + s.formula.cls : "");
+    fEl.innerHTML = s.formula.html;
+
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  // ---------- contrast strips ----------
+  // good: W={R1,R2}=v7, R={R2,R3}; R2 overlap green
+  function strip(container, cfg) {
+    container.innerHTML = "";
+    cfg.forEach((c) => {
+      const wrap = document.createElement("div");
+      wrap.className = "nd";
+      const box = document.createElement("div");
+      box.className = "box";
+      box.style.background = c.bg;
+      box.style.borderColor = c.border || "transparent";
+      box.textContent = c.label;
+      wrap.appendChild(box);
+      const lbl = document.createElement("div");
+      lbl.textContent = c.tag;
+      lbl.style.color = c.tagColor || "#8888aa";
+      lbl.style.marginTop = "4px";
+      wrap.appendChild(lbl);
+      container.appendChild(wrap);
+    });
+  }
+  strip(document.getElementById("strip-good"), [
+    { label:"R1 v7", bg:"#1d4ed8", tag:"W set", tagColor:"#93c5fd" },
+    { label:"R2 v7", bg:"#065f46", border:"#10b981", tag:"W ∩ R ✓", tagColor:"#6ee7b7" },
+    { label:"R3 v6", bg:"#5b21b6", tag:"R set", tagColor:"#c4b5fd" },
+  ]);
+  strip(document.getElementById("strip-bad"), [
+    { label:"R1 v7", bg:"#1d4ed8", tag:"W set", tagColor:"#93c5fd" },
+    { label:"R2 v6", bg:"#3a3a5c", tag:"untouched", tagColor:"#8888aa" },
+    { label:"R3 v6", bg:"#5b21b6", tag:"R set ✗", tagColor:"#fca5a5" },
+  ]);
+
+  render();
+})();
+</script>
+</body>
+</html>

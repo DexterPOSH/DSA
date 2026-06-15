@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>REST vs RPC vs GraphQL — The Same Dashboard, Three Ways</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0 0 8px; color: #d0d0e0; font-size: 15px; }
+  .analogy p:last-child { margin-bottom: 0; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  /* style toggle tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab {
+    background: #24243e; border: 1px solid #3a3a5c; color: #a0a0b8;
+    padding: 9px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;
+    transition: all .15s ease; font-family: inherit;
+  }
+  .tab:hover { background: #2d2d50; color: #e0e0e0; }
+  .tab.active.rest { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+  .tab.active.rpc { background: #a855f7; border-color: #a855f7; color: #fff; }
+  .tab.active.graphql { background: #ec4899; border-color: #ec4899; color: #fff; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .seq-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 500px; height: auto; }
+  .lane-label { font-weight: 700; font-size: 13px; fill: #fff; }
+  .lane-sub { font-size: 10px; fill: #8888aa; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .lifeline { stroke: #3a3a5c; stroke-width: 2; stroke-dasharray: 4 4; }
+  .actor-box { rx: 8; }
+  .req-line { stroke-width: 2.5; }
+  .req-label { font-size: 10px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .packet { transition: none; }
+  .roundtrip-tag { font-size: 10px; fill: #f59e0b; font-family: "SF Mono", Menlo, Consolas, monospace; font-weight: 700; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.pink { color: #ec4899; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.dot { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.warn { border-left-color: #f59e0b; background: #332611; }
+  .narration.pink { border-left-color: #ec4899; background: #331022; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast scoreboard */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 18px 20px; }
+  .cx.rest { background: #14213a; border: 1px solid #3b82f6; }
+  .cx.rpc { background: #211433; border: 1px solid #a855f7; }
+  .cx.graphql { background: #2a1022; border: 1px solid #ec4899; }
+  .cx h3 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.rest h3 { color: #93c5fd; }
+  .cx.rpc h3 { color: #d8b4fe; }
+  .cx.graphql h3 { color: #f9a8d4; }
+  .cx .metric { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 0; border-bottom: 1px solid #ffffff14; }
+  .cx .metric:last-child { border-bottom: none; }
+  .cx .metric .k { color: #a0a0b8; }
+  .cx .metric .v { color: #fff; font-family: "SF Mono", Menlo, Consolas, monospace; font-weight: 700; text-align: right; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>REST vs RPC vs GraphQL</h1>
+  <div class="subtitle">The same job — render a <b>user dashboard</b> showing the user, their orders, and recommendations — done three ways. Watch the request packets travel and count the <b>round-trips</b>, <b>payload shape</b>, and <b>caching</b> cost for each style. <code>~50&ndash;150 ms</code> of mobile latency rides on every round-trip.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — three ways to order at a restaurant</h3>
+    <p><b>REST</b> is a printed menu of fixed dishes (resources). You talk in nouns + standard verbs — <code>GET</code> = "show me", <code>POST</code> = "make new", <code>DELETE</code> = "remove". Any waiter understands you. But want a dish <i>plus</i> its chef <i>plus</i> its calories? You may have to flag the waiter down <b>three separate times</b>.</p>
+    <p><b>RPC</b> is calling a private cook directly: <code>makeButterChicken(spicy=true)</code>. You focus on the <b>verb</b>, share a tight shorthand, and it's blazing fast — but a stranger who doesn't know the shorthand is lost (tight coupling).</p>
+    <p><b>GraphQL</b> is handing a waiter <b>one slip</b> that says exactly which fields you want — name, price, chef — no more, no less. One round-trip brings precisely that, but the waiter needs a smart brain (query planner + resolvers) to fulfil any custom slip.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">goal:</span><code>dashboard = user(42) + their orders + recommendations</code></div>
+    <div class="row"><span class="label">client:</span><code>mobile app</code> &nbsp;&middot;&nbsp; server holds <code>UserService</code>, <code>OrderService</code>, <code>RecoService</code></div>
+    <div class="row"><span class="label">measure:</span><code>round-trips &times; latency</code>, <code>payload bytes</code>, <code>cacheable?</code></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab rest active" data-style="rest">REST</button>
+    <button class="tab rpc" data-style="rpc">RPC / gRPC</button>
+    <button class="tab graphql" data-style="graphql">GraphQL</button>
+  </div>
+
+  <div class="stage">
+    <div class="seq-holder">
+      <svg viewBox="0 0 500 430" id="seq">
+        <!-- client lane -->
+        <rect class="actor-box" x="40" y="20" width="120" height="38" rx="8" fill="#2d2d50" stroke="#3a3a5c" stroke-width="2"/>
+        <text class="lane-label" x="100" y="38" text-anchor="middle">Client</text>
+        <text class="lane-sub" x="100" y="51" text-anchor="middle">mobile app</text>
+        <line class="lifeline" x1="100" y1="58" x2="100" y2="410"/>
+
+        <!-- server lane -->
+        <rect class="actor-box" x="340" y="20" width="120" height="38" rx="8" fill="#2d2d50" stroke="#3a3a5c" stroke-width="2"/>
+        <text class="lane-label" x="400" y="38" text-anchor="middle" id="server-name">Server</text>
+        <text class="lane-sub" x="400" y="51" text-anchor="middle" id="server-sub">REST API</text>
+        <line class="lifeline" x1="400" y1="58" x2="400" y2="410"/>
+
+        <g id="g-messages"></g>
+        <g id="g-packet"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Round-trips</div><div class="value amber" id="v-rt">0</div></div>
+        <div class="var"><div class="label">~Latency</div><div class="value amber" id="v-lat">0 ms</div></div>
+        <div class="var"><div class="label">Payload</div><div class="value" id="v-payload">&mdash;</div></div>
+        <div class="var"><div class="label">HTTP cache</div><div class="value green" id="v-cache">&mdash;</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch dot" style="background:#3b82f6"></span>Request packet leaving client</div>
+        <div class="legend-item"><span class="swatch dot" style="background:#10b981"></span>Response packet returning</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Each arrow pair = 1 round-trip (~50&ndash;150 ms)</div>
+        <div class="legend-item"><span class="swatch dot" style="background:#ef4444"></span>Over-/under-fetch or N+1 cost</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Pick a style above, then press <b>Next</b> to send the first request.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx rest">
+      <h3>REST</h3>
+      <div class="metric"><span class="k">Round-trips</span><span class="v">3</span></div>
+      <div class="metric"><span class="k">Payload</span><span class="v">JSON, fixed shape</span></div>
+      <div class="metric"><span class="k">Fetch flaw</span><span class="v">over + under-fetch</span></div>
+      <div class="metric"><span class="k">HTTP caching</span><span class="v">strong (GET, ETag, CDN)</span></div>
+      <div class="metric"><span class="k">Typing</span><span class="v">none (unless OpenAPI)</span></div>
+      <div class="metric"><span class="k">Best for</span><span class="v">public CRUD APIs</span></div>
+    </div>
+    <div class="cx rpc">
+      <h3>RPC / gRPC</h3>
+      <div class="metric"><span class="k">Round-trips</span><span class="v">1 (aggregate method)</span></div>
+      <div class="metric"><span class="k">Payload</span><span class="v">Protobuf, 30&ndash;60% smaller</span></div>
+      <div class="metric"><span class="k">Transport</span><span class="v">HTTP/2 multiplex + stream</span></div>
+      <div class="metric"><span class="k">HTTP caching</span><span class="v">hard (binary POST)</span></div>
+      <div class="metric"><span class="k">Typing</span><span class="v">strong (<code>.proto</code> codegen)</span></div>
+      <div class="metric"><span class="k">Best for</span><span class="v">internal microservices</span></div>
+    </div>
+    <div class="cx graphql">
+      <h3>GraphQL</h3>
+      <div class="metric"><span class="k">Round-trips</span><span class="v">1 (any shape)</span></div>
+      <div class="metric"><span class="k">Payload</span><span class="v">JSON, exact fields</span></div>
+      <div class="metric"><span class="k">Fetch flaw</span><span class="v">none over/under-fetch</span></div>
+      <div class="metric"><span class="k">HTTP caching</span><span class="v">hard (POST) &middot; N+1 risk</span></div>
+      <div class="metric"><span class="k">Typing</span><span class="v">strong (SDL schema)</span></div>
+      <div class="metric"><span class="k">Best for</span><span class="v">mobile / BFF aggregation</span></div>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>"REST means JSON" — wrong.</b> REST is an <b>architectural style</b> (resources, stateless, uniform interface, HTTP verbs), not a format. JSON is just the common convention; true REST also includes hypermedia (HATEOAS).</li>
+      <li><b>REST over- AND under-fetches.</b> A thin endpoint under-fetches (extra calls); a fat endpoint over-fetches (extra bytes). GraphQL solves both by letting the client pick exact fields.</li>
+      <li><b>"GraphQL is always faster" — wrong.</b> It saves round-trips and trims payload, but naive resolvers hit the <b>N+1 problem</b> — one query can fire hundreds of DB calls. <code>DataLoader</code> batching is almost mandatory.</li>
+      <li><b>gRPC runs on HTTP/2</b> (not HTTP/3 by default) with <b>Protobuf</b> binary — 30&ndash;60% smaller, single-digit ms internal latency. Browsers need a <b>gRPC-Web</b> proxy.</li>
+      <li><b>Caching:</b> REST <code>GET</code>s cache free on CDN/<code>ETag</code>. GraphQL/gRPC are <code>POST</code>-style → need persisted queries, field-level caching, or query hashing.</li>
+      <li><b>Versioning:</b> REST uses URL versions (<code>/v1</code>, <code>/v2</code>); GraphQL evolves fields with <code>@deprecated</code>; gRPC uses Protobuf field numbers for backward compatibility.</li>
+      <li><b>Not mutually exclusive:</b> common production shape is gRPC between internal services + a BFF/gateway exposing REST or GraphQL to the outside.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>All three move data between client and server, but optimize different costs: <b>REST</b> trades round-trips for dead-simple, cacheable, universally-understood resource URLs; <b>gRPC</b> trades browser-friendliness for the fastest, most compact, strongly-typed internal calls; <b>GraphQL</b> trades caching simplicity for one round-trip that returns exactly the fields each screen needs. Pick by who the client is and what you're optimizing — and remember they happily <b>coexist layer-by-layer</b> in one system.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- geometry ----------
+  const CLIENT_X = 100, SERVER_X = 400;
+  const Y0 = 80;            // first message y
+  const DY = 44;            // vertical gap between message rows
+
+  const gMsg = document.getElementById("g-messages");
+  const gPacket = document.getElementById("g-packet");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const serverName = document.getElementById("server-name");
+  const serverSub = document.getElementById("server-sub");
+  const vRt = document.getElementById("v-rt");
+  const vLat = document.getElementById("v-lat");
+  const vPayload = document.getElementById("v-payload");
+  const vCache = document.getElementById("v-cache");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+  const tabs = Array.from(document.querySelectorAll(".tab"));
+
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // a "message" = one arrow on the diagram.
+  // dir: "req" (client->server) or "res" (server->client)
+  // color, label, and which round-trip index it belongs to.
+  // ---------- the three scenarios ----------
+  // each step reveals messages 0..n and sets stats + narration.
+
+  const REQ = "#3b82f6", RES = "#10b981", BAD = "#ef4444";
+
+  const scenarios = {
+    rest: {
+      server: "REST API", sub: "GET /users/...",
+      msgs: [
+        { dir:"req", color:REQ, label:"GET /users/42" },
+        { dir:"res", color:RES, label:"200 user {...}" },
+        { dir:"req", color:REQ, label:"GET /users/42/orders" },
+        { dir:"res", color:RES, label:"200 [orders]" },
+        { dir:"req", color:REQ, label:"GET /recommendations?u=42" },
+        { dir:"res", color:RES, label:"200 [recos]" },
+      ],
+      steps: [
+        { reveal:0, rt:0, lat:0, payload:"—", cache:"yes", cls:"",
+          narr:`<b>REST: resources as URLs.</b> The dashboard needs three things, and REST models each as its own noun + <code>GET</code> verb. Press Next to fire the first call.` },
+        { reveal:2, rt:1, lat:100, payload:"fixed", cache:"yes", cls:"",
+          narr:`<b>Round-trip 1.</b> <code>GET /users/42</code> → <code>200 OK</code> with the user JSON. Each <code>GET</code> is <b>stateless</b> and <b>cacheable</b> on a CDN via <code>Cache-Control</code>/<code>ETag</code> — a big operational win.` },
+        { reveal:4, rt:2, lat:200, payload:"fixed", cache:"yes", cls:"warn",
+          narr:`<b>Round-trip 2.</b> The orders live at a different resource, so that's a <i>second</i> request. This is <b>under-fetching</b>: related data forces extra calls. Each one adds ~50–150 ms on mobile.` },
+        { reveal:6, rt:3, lat:300, payload:"over+under", cache:"yes", cls:"warn",
+          narr:`<b>Round-trip 3.</b> Recommendations = a third call. REST <b>over- AND under-fetches</b>: a thin endpoint needs extra trips; a fat one ships fields you didn't want. Net: <b>3 round-trips ≈ 300 ms</b>, but every response is cacheable and universally understood.` },
+      ]
+    },
+    rpc: {
+      server: "gRPC service", sub: "HTTP/2 + Protobuf",
+      msgs: [
+        { dir:"req", color:"#a855f7", label:"stub: GetDashboard(id=42)" },
+        { dir:"res", color:RES, label:"Dashboard{user,orders,recos}" },
+      ],
+      steps: [
+        { reveal:0, rt:0, lat:0, payload:"—", cache:"no", cls:"",
+          narr:`<b>RPC: call a remote function.</b> You design an aggregate method <code>GetDashboard(id=42)</code> on the server's <code>.proto</code> contract. The client calls a generated <b>stub</b> that looks like a local function.` },
+        { reveal:1, rt:0, lat:0, payload:"binary", cache:"no", cls:"",
+          narr:`<b>Stub serializes → wire.</b> Arguments are packed as <b>Protocol Buffers</b> (binary, schema-driven) and sent over <b>HTTP/2</b>. One TCP connection multiplexes many concurrent streams — and supports bidirectional <b>streaming</b>.` },
+        { reveal:2, rt:1, lat:5, payload:"30-60% smaller", cache:"no", cls:"good",
+          narr:`<b>One round-trip, tiny payload.</b> The server runs the method and returns one strongly-typed message. Protobuf is <b>30–60% smaller</b> than JSON and faster to parse — internal service calls hit <b>single-digit ms</b>. Schema mismatches are caught at <b>compile time</b>.` },
+        { reveal:2, rt:1, lat:5, payload:"30-60% smaller", cache:"no", cls:"warn",
+          narr:`<b>The catch.</b> Browsers can't speak gRPC natively (need a <b>gRPC-Web proxy</b>), and HTTP caching is hard because these are binary <code>POST</code>-style calls. gRPC shines for <b>internal east-west microservice</b> traffic, not public browser-facing APIs.` },
+      ]
+    },
+    graphql: {
+      server: "GraphQL", sub: "POST /graphql",
+      msgs: [
+        { dir:"req", color:"#ec4899", label:"POST /graphql { user{...orders recos} }" },
+        { dir:"res", color:RES, label:"200 { exactly those fields }" },
+      ],
+      steps: [
+        { reveal:0, rt:0, lat:0, payload:"—", cache:"no", cls:"",
+          narr:`<b>GraphQL: one endpoint, one query.</b> The client writes a query describing the <i>exact shape</i> it wants: <code>{ user(id:42){ name orders{ id total } recommendations{ title } } }</code> — sent to a single <code>POST /graphql</code>.` },
+        { reveal:1, rt:1, lat:100, payload:"exact fields", cache:"no", cls:"",
+          narr:`<b>Server resolves the tree.</b> It parses + validates the query, then runs a <b>resolver</b> per field (DB, another service, cache — anywhere). It assembles the response in the query's <i>exact</i> shape: <b>no over-fetch, no under-fetch</b>.` },
+        { reveal:2, rt:1, lat:100, payload:"exact fields", cache:"no", cls:"good",
+          narr:`<b>One round-trip.</b> The nested user + orders + recommendations that took REST <b>3 calls</b> arrive here in <b>1</b> ≈ 100 ms, with a payload trimmed to just the requested fields — ideal for mobile bandwidth and battery.` },
+        { reveal:2, rt:1, lat:100, payload:"exact fields", cache:"no", cls:"pink",
+          narr:`<b>The catch.</b> Most queries are <code>POST</code> with varying shapes → <b>HTTP caching is hard</b> (use persisted queries / field-level caching). And naive resolvers cause the <b>N+1 problem</b> — fetching N orders can fire N extra DB calls. <code>DataLoader</code> batching is almost mandatory.` },
+      ]
+    }
+  };
+
+  let style = "rest";
+  let cursor = 0;
+  let animId = null;
+
+  function curScenario() { return scenarios[style]; }
+  function curSteps() { return curScenario().steps; }
+
+  // draw a single message arrow (static), at row index `row`
+  function drawMessage(m, row, animatePacket) {
+    const y = Y0 + row * DY;
+    const fromX = m.dir === "req" ? CLIENT_X : SERVER_X;
+    const toX   = m.dir === "req" ? SERVER_X : CLIENT_X;
+    const isReq = m.dir === "req";
+
+    // line
+    const line = svgEl("line", {
+      x1: fromX, y1: y, x2: toX, y2: y,
+      stroke: m.color, "stroke-width": 2.5,
+      "stroke-dasharray": isReq ? "none" : "6 4",
+      class: "req-line"
+    });
+    gMsg.appendChild(line);
+
+    // arrowhead
+    const dir = toX > fromX ? 1 : -1;
+    const hx = toX, hy = y;
+    const head = svgEl("path", {
+      d: `M ${hx} ${hy} l ${-8*dir} -5 l 0 10 z`,
+      fill: m.color
+    });
+    gMsg.appendChild(head);
+
+    // label (above the line)
+    const midX = (fromX + toX) / 2;
+    const lbl = svgEl("text", {
+      x: midX, y: y - 6, "text-anchor": "middle",
+      class: "req-label", fill: isReq ? "#cbd5e1" : "#86efac"
+    });
+    lbl.textContent = m.label;
+    gMsg.appendChild(lbl);
+
+    // round-trip bracket tag for response rows in REST (show RT number)
+    if (animatePacket) animatePacketOn(fromX, toX, y, m.color);
+  }
+
+  function animatePacketOn(fromX, toX, y, color) {
+    if (animId) cancelAnimationFrame(animId);
+    gPacket.innerHTML = "";
+    const dot = svgEl("circle", { cx: fromX, cy: y, r: 7, fill: color, stroke:"#fff", "stroke-width":1.5 });
+    gPacket.appendChild(dot);
+    const dur = 520;
+    const start = performance.now();
+    function frame(t) {
+      let p = (t - start) / dur;
+      if (p > 1) p = 1;
+      const ease = p < .5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
+      const x = fromX + (toX - fromX) * ease;
+      dot.setAttribute("cx", x);
+      if (p < 1) animId = requestAnimationFrame(frame);
+      else setTimeout(() => { gPacket.innerHTML = ""; }, 180);
+    }
+    animId = requestAnimationFrame(frame);
+  }
+
+  function render(animateLast) {
+    const sc = curScenario();
+    const st = curSteps()[cursor];
+    gMsg.innerHTML = "";
+    if (!animateLast) gPacket.innerHTML = "";
+
+    serverName.textContent = sc.server;
+    serverSub.textContent = sc.sub;
+
+    const n = st.reveal; // number of messages to show
+    for (let i = 0; i < n; i++) {
+      const isLast = (i === n - 1);
+      drawMessage(sc.msgs[i], i, animateLast && isLast);
+    }
+
+    // stats
+    vRt.textContent = st.rt;
+    vLat.textContent = st.lat + " ms";
+    vPayload.textContent = st.payload;
+    vCache.textContent = st.cache === "yes" ? "yes" : (st.cache === "no" ? "hard" : st.cache);
+    vCache.className = "value " + (st.cache === "yes" ? "green" : "amber");
+    vLat.className = "value " + (st.lat <= 5 && st.lat > 0 ? "green" : "amber");
+
+    narrEl.className = "narration" + (st.cls ? " " + st.cls : "");
+    narrEl.innerHTML = st.narr;
+
+    stepEl.textContent = `step ${cursor} / ${curSteps().length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === curSteps().length - 1;
+  }
+
+  function setStyle(s) {
+    style = s;
+    cursor = 0;
+    tabs.forEach(t => {
+      t.classList.toggle("active", t.dataset.style === s);
+    });
+    render(false);
+  }
+
+  function next() { if (cursor < curSteps().length - 1) { cursor++; render(true); } }
+  function prev() { if (cursor > 0) { cursor--; render(false); } }
+  function reset() { cursor = 0; render(false); }
+
+  tabs.forEach(t => t.addEventListener("click", () => setStyle(t.dataset.style)));
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  setStyle("rest");
+})();
+</script>
+</body>
+</html>

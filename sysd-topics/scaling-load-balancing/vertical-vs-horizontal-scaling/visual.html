@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vertical vs Horizontal Scaling — Scale Up vs Scale Out</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* diagram SVG */
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 520px; height: auto; }
+
+  .lane-label { fill: #8888aa; font-size: 12px; font-family: "SF Mono", Menlo, Consolas, monospace; text-transform: uppercase; letter-spacing: 1px; }
+  .lane-divider { stroke: #3a3a5c; stroke-width: 1.5; stroke-dasharray: 4 4; }
+
+  .box { transition: all .45s cubic-bezier(.4,0,.2,1); }
+  .box rect { transition: all .45s cubic-bezier(.4,0,.2,1); }
+  .box text { font-family: -apple-system, sans-serif; fill: #fff; }
+  .box.dim { opacity: .18; }
+
+  .lb { transition: all .4s ease; }
+  .lb text { font-family: -apple-system, sans-serif; font-weight: 700; fill: #fff; }
+
+  .pkt { transition: all .15s linear; }
+  .wire { stroke: #3a3a5c; stroke-width: 2; fill: none; transition: all .4s ease; }
+  .wire.live { stroke: #f59e0b; }
+  .spec { font-family: "SF Mono", Menlo, Consolas, monospace; fill: #cbd5e1; }
+  .ceiling { stroke: #ef4444; stroke-width: 2; stroke-dasharray: 6 4; }
+  .ceiling-label { fill: #fca5a5; font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .dead { stroke: #ef4444; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.up { background: #1c2436; border: 1px solid #3b82f6; }
+  .cx.out { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.up h3 { color: #93c5fd; }
+  .cx.out h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx ul { margin: 8px 0 0; padding-left: 18px; }
+  .cx li { margin: 5px 0; font-size: 13px; color: #c8c8d8; }
+  .cx li b { color: #fff; }
+  .cx li.pro::marker { content: "+ "; color: #10b981; }
+  .cx li.con::marker { content: "− "; color: #ef4444; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Vertical vs Horizontal Scaling</h1>
+  <div class="subtitle">Two ways to handle more traffic: <b>scale up</b> — make one machine more powerful (more CPU/RAM) — versus <b>scale out</b> — add more machines behind a <code>load balancer</code> and split the load. Watch the same growing request load hit each strategy and see where each one shines and breaks.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the busy dhaba</h3>
+    <p>You run a <b>dhaba</b> with one cook. Customers keep coming. <b>Vertical scaling</b>: give that one cook a bigger stove, faster gas, three burners — same kitchen, one person, simply faster. Simple, but the cook is one human: if he gets sick, the whole dhaba shuts (a <b>single point of failure</b>), and even the best stove has a ceiling. <b>Horizontal scaling</b>: hire three more cooks, each with their own stove, and a waiter (the <b>load balancer</b>) hands each order to a free cook. One cook falls ill — the other three carry on. Need more capacity? Add another cook. The cost: coordination — who takes which order, everyone following the same recipe (<b>consistent data</b>), a more complex kitchen.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">workload:</span><code>incoming QPS keeps rising — one node serves ~2000 QPS</code></div>
+    <div class="row"><span class="label">scale up:</span><code>4 vCPU / 16 GB → 16 vCPU / 64 GB</code> &nbsp;(same app, more power)</div>
+    <div class="row"><span class="label">scale out:</span><code>N identical replicas behind a load balancer</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 520 420" id="diagram">
+        <!-- lane divider -->
+        <line class="lane-divider" x1="260" y1="40" x2="260" y2="400" />
+        <text class="lane-label" x="130" y="28" text-anchor="middle">SCALE UP &#8593; (vertical)</text>
+        <text class="lane-label" x="390" y="28" text-anchor="middle">SCALE OUT &#8594; (horizontal)</text>
+
+        <!-- traffic source -->
+        <g id="g-source"></g>
+        <!-- wires -->
+        <g id="g-wires"></g>
+        <!-- load balancer (right lane) -->
+        <g id="g-lb"></g>
+        <!-- boxes (servers) -->
+        <g id="g-boxes"></g>
+        <!-- ceiling marker for vertical -->
+        <g id="g-ceiling"></g>
+        <!-- moving packets -->
+        <g id="g-pkts"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Up — capacity</div><div class="value" id="v-up">2000 QPS</div></div>
+        <div class="var"><div class="label">Out — capacity</div><div class="value green" id="v-out">2000 QPS</div></div>
+        <div class="var"><div class="label">Up — nodes</div><div class="value" id="v-upn">1</div></div>
+        <div class="var"><div class="label">Out — nodes</div><div class="value green" id="v-outn">1</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>App server (handles requests)</div>
+        <div class="legend-item"><span class="swatch" style="background:#8b5cf6"></span>Load balancer (distributes load)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#fbbf24"></span>Request / packet in flight</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>New replica joining (zero-downtime)</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Hard ceiling / dead node (SPOF)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to start: one server on each side, the same trickle of traffic.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx up">
+      <h3>Scale up&nbsp;&nbsp;(vertical)</h3>
+      <div class="formula">2 vCPU box choking @ 2000 QPS → bigger box @ 8000 QPS</div>
+      <ul>
+        <li class="pro"><b>Dead simple</b> — same code, no distributed-systems problems (no consistency, no partitions).</li>
+        <li class="pro"><b>Lower latency</b> — faster CPU, bigger cache, less disk I/O; no extra network hop.</li>
+        <li class="con"><b>Hard ceiling</b> — even the largest box caps out (~<code>128 vCPU / 4 TB RAM</code>).</li>
+        <li class="con"><b>Single point of failure</b> — that one box dies, service dies.</li>
+        <li class="con"><b>Super-linear cost</b> — a 2&times; box often costs &gt; 2&times;; resize usually needs a <b>reboot</b> (downtime).</li>
+      </ul>
+    </div>
+    <div class="cx out">
+      <h3>Scale out&nbsp;&nbsp;(horizontal)</h3>
+      <div class="formula">5 nodes &times; 2000 QPS → ~10000 QPS (a bit less in practice)</div>
+      <ul>
+        <li class="pro"><b>No hard ceiling</b> — keep adding commodity boxes; ~linear, predictable cost.</li>
+        <li class="pro"><b>Redundant</b> — one node dies, the rest serve on (with health checks + LB).</li>
+        <li class="pro"><b>Elastic & zero-downtime</b> — autoscale: add at CPU <code>&gt;70%</code>, drop at <code>&lt;30%</code>.</li>
+        <li class="con"><b>Coordination cost</b> — CAP world: consistency, replication lag, partial failures.</li>
+        <li class="con"><b>Sub-linear speedup</b> — <code>N</code> nodes &ne; <code>N&times;</code> throughput; <code>+1–2 ms</code> LB hop.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Stateless vs stateful is the whole game.</b> A stateless web/API tier scales out trivially — add a replica, register it with the LB. A <b>stateful</b> DB is the hard part: you need <b>replication</b> (one primary + read replicas) or <b>sharding</b> (<code>user_id % N</code> / consistent hashing). Push state to Redis/DB/object store so any replica can serve any request.</li>
+      <li><b>"Horizontal is always better" is wrong.</b> Coordination overhead makes small or stateful workloads cheaper to scale <i>up</i>. Interviewers want to hear nuance, not "just add more servers."</li>
+      <li><b>Linear speedup is a myth.</b> <code>N</code> nodes give <i>sub</i>-linear throughput — load imbalance, coordination, and shared bottlenecks. <b>Amdahl's law</b>: the serial part (e.g. a single write primary) caps overall scaling.</li>
+      <li><b>"Infinite scaling" is a myth too.</b> Eventually network saturation or a shared component (single primary DB, central lock) becomes the bottleneck. Linear cost only holds for genuinely <b>shared-nothing</b> designs.</li>
+      <li><b>Downtime assumptions cut both ways.</b> Vertical resize usually needs a reboot (downtime). Horizontal isn't free either — new nodes need warm-up (cache fill, connection pool), rebalance, and LB registration.</li>
+      <li><b>Vocabulary:</b> "scale up" = vertical, "scale out" = horizontal. Real systems combine both — each node decently powerful <i>and</i> many nodes. Cassandra & DynamoDB are built to scale out; Spanner/CockroachDB give horizontally-scalable SQL.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p><b>Scale up first</b> for simple or stateful workloads — one bigger box is the cheapest, simplest answer until you hit its <b>ceiling</b> or can't tolerate a <b>single point of failure</b>. <b>Scale out</b> your stateless tier behind a load balancer for elastic, resilient, near-limitless growth — paying for it with coordination complexity and sub-linear speedup. The right answer in interviews is almost always <b>both</b>, applied to the right tier.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  const gSource = document.getElementById("g-source");
+  const gWires  = document.getElementById("g-wires");
+  const gLb     = document.getElementById("g-lb");
+  const gBoxes  = document.getElementById("g-boxes");
+  const gCeil   = document.getElementById("g-ceiling");
+  const gPkts   = document.getElementById("g-pkts");
+
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vUp = document.getElementById("v-up");
+  const vOut = document.getElementById("v-out");
+  const vUpn = document.getElementById("v-upn");
+  const vOutn = document.getElementById("v-outn");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+
+  // ---------- step model ----------
+  // up: { w, h, color, spec, dead }  — single growing box, center ~ (130, y)
+  // out: { nodes:[{color,dead,isNew}], lb:bool }  — boxes stacked in right lane
+  // load: number of in-flight packets to animate
+  const steps = [
+    {
+      up:  { spec:"4 vCPU / 16 GB", size:1, color:"#3b82f6", dead:false },
+      out: { nodes:[{color:"#3b82f6"}], lb:false },
+      load:2, ceiling:false,
+      upCap:"2000 QPS", outCap:"2000 QPS", upN:1, outN:1,
+      narr:`<b>1. The starting point.</b> Both sides run the <b>same app on one server</b> at <code>4 vCPU / 16 GB</code>, each comfortably serving ~<code>2000 QPS</code>. Traffic is light. Identical setups — for now.`,
+      cls:""
+    },
+    {
+      up:  { spec:"4 vCPU / 16 GB", size:1, color:"#f59e0b", dead:false, hot:true },
+      out: { nodes:[{color:"#f59e0b", hot:true}], lb:false },
+      load:6, ceiling:false,
+      upCap:"2000 QPS", outCap:"2000 QPS", upN:1, outN:1,
+      narr:`<b>2. Traffic surges.</b> Requests pile up faster than one box can serve them. Both single servers redline — CPU pinned, latency climbing. Time to scale. Two roads diverge from here.`,
+      cls:"move"
+    },
+    {
+      up:  { spec:"16 vCPU / 64 GB", size:2, color:"#3b82f6", dead:false, grew:true },
+      out: { nodes:[{color:"#f59e0b", hot:true}], lb:false },
+      load:6, ceiling:false,
+      upCap:"8000 QPS", outCap:"2000 QPS", upN:1, outN:1,
+      narr:`<b>3. Scale UP.</b> Resize the box: <code>4 vCPU / 16 GB → 16 vCPU / 64 GB</code>. <b>Same code, same one machine</b>, just more power — a single-node Postgres that choked at <code>2000 QPS</code> now handles <code>8000 QPS</code>. Faster CPU + bigger cache also <i>lowers</i> per-request latency. Catch: the resize usually needs a <b>reboot</b> (brief downtime).`,
+      cls:"good"
+    },
+    {
+      up:  { spec:"16 vCPU / 64 GB", size:2, color:"#3b82f6", dead:false },
+      out: { nodes:[{color:"#3b82f6"},{color:"#10b981", isNew:true}], lb:true },
+      load:6, ceiling:false,
+      upCap:"8000 QPS", outCap:"~4000 QPS", upN:1, outN:2,
+      narr:`<b>4. Scale OUT.</b> Instead of a bigger box, add an <b>identical replica</b> and put a <b>load balancer</b> in front. The LB spreads requests across both nodes (round-robin / least-connections / consistent hashing). Because the web tier is <b>stateless</b>, the new node serves traffic in seconds — <b>zero downtime</b>.`,
+      cls:"good"
+    },
+    {
+      up:  { spec:"16 vCPU / 64 GB", size:2, color:"#3b82f6", dead:false },
+      out: { nodes:[{color:"#3b82f6"},{color:"#3b82f6"},{color:"#3b82f6"},{color:"#3b82f6"},{color:"#10b981", isNew:true}], lb:true },
+      load:10, ceiling:false,
+      upCap:"8000 QPS", outCap:"~10000 QPS", upN:1, outN:5,
+      narr:`<b>5. Keep scaling out.</b> Five nodes &times; <code>2000 QPS</code> ≈ <code>10000 QPS</code> — in practice a bit less, because coordination overhead means <code>N</code> nodes give <b>sub-linear</b> throughput. This is autoscaling: CPU crosses <code>70%</code> → add a node; drops below <code>30%</code> → remove one.`,
+      cls:""
+    },
+    {
+      up:  { spec:"16 vCPU / 64 GB", size:2, color:"#3b82f6", dead:true },
+      out: { nodes:[{color:"#3b82f6"},{color:"#ef4444",dead:true},{color:"#3b82f6"},{color:"#3b82f6"},{color:"#3b82f6"}], lb:true },
+      load:10, ceiling:false,
+      upCap:"0 QPS", outCap:"~8000 QPS", upN:1, outN:4,
+      narr:`<b>6. A node fails.</b> On the left, the one big box is a <b>single point of failure</b> — it dies, the whole service is <b>down</b>. On the right, the LB's health check drops the dead node and routes around it; the other four keep serving. Redundancy is built in.`,
+      cls:"bad"
+    },
+    {
+      up:  { spec:"128 vCPU / 4 TB", size:3, color:"#3b82f6", dead:false },
+      out: { nodes:[{color:"#3b82f6"},{color:"#3b82f6"},{color:"#3b82f6"},{color:"#3b82f6"},{color:"#3b82f6"},{color:"#10b981",isNew:true}], lb:true },
+      load:12, ceiling:true,
+      upCap:"CEILING", outCap:"add more…", upN:1, outN:6,
+      narr:`<b>7. The ceiling vs the open road.</b> Vertical hits a <b>hard physical limit</b> — even the biggest box (~<code>128 vCPU / 4 TB</code>) can't grow further, and it stays a SPOF. Horizontal keeps adding commodity nodes — no hard cap, ~linear cost — until a <b>shared bottleneck</b> (single primary DB, network) or coordination cost finally limits it. Real systems use <b>both</b>: powerful nodes <i>and</i> many of them.`,
+      cls:"good"
+    }
+  ];
+
+  let cursor = 0;
+  let pktTimers = [];
+
+  function clearPkts() {
+    pktTimers.forEach(t => clearInterval(t));
+    pktTimers = [];
+    gPkts.innerHTML = "";
+  }
+
+  // ---- geometry ----
+  const SRC = { x: 260, y: 60 };          // shared traffic source at top center
+  const UP_CX = 130;                       // vertical lane center x
+  const OUT_X = 390;                       // horizontal lane center x
+  const LB = { x: 390, y: 130 };
+
+  function drawSource() {
+    gSource.innerHTML = "";
+    const g = svgEl("g", {});
+    const c = svgEl("rect", { x: SRC.x-46, y: SRC.y-18, width:92, height:34, rx:8, fill:"#2d2d50", stroke:"#3a3a5c", "stroke-width":2 });
+    const t = svgEl("text", { x: SRC.x, y: SRC.y+5, "text-anchor":"middle", "font-size":13, fill:"#cbd5e1" });
+    t.textContent = "client traffic";
+    g.appendChild(c); g.appendChild(t);
+    gSource.appendChild(g);
+  }
+
+  function render() {
+    clearPkts();
+    gWires.innerHTML = ""; gLb.innerHTML = ""; gBoxes.innerHTML = ""; gCeil.innerHTML = "";
+    drawSource();
+    const s = steps[cursor];
+
+    // ----- vertical lane: one box that grows -----
+    const upW = 50 + s.up.size * 34;
+    const upH = 44 + s.up.size * 30;
+    const upY = 300 - upH; // bottom-anchored around y=300
+    const upBoxTop = upY;
+    const upColor = s.up.dead ? "#ef4444" : s.up.color;
+    {
+      // wire source -> up box
+      const wy = upBoxTop;
+      const w = svgEl("path", { class:"wire" + (s.load>0 && !s.up.dead ? " live":""), d:`M ${SRC.x} ${SRC.y+16} C 130 130, ${UP_CX} 180, ${UP_CX} ${wy}` });
+      gWires.appendChild(w);
+
+      const g = svgEl("g", { class:"box" + (s.up.dead ? " ":"" ) });
+      const r = svgEl("rect", {
+        x: UP_CX - upW/2, y: upY, width: upW, height: upH, rx:10,
+        fill: upColor, stroke: s.up.grew ? "#93c5fd" : (s.up.dead ? "#fca5a5":"#1a1a2e"),
+        "stroke-width": s.up.grew ? 4 : 3,
+        opacity: s.up.dead ? 0.55 : 1
+      });
+      g.appendChild(r);
+      const label = svgEl("text", { x: UP_CX, y: upY + 22, "text-anchor":"middle", "font-size":13, "font-weight":700 });
+      label.textContent = s.up.dead ? "DOWN" : "1 server";
+      g.appendChild(label);
+      const spec = svgEl("text", { class:"spec", x: UP_CX, y: upY + upH - 12, "text-anchor":"middle", "font-size":11 });
+      spec.textContent = s.up.spec;
+      g.appendChild(spec);
+
+      if (s.up.dead) {
+        // X mark
+        const x1 = svgEl("line", { class:"dead", x1:UP_CX-upW/2+10, y1:upY+10, x2:UP_CX+upW/2-10, y2:upY+upH-10, "stroke-width":4 });
+        const x2 = svgEl("line", { class:"dead", x1:UP_CX+upW/2-10, y1:upY+10, x2:UP_CX-upW/2+10, y2:upY+upH-10, "stroke-width":4 });
+        g.appendChild(x1); g.appendChild(x2);
+      }
+      gBoxes.appendChild(g);
+
+      // ceiling line above the box when maxed
+      if (s.ceiling) {
+        const cy = upY - 14;
+        const line = svgEl("line", { class:"ceiling", x1: UP_CX - upW/2 - 14, y1: cy, x2: UP_CX + upW/2 + 14, y2: cy });
+        gCeil.appendChild(line);
+        const ct = svgEl("text", { class:"ceiling-label", x: UP_CX, y: cy - 6, "text-anchor":"middle" });
+        ct.textContent = "hard ceiling";
+        gCeil.appendChild(ct);
+      }
+    }
+
+    // ----- horizontal lane: LB + stacked replicas -----
+    const nodes = s.out.nodes;
+    let nodeCenters = [];
+    if (s.out.lb) {
+      // LB box
+      const g = svgEl("g", { class:"lb" });
+      const r = svgEl("rect", { x: LB.x-46, y: LB.y-18, width:92, height:36, rx:8, fill:"#8b5cf6", stroke:"#c4b5fd", "stroke-width":2 });
+      const t = svgEl("text", { x: LB.x, y: LB.y+5, "text-anchor":"middle", "font-size":12 });
+      t.textContent = "load balancer";
+      g.appendChild(r); g.appendChild(t);
+      gLb.appendChild(g);
+
+      // wire source -> LB
+      const w = svgEl("path", { class:"wire live", d:`M ${SRC.x} ${SRC.y+16} C 360 95, ${LB.x} 100, ${LB.x} ${LB.y-18}` });
+      gWires.appendChild(w);
+    }
+
+    // layout replicas in a grid below the LB (or below source if no LB)
+    const topY = s.out.lb ? LB.y + 40 : 110;
+    const nW = 60, nH = 42, gapX = 14, gapY = 16;
+    const perRow = 2;
+    nodes.forEach((nd, i) => {
+      const row = Math.floor(i / perRow);
+      const col = i % perRow;
+      const rowCount = Math.min(perRow, nodes.length - row*perRow);
+      const rowW = rowCount * nW + (rowCount-1) * gapX;
+      const startX = OUT_X - rowW/2;
+      const x = startX + col * (nW + gapX);
+      const y = topY + row * (nH + gapY);
+      const cx = x + nW/2, cyc = y + nH/2;
+      nodeCenters.push({ x: cx, y: y, dead: nd.dead });
+
+      const g = svgEl("g", { class:"box" });
+      const r = svgEl("rect", {
+        x, y, width:nW, height:nH, rx:8,
+        fill: nd.dead ? "#ef4444" : nd.color,
+        stroke: nd.isNew ? "#6ee7b7" : (nd.dead ? "#fca5a5" : "#1a1a2e"),
+        "stroke-width": nd.isNew ? 4 : 2.5,
+        opacity: nd.dead ? 0.5 : 1
+      });
+      g.appendChild(r);
+      const t = svgEl("text", { x: cx, y: cyc + 4, "text-anchor":"middle", "font-size":12, "font-weight":700 });
+      t.textContent = nd.dead ? "✕" : "node";
+      g.appendChild(t);
+      if (nd.dead) {
+        const x1 = svgEl("line", { class:"dead", x1:x+8, y1:y+8, x2:x+nW-8, y2:y+nH-8, "stroke-width":3 });
+        const x2 = svgEl("line", { class:"dead", x1:x+nW-8, y1:y+8, x2:x+8, y2:y+nH-8, "stroke-width":3 });
+        g.appendChild(x1); g.appendChild(x2);
+      }
+      gBoxes.appendChild(g);
+
+      // wire LB -> node (or source -> node if single, no LB)
+      if (s.out.lb) {
+        const w = svgEl("path", { class:"wire" + (nd.dead ? "" : " live"), d:`M ${LB.x} ${LB.y+18} L ${cx} ${y}` });
+        gWires.appendChild(w);
+      } else {
+        const w = svgEl("path", { class:"wire" + (nd.dead ? "" : " live"), d:`M ${SRC.x} ${SRC.y+16} C 360 110, ${cx} 150, ${cx} ${y}` });
+        gWires.appendChild(w);
+      }
+    });
+
+    // ----- animate packets -----
+    animatePackets(s, upBoxTop, upW, nodeCenters);
+
+    // ----- side stats -----
+    vUp.textContent = s.upCap;  vUp.className = "value" + (s.up.dead ? " red" : (s.ceiling ? " red" : ""));
+    vOut.textContent = s.outCap; vOut.className = "value green";
+    vUpn.textContent = s.up.dead ? "0" : "1"; vUpn.className = "value" + (s.up.dead ? " red" : "");
+    vOutn.textContent = s.outN; vOutn.className = "value green";
+
+    // ----- narration -----
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function spawnPacket(path) {
+    const c = svgEl("circle", { class:"pkt", r:4.5, fill:"#fbbf24", stroke:"#fde68a", "stroke-width":1 });
+    gPkts.appendChild(c);
+    const len = path.getTotalLength();
+    let t = 0;
+    const speed = 0.018 + Math.random()*0.01;
+    const timer = setInterval(() => {
+      t += speed;
+      if (t >= 1) { t = 0; } // loop
+      const pt = path.getPointAtLength(len * t);
+      c.setAttribute("cx", pt.x);
+      c.setAttribute("cy", pt.y);
+    }, 16);
+    pktTimers.push(timer);
+    return c;
+  }
+
+  function animatePackets(s, upBoxTop, upW, nodeCenters) {
+    // build invisible helper paths and run packets along the live wires
+    // vertical: source -> up box (unless dead)
+    if (!s.up.dead) {
+      const p = svgEl("path", { d:`M ${SRC.x} ${SRC.y+16} C 130 130, ${UP_CX} 180, ${UP_CX} ${upBoxTop}`, fill:"none", stroke:"none" });
+      gPkts.appendChild(p);
+      const count = Math.min(4, Math.ceil(s.load/2));
+      for (let i=0;i<count;i++) setTimeout(()=>spawnPacket(p), i*260);
+    }
+    // horizontal: source->LB->each live node, OR source->node
+    const liveNodes = nodeCenters.filter(n => !n.dead);
+    if (s.out.lb) {
+      // source -> LB
+      const pLb = svgEl("path", { d:`M ${SRC.x} ${SRC.y+16} C 360 95, ${LB.x} 100, ${LB.x} ${LB.y-18}`, fill:"none", stroke:"none" });
+      gPkts.appendChild(pLb);
+      const lbCount = Math.min(5, Math.ceil(s.load/2));
+      for (let i=0;i<lbCount;i++) setTimeout(()=>spawnPacket(pLb), i*150);
+      // LB -> nodes
+      liveNodes.forEach((n, idx) => {
+        const p = svgEl("path", { d:`M ${LB.x} ${LB.y+18} L ${n.x} ${n.y}`, fill:"none", stroke:"none" });
+        gPkts.appendChild(p);
+        setTimeout(()=>spawnPacket(p), idx*120);
+      });
+    } else {
+      liveNodes.forEach((n, idx) => {
+        const p = svgEl("path", { d:`M ${SRC.x} ${SRC.y+16} C 360 110, ${n.x} 150, ${n.x} ${n.y}`, fill:"none", stroke:"none" });
+        gPkts.appendChild(p);
+        const count = Math.min(4, Math.ceil(s.load/2));
+        for (let i=0;i<count;i++) setTimeout(()=>spawnPacket(p), i*260);
+      });
+    }
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

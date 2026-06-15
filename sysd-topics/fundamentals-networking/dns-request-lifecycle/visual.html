@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DNS &amp; HTTP Request Lifecycle — What Happens When You Type a URL</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 860px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* ---- the map SVG ---- */
+  .map-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+
+  .lane-label { fill: #666680; font-size: 10px; font-family: "SF Mono", Menlo, Consolas, monospace; letter-spacing: .5px; }
+
+  .box rect { transition: all .35s ease; }
+  .box text { font-family: -apple-system, sans-serif; fill: #e6e6f0; }
+  .box .title { font-weight: 700; font-size: 12px; }
+  .box .sub { font-size: 9px; fill: #9090b0; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .box.dim rect { opacity: .28; }
+  .box.dim text { opacity: .35; }
+  .box.active rect { stroke-width: 3; filter: drop-shadow(0 0 6px rgba(59,130,246,.55)); }
+
+  /* link arrows between boxes */
+  .link { stroke: #3a3a5c; stroke-width: 2; fill: none; transition: all .35s ease; }
+  .link.lit { stroke: #f59e0b; stroke-width: 3.5; }
+  .link.lit-good { stroke: #10b981; stroke-width: 3.5; }
+  .link.dim { opacity: .2; }
+  .arrowhead { fill: #3a3a5c; transition: fill .35s ease; }
+  .arrowhead.lit { fill: #f59e0b; }
+  .arrowhead.lit-good { fill: #10b981; }
+
+  /* travelling packet dot */
+  #packet { transition: opacity .2s ease; }
+  #packet circle { fill: #fbbf24; stroke: #1a1a2e; stroke-width: 2; }
+  #packet text { font-size: 9px; fill: #1a1a2e; font-weight: 700; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .badge { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; }
+
+  /* ---- side panel ---- */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 64px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.dns  { border-left-color: #f59e0b; background: #332611; }
+  .narration.conn { border-left-color: #8b5cf6; background: #221a3a; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* phase tabs */
+  .phases { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+  .phase-tag { font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; padding: 4px 10px; border-radius: 999px;
+               border: 1px solid #3a3a5c; color: #8888aa; }
+  .phase-tag.on { color: #fff; }
+  .phase-tag.dns.on { background: #332611; border-color: #f59e0b; color: #fbbf24; }
+  .phase-tag.conn.on { background: #221a3a; border-color: #8b5cf6; color: #c4b5fd; }
+  .phase-tag.http.on { background: #14321f; border-color: #10b981; color: #6ee7b7; }
+
+  /* ---- record types / extras grid ---- */
+  .grid2 { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  .card { background: #24243e; border-radius: 12px; padding: 20px 22px; }
+  .card h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .card ul { margin: 0; padding: 0; list-style: none; }
+  .card li { padding: 8px 0; border-bottom: 1px solid #2d2d50; font-size: 13.5px; color: #d0d0e0; }
+  .card li:last-child { border-bottom: none; }
+  .card li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 12.5px; }
+  .card li b { color: #fff; }
+
+  /* latency comparison */
+  .latency { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .latency { grid-template-columns: 1fr; } }
+  .lat { border-radius: 12px; padding: 20px 22px; }
+  .lat.cold { background: #2a1717; border: 1px solid #ef4444; }
+  .lat.warm { background: #14321f; border: 1px solid #10b981; }
+  .lat h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .lat.cold h3 { color: #fca5a5; }
+  .lat.warm h3 { color: #6ee7b7; }
+  .lat .big { font-size: 24px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .lat.cold .big { color: #ef4444; }
+  .lat.warm .big { color: #10b981; }
+  .lat p { margin: 8px 0 0; font-size: 13px; color: #c8c8d8; }
+  .lat .bar { height: 14px; border-radius: 7px; margin: 12px 0 2px; }
+  .lat ul { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; color: #b8b8cc; }
+  .lat ul code { color: #fbbf24; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>DNS &amp; HTTP Request Lifecycle</h1>
+  <div class="subtitle">What actually happens when you type <code>https://www.example.com</code> and press Enter — from cache checks, through the recursive resolver's <b>root → TLD → authoritative</b> walk, to the TCP + TLS handshakes and the final HTTP response.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — looking up a phone number</h3>
+    <p>You need someone's extension. First you flip through <b>your own contacts</b> (the browser cache) — maybe you already wrote it down. If not, you check the <b>sticky note on your monitor</b> (the OS cache / <code>/etc/hosts</code>). Still nothing? You phone a <b>friend who is great with directories</b> (the recursive resolver) and say "just get me the number." That friend does the legwork: they ask the <b>master directory operator</b> (root) "who handles <code>.com</code>?", then ask that <b>city directory</b> (the TLD) "who handles <code>example.com</code>?", and finally call that <b>company's front desk</b> (the authoritative nameserver) for the exact extension (the IP). Your friend writes the number on their own pad for next time (caching, until the TTL expires) and reads it back to you. Only then do you actually dial.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">you type:</span><code>https://www.example.com</code></div>
+    <div class="row"><span class="label">goal:</span>resolve the hostname to an IP, open a secure connection, fetch the page</div>
+    <div class="row"><span class="label">answer:</span><code>www.example.com → A 93.184.216.34</code> &nbsp;(then HTTPS on port <code>443</code>)</div>
+  </div>
+
+  <div class="phases">
+    <span class="phase-tag dns" id="ph-dns">PHASE 1 · DNS RESOLUTION (steps 1–7)</span>
+    <span class="phase-tag conn" id="ph-conn">PHASE 2 · CONNECT: TCP + TLS (steps 8–9)</span>
+    <span class="phase-tag http" id="ph-http">PHASE 3 · HTTP + RENDER (steps 10–11)</span>
+  </div>
+
+  <div class="stage">
+    <div class="map-holder">
+      <svg viewBox="0 0 560 520" id="map">
+        <defs>
+          <marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path class="arrowhead" d="M0,0 L6,3 L0,6 Z" />
+          </marker>
+        </defs>
+
+        <!-- lane labels -->
+        <text class="lane-label" x="14" y="20">CLIENT SIDE — caches</text>
+        <text class="lane-label" x="300" y="20">DNS HIERARCHY — the resolver's walk</text>
+        <text class="lane-label" x="14" y="372">THE CONNECTION — to the server IP</text>
+
+        <!-- links are drawn first (behind boxes); ids tie to step "lit" sets -->
+        <g id="links">
+          <!-- browser -> os -->
+          <path id="l-browser-os" class="link" d="M110,78 L110,118" marker-end="url(#ah)"/>
+          <!-- os -> resolver -->
+          <path id="l-os-res" class="link" d="M170,148 L300,148" marker-end="url(#ah)"/>
+          <!-- resolver -> root -->
+          <path id="l-res-root" class="link" d="M420,128 L470,108" marker-end="url(#ah)"/>
+          <!-- resolver -> tld -->
+          <path id="l-res-tld" class="link" d="M430,148 L470,168" marker-end="url(#ah)"/>
+          <!-- resolver -> auth -->
+          <path id="l-res-auth" class="link" d="M420,170 L470,228" marker-end="url(#ah)"/>
+          <!-- resolver -> client (answer back down) -->
+          <path id="l-res-back" class="link" d="M300,168 L110,200" marker-end="url(#ah)"/>
+          <!-- client -> TCP -->
+          <path id="l-client-tcp" class="link" d="M110,232 L110,300" marker-end="url(#ah)"/>
+          <!-- TCP -> TLS -->
+          <path id="l-tcp-tls" class="link" d="M170,322 L210,322" marker-end="url(#ah)"/>
+          <!-- TLS -> edge/server -->
+          <path id="l-tls-edge" class="link" d="M330,322 L380,322" marker-end="url(#ah)"/>
+          <!-- edge -> origin -->
+          <path id="l-edge-origin" class="link" d="M450,344 L450,408" marker-end="url(#ah)"/>
+          <!-- origin -> render (back to client area) -->
+          <path id="l-origin-render" class="link" d="M380,430 L210,460" marker-end="url(#ah)"/>
+        </g>
+
+        <!-- ================= BOXES ================= -->
+        <!-- Browser cache -->
+        <g class="box" id="b-browser">
+          <rect x="40" y="44" width="140" height="34" rx="7" fill="#1e3a5f" stroke="#3b82f6"/>
+          <text class="title" x="50" y="60">Browser</text>
+          <text class="sub" x="50" y="72">cache check · TTL</text>
+        </g>
+        <!-- OS cache / hosts -->
+        <g class="box" id="b-os">
+          <rect x="40" y="118" width="140" height="34" rx="7" fill="#1e3a5f" stroke="#3b82f6"/>
+          <text class="title" x="50" y="134">OS cache</text>
+          <text class="sub" x="50" y="146">/etc/hosts · stub</text>
+        </g>
+        <!-- Recursive resolver -->
+        <g class="box" id="b-resolver">
+          <rect x="300" y="128" width="130" height="42" rx="7" fill="#3a2a0a" stroke="#f59e0b"/>
+          <text class="title" x="310" y="146">Recursive</text>
+          <text class="title" x="310" y="160">resolver</text>
+          <text class="sub" x="372" y="146">8.8.8.8</text>
+          <text class="sub" x="372" y="160">Anycast</text>
+        </g>
+        <!-- Root -->
+        <g class="box" id="b-root">
+          <rect x="470" y="74" width="80" height="34" rx="7" fill="#3a2a0a" stroke="#f59e0b"/>
+          <text class="title" x="480" y="90">Root NS</text>
+          <text class="sub" x="480" y="102">13 sets</text>
+        </g>
+        <!-- TLD -->
+        <g class="box" id="b-tld">
+          <rect x="470" y="152" width="80" height="34" rx="7" fill="#3a2a0a" stroke="#f59e0b"/>
+          <text class="title" x="480" y="168">TLD NS</text>
+          <text class="sub" x="480" y="180">.com</text>
+        </g>
+        <!-- Authoritative -->
+        <g class="box" id="b-auth">
+          <rect x="470" y="228" width="80" height="44" rx="7" fill="#3a2a0a" stroke="#f59e0b"/>
+          <text class="title" x="480" y="246">Auth NS</text>
+          <text class="sub" x="480" y="258">example</text>
+          <text class="sub" x="480" y="268">.com</text>
+        </g>
+
+        <!-- TCP handshake -->
+        <g class="box" id="b-tcp">
+          <rect x="40" y="300" width="130" height="44" rx="7" fill="#2a1f47" stroke="#8b5cf6"/>
+          <text class="title" x="50" y="318">TCP :443</text>
+          <text class="sub" x="50" y="330">SYN / SYN-ACK</text>
+          <text class="sub" x="50" y="340">/ ACK</text>
+        </g>
+        <!-- TLS handshake -->
+        <g class="box" id="b-tls">
+          <rect x="210" y="300" width="120" height="44" rx="7" fill="#2a1f47" stroke="#8b5cf6"/>
+          <text class="title" x="220" y="318">TLS</text>
+          <text class="sub" x="220" y="330">ClientHello…</text>
+          <text class="sub" x="220" y="340">cert · keys</text>
+        </g>
+        <!-- CDN edge / LB -->
+        <g class="box" id="b-edge">
+          <rect x="380" y="300" width="140" height="44" rx="7" fill="#163a2a" stroke="#10b981"/>
+          <text class="title" x="390" y="318">CDN edge / LB</text>
+          <text class="sub" x="390" y="330">GeoDNS · Anycast</text>
+          <text class="sub" x="390" y="340">nearest PoP</text>
+        </g>
+        <!-- Origin server -->
+        <g class="box" id="b-origin">
+          <rect x="380" y="408" width="140" height="44" rx="7" fill="#163a2a" stroke="#10b981"/>
+          <text class="title" x="390" y="426">Origin server</text>
+          <text class="sub" x="390" y="438">HTTP GET /</text>
+          <text class="sub" x="390" y="448">→ 200 OK + HTML</text>
+        </g>
+        <!-- Render -->
+        <g class="box" id="b-render">
+          <rect x="40" y="438" width="170" height="44" rx="7" fill="#163a2a" stroke="#10b981"/>
+          <text class="title" x="50" y="456">Browser renders</text>
+          <text class="sub" x="50" y="468">parse HTML · paint</text>
+        </g>
+
+        <!-- travelling packet -->
+        <g id="packet" style="opacity:0">
+          <circle cx="0" cy="0" r="13"/>
+          <text x="0" y="3" text-anchor="middle" id="packet-label">?</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Phase</div><div class="value" id="v-phase">—</div></div>
+        <div class="var"><div class="label">Lookup</div><div class="value amber" id="v-lookup">—</div></div>
+        <div class="var"><div class="label">Resolved IP</div><div class="value green" id="v-ip">—</div></div>
+        <div class="var"><div class="label">Round trips</div><div class="value" id="v-rtt">0</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch round" style="background:#3b82f6"></span>Client-side caches (browser, OS)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#f59e0b"></span>DNS resolver + hierarchy (root/TLD/auth)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#8b5cf6"></span>Connection setup (TCP, TLS)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#10b981"></span>HTTP layer (edge, origin, render)</div>
+        <div class="legend-item"><span class="swatch" style="background:#fbbf24"></span>Packet in flight / cache hit</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to follow the request from your keystroke all the way to a painted page.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="latency">
+    <div class="lat cold">
+      <h3>Cold lookup (cache miss)</h3>
+      <div class="big">~tens–hundreds of ms</div>
+      <div class="bar" style="background:linear-gradient(90deg,#ef4444,#f59e0b)"></div>
+      <p>Nothing cached, so the resolver makes <b>several sequential round trips</b> before you even open a socket:</p>
+      <ul>
+        <li>resolver → <b>root</b> (who owns <code>.com</code>?)</li>
+        <li>resolver → <b>TLD</b> (who owns <code>example.com</code>?)</li>
+        <li>resolver → <b>authoritative</b> (the actual A record)</li>
+        <li>then <b>TCP</b> (1 RTT) + <b>TLS</b> (1–2 RTT) + the HTTP request</li>
+      </ul>
+    </div>
+    <div class="lat warm">
+      <h3>Warm lookup (cache hit)</h3>
+      <div class="big">~0 ms for DNS</div>
+      <div class="bar" style="background:linear-gradient(90deg,#10b981,#3b82f6); width:30%"></div>
+      <p>If the browser, OS, or resolver still holds a <b>non-expired</b> record (within its <code>TTL</code>), the whole hierarchy walk is skipped — the IP is returned instantly. The expensive part of "loading a page" is rarely DNS once it's cached.</p>
+      <ul>
+        <li><code>TTL</code> = how many seconds an answer may be cached</li>
+        <li>low TTL → fast failover, more lookups; high TTL → fewer lookups, slower changes</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>DNS record types you should name</h3>
+      <ul>
+        <li><code>A</code> — hostname → <b>IPv4</b> address (e.g. <code>93.184.216.34</code>).</li>
+        <li><code>AAAA</code> — hostname → <b>IPv6</b> address.</li>
+        <li><code>CNAME</code> — <b>alias</b> one name to another (<code>www → example.com</code>); resolver re-resolves the target.</li>
+        <li><code>NS</code> — delegates a zone to its <b>nameservers</b> (this is what root and TLD hand back).</li>
+        <li><code>MX</code> — <b>mail</b> exchanger for the domain (used by email, not web).</li>
+        <li><code>TXT</code> — arbitrary text (SPF, domain verification, etc.).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Distribution &amp; resilience tricks</h3>
+      <ul>
+        <li><b>CDN / GeoDNS</b> — the authoritative server can return a <i>different</i> IP based on where the resolver is, sending you to the <b>nearest edge PoP</b>.</li>
+        <li><b>Anycast</b> — one IP advertised from many locations; <b>BGP routes you to the closest instance</b>. Used by big resolvers (<code>8.8.8.8</code>, <code>1.1.1.1</code>) and root servers.</li>
+        <li><b>Caching layers</b> — browser → OS → resolver each cache by TTL, so most lookups never reach the authoritative server.</li>
+        <li><b>Load balancer</b> — behind one IP, an LB fans requests across many origin servers.</li>
+        <li><b>Connection reuse</b> — keep-alive / HTTP-2 multiplexing avoids redoing TCP + TLS for every asset.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Typing a URL triggers two distinct phases: first <b>name → IP</b> resolution, where caches are checked (browser → OS) and, on a miss, a <b>recursive resolver walks the hierarchy</b> root → TLD → authoritative and caches the answer by <code>TTL</code>; then <b>IP → page</b>, where the browser opens a <b>TCP</b> connection, negotiates <b>TLS</b>, sends an <b>HTTP GET</b> (often to a nearby CDN edge), and renders the response. Cached DNS is ~0 ms; a cold lookup is several sequential round trips before a single byte of the page moves.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- box centre coordinates (for packet travel) ----------
+  const C = {
+    browser:  [110, 61],
+    os:       [110, 135],
+    resolver: [365, 149],
+    root:     [510, 91],
+    tld:      [510, 169],
+    auth:     [510, 250],
+    tcp:      [105, 322],
+    tls:      [270, 322],
+    edge:     [450, 322],
+    origin:   [450, 430],
+    render:   [125, 460],
+  };
+
+  // ---------- steps ----------
+  // each step: {
+  //   activeBoxes: [ids], litLinks: [{id, cls}], packet: {from,to,label} | null,
+  //   phase, lookup, ip, rtt, narration, narrClass
+  // }
+  const steps = [];
+
+  steps.push({
+    activeBoxes: ["browser"],
+    litLinks: [],
+    packet: { at: "browser", label: "URL" },
+    phase: "DNS", lookup: "browser cache", ip: "—", rtt: 0,
+    narration: `<b>1. Browser cache check.</b> Before touching the network, the browser asks its own DNS cache: "do I already know the IP for <code>www.example.com</code>, and is it still within <code>TTL</code>?" A hit here is essentially <b>free (~0 ms)</b>. Assume a miss so we can see the full journey.`,
+    narrClass: "dns"
+  });
+
+  steps.push({
+    activeBoxes: ["os"],
+    litLinks: [{ id: "l-browser-os", cls: "lit" }],
+    packet: { from: "browser", to: "os", label: "?" },
+    phase: "DNS", lookup: "OS cache / hosts", ip: "—", rtt: 0,
+    narration: `<b>2. OS cache &amp; <code>/etc/hosts</code>.</b> The OS resolver (stub) is consulted next. It first checks the static <code>/etc/hosts</code> file (a manual override — handy for local dev) and then the OS-level DNS cache. Still no answer, so the stub forwards the query to its configured <b>recursive resolver</b>.`,
+    narrClass: "dns"
+  });
+
+  steps.push({
+    activeBoxes: ["resolver"],
+    litLinks: [{ id: "l-os-res", cls: "lit" }],
+    packet: { from: "os", to: "resolver", label: "?" },
+    phase: "DNS", lookup: "recursive resolver", ip: "—", rtt: 1,
+    narration: `<b>3. Recursive resolver.</b> The query reaches a <b>recursive resolver</b> — usually your ISP's, or a public one like <code>8.8.8.8</code> / <code>1.1.1.1</code> (reached via <b>Anycast</b>, so you hit the nearest instance). You ask it once for the final answer; <b>it does all the legwork</b> below and is the heart of DNS resolution.`,
+    narrClass: "dns"
+  });
+
+  steps.push({
+    activeBoxes: ["resolver", "root"],
+    litLinks: [{ id: "l-res-root", cls: "lit" }],
+    packet: { from: "resolver", to: "root", label: "?" },
+    phase: "DNS", lookup: "root → .com NS", ip: "—", rtt: 2,
+    narration: `<b>4. Root nameserver.</b> The resolver asks a <b>root server</b>: "who is authoritative for <code>.com</code>?" The root doesn't know the final IP — it just <b>delegates</b>, returning the <code>NS</code> records for the <code>.com</code> <b>TLD</b> servers. (There are 13 root server identities, themselves Anycast.)`,
+    narrClass: "dns"
+  });
+
+  steps.push({
+    activeBoxes: ["resolver", "tld"],
+    litLinks: [{ id: "l-res-tld", cls: "lit" }],
+    packet: { from: "resolver", to: "tld", label: "?" },
+    phase: "DNS", lookup: ".com → example.com NS", ip: "—", rtt: 3,
+    narration: `<b>5. TLD nameserver (.com).</b> Now the resolver asks the <code>.com</code> TLD server: "who is authoritative for <code>example.com</code>?" Again, no IP yet — the TLD <b>narrows the search</b> and hands back the <code>NS</code> records for <code>example.com</code>'s <b>authoritative nameserver</b>.`,
+    narrClass: "dns"
+  });
+
+  steps.push({
+    activeBoxes: ["resolver", "auth"],
+    litLinks: [{ id: "l-res-auth", cls: "lit" }],
+    packet: { from: "resolver", to: "auth", label: "?" },
+    phase: "DNS", lookup: "authoritative → A", ip: "93.184.216.34", rtt: 4,
+    narration: `<b>6. Authoritative nameserver.</b> Finally the resolver asks <code>example.com</code>'s authoritative server for <code>www</code>. <b>This one actually owns the record</b> and returns the <code>A</code> / <code>AAAA</code> answer: <code>www.example.com → 93.184.216.34</code>. With <b>GeoDNS</b>, this answer can differ by the resolver's location to point you at the nearest CDN edge.`,
+    narrClass: "dns"
+  });
+
+  steps.push({
+    activeBoxes: ["resolver", "browser"],
+    litLinks: [{ id: "l-res-back", cls: "lit-good" }],
+    packet: { from: "resolver", to: "browser", label: "IP" },
+    phase: "DNS", lookup: "answer + cache (TTL)", ip: "93.184.216.34", rtt: 4,
+    narration: `<b>7. Cache &amp; return.</b> The resolver <b>caches the answer</b> (and the intermediate NS records) honoring each record's <code>TTL</code>, then returns the IP to your OS → browser. The next visitor — and you, until the TTL expires — skips the whole walk. <b>This is why DNS feels instant most of the time.</b>`,
+    narrClass: "good"
+  });
+
+  steps.push({
+    activeBoxes: ["browser", "tcp"],
+    litLinks: [{ id: "l-client-tcp", cls: "lit" }],
+    packet: { from: "browser", to: "tcp", label: "SYN" },
+    phase: "TCP", lookup: "done", ip: "93.184.216.34", rtt: 5,
+    narration: `<b>8. TCP handshake.</b> Now we have an IP, so the browser opens a TCP connection to <code>93.184.216.34:443</code>. Three packets — <b>SYN → SYN-ACK → ACK</b> (one round trip) — establish a reliable, ordered byte stream. Port <b>443</b> signals HTTPS.`,
+    narrClass: "conn"
+  });
+
+  steps.push({
+    activeBoxes: ["tcp", "tls"],
+    litLinks: [{ id: "l-tcp-tls", cls: "lit" }],
+    packet: { from: "tcp", to: "tls", label: "🔒" },
+    phase: "TLS", lookup: "done", ip: "93.184.216.34", rtt: 6,
+    narration: `<b>9. TLS handshake.</b> Over that TCP stream, TLS negotiates encryption: <b>ClientHello → ServerHello</b>, the server presents its <b>certificate</b> (proving it really is example.com), and both sides do a <b>key exchange</b> to derive a shared session key. Result: an <b>encrypted channel</b> (1–2 RTT; faster with TLS 1.3 / session resumption).`,
+    narrClass: "conn"
+  });
+
+  steps.push({
+    activeBoxes: ["tls", "edge", "origin"],
+    litLinks: [{ id: "l-tls-edge", cls: "lit-good" }, { id: "l-edge-origin", cls: "lit-good" }],
+    packet: { from: "edge", to: "origin", label: "GET" },
+    phase: "HTTP", lookup: "done", ip: "93.184.216.34", rtt: 7,
+    narration: `<b>10. HTTP request &amp; response.</b> Over the secure channel the browser sends <code>GET / HTTP/1.1</code> (with headers like <code>Host</code>, cookies, <code>Accept</code>). The IP often belongs to a <b>CDN edge / load balancer</b>, which may serve cached content directly or forward to an <b>origin server</b>. The server replies <code>200 OK</code> with the HTML body.`,
+    narrClass: "good"
+  });
+
+  steps.push({
+    activeBoxes: ["origin", "render"],
+    litLinks: [{ id: "l-origin-render", cls: "lit-good" }],
+    packet: { from: "origin", to: "render", label: "200" },
+    phase: "RENDER", lookup: "done", ip: "93.184.216.34", rtt: 8,
+    narration: `<b>11. Browser renders.</b> The browser parses the HTML, builds the DOM/CSSOM, and paints. It discovers more resources (CSS, JS, images) and <b>repeats the lifecycle</b> for each — though DNS is now cached and the connection can be <b>reused</b> (keep-alive / HTTP-2 multiplexing), so subsequent fetches are far cheaper. <b>The page appears.</b>`,
+    narrClass: "good"
+  });
+
+  // ---------- DOM refs ----------
+  const links = {
+    "l-browser-os": document.getElementById("l-browser-os"),
+    "l-os-res": document.getElementById("l-os-res"),
+    "l-res-root": document.getElementById("l-res-root"),
+    "l-res-tld": document.getElementById("l-res-tld"),
+    "l-res-auth": document.getElementById("l-res-auth"),
+    "l-res-back": document.getElementById("l-res-back"),
+    "l-client-tcp": document.getElementById("l-client-tcp"),
+    "l-tcp-tls": document.getElementById("l-tcp-tls"),
+    "l-tls-edge": document.getElementById("l-tls-edge"),
+    "l-edge-origin": document.getElementById("l-edge-origin"),
+    "l-origin-render": document.getElementById("l-origin-render"),
+  };
+  const allBoxIds = ["browser","os","resolver","root","tld","auth","tcp","tls","edge","origin","render"];
+  const boxes = {};
+  allBoxIds.forEach(id => boxes[id] = document.getElementById("b-" + id));
+
+  const packet = document.getElementById("packet");
+  const packetLabel = document.getElementById("packet-label");
+
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vPhase = document.getElementById("v-phase");
+  const vLookup = document.getElementById("v-lookup");
+  const vIp = document.getElementById("v-ip");
+  const vRtt = document.getElementById("v-rtt");
+  const phDns = document.getElementById("ph-dns");
+  const phConn = document.getElementById("ph-conn");
+  const phHttp = document.getElementById("ph-http");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  let cursor = -1; // -1 = intro (nothing lit yet)
+
+  function setPacket(p) {
+    if (!p) { packet.style.opacity = 0; return; }
+    packet.style.opacity = 1;
+    packetLabel.textContent = p.label;
+    const pos = p.at ? C[p.at] : C[p.to];
+    packet.setAttribute("transform", `translate(${pos[0]}, ${pos[1]})`);
+  }
+
+  function render() {
+    // intro state
+    if (cursor < 0) {
+      allBoxIds.forEach(id => boxes[id].className.baseVal = "box");
+      Object.values(links).forEach(l => l.className.baseVal = "link");
+      setPacket(null);
+      vPhase.textContent = "—"; vLookup.textContent = "—"; vIp.textContent = "—"; vRtt.textContent = "0";
+      vLookup.className = "value amber"; vIp.className = "value green";
+      [phDns, phConn, phHttp].forEach(p => p.classList.remove("on"));
+      narrEl.className = "narration";
+      narrEl.innerHTML = `Press <b>Next</b> to follow the request from your keystroke all the way to a painted page.`;
+      stepEl.textContent = `step 0 / ${steps.length}`;
+      btnPrev.disabled = true;
+      btnNext.disabled = false;
+      return;
+    }
+
+    const s = steps[cursor];
+    const activeSet = new Set(s.activeBoxes);
+    const litSet = new Set(s.litLinks.map(l => l.id));
+
+    // boxes: active vs dim. Boxes touched in earlier steps stay normal (not dim).
+    allBoxIds.forEach(id => {
+      if (activeSet.has(id)) boxes[id].className.baseVal = "box active";
+      else boxes[id].className.baseVal = "box";
+    });
+
+    // links
+    Object.keys(links).forEach(id => {
+      links[id].className.baseVal = "link";
+    });
+    s.litLinks.forEach(l => {
+      links[l.id].className.baseVal = "link " + l.cls;
+      // colour the arrowhead too by toggling a class on the marker path indirectly:
+      // simplest: set marker stroke via the path's own colour is enough visually.
+    });
+
+    // packet
+    setPacket(s.packet);
+
+    // side panel
+    vPhase.textContent = s.phase;
+    vLookup.textContent = s.lookup;
+    vIp.textContent = s.ip;
+    vRtt.textContent = s.rtt;
+    vLookup.className = "value " + (s.phase === "DNS" ? "amber" : "");
+    vIp.className = "value " + (s.ip !== "—" ? "green" : "");
+
+    // phase tags
+    phDns.classList.toggle("on", s.phase === "DNS");
+    phConn.classList.toggle("on", s.phase === "TCP" || s.phase === "TLS");
+    phHttp.classList.toggle("on", s.phase === "HTTP" || s.phase === "RENDER");
+
+    // narration
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    stepEl.textContent = `step ${cursor + 1} / ${steps.length}`;
+    btnPrev.disabled = false;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > -1) { cursor--; render(); } }
+  function reset() { cursor = -1; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

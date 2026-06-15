@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cache Strategies — Read & Write Flow Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  /* strategy tabs */
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .tab {
+    background: #24243e; border: 1px solid #3a3a5c; color: #a0a0b8;
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 13px;
+    font-weight: 500; transition: all .15s ease; font-family: inherit;
+  }
+  .tab:hover { background: #2d2d50; color: #e0e0e0; }
+  .tab.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* flow SVG */
+  .flow-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 520px; height: auto; }
+  .box-rect { transition: all .35s ease; }
+  .box-label { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 14px; fill: #fff; }
+  .box-sub { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10px; fill: #cdd; }
+  .lane-line { stroke: #3a3a5c; stroke-width: 2; fill: none; }
+  .arrow-path { fill: none; stroke-width: 3; transition: all .3s ease; }
+  .arrow-label { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px; fill: #c8c8d8; }
+  .arrow-num { font-family: -apple-system, sans-serif; font-weight: 800; font-size: 12px; fill: #1a1a2e; }
+  .packet { transition: all .15s linear; }
+  .dimmed { opacity: .18; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.through { background: #14321f; border: 1px solid #10b981; }
+  .cx.back { background: #332611; border: 1px solid #f59e0b; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.through h3 { color: #6ee7b7; }
+  .cx.back h3 { color: #fcd34d; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 20px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.through .big { color: #10b981; }
+  .cx.back .big { color: #f59e0b; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cache Strategies — How Reads &amp; Writes Flow</h1>
+  <div class="subtitle">Patterns that decide how the <b>application</b>, the <b>cache</b> (Redis/Memcached, <code>~1 ms</code>) and the <b>database</b> (<code>5-20 ms</code>) route and synchronize data. Each one trades <code>speed</code> against <code>consistency</code> against <code>data-loss risk</code>.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the restaurant kitchen</h3>
+    <p>The main <b>store-room</b> (database) is far at the back and slow. At the counter the cook keeps a small <b>shelf</b> (cache) with the most-used ingredients. <b>Cache-aside:</b> the cook checks the shelf first — found it (<b>hit</b>), else walks to the store-room, grabs it, drops a copy on the shelf (<b>miss</b>). <b>Write-through:</b> new stock goes onto the shelf <i>and</i> the store-room together, so they always match. <b>Write-back:</b> the cook updates only the shelf and syncs the store-room later in a batch — fast, but if the shelf tips over, pending updates are lost.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">cache read:</span><code>sub-ms .. ~1 ms</code> &nbsp;|&nbsp; <span class="label">db read:</span><code>5-20 ms</code></div>
+    <div class="row"><span class="label">goal:</span><code>serve ~90% of reads from cache (90% hit ratio)</code> → average latency drops, DB load drops</div>
+    <div class="row"><span class="label">guards:</span><code>TTL</code> bounds staleness &nbsp;|&nbsp; <code>LRU</code> evicts when memory is full</div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="stage">
+    <div class="flow-holder">
+      <svg viewBox="0 0 520 360" id="flow">
+        <defs>
+          <marker id="ah-blue" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0 0 L9 4.5 L0 9 z" fill="#3b82f6" />
+          </marker>
+          <marker id="ah-green" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0 0 L9 4.5 L0 9 z" fill="#10b981" />
+          </marker>
+          <marker id="ah-amber" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0 0 L9 4.5 L0 9 z" fill="#f59e0b" />
+          </marker>
+          <marker id="ah-red" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0 0 L9 4.5 L0 9 z" fill="#ef4444" />
+          </marker>
+        </defs>
+
+        <!-- three pillars: App (x=70), Cache (x=260), DB (x=450) -->
+        <!-- App -->
+        <g id="box-app">
+          <rect class="box-rect" x="22" y="150" width="96" height="64" rx="10" fill="#3b82f6" stroke="#1a1a2e" stroke-width="3"/>
+          <text class="box-label" x="70" y="178" text-anchor="middle">App</text>
+          <text class="box-sub" x="70" y="196" text-anchor="middle">client logic</text>
+        </g>
+        <!-- Cache -->
+        <g id="box-cache">
+          <rect class="box-rect" x="212" y="150" width="96" height="64" rx="10" fill="#8b5cf6" stroke="#1a1a2e" stroke-width="3"/>
+          <text class="box-label" x="260" y="174" text-anchor="middle">Cache</text>
+          <text class="box-sub" x="260" y="190" text-anchor="middle">~1 ms · TTL</text>
+          <text class="box-sub" x="260" y="203" text-anchor="middle">LRU evict</text>
+        </g>
+        <!-- DB -->
+        <g id="box-db">
+          <rect class="box-rect" x="402" y="150" width="96" height="64" rx="10" fill="#0ea5e9" stroke="#1a1a2e" stroke-width="3"/>
+          <text class="box-label" x="450" y="178" text-anchor="middle">Database</text>
+          <text class="box-sub" x="450" y="196" text-anchor="middle">5-20 ms</text>
+        </g>
+
+        <!-- dynamic arrows + packet injected here -->
+        <g id="g-arrows"></g>
+        <g id="g-packet"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Strategy</div><div class="value" id="v-strat" style="font-size:13px">—</div></div>
+        <div class="var"><div class="label">Operation</div><div class="value" id="v-op" style="font-size:13px">—</div></div>
+        <div class="var"><div class="label">Latency</div><div class="value amber" id="v-lat">—</div></div>
+        <div class="var"><div class="label">Consistency</div><div class="value green" id="v-cons" style="font-size:13px">—</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch round" style="background:#3b82f6"></span>App ↔ data path (request)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#10b981"></span>Cache hit / fast / consistent</div>
+        <div class="legend-item"><span class="swatch round" style="background:#f59e0b"></span>Cache miss / async / lazy</div>
+        <div class="legend-item"><span class="swatch round" style="background:#ef4444"></span>Slow DB hop / data-loss risk</div>
+        <div class="legend-item"><span class="swatch round" style="background:#8b5cf6"></span>Cache node</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Pick a strategy above, then press <b>Next</b> to watch a request travel through App → Cache → DB.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx through">
+      <h3>Write-through</h3>
+      <div class="formula">write → cache + DB (synchronous)</div>
+      <p>Every write lands in <b>both</b> cache and DB before success returns. Cache is always consistent with the DB, with <b>no data-loss</b> on a cache crash.</p>
+      <p>Cost: write latency = <span class="big">cache + DB</span> (the sum). Writes are slower. Good for config / session data where read-after-write must hold.</p>
+    </div>
+    <div class="cx back">
+      <h3>Write-back (write-behind)</h3>
+      <div class="formula">write → cache (ack now), DB flushed async</div>
+      <p>Write hits only the cache and acks in <span class="big">~1 ms</span>. Dirty entries are batched and flushed to the DB later — best throughput, absorbs write bursts.</p>
+      <p>Cost: a cache crash loses un-flushed writes (<b>data-loss risk</b>). Great for counters / metrics; never for financial data.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>"Cache is always consistent with the DB" — false.</b> Only <b>write-through (sync)</b> gives tight consistency. Cache-aside and write-back always have a <b>staleness window</b>. State the consistency model explicitly.</li>
+      <li><b>Invalidate, don't update, on write.</b> On a write, <b>delete</b> the cache key rather than overwriting it — concurrent writes can overwrite the cache with a <b>stale value</b> (race). Delete forces the next read to reload fresh.</li>
+      <li><b>Cache stampede / thundering herd</b> — a popular key expires and thousands of concurrent misses slam the DB at once. Mitigate with <b>request coalescing / single-flight</b>, early/probabilistic expiration, or a short-TTL lock.</li>
+      <li><b>Negative caching</b> — cache "not found" with a short TTL too, or missing keys hammer the DB on every request.</li>
+      <li><b>Write-around</b> — writes go straight to the DB, bypassing the cache, so write-once-read-never data doesn't pollute it. Tradeoff: the first read of fresh data always misses.</li>
+      <li><b>Read-through</b> — like cache-aside, but the <b>cache library</b> loads from the DB on a miss, not your app code. Cleaner code, less control. e.g. Netflix <b>EVCache</b>; cache-aside powers Facebook's <b>Memcached + MySQL</b>.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>There is no "best" cache strategy — only the right trade. <b>Cache-aside</b> is the read-heavy default (lazy-load on miss, <b>invalidate</b> on write). For writes you choose your poison: <b>write-through</b> buys consistency at the cost of slower writes, <b>write-back</b> buys blazing throughput at the risk of lost data, and <b>write-around</b> keeps rarely-read data out of the cache. Always pair them with a <b>TTL</b> + <b>LRU</b> and a plan for the <b>stampede</b>.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- geometry ----------
+  // pillar centers
+  const APP = { x: 70, y: 182 }, CACHE = { x: 260, y: 182 }, DB = { x: 450, y: 182 };
+  const APP_R = { x: 118 }, CACHE_L = { x: 212 }, CACHE_R = { x: 308 }, DB_L = { x: 402 };
+
+  const COL = { blue:"#3b82f6", green:"#10b981", amber:"#f59e0b", red:"#ef4444", purple:"#8b5cf6" };
+  const MARK = { "#3b82f6":"ah-blue", "#10b981":"ah-green", "#f59e0b":"ah-amber", "#ef4444":"ah-red" };
+
+  // An arrow hop between two horizontal pillars, at a given vertical offset.
+  // dir: 'r' (left->right) or 'l' (right->left). yOff shifts the lane up/down.
+  function hop(fromX, toX, yOff, color, label, num) {
+    const y = 182 + yOff;
+    const x1 = fromX, x2 = toX;
+    return { x1, y1: y, x2, y2: y, color, label, num, yOff };
+  }
+
+  // ---------- strategies & their step sequences ----------
+  // each step: { arrows:[...], packet:{path of {x,y}}, dim:[boxIds], narr, cls, lat, cons, op }
+  // arrows reference predefined hop descriptors.
+
+  const strategies = {
+    "cache-aside": {
+      title: "Cache-Aside (lazy)",
+      sub: "read-heavy default",
+      steps: [
+        {
+          op:"READ · hit", lat:"~1 ms", cons:"may be stale", cls:"good",
+          arrows:[ hop(APP_R.x, CACHE_L.x, -34, COL.blue, "1 GET key", "1"),
+                   hop(CACHE_L.x, APP_R.x, 34, COL.green, "2 value ✓", "2") ],
+          packet:[APP_R.x,182,-34, CACHE_L.x,182,-34, CACHE_L.x,182,34, APP_R.x,182,34],
+          dim:["box-db"],
+          narr:`<b>Read — cache HIT.</b> The app asks the cache for the key (<code>GET</code>). It's present, so the value returns in <code>~1 ms</code>. The database is never touched — this is the ~90% of reads we want to serve from cache.`
+        },
+        {
+          op:"READ · miss", lat:"5-20 ms", cons:"fresh", cls:"move",
+          arrows:[ hop(APP_R.x, CACHE_L.x, -54, COL.blue, "1 GET (miss)", "1"),
+                   hop(APP_R.x, DB_L.x, 0, COL.red, "2 read DB", "2"),
+                   hop(DB_L.x, APP_R.x, 30, COL.red, "3 value", "3"),
+                   hop(APP_R.x, CACHE_L.x, 54, COL.amber, "4 SET key EX ttl", "4") ],
+          packet:[APP_R.x,182,-54, CACHE_L.x,182,-54, APP_R.x,182,-54, APP_R.x,182,0, DB_L.x,182,0, DB_L.x,182,30, APP_R.x,182,30, APP_R.x,182,54, CACHE_L.x,182,54],
+          dim:[],
+          narr:`<b>Read — cache MISS.</b> Not in cache, so the app reads the DB (<code>5-20 ms</code>), then writes the value back into the cache with a TTL (<code>SET key value EX ttl</code>), then returns. The <b>app</b> orchestrates both stores — the cache knows nothing about the DB.`
+        },
+        {
+          op:"WRITE", lat:"DB + del", cons:"invalidated", cls:"move",
+          arrows:[ hop(APP_R.x, DB_L.x, -20, COL.blue, "1 write DB", "1"),
+                   hop(APP_R.x, CACHE_L.x, 30, COL.amber, "2 DEL key (invalidate)", "2") ],
+          packet:[APP_R.x,182,-20, DB_L.x,182,-20, APP_R.x,182,-20, APP_R.x,182,30, CACHE_L.x,182,30],
+          dim:[],
+          narr:`<b>Write — invalidate, don't update.</b> The app writes to the DB, then <b>deletes</b> the cache key. Deleting (not overwriting) avoids a race where two concurrent writes leave a stale value behind. The next read misses and reloads the fresh value.`
+        }
+      ]
+    },
+
+    "read-through": {
+      title: "Read-Through",
+      sub: "cache loads on miss",
+      steps: [
+        {
+          op:"READ · hit", lat:"~1 ms", cons:"may be stale", cls:"good",
+          arrows:[ hop(APP_R.x, CACHE_L.x, -20, COL.blue, "1 GET key", "1"),
+                   hop(CACHE_L.x, APP_R.x, 20, COL.green, "2 value ✓", "2") ],
+          packet:[APP_R.x,182,-20, CACHE_L.x,182,-20, CACHE_L.x,182,20, APP_R.x,182,20],
+          dim:["box-db"],
+          narr:`<b>Read — HIT.</b> The app only ever talks to the cache. On a hit, the value returns in <code>~1 ms</code>. The app code stays clean — no DB logic in it at all.`
+        },
+        {
+          op:"READ · miss", lat:"5-20 ms", cons:"fresh", cls:"move",
+          arrows:[ hop(APP_R.x, CACHE_L.x, -40, COL.blue, "1 GET (miss)", "1"),
+                   hop(CACHE_R.x, DB_L.x, -10, COL.amber, "2 cache loads", "2"),
+                   hop(DB_L.x, CACHE_R.x, 18, COL.amber, "3 value", "3"),
+                   hop(CACHE_L.x, APP_R.x, 40, COL.green, "4 populate + return", "4") ],
+          packet:[APP_R.x,182,-40, CACHE_L.x,182,-40, CACHE_R.x,182,-10, DB_L.x,182,-10, DB_L.x,182,18, CACHE_R.x,182,18, CACHE_L.x,182,40, APP_R.x,182,40],
+          dim:[],
+          narr:`<b>Read — MISS.</b> The difference from cache-aside: the <b>cache library itself</b> loads from the DB, populates, then returns. The load logic lives in the cache layer, not your app. Cleaner, but you depend on the provider and get less control.`
+        }
+      ]
+    },
+
+    "write-through": {
+      title: "Write-Through",
+      sub: "sync to both",
+      steps: [
+        {
+          op:"WRITE", lat:"cache + DB", cons:"strong", cls:"good",
+          arrows:[ hop(APP_R.x, CACHE_L.x, -20, COL.blue, "1 write cache", "1"),
+                   hop(CACHE_R.x, DB_L.x, -20, COL.green, "2 write DB (sync)", "2"),
+                   hop(DB_L.x, APP_R.x, 34, COL.green, "3 both confirmed ✓", "3") ],
+          packet:[APP_R.x,182,-20, CACHE_L.x,182,-20, CACHE_R.x,182,-20, DB_L.x,182,-20, DB_L.x,182,34, APP_R.x,182,34],
+          dim:[],
+          narr:`<b>Write — synchronous to both.</b> Every write goes to the cache <i>and</i> the DB; success returns only after <b>both</b> confirm. The cache is always consistent with the DB and nothing is lost on a crash.`
+        },
+        {
+          op:"WRITE · cost", lat:"cache + DB", cons:"strong", cls:"bad",
+          arrows:[ hop(APP_R.x, CACHE_L.x, -20, COL.blue, "1 write cache", "1"),
+                   hop(CACHE_R.x, DB_L.x, -20, COL.red, "2 + DB latency", "2"),
+                   hop(DB_L.x, APP_R.x, 34, COL.green, "3 confirm ✓", "3") ],
+          packet:[APP_R.x,182,-20, CACHE_L.x,182,-20, CACHE_R.x,182,-20, DB_L.x,182,-20],
+          dim:[],
+          narr:`<b>The tradeoff.</b> Because the write blocks on the slow DB hop, total <b>write latency = cache write + DB write</b> (the sum). Writes are slower. Worth it for read-after-write data: config, session state — where staleness is unacceptable.`
+        },
+        {
+          op:"READ", lat:"~1 ms", cons:"strong", cls:"good",
+          arrows:[ hop(APP_R.x, CACHE_L.x, -20, COL.blue, "1 GET key", "1"),
+                   hop(CACHE_L.x, APP_R.x, 20, COL.green, "2 fresh value ✓", "2") ],
+          packet:[APP_R.x,182,-20, CACHE_L.x,182,-20, CACHE_L.x,182,20, APP_R.x,182,20],
+          dim:["box-db"],
+          narr:`<b>Reads stay fast and correct.</b> Since every write already populated the cache, reads hit a value that's guaranteed up-to-date with the DB — <code>~1 ms</code> and never stale.`
+        }
+      ]
+    },
+
+    "write-back": {
+      title: "Write-Back",
+      sub: "async flush",
+      steps: [
+        {
+          op:"WRITE · ack", lat:"~1 ms", cons:"eventual", cls:"good",
+          arrows:[ hop(APP_R.x, CACHE_L.x, -20, COL.blue, "1 write cache", "1"),
+                   hop(CACHE_L.x, APP_R.x, 20, COL.green, "2 ack now ✓", "2") ],
+          packet:[APP_R.x,182,-20, CACHE_L.x,182,-20, CACHE_L.x,182,20, APP_R.x,182,20],
+          dim:["box-db"],
+          narr:`<b>Write — acked immediately.</b> The write lands only in the cache and returns in <code>~1 ms</code>. The entry is marked <b>dirty</b>. The DB hasn't been touched yet — the app doesn't wait for it.`
+        },
+        {
+          op:"FLUSH · async", lat:"batched", cons:"eventual", cls:"move",
+          arrows:[ hop(CACHE_R.x, DB_L.x, 0, COL.amber, "3 async batch flush", "3") ],
+          packet:[CACHE_R.x,182,0, DB_L.x,182,0],
+          dim:["box-app"],
+          narr:`<b>Flush later, in batches.</b> Asynchronously the cache coalesces dirty entries and flushes them to the DB. Multiple writes to the same key collapse into one DB write — this <b>write coalescing</b> absorbs bursts (counters, metrics) and maximizes throughput.`
+        },
+        {
+          op:"CRASH", lat:"—", cons:"DATA LOSS", cls:"bad",
+          arrows:[ hop(CACHE_R.x, DB_L.x, 0, COL.red, "✗ un-flushed lost", "!") ],
+          packet:[],
+          dim:["box-app"],
+          narr:`<b>The risk.</b> If the cache crashes before the flush, every un-flushed dirty write is <b>gone</b> — the DB never saw it. Write-back is <b>not durable</b>. Blazing fast for metrics and like-counts; never for financial or critical data.`
+        }
+      ]
+    },
+
+    "write-around": {
+      title: "Write-Around",
+      sub: "bypass cache",
+      steps: [
+        {
+          op:"WRITE", lat:"5-20 ms", cons:"DB only", cls:"move",
+          arrows:[ hop(APP_R.x, DB_L.x, -20, COL.blue, "1 write straight to DB", "1") ],
+          packet:[APP_R.x,182,-20, CACHE_L.x,182,-20, CACHE_R.x,182,-20, DB_L.x,182,-20],
+          dim:["box-cache"],
+          narr:`<b>Write — bypass the cache.</b> The write goes <b>straight to the DB</b>; the cache is skipped entirely. This keeps "write-once-read-never" data (logs, audit trails, bulk imports) from polluting the cache and evicting hot keys.`
+        },
+        {
+          op:"READ · 1st", lat:"5-20 ms", cons:"fresh", cls:"move",
+          arrows:[ hop(APP_R.x, CACHE_L.x, -40, COL.blue, "1 GET (miss)", "1"),
+                   hop(APP_R.x, DB_L.x, 0, COL.red, "2 read DB", "2"),
+                   hop(APP_R.x, CACHE_L.x, 40, COL.amber, "3 now populate", "3") ],
+          packet:[APP_R.x,182,-40, CACHE_L.x,182,-40, APP_R.x,182,-40, APP_R.x,182,0, DB_L.x,182,0, APP_R.x,182,40, CACHE_L.x,182,40],
+          dim:[],
+          narr:`<b>First read always misses.</b> Because the write skipped the cache, the very first read of fresh data isn't there — it falls through to the DB (<code>5-20 ms</code>), then populates the cache (pairs naturally with cache-aside). The tradeoff for not polluting the cache.`
+        }
+      ]
+    }
+  };
+
+  const order = ["cache-aside","read-through","write-through","write-back","write-around"];
+
+  // ---------- DOM ----------
+  const gArrows = document.getElementById("g-arrows");
+  const gPacket = document.getElementById("g-packet");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const tabsEl = document.getElementById("tabs");
+  const vStrat = document.getElementById("v-strat");
+  const vOp = document.getElementById("v-op");
+  const vLat = document.getElementById("v-lat");
+  const vCons = document.getElementById("v-cons");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+  const boxes = { "box-app":document.getElementById("box-app"),
+                  "box-cache":document.getElementById("box-cache"),
+                  "box-db":document.getElementById("box-db") };
+
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  let current = "cache-aside";
+  let cursor = 0;
+  let animTimer = null;
+
+  // build tabs
+  order.forEach(id => {
+    const b = document.createElement("button");
+    b.className = "tab" + (id === current ? " active" : "");
+    b.textContent = strategies[id].title;
+    b.dataset.id = id;
+    b.addEventListener("click", () => { selectStrategy(id); });
+    tabsEl.appendChild(b);
+  });
+
+  function selectStrategy(id) {
+    current = id; cursor = 0;
+    [...tabsEl.children].forEach(c => c.classList.toggle("active", c.dataset.id === id));
+    render();
+  }
+
+  // curved-ish arc path for an arrow lane (slight bow so overlapping lanes separate)
+  function arrowPath(a) {
+    const midX = (a.x1 + a.x2) / 2;
+    // bow amount proportional to yOff so lanes don't overlap visually
+    return `M ${a.x1} ${a.y1} L ${a.x2} ${a.y2}`;
+  }
+
+  function clearAnim() { if (animTimer) { clearInterval(animTimer); animTimer = null; } }
+
+  function render() {
+    clearAnim();
+    const strat = strategies[current];
+    const s = strat.steps[cursor];
+    gArrows.innerHTML = ""; gPacket.innerHTML = "";
+
+    // dim boxes
+    for (const id in boxes) boxes[id].classList.toggle("dimmed", s.dim.includes(id));
+
+    // draw arrows
+    s.arrows.forEach(a => {
+      const path = svgEl("path", {
+        class: "arrow-path",
+        d: arrowPath(a),
+        stroke: a.color,
+        "marker-end": "url(#" + MARK[a.color] + ")",
+        "stroke-dasharray": (a.color === COL.amber || a.color === COL.red) ? "7 5" : "none"
+      });
+      gArrows.appendChild(path);
+      // numbered badge at arrow start-ish
+      const bx = a.x1 + (a.x2 - a.x1) * 0.5;
+      const badge = svgEl("circle", { cx: bx, cy: a.y1, r: 9, fill: a.color, stroke:"#1a1a2e", "stroke-width":2 });
+      const bt = svgEl("text", { class:"arrow-num", x: bx, y: a.y1 + 4, "text-anchor":"middle" });
+      bt.textContent = a.num;
+      gArrows.appendChild(badge); gArrows.appendChild(bt);
+      // label above the lane
+      const lbl = svgEl("text", { class:"arrow-label", x: bx, y: a.y1 - 13, "text-anchor":"middle" });
+      lbl.textContent = a.label;
+      gArrows.appendChild(lbl);
+    });
+
+    // animate travelling packet along the polyline in s.packet [x,y,off, x,y,off, ...]
+    const pts = [];
+    for (let i = 0; i < s.packet.length; i += 3) {
+      pts.push({ x: s.packet[i], y: s.packet[i+1] + s.packet[i+2] });
+    }
+    if (pts.length >= 2) {
+      const dot = svgEl("circle", { class:"packet", cx: pts[0].x, cy: pts[0].y, r: 7,
+                  fill: "#fbbf24", stroke:"#fff", "stroke-width":2 });
+      gPacket.appendChild(dot);
+      let seg = 0, t = 0;
+      const stepsPerSeg = 18;
+      animTimer = setInterval(() => {
+        if (seg >= pts.length - 1) { seg = 0; t = 0; } // loop the animation
+        const a = pts[seg], b = pts[seg+1];
+        const x = a.x + (b.x - a.x) * (t / stepsPerSeg);
+        const y = a.y + (b.y - a.y) * (t / stepsPerSeg);
+        dot.setAttribute("cx", x); dot.setAttribute("cy", y);
+        t++;
+        if (t > stepsPerSeg) { t = 0; seg++; }
+      }, 22);
+    }
+
+    // side panel
+    vStrat.textContent = strat.title;
+    vOp.textContent = s.op;
+    vLat.textContent = s.lat;
+    vLat.className = "value " + (s.cls === "bad" ? "red" : s.cls === "move" ? "amber" : "green");
+    vCons.textContent = s.cons;
+    vCons.className = "value " + (s.cons.includes("strong") || s.cons.includes("fresh") ? "green"
+                      : s.cons.includes("LOSS") || s.cons.includes("stale") ? "red" : "amber");
+
+    // narration
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor + 1} / ${strat.steps.length}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === strat.steps.length - 1;
+  }
+
+  function next() { const n = strategies[current].steps.length; if (cursor < n - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

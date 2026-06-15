@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Design a Web Crawler — The Crawl Loop Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 860px) { .stage { grid-template-columns: 1fr; } }
+
+  /* architecture SVG */
+  .arch-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+
+  .box rect { transition: all .35s ease; }
+  .box text { font-family: -apple-system, sans-serif; fill: #e8e8f4; }
+  .box .b-title { font-weight: 700; font-size: 12.5px; }
+  .box .b-sub { font-size: 9px; fill: #9090b0; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .box.active rect { stroke: #10b981; stroke-width: 3; filter: drop-shadow(0 0 6px #10b98188); }
+  .box.dim { opacity: .32; }
+
+  .edge-line { fill: none; stroke: #3a3a5c; stroke-width: 2; }
+  .edge-line.lit { stroke: #f59e0b; stroke-width: 3.5; }
+  .edge-arrow { fill: #3a3a5c; transition: fill .3s ease; }
+  .edge-arrow.lit { fill: #f59e0b; }
+  .edge-label { fill: #707090; font-size: 9px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .packet { transition: none; }
+  .packet circle { fill: #f59e0b; stroke: #fbbf24; stroke-width: 2; }
+  .packet text { fill: #1a1a2e; font-size: 8px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 70px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.warn { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* two-tier frontier panel */
+  .frontier { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .frontier h3 { margin: 0 0 4px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .frontier .sub { color: #9090b0; font-size: 13px; margin: 0 0 16px; }
+  .frontier .sub b { color: #fff; }
+  .tier { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 700px) { .tier { grid-template-columns: 1fr; } }
+  .tcol { background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 10px; padding: 14px 16px; }
+  .tcol h4 { margin: 0 0 4px; font-size: 13px; color: #e0e0e0; }
+  .tcol .why { font-size: 11.5px; color: #9090b0; margin: 0 0 12px; }
+  .q { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .q .qlabel { font-size: 10px; color: #8888aa; width: 64px; flex: none; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .q .cells { display: flex; gap: 4px; flex: 1; }
+  .cell { flex: 1; height: 22px; border-radius: 4px; font-size: 9px; color: #1a1a2e; font-weight: 700;
+          display: flex; align-items: center; justify-content: center; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .edge { margin-top: 24px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Design a Web Crawler — The Crawl Loop</h1>
+  <div class="subtitle">How a distributed crawler fetches <b>~1 billion pages/month</b> (~400 pages/sec, ~1.6 Gbps inbound) by sending each URL around a loop: <code>Frontier → Fetch → Store → Parse → Dedup → back to Frontier</code> — staying polite to every host and never crawling the same page twice.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — exploring a city with a shared to-do list</h3>
+    <p>Imagine a team of explorers mapping a giant city. They share one <b>to-do list of streets to visit</b> (the <b>URL Frontier</b>). An explorer takes the next street off the list, walks it (<b>fetch the page</b>), writes down what they saw in a shared notebook (<b>content store</b>), and notes every <b>new street sign</b> they spotted (<b>extracted links</b>). Before adding a new street to the list, they check a "<b>streets we've already mapped</b>" ledger (<b>dedup / seen-set</b>) so nobody walks the same street twice. And there's etiquette: <b>don't send ten explorers down one tiny alley at once</b> — knock politely, obey the alley's posted rules (<code>robots.txt</code>), and space out your visits. The list never empties on its own; it keeps growing from the signs you find.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">goal:</span><code>seed URLs → fetch pages → extract links → repeat</code></div>
+    <div class="row"><span class="label">scale:</span><code>~400 pages/sec avg, ~1000/sec peak, ~100 TB/month compressed</code></div>
+    <div class="row"><span class="label">rules:</span><code>dedup (no page twice) + politeness (no host hammering)</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="arch-holder">
+      <svg viewBox="0 0 560 440" id="arch">
+        <defs></defs>
+        <g id="g-edges"></g>
+        <g id="g-boxes"></g>
+        <g id="g-packet"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Stage</div><div class="value" id="v-stage">—</div></div>
+        <div class="var"><div class="label">In flight</div><div class="value amber" id="v-url">seed</div></div>
+        <div class="var"><div class="label">Pages fetched</div><div class="value green" id="v-fetched">0</div></div>
+        <div class="var"><div class="label">Frontier size</div><div class="value" id="v-frontier">3</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Frontier — prioritized + polite URL queue</div>
+        <div class="legend-item"><span class="swatch" style="background:#8b5cf6"></span>Fetcher fleet (+ DNS &amp; robots cache)</div>
+        <div class="legend-item"><span class="swatch" style="background:#06b6d4"></span>Content store (blob, content-hashed)</div>
+        <div class="legend-item"><span class="swatch" style="background:#ec4899"></span>Parser &amp; link extractor</div>
+        <div class="legend-item"><span class="swatch round" style="background:#f59e0b"></span>The URL traveling the loop</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Active component this step</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to follow one URL all the way around the crawl loop.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="frontier">
+    <h3>Inside the URL Frontier — Mercator-style two-tier queues</h3>
+    <p class="sub">The frontier is the crawler's <b>brain</b>. It juggles two conflicting goals at once: crawl <b>important pages first</b> (prioritization) and <b>never hammer a single host</b> (politeness). Two tiers of queues solve both.</p>
+    <div class="tier">
+      <div class="tcol">
+        <h4>Front queues → prioritization</h4>
+        <p class="why">One queue per priority level. A PageRank / freshness signal assigns each URL a priority; a biased router pulls high-priority URLs more often.</p>
+        <div class="q"><span class="qlabel">P1 (high)</span><div class="cells">
+          <div class="cell" style="background:#f87171">/news</div><div class="cell" style="background:#f87171">/home</div><div class="cell" style="background:#f87171">/login</div></div></div>
+        <div class="q"><span class="qlabel">P2 (med)</span><div class="cells">
+          <div class="cell" style="background:#fbbf24">/blog</div><div class="cell" style="background:#fbbf24">/docs</div></div></div>
+        <div class="q"><span class="qlabel">P3 (low)</span><div class="cells">
+          <div class="cell" style="background:#94a3b8">/archive</div></div></div>
+      </div>
+      <div class="tcol">
+        <h4>Back queues → politeness</h4>
+        <p class="why">One queue per host. All URLs of a host land in the same queue, so one worker drains it serially → automatic per-host rate limiting. A heap tracks each host's next-ready time.</p>
+        <div class="q"><span class="qlabel">host A</span><div class="cells">
+          <div class="cell" style="background:#60a5fa">a/1</div><div class="cell" style="background:#60a5fa">a/2</div><div class="cell" style="background:#60a5fa">a/3</div></div></div>
+        <div class="q"><span class="qlabel">host B</span><div class="cells">
+          <div class="cell" style="background:#34d399">b/1</div><div class="cell" style="background:#34d399">b/2</div></div></div>
+        <div class="q"><span class="qlabel">host C</span><div class="cells">
+          <div class="cell" style="background:#c084fc">c/1</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Dedup at scale = Bloom filter + content hash.</b> Billions of URLs won't fit an exact RAM set, so a <b>Bloom filter</b> (~10 bits/elem → ~1% false-positive) answers "definitely new" vs "maybe seen" in ~5 GB; only "maybe" hits the backing KV store. Separately, a <b>SHA-256 content hash</b> makes the blob store content-addressed, so mirror pages with the same bytes are stored once.</li>
+      <li><b>Politeness needs caching.</b> Cache <code>robots.txt</code> per host (with TTL) and run a dedicated <b>cached DNS resolver</b> — millions of synchronous, uncached DNS lookups would throttle the whole fleet.</li>
+      <li><b>Storage &amp; bandwidth dominate</b>, not CPU: ~1.6 Gbps sustained inbound and ~1.2 PB/year compressed → fetchers scale horizontally and content lands in a blob store (S3 / HDFS).</li>
+      <li><b>Frontier is a hotspot / SPOF.</b> Shard it <b>by host (domain hash)</b> so one host always maps to one shard — per-host serialization survives and throughput scales linearly.</li>
+      <li><b>Spider traps.</b> Calendars and infinite generated URLs trap the crawler. Defend with per-host URL budgets, max crawl depth, URL-length limits, and blacklists.</li>
+      <li><b>NoSQL, not SQL.</b> URL metadata is a simple key-based lookup/upsert by <code>url_hash</code> at huge write volume — wide-column stores (Cassandra / Bigtable) shard naturally; SQL joins &amp; ACID are wasted here and become the bottleneck.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>A web crawler is a <b>loop, not a pipeline</b>: every fetched page feeds links back into the frontier, so the design lives or dies on two guards — a <b>two-tier frontier</b> (front queues for priority, back queues for per-host politeness) and <b>two-level dedup</b> (Bloom filter on URLs, content hash on bytes). Get those right and the rest — fetchers, blob store, DNS/robots caches — just scale horizontally.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- component boxes ----------
+  // id, x, y, w, h, color, title, sub lines
+  const W = 132, H = 56;
+  const boxes = {
+    seed:    { x: 24,  y: 16,  w: 120, h: 40, color:"#475569", title:"Seed URLs", sub:"bootstrap list" },
+    frontier:{ x: 24,  y: 96,  w: W,   h: H,  color:"#3b82f6", title:"URL Frontier", sub:["2-tier queue","priority+polite"] },
+    fetcher: { x: 214, y: 96,  w: W,   h: H,  color:"#8b5cf6", title:"Fetcher fleet", sub:["DNS+robots cache","HTTP GET"] },
+    store:   { x: 404, y: 96,  w: W,   h: H,  color:"#06b6d4", title:"Content store", sub:["blob, SHA-256","content-addressed"] },
+    parser:  { x: 404, y: 256, w: W,   h: H,  color:"#ec4899", title:"Parser", sub:["extract text","+ outlinks"] },
+    dedup:   { x: 214, y: 256, w: W,   h: H,  color:"#f59e0b", title:"URL filter+dedup", sub:["normalize","Bloom + seen-set"] },
+    meta:    { x: 24,  y: 256, w: W,   h: H,  color:"#64748b", title:"Metadata DB", sub:["status, ts,","content-hash"] },
+  };
+
+  // ---------- edges (waypoints), id -> from box anchor to box anchor ----------
+  // each edge: list of points (the packet travels along these)
+  function anchor(b, side) {
+    if (side === "r") return { x: b.x + b.w, y: b.y + b.h/2 };
+    if (side === "l") return { x: b.x,        y: b.y + b.h/2 };
+    if (side === "t") return { x: b.x + b.w/2, y: b.y };
+    if (side === "b") return { x: b.x + b.w/2, y: b.y + b.h };
+  }
+  const edges = {
+    e_seed:    { pts: [anchor(boxes.seed,"b"), anchor(boxes.frontier,"t")], label:"" },
+    e_dequeue: { pts: [anchor(boxes.frontier,"r"), anchor(boxes.fetcher,"l")], label:"getNext" },
+    e_fetch:   { pts: [anchor(boxes.fetcher,"r"), anchor(boxes.store,"l")], label:"raw HTML" },
+    e_parse:   { pts: [anchor(boxes.store,"b"), anchor(boxes.parser,"t")], label:"parse" },
+    e_links:   { pts: [anchor(boxes.parser,"l"), anchor(boxes.dedup,"r")], label:"outlinks" },
+    e_meta:    { pts: [anchor(boxes.dedup,"l"), anchor(boxes.meta,"r")], label:"upsert" },
+    e_loop:    { pts: [anchor(boxes.dedup,"t"), { x: boxes.dedup.x + boxes.dedup.w/2, y: 190 },
+                       { x: boxes.frontier.x + boxes.frontier.w/2, y: 190 }, anchor(boxes.frontier,"b") ], label:"new URLs" },
+  };
+
+  const NS = "http://www.w3.org/2000/svg";
+  function svgEl(tag, attrs) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+
+  // ---------- steps ----------
+  // active: box id highlighted; lit: edge ids; packetEdge: edge to animate packet along (0..1 at this step => end)
+  // place packet AT a box (atBox) or moving along an edge (onEdge)
+  const steps = [
+    {
+      active: ["frontier"], lit: ["e_seed"], atBox: "frontier",
+      stage:"Frontier", url:"seed×3", fetched:0, frontier:3, cls:"",
+      narr:`<b>1. Seed the frontier.</b> We drop a handful of <b>seed URLs</b> into the <b>URL Frontier</b> — the central queue of "pages still to crawl". From here on the frontier never empties on its own; it keeps refilling from links we discover. Everything orbits this queue.`
+    },
+    {
+      active: ["frontier","fetcher"], lit: ["e_dequeue"], onEdge: "e_dequeue",
+      stage:"Dequeue", url:"http://a.com/p1", fetched:0, frontier:2, cls:"move",
+      narr:`<b>2. A fetcher dequeues a URL.</b> <code>getNextURL(workerId)</code> hands the worker the next URL — but the frontier picks it <b>respecting politeness</b>: it serves from a host's back queue only when that host is "ready", so no single site gets slammed.`
+    },
+    {
+      active: ["fetcher"], lit: [], atBox: "fetcher",
+      stage:"Resolve+robots", url:"http://a.com/p1", fetched:0, frontier:2, cls:"",
+      narr:`<b>3. Resolve &amp; check the rules.</b> The fetcher looks up the host in its <b>cached DNS resolver</b> (uncached lookups are slow and would throttle the fleet), then checks the <b>cached <code>robots.txt</code></b> for this host. Disallowed? Drop it. Allowed? Proceed to fetch.`
+    },
+    {
+      active: ["fetcher","store"], lit: ["e_fetch"], onEdge: "e_fetch",
+      stage:"Fetch→Store", url:"200 OK · 500 KB", fetched:1, frontier:2, cls:"good",
+      narr:`<b>4. HTTP GET, then store the bytes.</b> The worker fetches the page (handling redirects &amp; timeouts) and writes the raw HTML to the <b>content store</b>. The key is the <code>SHA-256</code> of the bytes — <b>content-addressed</b>, so two URLs with identical content are stored only once.`
+    },
+    {
+      active: ["store","parser"], lit: ["e_parse"], onEdge: "e_parse",
+      stage:"Parse", url:"~10 outlinks", fetched:1, frontier:2, cls:"",
+      narr:`<b>5. Parse &amp; extract links.</b> The <b>parser</b> reads the stored HTML, pulls out the text (for downstream indexing) and every <b>outlink</b> on the page — on average ~10 per page. Those outlinks are the fuel that keeps the loop running.`
+    },
+    {
+      active: ["parser","dedup"], lit: ["e_links"], onEdge: "e_links",
+      stage:"Filter+Dedup", url:"10 → 4 new", fetched:1, frontier:2, cls:"move",
+      narr:`<b>6. Normalize, filter, dedup.</b> Each outlink is <b>normalized</b> (lowercase host, strip fragments &amp; tracking params, sort query) then checked against the <b>seen-set</b>. A <b>Bloom filter</b> rejects most already-seen URLs in RAM; only "maybe new" ones hit the backing KV store. Say 4 of 10 survive as genuinely new.`
+    },
+    {
+      active: ["dedup","meta"], lit: ["e_meta"], onEdge: "e_meta",
+      stage:"Persist meta", url:"upsert url_hash", fetched:1, frontier:2, cls:"",
+      narr:`<b>7. Record crawl state.</b> The <b>metadata DB</b> (wide-column NoSQL, sharded by <code>url_hash</code>) gets the page's <code>status=FETCHED</code>, <code>last_crawled_at</code>, and <code>content_hash</code>. Simple key-based upserts at high write volume — exactly what Cassandra/Bigtable are built for.`
+    },
+    {
+      active: ["dedup","frontier"], lit: ["e_loop"], onEdge: "e_loop",
+      stage:"Loop back", url:"+4 URLs", fetched:1, frontier:6, cls:"good",
+      narr:`<b>8. Feed new URLs back — the loop closes.</b> The 4 new URLs are pushed back into the <b>frontier</b> via <code>addURL</code>, each routed to its host's back queue and given a priority. The frontier grew from 2 to 6. This feedback is why a crawler is a <b>loop, not a pipeline</b> — and why it can crawl the whole web from a few seeds.`
+    },
+    {
+      active: ["frontier"], lit: ["e_dequeue","e_loop"], atBox: "frontier",
+      stage:"Repeat", url:"next URL…", fetched:1, frontier:6, cls:"",
+      narr:`<b>9. Repeat forever.</b> The next worker dequeues the next polite, prioritized URL and the whole cycle runs again — across a <b>horizontally scaled fetcher fleet</b>, many hosts in flight at once. A <b>re-crawl scheduler</b> periodically re-injects old URLs for <b>freshness</b>, since pages keep changing.`
+    },
+  ];
+
+  // ---------- DOM ----------
+  const gEdges = document.getElementById("g-edges");
+  const gBoxes = document.getElementById("g-boxes");
+  const gPacket = document.getElementById("g-packet");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vStage = document.getElementById("v-stage");
+  const vUrl = document.getElementById("v-url");
+  const vFetched = document.getElementById("v-fetched");
+  const vFrontier = document.getElementById("v-frontier");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  // build static edges once
+  function lineForPts(pts) {
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 1; i < pts.length; i++) d += ` L ${pts[i].x} ${pts[i].y}`;
+    return d;
+  }
+  function arrowHead(pts) {
+    const a = pts[pts.length-2], b = pts[pts.length-1];
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    const s = 7;
+    const p1 = { x: b.x - s*Math.cos(ang - 0.5), y: b.y - s*Math.sin(ang - 0.5) };
+    const p2 = { x: b.x - s*Math.cos(ang + 0.5), y: b.y - s*Math.sin(ang + 0.5) };
+    return `${b.x},${b.y} ${p1.x.toFixed(1)},${p1.y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  const edgeEls = {};
+  for (const id in edges) {
+    const e = edges[id];
+    const path = svgEl("path", { class:"edge-line", id:"line-"+id, d: lineForPts(e.pts) });
+    const head = svgEl("polygon", { class:"edge-arrow", id:"arrow-"+id, points: arrowHead(e.pts) });
+    gEdges.appendChild(path); gEdges.appendChild(head);
+    if (e.label) {
+      const mid = e.pts[Math.floor(e.pts.length/2)] || e.pts[0];
+      const a = e.pts[0], b = e.pts[e.pts.length-1];
+      const lx = (a.x + b.x)/2, ly = (a.y + b.y)/2;
+      const lbl = svgEl("text", { class:"edge-label", x: lx, y: ly - 5, "text-anchor":"middle" });
+      lbl.textContent = e.label;
+      gEdges.appendChild(lbl);
+    }
+    edgeEls[id] = { path, head };
+  }
+
+  // build boxes once
+  const boxEls = {};
+  for (const id in boxes) {
+    const b = boxes[id];
+    const g = svgEl("g", { class:"box", id:"box-"+id });
+    const rect = svgEl("rect", { x:b.x, y:b.y, width:b.w, height:b.h, rx:9,
+      fill:b.color, "fill-opacity":0.22, stroke:b.color, "stroke-width":2 });
+    g.appendChild(rect);
+    const title = svgEl("text", { class:"b-title", x:b.x + b.w/2, y:b.y + (Array.isArray(b.sub)? 20:24), "text-anchor":"middle" });
+    title.textContent = b.title;
+    g.appendChild(title);
+    const subs = Array.isArray(b.sub) ? b.sub : [b.sub];
+    subs.forEach((s, i) => {
+      const st = svgEl("text", { class:"b-sub", x:b.x + b.w/2, y:b.y + (Array.isArray(b.sub)?34:40) + i*11, "text-anchor":"middle" });
+      st.textContent = s; g.appendChild(st);
+    });
+    gBoxes.appendChild(g);
+    boxEls[id] = g;
+  }
+
+  // packet group
+  const pkt = svgEl("g", { class:"packet", id:"pkt" });
+  const pkc = svgEl("circle", { cx:0, cy:0, r:11 });
+  const pkt_txt = svgEl("text", { x:0, y:3, "text-anchor":"middle" });
+  pkt_txt.textContent = "URL";
+  pkt.appendChild(pkc); pkt.appendChild(pkt_txt);
+  gPacket.appendChild(pkt);
+
+  let cursor = 0;
+  let anim = null;
+
+  function setPacket(x, y) {
+    pkc.setAttribute("cx", x); pkc.setAttribute("cy", y);
+    pkt_txt.setAttribute("x", x); pkt_txt.setAttribute("y", y + 3);
+  }
+
+  function animateAlong(pts, done) {
+    // total length
+    const segs = [];
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const dx = pts[i].x - pts[i-1].x, dy = pts[i].y - pts[i-1].y;
+      const len = Math.hypot(dx, dy);
+      segs.push({ a: pts[i-1], b: pts[i], len });
+      total += len;
+    }
+    const dur = 850;
+    const t0 = performance.now();
+    function frame(now) {
+      let p = Math.min(1, (now - t0) / dur);
+      const ease = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
+      let dist = ease * total, acc = 0, x = pts[0].x, y = pts[0].y;
+      for (const s of segs) {
+        if (dist <= acc + s.len) {
+          const f = (dist - acc) / s.len;
+          x = s.a.x + (s.b.x - s.a.x) * f;
+          y = s.a.y + (s.b.y - s.a.y) * f;
+          break;
+        }
+        acc += s.len; x = s.b.x; y = s.b.y;
+      }
+      setPacket(x, y);
+      if (p < 1) anim = requestAnimationFrame(frame);
+      else if (done) done();
+    }
+    anim = requestAnimationFrame(frame);
+  }
+
+  function render(animatePacket) {
+    if (anim) { cancelAnimationFrame(anim); anim = null; }
+    const s = steps[cursor];
+
+    // boxes
+    for (const id in boxEls) {
+      boxEls[id].classList.remove("active","dim");
+      if (s.active.includes(id)) boxEls[id].classList.add("active");
+    }
+    // edges
+    for (const id in edgeEls) {
+      const lit = s.lit.includes(id);
+      edgeEls[id].path.classList.toggle("lit", lit);
+      edgeEls[id].head.classList.toggle("lit", lit);
+    }
+
+    // packet position
+    if (s.onEdge && animatePacket) {
+      const pts = edges[s.onEdge].pts;
+      setPacket(pts[0].x, pts[0].y);
+      animateAlong(pts);
+    } else if (s.onEdge) {
+      const pts = edges[s.onEdge].pts;
+      setPacket(pts[pts.length-1].x, pts[pts.length-1].y);
+    } else if (s.atBox) {
+      const b = boxes[s.atBox];
+      setPacket(b.x + b.w/2, b.y + b.h/2);
+    }
+
+    // side panel
+    vStage.textContent = s.stage;
+    vUrl.textContent = s.url;
+    vFetched.textContent = s.fetched;
+    vFrontier.textContent = s.frontier;
+
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(true); } }
+  function prev() { if (cursor > 0) { cursor--; render(false); } }
+  function reset() { cursor = 0; render(false); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render(false);
+})();
+</script>
+</body>
+</html>

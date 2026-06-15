@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Circuit Breakers — The Closed / Open / Half-Open State Machine</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* diagram SVG */
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 520px; height: auto; }
+
+  .box { transition: all .4s ease; }
+  .box-label { font-family: -apple-system, sans-serif; font-weight: 700; fill: #fff; }
+  .box-sub { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10px; fill: #cdd; }
+
+  .wire { fill: none; stroke: #3a3a5c; stroke-width: 6; transition: all .4s ease; }
+  .wire.live { stroke: #10b981; }
+  .wire.dead { stroke: #ef4444; stroke-dasharray: 8 7; }
+
+  .statebadge { transition: all .4s ease; }
+  .arrow-head { transition: all .4s ease; }
+
+  .endlabel { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 12px; fill: #cbd5e1; }
+  .endsub { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #8892b0; }
+
+  .packet { transition: opacity .3s ease; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.bad { border-left-color: #ef4444; background: #2a1717; }
+  .narration.warn { border-left-color: #f59e0b; background: #332611; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* state machine strip */
+  .smstrip { margin-top: 8px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .smnode {
+    border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 700;
+    border: 2px solid #3a3a5c; color: #8892b0; background: #1f1f3a; transition: all .35s ease;
+    min-width: 120px; text-align: center;
+  }
+  .smnode .tiny { display: block; font-size: 10px; font-weight: 500; color: #6b7280; margin-top: 3px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .smnode.active.closed { border-color: #10b981; color: #6ee7b7; background: #14321f; box-shadow: 0 0 0 3px #10b98133; }
+  .smnode.active.open   { border-color: #ef4444; color: #fca5a5; background: #2a1717; box-shadow: 0 0 0 3px #ef444433; }
+  .smnode.active.half   { border-color: #f59e0b; color: #fcd34d; background: #332611; box-shadow: 0 0 0 3px #f59e0b33; }
+  .smarrow { align-self: center; color: #4b5168; font-size: 18px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.smart { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.smart h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 22px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.smart .big { color: #10b981; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Circuit Breakers — Closed / Open / Half-Open</h1>
+  <div class="subtitle">A client-side resiliency pattern that <b>fail-fasts</b> calls to a failing downstream once errors cross a threshold — so the caller's threads don't hang on <code>30s</code> timeouts and the sick dependency gets room to recover. Watch a request travel the wire as the breaker trips and heals.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the MCB in your house</h3>
+    <p>Think of the <b>MCB (circuit breaker switch)</b> in your home's wiring. Normally it sits <b>closed</b> — current flows, every appliance runs. If a short circuit or overload hits, the MCB instantly <b>trips open</b> and cuts the current, intentionally breaking the circuit so the wiring doesn't melt and the house doesn't catch fire. A software circuit breaker does exactly this between your service and a downstream API: healthy → <b>closed</b>, calls flow; downstream collapses → <b>trip open</b>, every new call fails instantly without even touching downstream; a while later it lets a tiny <b>trial</b> current through (<b>half-open</b>) — if downstream is healthy again, snap back closed; if not, open again. It protects <i>both</i> sides: the caller from hanging, and the downstream from a pile-on.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">setup:</span><code>checkout → Payment API @ 500 QPS, normal latency 40ms</code></div>
+    <div class="row"><span class="label">trip rule:</span><code>error rate &gt; 50% over a rolling window of 20+ requests</code></div>
+    <div class="row"><span class="label">sleep window:</span><code>30s open, then 1 trial probe (half-open)</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 520 300" id="diagram">
+        <!-- caller box -->
+        <g id="caller">
+          <rect class="box" x="20" y="110" width="110" height="80" rx="10" fill="#243a5e" stroke="#3b82f6" stroke-width="2.5"/>
+          <text class="box-label" x="75" y="143" text-anchor="middle" font-size="14">Checkout</text>
+          <text class="box-sub" x="75" y="162" text-anchor="middle">caller · 500 QPS</text>
+        </g>
+
+        <!-- wire caller -> breaker -->
+        <path id="wire1" class="wire" d="M130 150 L210 150"/>
+
+        <!-- breaker (the switch) -->
+        <g id="breaker">
+          <rect id="breaker-box" class="box" x="210" y="100" width="100" height="100" rx="12" fill="#1f1f3a" stroke="#10b981" stroke-width="3"/>
+          <text class="box-label" x="260" y="128" text-anchor="middle" font-size="12">BREAKER</text>
+          <!-- switch contacts -->
+          <circle cx="227" cy="158" r="5" fill="#cbd5e1"/>
+          <circle cx="293" cy="158" r="5" fill="#cbd5e1"/>
+          <!-- switch lever (rotates around left contact) -->
+          <line id="lever" x1="227" y1="158" x2="293" y2="158" stroke="#10b981" stroke-width="5" stroke-linecap="round"/>
+          <text id="state-text" class="statebadge" x="260" y="190" text-anchor="middle" font-size="13" font-weight="700" fill="#6ee7b7">CLOSED</text>
+        </g>
+
+        <!-- wire breaker -> downstream -->
+        <path id="wire2" class="wire" d="M310 150 L400 150"/>
+
+        <!-- downstream box -->
+        <g id="downstream">
+          <rect id="down-box" class="box" x="400" y="110" width="110" height="80" rx="10" fill="#243a5e" stroke="#3b82f6" stroke-width="2.5"/>
+          <text class="box-label" x="455" y="143" text-anchor="middle" font-size="14">Payment</text>
+          <text id="down-sub" class="box-sub" x="455" y="162" text-anchor="middle">healthy · 40ms</text>
+        </g>
+
+        <!-- travelling packet -->
+        <circle id="packet" class="packet" cx="130" cy="150" r="9" fill="#fbbf24" stroke="#fff" stroke-width="2" opacity="0"/>
+
+        <!-- fallback / fast-fail indicator -->
+        <text id="fastfail" x="260" y="245" text-anchor="middle" font-size="12" font-weight="700" fill="#fca5a5" opacity="0"></text>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">State</div><div class="value green" id="v-state">CLOSED</div></div>
+        <div class="var"><div class="label">Err rate</div><div class="value" id="v-err">0%</div></div>
+        <div class="var"><div class="label">Call latency</div><div class="value" id="v-lat">40ms</div></div>
+        <div class="var"><div class="label">Threads held</div><div class="value green" id="v-threads">free</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch round" style="background:#10b981"></span>Closed — calls flow normally</div>
+        <div class="legend-item"><span class="swatch round" style="background:#ef4444"></span>Open — fail-fast, downstream not called</div>
+        <div class="legend-item"><span class="swatch round" style="background:#f59e0b"></span>Half-open — single trial probe</div>
+        <div class="legend-item"><span class="swatch round" style="background:#fbbf24"></span>Request packet on the wire</div>
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Service (caller / downstream)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to send the first request while the breaker is healthy and Closed.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="smstrip">
+    <div class="smnode closed" id="sm-closed">CLOSED<span class="tiny">calls flow · count failures</span></div>
+    <div class="smarrow">&#8594;</div>
+    <div class="smnode open" id="sm-open">OPEN<span class="tiny">fail-fast · 30s sleep</span></div>
+    <div class="smarrow">&#8594;</div>
+    <div class="smnode half" id="sm-half">HALF-OPEN<span class="tiny">1 trial probe</span></div>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>No breaker — cascading failure</h3>
+      <div class="formula">500 QPS &times; 30s timeout = pile-up</div>
+      <p>Payment dies; every call hangs the full <code>30s</code> timeout. At <code>500 QPS</code> that's <span class="big">thousands</span> of blocked threads. The threads never free, so <b>checkout itself hangs</b> and the failure cascades upstream — a "retry storm."</p>
+    </div>
+    <div class="cx smart">
+      <h3>With breaker — fail-fast</h3>
+      <div class="formula">trip in ~1-2s, then ~0.1ms reject</div>
+      <p>After ~1-2s the breaker trips Open. Now all <code>500 QPS</code> fail or serve a fallback in <span class="big">~0.1ms</span> instead of waiting <code>30s</code>. Threads stay free, checkout stays alive, and Payment gets load relief to recover.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>It doesn't fix downstream.</b> A breaker only <b>protects the caller</b> (fail-fast, save threads) and gives the dependency <b>load relief</b>. Recovery is downstream's own job.</li>
+      <li><b>Breaker &ne; retry.</b> A retry re-attempts the <i>same</i> request for transient errors; a breaker blocks <i>future</i> requests during sustained failure. "Try again" vs "don't try right now." They complement but do different jobs.</li>
+      <li><b>Half-open is the whole point of auto-recovery.</b> Without it the breaker would stay Open forever (or need a manual reset). The single trial probe is what discovers downstream is healthy again.</li>
+      <li><b>Per-dependency isolation.</b> Each downstream gets its <i>own</i> breaker — Payment tripping must not block Search calls. One global breaker is a classic mistake.</li>
+      <li><b>Minimum volume guards false trips.</b> On low traffic, error <i>rate</i> alone makes <code>1/2</code> look like 100%. Require a minimum count (e.g. <code>20+</code> requests) before the rate can trip.</li>
+      <li><b>Timeout is mandatory.</b> Without a per-call timeout a hanging call never counts as a "failure," so the breaker never trips. Timeout + breaker go together.</li>
+      <li><b>Real systems:</b> Netflix <b>Hystrix</b>, <b>Resilience4j</b> (Java), <b>Polly</b> (.NET), and <b>Envoy / Istio</b> outlier detection. Often paired with retries and bulkheads.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>A circuit breaker is a 3-state machine — <b>Closed</b> (calls flow, failures counted), <b>Open</b> (fail-fast for a sleep window so the caller's threads aren't burned on <code>30s</code> timeouts), and <b>Half-Open</b> (one trial probe that snaps back to Closed on success or back to Open on failure). It protects the <b>caller</b> and relieves the <b>downstream</b> — but never repairs downstream itself.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- DOM refs ----------
+  const lever      = document.getElementById("lever");
+  const breakerBox = document.getElementById("breaker-box");
+  const stateText  = document.getElementById("state-text");
+  const wire1      = document.getElementById("wire1");
+  const wire2      = document.getElementById("wire2");
+  const downBox    = document.getElementById("down-box");
+  const downSub    = document.getElementById("down-sub");
+  const packet     = document.getElementById("packet");
+  const fastfail   = document.getElementById("fastfail");
+
+  const vState   = document.getElementById("v-state");
+  const vErr     = document.getElementById("v-err");
+  const vLat     = document.getElementById("v-lat");
+  const vThreads = document.getElementById("v-threads");
+
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+
+  const smClosed = document.getElementById("sm-closed");
+  const smOpen   = document.getElementById("sm-open");
+  const smHalf   = document.getElementById("sm-half");
+
+  // ---------- steps ----------
+  // each step: { state, errRate, latency, threads(class+text), down(text+healthy),
+  //   wire2:'live'|'dead', packetMode:'flow'|'fail'|'probe-ok'|'probe-fail'|'none',
+  //   fastfailText, narration, narrClass }
+  const steps = [
+    {
+      state:"CLOSED", errRate:"0%", latency:"40ms", threads:["green","free"],
+      down:["healthy · 40ms", true], wire2:"live", packetMode:"flow", fastfail:"",
+      narration:`<b>1. Closed — normal operation.</b> The switch is <b>closed</b>, so every request flows <code>Checkout → Breaker → Payment</code> and back in ~<code>40ms</code>. The breaker quietly records each outcome (success / failure) in a rolling window. Error rate is <code>0%</code>.`,
+      narrClass:"good"
+    },
+    {
+      state:"CLOSED", errRate:"35%", latency:"30s ⏱", threads:["amber","filling"],
+      down:["sick · timing out", false], wire2:"live", packetMode:"flow", fastfail:"",
+      narration:`<b>2. Downstream gets sick.</b> Payment starts failing — calls now hang to the full <code>30s</code> timeout (each becomes a "failure"). The wire is still closed, so traffic keeps flowing in and threads start piling up. Error rate climbs through <code>35%</code>… still under the <code>50%</code> trip line.`,
+      narrClass:"warn"
+    },
+    {
+      state:"CLOSED", errRate:"62%", latency:"30s ⏱", threads:["red","exhausting"],
+      down:["DOWN · timing out", false], wire2:"live", packetMode:"fail", fastfail:"",
+      narration:`<b>3. Threshold crossed.</b> Over the last <code>20+</code> requests the error rate hits <code>62% &gt; 50%</code>. The minimum-volume guard is satisfied, so this isn't noise — the breaker is about to <b>trip</b>. Right now, without tripping, <code>500 QPS × 30s</code> would block thousands of threads and drag Checkout down too.`,
+      narrClass:"bad"
+    },
+    {
+      state:"OPEN", errRate:"62%", latency:"~0.1ms", threads:["green","freed"],
+      down:["DOWN · not called", false], wire2:"dead", packetMode:"fail", fastfail:"⚡ fail-fast / fallback",
+      narration:`<b>4. Trip → Open.</b> The switch flips <b>open</b>: the wire to Payment is cut. Every incoming request is now rejected (or served a fallback like "Payment temporarily unavailable") in ~<code>0.1ms</code> instead of waiting <code>30s</code>. Threads are freed instantly — Checkout survives, and Payment stops getting hammered. A <code>30s</code> sleep-window timer starts.`,
+      narrClass:"bad"
+    },
+    {
+      state:"OPEN", errRate:"—", latency:"~0.1ms", threads:["green","freed"],
+      down:["recovering…", false], wire2:"dead", packetMode:"none", fastfail:"⚡ fail-fast / fallback",
+      narration:`<b>5. Open — sleep window.</b> For the full <code>30s</code> the breaker stays Open and never calls Payment at all. This silence is the <b>load relief</b> that lets the downstream actually recover. Note: the breaker isn't <i>fixing</i> Payment — it's just getting out of the way while Payment heals itself.`,
+      narrClass:"bad"
+    },
+    {
+      state:"HALF-OPEN", errRate:"probing", latency:"trial", threads:["amber","1 probe"],
+      down:["recovering…", false], wire2:"live", packetMode:"probe-ok", fastfail:"",
+      narration:`<b>6. Half-Open — one cautious probe.</b> The <code>30s</code> timer fires. Rather than reopening the floodgates, the breaker lets exactly <b>one trial request</b> through to test the water. If we dumped all <code>500 QPS</code> at once we'd re-crush a still-fragile Payment — so only 1 probe goes.`,
+      narrClass:"warn"
+    },
+    {
+      state:"CLOSED", errRate:"0%", latency:"40ms", threads:["green","free"],
+      down:["healthy · 40ms", true], wire2:"live", packetMode:"flow", fastfail:"",
+      narration:`<b>7a. Probe succeeds → Closed.</b> The trial request comes back healthy in <code>40ms</code>. Payment has recovered, so the breaker snaps back to <b>Closed</b> and full <code>500 QPS</code> traffic resumes. Auto-recovery complete — no human, no manual reset.`,
+      narrClass:"good"
+    },
+    {
+      state:"OPEN", errRate:"100%", latency:"~0.1ms", threads:["green","freed"],
+      down:["still DOWN", false], wire2:"dead", packetMode:"probe-fail", fastfail:"⚡ fail-fast / fallback",
+      narration:`<b>7b. (Alt) Probe fails → back to Open.</b> If instead the trial request fails, Payment is still sick. The breaker immediately flips back to <b>Open</b> and waits another sleep window — often with <b>exponential backoff</b> (30s → 60s → 120s) so it doesn't thrash. It will probe again later.`,
+      narrClass:"bad"
+    }
+  ];
+
+  let cursor = 0;
+  let anim = null;
+
+  function setLever(state) {
+    // closed = horizontal connecting both contacts; open/half = lifted up at right end
+    if (state === "CLOSED") {
+      lever.setAttribute("x2", "293"); lever.setAttribute("y2", "158");
+      lever.setAttribute("stroke", "#10b981");
+    } else if (state === "OPEN") {
+      lever.setAttribute("x2", "283"); lever.setAttribute("y2", "128");
+      lever.setAttribute("stroke", "#ef4444");
+    } else { // HALF-OPEN
+      lever.setAttribute("x2", "288"); lever.setAttribute("y2", "143");
+      lever.setAttribute("stroke", "#f59e0b");
+    }
+  }
+
+  function stateColor(state) {
+    if (state === "CLOSED") return "#10b981";
+    if (state === "OPEN")   return "#ef4444";
+    return "#f59e0b";
+  }
+
+  function highlightSM(state) {
+    smClosed.classList.toggle("active", state === "CLOSED");
+    smOpen.classList.toggle("active", state === "OPEN");
+    smHalf.classList.toggle("active", state === "HALF-OPEN");
+  }
+
+  // animate the travelling packet
+  function runPacket(mode) {
+    if (anim) { clearTimeout(anim); anim = null; }
+    packet.setAttribute("opacity", "0");
+    if (mode === "none") return;
+
+    const col = stateColor(steps[cursor].state);
+    // start at caller edge
+    let t0 = null;
+    const fail   = (mode === "fail" || mode === "probe-fail");
+    const probe  = (mode === "probe-ok" || mode === "probe-fail");
+    // packet stops at breaker (260) when open/fail; travels to downstream (455) and back when flowing/probe
+    const stopAtBreaker = (steps[cursor].state === "OPEN");
+    const reachX = stopAtBreaker ? 250 : 446;
+    const startX = 132;
+
+    packet.setAttribute("fill", probe ? "#f59e0b" : "#fbbf24");
+    packet.setAttribute("opacity", "1");
+
+    const dur = 900;
+    function frame(ts) {
+      if (!t0) t0 = ts;
+      const p = Math.min((ts - t0) / dur, 1);
+      // ease out-and-back: 0->1 go, 1->2 return
+      let x;
+      if (p < 0.5) {
+        x = startX + (reachX - startX) * (p / 0.5);
+      } else {
+        // return only if it reached downstream and is not a hard fast-fail bounce at breaker
+        x = reachX - (reachX - startX) * ((p - 0.5) / 0.5);
+        if (stopAtBreaker) x = reachX; // bounce/stop at breaker
+      }
+      packet.setAttribute("cx", x.toFixed(1));
+      packet.setAttribute("cy", "150");
+      // color shift on the way back if failed
+      if (fail && p > 0.5) packet.setAttribute("fill", "#ef4444");
+      if (p < 1) { anim = requestAnimationFrame(frame); }
+      else {
+        // loop the flow modes so motion is visible while paused on the step
+        if (mode === "flow") { t0 = null; anim = requestAnimationFrame(frame); }
+        else { packet.setAttribute("opacity", stopAtBreaker ? "0" : "0"); }
+      }
+    }
+    anim = requestAnimationFrame(frame);
+  }
+
+  function render() {
+    const s = steps[cursor];
+
+    setLever(s.state);
+    const col = stateColor(s.state);
+    breakerBox.setAttribute("stroke", col);
+    stateText.setAttribute("fill", col);
+    stateText.textContent = s.state;
+
+    wire1.setAttribute("class", "wire live");
+    wire2.setAttribute("class", "wire " + (s.wire2 === "live" ? "live" : "dead"));
+
+    // downstream visual
+    downSub.textContent = s.down[0];
+    if (s.down[1]) {
+      downBox.setAttribute("stroke", "#3b82f6"); downBox.setAttribute("fill", "#243a5e");
+    } else {
+      downBox.setAttribute("stroke", "#ef4444"); downBox.setAttribute("fill", "#3a1d1d");
+    }
+
+    // fast-fail label
+    if (s.fastfail) { fastfail.textContent = s.fastfail; fastfail.setAttribute("opacity", "1"); }
+    else { fastfail.setAttribute("opacity", "0"); }
+
+    // side vars
+    vState.textContent = s.state;
+    vState.className = "value " + (s.state === "CLOSED" ? "green" : s.state === "OPEN" ? "red" : "amber");
+    vErr.textContent = s.errRate;
+    vErr.className = "value " + (s.errRate.indexOf("62") >= 0 || s.errRate.indexOf("100") >= 0 ? "red"
+                                : s.errRate.indexOf("35") >= 0 ? "amber" : "");
+    vLat.textContent = s.latency;
+    vLat.className = "value " + (s.latency.indexOf("30s") >= 0 ? "red" : s.latency.indexOf("0.1") >= 0 ? "green" : "");
+    vThreads.textContent = s.threads[1];
+    vThreads.className = "value " + s.threads[0];
+
+    // narration
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    highlightSM(s.state);
+    runPacket(s.packetMode);
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

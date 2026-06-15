@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SQL vs NoSQL — A Write Request Through Both Worlds</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy p + p { margin-top: 10px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 540px; height: auto; }
+
+  /* shared svg styling */
+  .col-title { font-family: -apple-system, sans-serif; font-weight: 800; font-size: 14px; }
+  .col-sql { fill: #60a5fa; }
+  .col-nosql { fill: #f472b6; }
+  .lane-bg { fill: #1f1f3a; stroke: #3a3a5c; stroke-width: 1; rx: 10; }
+  .box { transition: all .35s ease; }
+  .box rect { transition: all .35s ease; }
+  .box-label { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 11px; fill: #e8e8f4; }
+  .box-sub { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.5px; fill: #9a9ab8; }
+  .dim { opacity: .28; }
+  .active rect { stroke: #fbbf24; stroke-width: 2.5; }
+  .ok rect { stroke: #10b981; stroke-width: 2.5; }
+  .reject rect { stroke: #ef4444; stroke-width: 2.5; }
+
+  .flow-line { stroke: #3a3a5c; stroke-width: 2; fill: none; }
+
+  .packet { transition: all .7s cubic-bezier(.5,.05,.3,1); }
+  .packet circle { fill: #fbbf24; stroke: #1a1a2e; stroke-width: 2; }
+  .packet text { font-family: "SF Mono", monospace; font-size: 9px; font-weight: 700; fill: #1a1a2e; }
+  .packet.hidden { opacity: 0; }
+
+  .replica { transition: all .4s ease; }
+  .replica.stale rect { stroke: #f59e0b; stroke-width: 2.5; stroke-dasharray: 4 3; }
+  .replica.synced rect { stroke: #10b981; stroke-width: 2.5; }
+  .replica.partition rect { stroke: #ef4444; stroke-width: 2.5; stroke-dasharray: 2 3; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.pink { color: #f472b6; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+  .swatch.dash { background: repeating-linear-gradient(90deg,#f59e0b 0 4px,transparent 4px 7px); }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.sql { border-left-color: #60a5fa; background: #131f33; }
+  .narration.nosql { border-left-color: #f472b6; background: #2c1424; }
+  .narration.warn { border-left-color: #f59e0b; background: #332611; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.sql { background: #131f33; border: 1px solid #3b82f6; }
+  .cx.nosql { background: #2c1424; border: 1px solid #ec4899; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.sql h3 { color: #93c5fd; }
+  .cx.nosql h3 { color: #f9a8d4; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx ul { margin: 8px 0 0; padding-left: 18px; }
+  .cx li { font-size: 13px; color: #c8c8d8; margin: 5px 0; }
+  .cx li b { color: #fff; }
+  .cx .big { font-size: 20px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.sql .big { color: #60a5fa; }
+  .cx.nosql .big { color: #f472b6; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SQL vs NoSQL — One Write, Two Worlds</h1>
+  <div class="subtitle">Follow a single <code>write</code> request as it travels through a <b>relational SQL engine</b> (schema-on-write, ACID, scale up) and a <b>NoSQL cluster</b> (schema-on-read, BASE, scale out) — then watch what each does when a network partition splits the cluster.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the government form vs the free-form diary</h3>
+    <p><b>SQL = a government office form.</b> Every column is pre-defined (Name, DOB, Aadhaar), every field has a fixed type, and if one mandatory field is blank or wrong-typed, the whole form is <b>rejected at the counter</b>. If two clerks edit the same record at once, a <b>lock</b> keeps it from corrupting. Reliable but rigid — a new column means changing the whole template.</p>
+    <p><b>NoSQL = a free-form diary.</b> Each page (document) can hold whatever you want — one page just a name &amp; phone, the next a name, address, 3 emails and a nested order list. Super flexible and you can rip in new pages fast (horizontal scale), but <b>no central rulebook</b> forces every page into the same shape — keeping things consistent is now <i>your application's</i> job.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">request:</span><code>INSERT user { id: 42, email: "a@x.com", age: "twenty" }</code></div>
+    <div class="row"><span class="label">SQL side:</span><code>schema = users(id INT, email VARCHAR UNIQUE, age INT)</code> — validates on write</div>
+    <div class="row"><span class="label">NoSQL side:</span><code>partition_key = user_id</code> — sharded across N nodes, no enforced schema</div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 540 430" id="diagram">
+        <!-- lane backgrounds -->
+        <rect class="lane-bg" x="6"   y="34" width="258" height="386" rx="10" />
+        <rect class="lane-bg" x="276" y="34" width="258" height="386" rx="10" />
+        <text class="col-title col-sql"   x="135" y="24" text-anchor="middle">SQL  (Postgres / MySQL)</text>
+        <text class="col-title col-nosql" x="405" y="24" text-anchor="middle">NoSQL  (Cassandra / Dynamo)</text>
+
+        <!-- flow connectors SQL -->
+        <path class="flow-line" d="M135 96 V120" />
+        <path class="flow-line" d="M135 168 V192" />
+        <path class="flow-line" d="M135 240 V264" />
+        <!-- flow connectors NoSQL: client -> coordinator -> 3 shards -->
+        <path class="flow-line" d="M405 96 V120" />
+        <path class="flow-line" d="M405 168 V196" />
+        <path class="flow-line" d="M405 196 H336 V232" />
+        <path class="flow-line" d="M405 196 V232" />
+        <path class="flow-line" d="M405 196 H474 V232" />
+
+        <g id="g-boxes"></g>
+        <g id="g-replicas"></g>
+        <g id="g-packets"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Schema check</div><div class="value" id="v-schema">—</div></div>
+        <div class="var"><div class="label">Consistency</div><div class="value green" id="v-consistency">—</div></div>
+        <div class="var"><div class="label">Scaling</div><div class="value amber" id="v-scaling">—</div></div>
+        <div class="var"><div class="label">Throughput</div><div class="value pink" id="v-tput">—</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch round" style="background:#fbbf24"></span>Write packet in flight</div>
+        <div class="legend-item"><span class="swatch" style="background:#60a5fa"></span>SQL component (single box)</div>
+        <div class="legend-item"><span class="swatch" style="background:#f472b6"></span>NoSQL shard / replica</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Committed / synced (consistent)</div>
+        <div class="legend-item"><span class="swatch dash"></span>Soft / eventually-consistent (stale)</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Rejected / partitioned</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to send the write into both databases at once and compare every stage.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx sql">
+      <h3>SQL — schema-on-write · ACID · scale-up</h3>
+      <div class="formula">CREATE TABLE users (id INT, email VARCHAR UNIQUE, age INT);</div>
+      <ul>
+        <li><b>Validates on write</b> — wrong type / missing field is rejected at the door. Data integrity guaranteed (FK, UNIQUE, NOT NULL).</li>
+        <li><b>ACID</b> via WAL + locks/MVCC — atomic commits, no double-spend.</li>
+        <li><b>Scales vertically</b>: bigger box. One tuned node ≈ <span class="big">single-digit-k → low-tens-of-k</span> writes/sec; then read replicas / sharding (Vitess).</li>
+        <li>First-class <b>ad-hoc JOINs</b> &amp; a query planner — declarative.</li>
+      </ul>
+    </div>
+    <div class="cx nosql">
+      <h3>NoSQL — schema-on-read · BASE · scale-out</h3>
+      <div class="formula">put(partition_key=user_id, doc={...})  // any shape</div>
+      <ul>
+        <li><b>No write-time schema</b> — app interprets shape on read. Flexible, but risks <b>schema drift</b>.</li>
+        <li><b>BASE</b> (Basically Available, Soft state, Eventually consistent) — replicas converge over time; modern stores offer <b>tunable</b> consistency.</li>
+        <li><b>Scales horizontally</b>: add nodes, partition by key → <span class="big">millions</span> of ops/sec, near-linear.</li>
+        <li><b>Query-driven modeling</b> — denormalize for your access pattern; cross-partition JOINs are slow/absent.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>"NoSQL means no schema" — wrong.</b> The schema still exists; it's just <b>implicit in app code</b> (schema-on-read) instead of enforced by the DB. Better framing: <i>schema-on-write vs schema-on-read</i>.</li>
+      <li><b>"NoSQL always scales better" — wrong.</b> A bad partition key creates <b>hot partitions</b> and throughput collapses; an unindexed cross-partition scan can be slower than a SQL JOIN. Scale isn't free — it costs query-driven modeling.</li>
+      <li><b>"NoSQL = no transactions" — outdated.</b> MongoDB 4.0+ has multi-document ACID; DynamoDB has transactions &amp; strongly-consistent reads; Cassandra tunes per-query (<code>ONE</code>/<code>QUORUM</code>/<code>ALL</code>).</li>
+      <li><b>CAP only bites during a partition.</b> Normal operation can have both C and A. SQL (single/sync-replica) leans <b>CP</b>; Dynamo-style leans <b>AP</b> — but it's tunable now.</li>
+      <li><b>NewSQL is the middle path.</b> Spanner, CockroachDB, TiDB, Vitess give horizontal scale + SQL + (often) strong consistency. SQL-vs-NoSQL is a <b>spectrum</b>, not a binary.</li>
+      <li><b>Real systems are polyglot.</b> Postgres for orders + Redis for cache + Elasticsearch for search — pick per access pattern.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>SQL validates structure <b>up front (schema-on-write)</b> and guards data with <b>ACID</b>, scaling <b>up</b> — ideal for money, orders, complex JOINs and strong consistency. NoSQL skips write-time schema <b>(schema-on-read)</b>, embraces <b>BASE / tunable consistency</b> and scales <b>out</b> to millions of ops/sec — ideal for huge write-heavy, flexible-schema workloads. It's a <b>spectrum</b> (NewSQL bridges both), and real systems mix them.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const svgNS = "http://www.w3.org/2000/svg";
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS(svgNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // ---------- static box definitions ----------
+  // SQL lane (single boxes stacked)
+  const sqlBoxes = [
+    { id:"sql-client", x:75, y:64,  w:120, h:32, label:"Client", sub:"INSERT user{...}" },
+    { id:"sql-schema", x:55, y:120, w:160, h:48, label:"Schema validator", sub:"type-check vs CREATE TABLE" },
+    { id:"sql-txn",    x:55, y:192, w:160, h:48, label:"ACID engine (WAL+lock)", sub:"atomic · isolated · durable" },
+    { id:"sql-store",  x:55, y:264, w:160, h:48, label:"Single primary node", sub:"vertical scale: bigger box" },
+  ];
+  // NoSQL lane: client, coordinator, then 3 shards
+  const nosqlBoxes = [
+    { id:"no-client", x:345, y:64,  w:120, h:32, label:"Client", sub:"put(key,doc)" },
+    { id:"no-coord",  x:330, y:120, w:150, h:48, label:"Coordinator", sub:"hash(user_id) → shard" },
+  ];
+  const shards = [
+    { id:"shard1", x:300, y:232, w:72, h:48, label:"Shard 1", sub:"replica" },
+    { id:"shard2", x:369, y:232, w:72, h:48, label:"Shard 2", sub:"replica" },
+    { id:"shard3", x:438, y:232, w:72, h:48, label:"Shard 3", sub:"replica" },
+  ];
+
+  const gBoxes = document.getElementById("g-boxes");
+  const gReplicas = document.getElementById("g-replicas");
+  const gPackets = document.getElementById("g-packets");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vSchema = document.getElementById("v-schema");
+  const vCons = document.getElementById("v-consistency");
+  const vScale = document.getElementById("v-scaling");
+  const vTput = document.getElementById("v-tput");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  function drawBox(b, cls) {
+    const g = svgEl("g", { class: "box " + (cls||"") , id: "g-"+b.id });
+    const fill = b.lane === "nosql" ? "#3a1d2e" : "#1c2740";
+    const stroke = b.lane === "nosql" ? "#7a3a5a" : "#3a5278";
+    g.appendChild(svgEl("rect", { x:b.x, y:b.y, width:b.w, height:b.h, rx:8, fill, stroke, "stroke-width":1.5 }));
+    const t1 = svgEl("text", { class:"box-label", x:b.x+b.w/2, y:b.y+ (b.sub? b.h/2 -1 : b.h/2+4), "text-anchor":"middle" });
+    t1.textContent = b.label; g.appendChild(t1);
+    if (b.sub) {
+      const t2 = svgEl("text", { class:"box-sub", x:b.x+b.w/2, y:b.y+b.h/2+13, "text-anchor":"middle" });
+      t2.textContent = b.sub; g.appendChild(t2);
+    }
+    return g;
+  }
+
+  // tag lanes
+  sqlBoxes.forEach(b=>b.lane="sql");
+  nosqlBoxes.forEach(b=>b.lane="nosql");
+  shards.forEach(b=>b.lane="nosql");
+
+  // ---------- packet helper ----------
+  function packet(x, y, label) {
+    const g = svgEl("g", { class:"packet" });
+    g.appendChild(svgEl("circle", { cx:x, cy:y, r:11 }));
+    const t = svgEl("text", { x:x, y:y+3, "text-anchor":"middle" });
+    t.textContent = label || "W"; g.appendChild(t);
+    return g;
+  }
+
+  // ---------- steps ----------
+  // Each step describes: active box ids (highlight class map), shard states,
+  // packet position, narration, side stats.
+  const steps = [
+    {
+      narr:`<b>1. The same write enters both worlds.</b> A client fires <code>INSERT user {id:42, email, age:"twenty"}</code> at an SQL engine and a NoSQL cluster simultaneously. Watch how each handles it at every stage.`,
+      cls:"", boxstate:{}, shardState:{}, packets:[ {lane:"sql",x:135,y:80}, {lane:"nosql",x:405,y:80} ],
+      stats:{schema:"—",cons:"—",scale:"—",tput:"—"}, consClass:"green"
+    },
+    {
+      narr:`<b>2. SQL: schema-on-write.</b> Before storing anything, the engine type-checks the row against <code>CREATE TABLE users(id INT, email VARCHAR UNIQUE, age INT)</code>. Here <code>age:"twenty"</code> is a string, not an INT — so the write is <b>rejected at the counter</b>. Bad data never lands.`,
+      cls:"", boxstate:{}, boxState:{ "sql-schema":"reject" }, shardState:{},
+      packets:[ {lane:"sql",x:135,y:144,reject:true}, {lane:"nosql",x:405,y:80} ],
+      stats:{schema:"REJECTED (type)",cons:"strong",scale:"—",tput:"—"}, consClass:"green", narrClass:"sql", schemaClass:"reject"
+    },
+    {
+      narr:`<b>3. NoSQL: schema-on-read.</b> The coordinator hashes <code>user_id</code> to pick a shard and just <b>stores the document as-is</b> — <code>age:"twenty"</code> is accepted, no type check. Flexibility &amp; fast iteration… but the malformed value is now in the store, to be dealt with on read (schema drift risk).`,
+      cls:"", boxState:{ "no-coord":"active" }, shardState:{},
+      packets:[ {lane:"sql",x:135,y:144,reject:true}, {lane:"nosql",x:405,y:144} ],
+      stats:{schema:"none (app-side)",cons:"—",scale:"—",tput:"—"}, consClass:"green", narrClass:"nosql", schemaClass:"amber"
+    },
+    {
+      narr:`<b>4. SQL commit = ACID.</b> Assume a valid row now. The engine writes to the <b>WAL</b>, takes a lock / MVCC snapshot, and commits <b>atomically &amp; durably</b> on the single primary. Two concurrent edits to the same row are serialized — no corruption, no double-spend.`,
+      cls:"", boxState:{ "sql-txn":"active", "sql-store":"ok" }, shardState:{},
+      packets:[ {lane:"sql",x:135,y:288,ok:true}, {lane:"nosql",x:405,y:144} ],
+      stats:{schema:"OK",cons:"ACID · strong",scale:"vertical",tput:"~1k–10k+ w/s"}, consClass:"green", narrClass:"sql"
+    },
+    {
+      narr:`<b>5. NoSQL replicate = BASE.</b> The coordinator fans the write out to N replica shards. It can <b>ack the client immediately</b> after one replica — the others converge a moment later. For an instant some replicas are <b>stale (soft state)</b> → <i>eventually consistent</i>. (Modern stores let you demand <code>QUORUM</code>/strong reads at extra latency.)`,
+      cls:"", boxState:{ "no-coord":"active" },
+      shardState:{ shard1:"synced", shard2:"stale", shard3:"stale" },
+      packets:[ {lane:"sql",x:135,y:288,ok:true}, {lane:"nosql",x:336,y:256} ],
+      stats:{schema:"none",cons:"BASE · eventual",scale:"horizontal",tput:"→ millions ops/s"}, consClass:"amber", narrClass:"nosql"
+    },
+    {
+      narr:`<b>6. Eventually consistent.</b> A few milliseconds later the replication finishes — every replica now holds the same value and the cluster is <b>converged</b>. The window of staleness has closed. This is the "Eventually" in BASE.`,
+      cls:"", boxState:{}, shardState:{ shard1:"synced", shard2:"synced", shard3:"synced" },
+      packets:[ {lane:"sql",x:135,y:288,ok:true} ],
+      stats:{schema:"none",cons:"converged",scale:"horizontal",tput:"→ millions ops/s"}, consClass:"green", narrClass:"good"
+    },
+    {
+      narr:`<b>7. Scaling, the core split.</b> SQL grows by making the <b>one box bigger</b> (vertical) — cross-shard JOINs &amp; distributed txns are expensive, so a tuned node does single-digit-k to low-tens-of-k writes/sec, then read replicas. NoSQL grows by <b>adding nodes</b> (horizontal), partitioning by key to reach <b>millions</b> of ops/sec near-linearly.`,
+      cls:"", boxState:{ "sql-store":"active" }, shardState:{ shard1:"synced", shard2:"synced", shard3:"synced", shardNew:true },
+      packets:[], stats:{schema:"—",cons:"—",scale:"up  vs  out",tput:"10k  vs  millions"}, consClass:"green", narrClass:"warn"
+    },
+    {
+      narr:`<b>8. The partition test (CAP).</b> A network link cuts the cluster in two. <b>SQL</b> (single / sync-replica, CP-leaning) refuses writes on the cut side rather than risk divergence — <b>consistency over availability</b>. <b>NoSQL</b> (Dynamo-style, AP-leaning) keeps accepting writes on both sides and stays <b>available</b>, serving possibly-stale reads until the partition heals. <i>Interviewer's favorite: "stale data or an error?"</i>`,
+      cls:"", boxState:{ "sql-store":"reject", "sql-txn":"reject" },
+      shardState:{ shard1:"synced", shard2:"partition", shard3:"partition", split:true },
+      packets:[ {lane:"sql",x:135,y:288,reject:true}, {lane:"nosql",x:300,y:256,stale:true}, {lane:"nosql",x:474,y:256,stale:true} ],
+      stats:{schema:"—",cons:"CP  vs  AP",scale:"—",tput:"—"}, consClass:"amber", narrClass:"warn"
+    }
+  ];
+
+  // ---------- render ----------
+  let cursor = 0;
+
+  function render() {
+    const s = steps[cursor];
+    gBoxes.innerHTML = ""; gReplicas.innerHTML = ""; gPackets.innerHTML = "";
+
+    // draw SQL + NoSQL coordinator boxes
+    sqlBoxes.concat(nosqlBoxes).forEach(b => {
+      const st = (s.boxState && s.boxState[b.id]) || "";
+      gBoxes.appendChild(drawBox(b, st));
+    });
+
+    // draw shards (replicas) with state
+    shards.forEach(sh => {
+      const st = (s.shardState && s.shardState[sh.id]) || "";
+      const g = svgEl("g", { class:"replica box " + st, id:"g-"+sh.id });
+      g.appendChild(svgEl("rect", { x:sh.x, y:sh.y, width:sh.w, height:sh.h, rx:8,
+        fill:"#3a1d2e", stroke:"#7a3a5a", "stroke-width":1.5 }));
+      const t1 = svgEl("text", { class:"box-label", x:sh.x+sh.w/2, y:sh.y+sh.h/2-1, "text-anchor":"middle" });
+      t1.textContent = sh.label; g.appendChild(t1);
+      let subTxt = sh.sub;
+      if (st === "synced") subTxt = "synced ✓";
+      else if (st === "stale") subTxt = "stale…";
+      else if (st === "partition") subTxt = "cut off";
+      const t2 = svgEl("text", { class:"box-sub", x:sh.x+sh.w/2, y:sh.y+sh.h/2+12, "text-anchor":"middle" });
+      t2.textContent = subTxt; g.appendChild(t2);
+      gReplicas.appendChild(g);
+    });
+
+    // optional: a new shard joining (scale-out) + partition divider
+    if (s.shardState && s.shardState.shardNew) {
+      const g = svgEl("g", { class:"replica box synced" });
+      g.appendChild(svgEl("rect", { x:438, y:288, width:72, height:34, rx:8,
+        fill:"#14321f", stroke:"#10b981", "stroke-width":2.5 }));
+      const t = svgEl("text", { class:"box-label", x:474, y:309, "text-anchor":"middle" });
+      t.textContent = "+ Shard 4"; g.appendChild(t);
+      gReplicas.appendChild(g);
+    }
+    if (s.shardState && s.shardState.split) {
+      const ln = svgEl("line", { x1:355, y1:222, x2:355, y2:296, stroke:"#ef4444",
+        "stroke-width":3, "stroke-dasharray":"5 4" });
+      gReplicas.appendChild(ln);
+      const t = svgEl("text", { x:355, y:218, "text-anchor":"middle", fill:"#ef4444",
+        "font-size":"10px", "font-family":"monospace", "font-weight":"700" });
+      t.textContent = "✂ partition"; gReplicas.appendChild(t);
+    }
+
+    // packets
+    (s.packets || []).forEach(p => {
+      let label = "W";
+      if (p.reject) label = "✕";
+      else if (p.ok) label = "✓";
+      else if (p.stale) label = "?";
+      const g = packet(p.x, p.y, label);
+      if (p.reject) g.querySelector("circle").setAttribute("fill", "#ef4444");
+      else if (p.ok) g.querySelector("circle").setAttribute("fill", "#10b981");
+      else if (p.stale) g.querySelector("circle").setAttribute("fill", "#f59e0b");
+      if (p.reject || p.stale) g.querySelector("text").setAttribute("fill", "#fff");
+      gPackets.appendChild(g);
+    });
+
+    // side stats
+    vSchema.textContent = s.stats.schema;
+    vCons.textContent = s.stats.cons;
+    vScale.textContent = s.stats.scale;
+    vTput.textContent = s.stats.tput;
+    vCons.className = "value " + (s.consClass || "green");
+    vSchema.className = "value " + (s.schemaClass || "");
+
+    // narration
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

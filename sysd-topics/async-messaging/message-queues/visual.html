@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Message Queues — Producer, Broker & Competing Consumers</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+
+  /* static architecture pieces */
+  .box-fill { transition: all .4s ease; }
+  .lane { stroke: #3a3a5c; stroke-width: 2; stroke-dasharray: 4 4; fill: none; }
+  .comp-label { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 12px; fill: #fff; }
+  .sub-label { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #a8a8c8; }
+  .slot { fill: #1f1f3a; stroke: #3a3a5c; stroke-width: 1.5; transition: all .35s ease; }
+
+  /* message packet */
+  .msg circle { transition: all .5s ease; }
+  .msg text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #1a1a2e; font-weight: 700; }
+
+  .flow-arrow { stroke: #555577; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.warn { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #321717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.queue { background: #16243a; border: 1px solid #3b82f6; }
+  .cx.pubsub { background: #2a1f3a; border: 1px solid #8b5cf6; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.queue h3 { color: #93c5fd; }
+  .cx.pubsub h3 { color: #c4b5fd; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 18px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.queue .big { color: #3b82f6; }
+  .cx.pubsub .big { color: #8b5cf6; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Message Queues — Producer, Broker &amp; Competing Consumers</h1>
+  <div class="subtitle">How a queue lets a <b>producer</b> hand off work and walk away, while a <b>broker</b> buffers the burst and <b>competing consumers</b> drain it — each message going to exactly one worker, with <code>ack</code>, <code>visibility timeout</code> and a <code>dead letter queue</code> keeping delivery safe.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the kitchen order rail</h3>
+    <p>In a busy restaurant the <b>waiter (producer)</b> doesn't stand next to the chef waiting for the dish — they clip the order ticket onto the <b>order rail (the queue)</b> and immediately go serve the next table. A free <b>chef (consumer)</b> grabs the next ticket off the rail and cooks it. If lunch-rush orders arrive faster than chefs can cook, tickets just <b>pile up on the rail</b> (buffering the burst) — nothing is lost. One ticket is taken by <b>exactly one</b> chef so no dish is cooked twice, and if a chef calls in sick another chef simply works the same rail. Producer and consumer are <b>decoupled in both time and speed.</b></p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">producer:</span><code>{order_id: 8821, action: "send_email"}</code> &nbsp;~hundreds of bytes (SQS max 256 KB)</div>
+    <div class="row"><span class="label">broker:</span><code>durable queue</code> &nbsp;holds backlog, persists to disk, ~tens of thousands msg/sec</div>
+    <div class="row"><span class="label">rule:</span><code>each message → exactly ONE consumer</code> (competing consumers) &nbsp;·&nbsp; delete only after <code>ack</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 560 360" id="diagram">
+        <defs>
+          <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#555577" />
+          </marker>
+        </defs>
+
+        <!-- PRODUCER -->
+        <rect class="box-fill" x="14" y="150" width="84" height="60" rx="10" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2" />
+        <text class="comp-label" x="56" y="176" text-anchor="middle">Producer</text>
+        <text class="sub-label" x="56" y="192" text-anchor="middle">API / waiter</text>
+
+        <!-- arrow producer -> queue -->
+        <path class="flow-arrow" d="M100 180 L150 180" />
+
+        <!-- BROKER / QUEUE -->
+        <rect class="box-fill" x="156" y="118" width="190" height="124" rx="12" fill="#201d33" stroke="#8888aa" stroke-width="2" />
+        <text class="comp-label" x="251" y="138" text-anchor="middle">Broker — Queue</text>
+        <text class="sub-label" x="251" y="152" text-anchor="middle">durable buffer · FIFO-ish backlog</text>
+        <!-- queue slots (head on the right, tail on the left) -->
+        <g id="g-slots"></g>
+        <text class="sub-label" x="176" y="234" text-anchor="middle">tail (in)</text>
+        <text class="sub-label" x="326" y="234" text-anchor="middle">head (out)</text>
+
+        <!-- arrows queue -> consumers -->
+        <path class="flow-arrow" d="M348 150 L408 96" />
+        <path class="flow-arrow" d="M348 180 L408 180" />
+        <path class="flow-arrow" d="M348 210 L408 264" />
+
+        <!-- CONSUMERS (competing) -->
+        <g id="cons-0">
+          <rect class="box-fill" x="410" y="66" width="92" height="56" rx="10" fill="#143226" stroke="#10b981" stroke-width="2" />
+          <text class="comp-label" x="456" y="90" text-anchor="middle">Consumer 1</text>
+          <text class="sub-label" x="456" y="106" text-anchor="middle" id="cons-0-st">idle</text>
+        </g>
+        <g id="cons-1">
+          <rect class="box-fill" x="410" y="152" width="92" height="56" rx="10" fill="#143226" stroke="#10b981" stroke-width="2" />
+          <text class="comp-label" x="456" y="176" text-anchor="middle">Consumer 2</text>
+          <text class="sub-label" x="456" y="192" text-anchor="middle" id="cons-1-st">idle</text>
+        </g>
+        <g id="cons-2">
+          <rect class="box-fill" x="410" y="238" width="92" height="56" rx="10" fill="#143226" stroke="#10b981" stroke-width="2" />
+          <text class="comp-label" x="456" y="262" text-anchor="middle">Consumer 3</text>
+          <text class="sub-label" x="456" y="278" text-anchor="middle" id="cons-2-st">idle</text>
+        </g>
+
+        <!-- DLQ -->
+        <rect class="box-fill" x="190" y="296" width="122" height="48" rx="10" fill="#2a1717" stroke="#ef4444" stroke-width="2" opacity="0.35" id="dlq-box" />
+        <text class="comp-label" x="251" y="316" text-anchor="middle" id="dlq-label" opacity="0.45">Dead Letter Queue</text>
+        <text class="sub-label" x="251" y="330" text-anchor="middle" id="dlq-sub" opacity="0.45">poison after 5 fails</text>
+        <path class="flow-arrow" d="M251 244 L251 294" id="dlq-arrow" style="opacity:0" />
+
+        <!-- floating message packets -->
+        <g id="g-msgs"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">In queue</div><div class="value" id="v-queue">0</div></div>
+        <div class="var"><div class="label">In flight</div><div class="value amber" id="v-inflight">0</div></div>
+        <div class="var"><div class="label">Acked / done</div><div class="value green" id="v-done">0</div></div>
+        <div class="var"><div class="label">To DLQ</div><div class="value red" id="v-dlq">0</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch round" style="background:#94a3b8"></span>Message waiting in queue</div>
+        <div class="legend-item"><span class="swatch round" style="background:#f59e0b"></span>In flight (received, not yet acked)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#10b981"></span>Processed &amp; acknowledged</div>
+        <div class="legend-item"><span class="swatch round" style="background:#ef4444"></span>Failed / poison message</div>
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Producer&nbsp;&nbsp;<span class="swatch" style="background:#10b981"></span>Consumers</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to watch a producer enqueue messages and competing consumers drain the queue.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx queue">
+      <h3>Queue — point to point</h3>
+      <div class="formula">1 message &rarr; 1 consumer</div>
+      <p>Competing consumers <b>share the work</b>. Add more consumers and throughput goes up — each message is handled <span class="big">exactly once</span> across the pool. Use when a task must be <b>done once</b>: send the email, charge the card, transcode the video.</p>
+      <p>Tools: <b>AWS SQS, RabbitMQ, ActiveMQ, Redis Streams</b>.</p>
+    </div>
+    <div class="cx pubsub">
+      <h3>Pub/Sub — fan-out</h3>
+      <div class="formula">1 message &rarr; ALL subscribers</div>
+      <p>A topic <b>broadcasts</b> the event to every independent subscriber. One <code>order_placed</code> event reaches <span class="big">inventory + shipping + analytics + email</span> at once. Use when many systems must each react to the same event.</p>
+      <p>Tools: <b>Kafka, AWS SNS, Google Pub/Sub</b>.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>At-least-once, not exactly-once.</b> An <code>ack</code> can be lost or a consumer can crash mid-process, so a message may be <b>redelivered</b>. Make consumers <b>idempotent</b> (dedup on <code>order_id</code>) or you get double charges / double emails — the single most common trap.</li>
+      <li><b>Visibility timeout.</b> On receive, the broker hides the message (SQS default <code>30s</code>). If no ack arrives in time it becomes visible again for another consumer. Set it <b>above worst-case processing time</b>, or you redeliver work that's still running.</li>
+      <li><b>Ordering isn't free.</b> Standard SQS / multi-partition Kafka give <b>no global order</b>. Need strict FIFO? Use a FIFO queue (<code>~3000 msg/s</code>) or a single Kafka partition — and accept the lower throughput.</li>
+      <li><b>DLQ stops poison messages.</b> A message that always fails would block the queue (especially FIFO). After <code>max-retries</code> (e.g. 5) route it to a <b>dead letter queue</b> to inspect/replay later.</li>
+      <li><b>The queue is not an infinite buffer.</b> If producers are <i>sustainably</i> faster than consumers the backlog grows forever — that's a bug. Scale consumers or apply backpressure; a queue only absorbs <b>temporary</b> bursts.</li>
+      <li><b>Queue vs log.</b> SQS/RabbitMQ <b>delete</b> on ack. Kafka is an append-only <b>log</b> — messages stay for a retention window, consumers track an <code>offset</code>, and multiple groups can <b>replay</b> the same data independently.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>A message queue puts a <b>durable broker between producer and consumer</b> so they're decoupled in time and speed: the producer fires-and-forgets, the queue <b>buffers the burst</b>, and competing consumers each pull <b>exactly one</b> message and <code>ack</code> it. Because delivery is <b>at-least-once</b>, keep consumers <b>idempotent</b>, tune the <b>visibility timeout</b>, and route poison messages to a <b>DLQ</b>.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- helpers ----------
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  const gSlots = document.getElementById("g-slots");
+  const gMsgs  = document.getElementById("g-msgs");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vQueue = document.getElementById("v-queue");
+  const vInflight = document.getElementById("v-inflight");
+  const vDone  = document.getElementById("v-done");
+  const vDlq   = document.getElementById("v-dlq");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+  const dlqBox = document.getElementById("dlq-box");
+  const dlqLabel = document.getElementById("dlq-label");
+  const dlqSub = document.getElementById("dlq-sub");
+  const dlqArrow = document.getElementById("dlq-arrow");
+
+  // queue slots layout: head on right, tail on left, inside broker box
+  const SLOT_N = 4;
+  const slotX = [318, 280, 242, 204]; // index 0 = head (right), increasing index = toward tail
+  const slotY = 180;
+  // build empty slot rects
+  for (let i = 0; i < SLOT_N; i++) {
+    gSlots.appendChild(svgEl("rect", {
+      class: "slot", x: slotX[i]-15, y: slotY-15, width: 30, height: 30, rx: 7
+    }));
+  }
+
+  const COLORS = {
+    queued:  { fill:"#94a3b8", stroke:"#cbd5e1" },
+    inflight:{ fill:"#f59e0b", stroke:"#fbbf24" },
+    done:    { fill:"#10b981", stroke:"#6ee7b7" },
+    failed:  { fill:"#ef4444", stroke:"#fca5a5" }
+  };
+
+  // consumer anchor centers
+  const consPos = [ {x:456,y:94}, {x:456,y:180}, {x:456,y:266} ];
+  const producerOut = { x:120, y:180 };
+  const dlqPos = { x:251, y:320 };
+
+  // ---------- step model ----------
+  // Each step is a full snapshot of msg states so Back/Next are deterministic.
+  // A message: { id, label, state, where } where:
+  //   state: 'queued' | 'inflight' | 'done' | 'failed'
+  //   where: {x,y} render position
+  // We pre-author each step's message array + narration + stats + decorations.
+
+  // positions for queue slots given a "queue list" (head first)
+  function slotPosFor(idxInQueue) {
+    const i = Math.min(idxInQueue, SLOT_N - 1);
+    return { x: slotX[i], y: slotY };
+  }
+
+  const steps = [];
+
+  function mk(list, narr, cls, deco) {
+    // list: array of {id,label,state,pos}
+    deco = deco || {};
+    const stats = { queue:0, inflight:0, done:0, dlq:0 };
+    list.forEach(m => {
+      if (m.state === "queued") stats.queue++;
+      else if (m.state === "inflight") stats.inflight++;
+      else if (m.state === "done") stats.done++;
+      else if (m.state === "failed") stats.dlq++;
+    });
+    steps.push({ list: list.map(m => ({...m})), narr, cls: cls||"", stats, deco });
+  }
+
+  // message labels (order ids)
+  const A = { id:"A", label:"21" };
+  const B = { id:"B", label:"22" };
+  const C = { id:"C", label:"23" };
+  const D = { id:"D", label:"24" };
+
+  // STEP 0 — intro: empty system
+  mk([], `<b>1. The setup.</b> A <b>producer</b> on the left, a <b>broker queue</b> in the middle, and three <b>consumers</b> on the right that all read the <i>same</i> queue. Right now everything is idle — no messages yet.`, "");
+
+  // STEP 1 — produce / enqueue (burst arrives)
+  mk([
+    { ...A, state:"queued", pos: slotPosFor(0) },
+    { ...B, state:"queued", pos: slotPosFor(1) },
+    { ...C, state:"queued", pos: slotPosFor(2) },
+    { ...D, state:"queued", pos: slotPosFor(3) },
+  ],
+  `<b>2. Produce (enqueue).</b> A burst of orders comes in. The producer fires each message — e.g. <code>{order_id: 8821, action:"send_email"}</code> — into the queue and <b>immediately returns</b>; it never waits for a consumer. The broker holds the backlog (millions deep if needed) and persists it to disk so a crash won't lose it.`,
+  "");
+
+  // STEP 2 — buffer the burst (highlight decoupling)
+  mk([
+    { ...A, state:"queued", pos: slotPosFor(0) },
+    { ...B, state:"queued", pos: slotPosFor(1) },
+    { ...C, state:"queued", pos: slotPosFor(2) },
+    { ...D, state:"queued", pos: slotPosFor(3) },
+  ],
+  `<b>3. Buffer the burst (load leveling).</b> Orders arrived faster than the consumers can process — that's fine. They simply <b>wait in line</b> on the durable queue. This is the whole point: a flash sale of <code>50k orders/min</code> can drain into a DB that only does <code>5k/min</code>, smoothed over time instead of crashing it.`,
+  "");
+
+  // STEP 3 — consume: each message to ONE consumer (competing consumers)
+  mk([
+    { ...A, state:"inflight", pos: consPos[0] },
+    { ...B, state:"inflight", pos: consPos[1] },
+    { ...C, state:"queued",   pos: slotPosFor(0) },
+    { ...D, state:"queued",   pos: slotPosFor(1) },
+  ],
+  `<b>4. Consume (competing consumers).</b> Free consumers poll the queue. Crucially, each message goes to <b>exactly one</b> consumer — C1 grabs <code>#21</code>, C2 grabs <code>#22</code>. The broker now marks them <b>in flight</b> and starts a <b>visibility timeout</b> (SQS default <code>30s</code>): while hidden, no one else can pick them up. Add consumers &rarr; throughput scales horizontally.`,
+  "warn", { consWork:[0,1] });
+
+  // STEP 4 — ack: success deletes the message
+  mk([
+    { ...A, state:"done", pos: consPos[0] },
+    { ...B, state:"done", pos: consPos[1] },
+    { ...C, state:"inflight", pos: consPos[2] },
+    { ...D, state:"queued",   pos: slotPosFor(0) },
+  ],
+  `<b>5. Acknowledge (ack).</b> C1 and C2 finish their work and send an <code>ack</code> — only <i>now</i> does the broker <b>delete</b> those messages for good. Meanwhile C3 has pulled <code>#23</code> (in flight). The ack is what makes the deletion safe: no ack, no delete.`,
+  "good", { consWork:[2] });
+
+  // STEP 5 — consumer crash -> visibility timeout -> redelivery (at-least-once)
+  mk([
+    { ...A, state:"done", pos: consPos[0] },
+    { ...B, state:"done", pos: consPos[1] },
+    { ...C, state:"queued", pos: slotPosFor(0) },   // #23 back in queue, redelivered
+    { ...D, state:"inflight", pos: consPos[0] },     // C1 now took #24
+  ],
+  `<b>6. Crash &amp; redelivery (at-least-once).</b> C3 <b>crashes</b> before acking <code>#23</code>. The broker waits out the visibility timeout, sees no ack, and makes <code>#23</code> <b>visible again</b> — C1 will now retake it. Nothing is lost. But note: if C3 had actually <i>done</i> the work and just lost the ack, the redelivery means the work runs <b>twice</b> &rarr; consumers must be <b>idempotent</b>.`,
+  "warn", { crash:2, consWork:[0] });
+
+  // STEP 6 — poison message -> DLQ
+  mk([
+    { ...A, state:"done", pos: consPos[0] },
+    { ...B, state:"done", pos: consPos[1] },
+    { ...C, state:"failed", pos: dlqPos },          // #23 keeps failing -> DLQ
+    { ...D, state:"done", pos: consPos[0] },
+  ],
+  `<b>7. Poison message &rarr; Dead Letter Queue.</b> Suppose <code>#23</code> is malformed and fails <b>every</b> attempt. After <code>max-retries</code> (e.g. 5) the broker stops redelivering it and routes it to a <b>dead letter queue</b>. This prevents one bad message from blocking the whole queue, and lets you inspect or replay it later. <code>#24</code> finished cleanly. Queue drained.`,
+  "bad", { dlq:true });
+
+  // ---------- render ----------
+  let cursor = 0;
+
+  function setConsumerState(i, txt) {
+    document.getElementById("cons-" + i + "-st").textContent = txt;
+  }
+
+  function render() {
+    const s = steps[cursor];
+    gMsgs.innerHTML = "";
+
+    // reset consumer labels & boxes
+    for (let i = 0; i < 3; i++) {
+      setConsumerState(i, "idle");
+      document.querySelector("#cons-" + i + " rect").setAttribute("stroke", "#10b981");
+    }
+
+    // decorations: consumers working
+    if (s.deco.consWork) {
+      s.deco.consWork.forEach(i => setConsumerState(i, "processing…"));
+    }
+    if (typeof s.deco.crash === "number") {
+      setConsumerState(s.deco.crash, "CRASHED");
+      document.querySelector("#cons-" + s.deco.crash + " rect").setAttribute("stroke", "#ef4444");
+    }
+
+    // DLQ highlight
+    const dlqOn = !!s.deco.dlq;
+    [dlqBox].forEach(el => el.setAttribute("opacity", dlqOn ? "1" : "0.35"));
+    [dlqLabel, dlqSub].forEach(el => el.setAttribute("opacity", dlqOn ? "1" : "0.45"));
+    dlqArrow.style.opacity = dlqOn ? "1" : "0";
+
+    // draw messages
+    s.list.forEach(m => {
+      const c = COLORS[m.state];
+      const g = svgEl("g", { class:"msg" });
+      const circ = svgEl("circle", {
+        cx: m.pos.x, cy: m.pos.y, r: 13,
+        fill: c.fill, stroke: c.stroke, "stroke-width": 2
+      });
+      const t = svgEl("text", { x: m.pos.x, y: m.pos.y + 3, "text-anchor":"middle" });
+      t.textContent = m.label;
+      g.appendChild(circ); g.appendChild(t);
+      gMsgs.appendChild(g);
+    });
+
+    // stats
+    vQueue.textContent = s.stats.queue;
+    vInflight.textContent = s.stats.inflight;
+    vDone.textContent = s.stats.done;
+    vDlq.textContent = s.stats.dlq;
+
+    // narration
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

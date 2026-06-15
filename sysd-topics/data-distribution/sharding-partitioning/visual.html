@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sharding &amp; Partitioning — How One Big Dataset Splits Across Many Nodes</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  /* diagram SVG */
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 520px; height: auto; }
+
+  .router-box { fill: #2d2d50; stroke: #3b82f6; stroke-width: 2; transition: all .3s ease; }
+  .router-label { fill: #cdd; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px; }
+  .router-title { fill: #fff; font-weight: 700; font-size: 13px; font-family: -apple-system, sans-serif; }
+
+  .shard rect { transition: all .4s ease; }
+  .shard .body { fill: #232344; stroke: #3a3a5c; stroke-width: 2; }
+  .shard.hot .body { fill: #3a1a1a; stroke: #ef4444; stroke-width: 3; }
+  .shard.target .body { stroke: #10b981; stroke-width: 3; }
+  .shard-name { fill: #fff; font-weight: 700; font-size: 13px; font-family: -apple-system, sans-serif; }
+  .shard-range { fill: #8899bb; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10px; }
+  .load-track { fill: #1a1a2e; }
+  .load-fill { transition: height .5s ease, y .5s ease, fill .4s ease; }
+  .shard-stat { fill: #aab; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; }
+
+  .wire { fill: none; stroke: #3a3a5c; stroke-width: 2; transition: all .4s ease; }
+  .wire.active { stroke: #f59e0b; stroke-width: 3.5; }
+  .wire.scatter { stroke: #f59e0b; stroke-width: 2.5; stroke-dasharray: 5 4; }
+
+  .packet { transition: all .5s ease; }
+  .packet circle { fill: #f59e0b; stroke: #fbbf24; stroke-width: 2; }
+  .packet text { fill: #1a1a2e; font-weight: 700; font-size: 10px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #3b82f6; font-weight: 700; word-break: break-all; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.dot { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.repl { background: #17222a; border: 1px solid #06b6d4; }
+  .cx.shard { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.repl h3 { color: #67e8f9; }
+  .cx.shard h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 16px; font-weight: 800; }
+  .cx.repl .big { color: #06b6d4; }
+  .cx.shard .big { color: #10b981; }
+  .cx .mini { display: flex; gap: 6px; margin: 12px 0 4px; }
+  .cx .node-chip { flex: 1; text-align: center; font-size: 10px; font-family: "SF Mono", Menlo, Consolas, monospace;
+                   padding: 8px 2px; border-radius: 6px; color: #fff; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Sharding &amp; Partitioning — Splitting One Big Dataset</h1>
+  <div class="subtitle">When a single machine runs out of <b>write throughput</b> or <b>storage</b>, you break the dataset into independent chunks (<b>shards</b>) on separate nodes. A <b>router</b> reads the <code>shard key</code> and sends each request to exactly one shard — so the system scales <b>horizontally</b> instead of hitting one node's ceiling.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — one giant library becomes branches</h3>
+    <p>A city has <b>one giant library</b>: 10 crore books, one building, one entry gate. As books grow, the building runs out of space and the single gate jams with queues — one librarian can't cope. That's a <b>single overloaded database</b>. The city splits it into <b>branches</b>: authors A–G in branch A, H–N in branch B, O–Z in branch C — each with its own building, librarian and gate (this is <b>range partitioning</b>). But if "Harry Potter" gets super popular, its branch is mobbed while others sit idle — a <b>hot shard</b>. Fix: pick the branch by <b>hashing the title</b> so popular and quiet books scatter evenly. Trade-off: now "all A-author books" live in many branches, so that one query must visit them all.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">shard key:</span><code>user_id</code> &nbsp;(high cardinality + even access)</div>
+    <div class="row"><span class="label">router:</span><code>shard = strategy(shard_key)</code> &nbsp;→ range | hash | directory</div>
+    <div class="row"><span class="label">goal:</span><code>50,000 wps &amp; 10 TB</code> when one node does <code>~5,000 wps, ~1 TB</code> → <code>~10 shards</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 520 440" id="svg">
+        <!-- client -->
+        <g id="client">
+          <rect class="router-box" x="20" y="30" width="110" height="46" rx="8" style="fill:#232344;stroke:#3a3a5c" />
+          <text class="router-title" x="75" y="50" text-anchor="middle">Client</text>
+          <text class="router-label" x="75" y="66" text-anchor="middle" id="client-req">write user 42</text>
+        </g>
+
+        <!-- router -->
+        <g id="router">
+          <rect class="router-box" x="190" y="22" width="140" height="62" rx="10" />
+          <text class="router-title" x="260" y="44" text-anchor="middle">Router / Proxy</text>
+          <text class="router-label" x="260" y="62" text-anchor="middle" id="router-formula">shard(key)?</text>
+          <text class="router-label" x="260" y="76" text-anchor="middle" id="router-sub" style="fill:#8899bb">Vitess · coordinator</text>
+        </g>
+
+        <!-- wires client->router -->
+        <path class="wire" id="wire-cr" d="M130 53 L190 53" />
+
+        <!-- wires router -> shards -->
+        <path class="wire" id="wire-0" d="M260 84 C260 130, 80 130, 80 188" />
+        <path class="wire" id="wire-1" d="M260 84 C260 130, 215 130, 215 188" />
+        <path class="wire" id="wire-2" d="M260 84 C260 130, 350 130, 350 188" />
+        <path class="wire" id="wire-3" d="M260 84 C260 130, 470 130, 470 188" />
+
+        <!-- shards -->
+        <g class="shard" id="shard-0">
+          <rect class="body" x="30" y="190" width="100" height="120" rx="10" />
+          <text class="shard-name" x="80" y="212" text-anchor="middle">Shard 0</text>
+          <text class="shard-range" x="80" y="228" text-anchor="middle" id="range-0">range</text>
+          <rect class="load-track" x="44" y="240" width="72" height="56" rx="4" />
+          <rect class="load-fill" id="load-0" x="44" y="282" width="72" height="14" rx="4" fill="#10b981" />
+          <text class="shard-stat" x="80" y="306" text-anchor="middle" id="stat-0">~5K wps</text>
+        </g>
+        <g class="shard" id="shard-1">
+          <rect class="body" x="165" y="190" width="100" height="120" rx="10" />
+          <text class="shard-name" x="215" y="212" text-anchor="middle">Shard 1</text>
+          <text class="shard-range" x="215" y="228" text-anchor="middle" id="range-1">range</text>
+          <rect class="load-track" x="179" y="240" width="72" height="56" rx="4" />
+          <rect class="load-fill" id="load-1" x="179" y="282" width="72" height="14" rx="4" fill="#10b981" />
+          <text class="shard-stat" x="215" y="306" text-anchor="middle" id="stat-1">~5K wps</text>
+        </g>
+        <g class="shard" id="shard-2">
+          <rect class="body" x="300" y="190" width="100" height="120" rx="10" />
+          <text class="shard-name" x="350" y="212" text-anchor="middle">Shard 2</text>
+          <text class="shard-range" x="350" y="228" text-anchor="middle" id="range-2">range</text>
+          <rect class="load-track" x="314" y="240" width="72" height="56" rx="4" />
+          <rect class="load-fill" id="load-2" x="314" y="282" width="72" height="14" rx="4" fill="#10b981" />
+          <text class="shard-stat" x="350" y="306" text-anchor="middle" id="stat-2">~5K wps</text>
+        </g>
+        <g class="shard" id="shard-3">
+          <rect class="body" x="420" y="190" width="100" height="120" rx="10" />
+          <text class="shard-name" x="470" y="212" text-anchor="middle">Shard 3</text>
+          <text class="shard-range" x="470" y="228" text-anchor="middle" id="range-3">range</text>
+          <rect class="load-track" x="434" y="240" width="72" height="56" rx="4" />
+          <rect class="load-fill" id="load-3" x="434" y="282" width="72" height="14" rx="4" fill="#10b981" />
+          <text class="shard-stat" x="470" y="306" text-anchor="middle" id="stat-3">~5K wps</text>
+        </g>
+
+        <!-- directory lookup table (hidden unless directory step) -->
+        <g id="directory" style="opacity:0">
+          <rect x="150" y="345" width="220" height="74" rx="8" fill="#1f1f3a" stroke="#8b5cf6" stroke-width="2" />
+          <text x="260" y="364" text-anchor="middle" style="fill:#c4b5fd;font-weight:700;font-size:11px;font-family:'SF Mono',monospace">Lookup table (key → shard)</text>
+          <text x="260" y="382" text-anchor="middle" style="fill:#cdd;font-size:10px;font-family:'SF Mono',monospace">42 → S2   ·   7 → S0   ·   99 → S1</text>
+          <text x="260" y="400" text-anchor="middle" style="fill:#f59e0b;font-size:10px;font-family:'SF Mono',monospace">flexible · but extra hop + SPOF risk</text>
+        </g>
+
+        <!-- travelling packet -->
+        <g class="packet" id="packet" style="opacity:0">
+          <circle cx="0" cy="0" r="13" />
+          <text x="0" y="4" text-anchor="middle" id="packet-label">42</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Strategy</div><div class="value" id="v-strat">—</div></div>
+        <div class="var"><div class="label">Shard key</div><div class="value" id="v-key">user_id</div></div>
+        <div class="var"><div class="label">Routed to</div><div class="value green" id="v-route">—</div></div>
+        <div class="var"><div class="label">Shards hit</div><div class="value amber" id="v-hit">0</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Healthy / balanced shard</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Hot shard (overloaded)</div>
+        <div class="legend-item"><span class="swatch dot" style="background:#f59e0b"></span>Request / packet in flight</div>
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Router (reads shard key)</div>
+        <div class="legend-item"><span class="swatch" style="background:#8b5cf6"></span>Directory lookup table</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to watch a single write find its shard, then compare range vs hash routing and see how a hot shard forms.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx repl">
+      <h3>Replication</h3>
+      <div class="formula">SAME data, copied to many nodes</div>
+      <p>Every node holds a <b>full copy</b>. Scales <span class="big">reads</span> &amp; gives <b>availability</b> (a replica can take over). It does <b>not</b> help write throughput or storage — every node still stores everything.</p>
+      <div class="mini">
+        <div class="node-chip" style="background:#0e7490">ALL</div>
+        <div class="node-chip" style="background:#0e7490">ALL</div>
+        <div class="node-chip" style="background:#0e7490">ALL</div>
+      </div>
+      <p>Same data ×3 → read scale + HA.</p>
+    </div>
+    <div class="cx shard">
+      <h3>Sharding</h3>
+      <div class="formula">DIFFERENT data, split across nodes</div>
+      <p>Each node holds a <b>distinct slice</b>. Scales <span class="big">writes + storage</span> — 10 shards ≈ 10× the write throughput and capacity. The classic interview trap: these are <b>complementary</b>, real systems <b>shard AND replicate each shard</b>.</p>
+      <div class="mini">
+        <div class="node-chip" style="background:#15803d">0–1M</div>
+        <div class="node-chip" style="background:#15803d">1–2M</div>
+        <div class="node-chip" style="background:#15803d">2–3M</div>
+      </div>
+      <p>Different slices → write + storage scale.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Shard key is everything</b> — pick a <b>high-cardinality</b> field with <b>even access</b> (<code>user_id</code>, <code>tenant_id</code>). A low-cardinality key like <code>country</code> (80% traffic from one country) leaves some shards hot and others idle. Wrong key = full re-design.</li>
+      <li><b>Range</b> → fast <code>BETWEEN</code>/scan queries, but a <b>monotonic key</b> (auto-increment id, <code>created_at</code>) piles every new write on the <i>latest</i> shard → hotspot. Fix: hash it, or shard on a high-cardinality dimension.</li>
+      <li><b>Hash</b> → uniform spread, but range queries scatter. Naive <code>hash(key) % N</code> remaps almost everything when <code>N</code> changes → use <b>consistent hashing</b> or a fixed count of logical partitions (e.g. 1024).</li>
+      <li><b>Directory</b> → a <code>key → shard</code> lookup table; max flexibility &amp; easy rebalance, but adds a hop and a <b>SPOF</b>.</li>
+      <li><b>Cross-shard = scatter-gather</b> — a query not keyed on the shard key hits every shard and merges; slow and tail-latency heavy (more shards → higher chance one is slow). Push such reads to a denormalized index (e.g. Elasticsearch).</li>
+      <li><b>Resharding isn't free</b> — live migration needs dual writes, backfill, cutover, verification. And a <b>celebrity</b> user can overload one shard even with even data → split that key or cache it.</li>
+      <li><b>Used by</b> — Instagram/Notion (Postgres on <code>user_id</code>/<code>workspace_id</code>), Vitess (MySQL: YouTube, Slack), MongoDB/Cassandra/DynamoDB (partition key), Discord (Cassandra on <code>channel_id</code>).</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Sharding splits <b>different</b> data across nodes (not copies — that's replication) so <b>writes and storage scale horizontally</b>. A router uses the <b>shard key</b> + a strategy (<b>range</b>, <b>hash</b>, or <b>directory</b>) to send each request to one shard. The whole game is choosing a <b>high-cardinality, evenly-accessed shard key</b> so no shard goes hot — and keeping each logical operation on a single shard to avoid slow scatter-gather.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---- DOM refs ----
+  const $ = id => document.getElementById(id);
+  const narrEl = $("narration"), stepEl = $("step-indicator");
+  const btnNext = $("btn-next"), btnPrev = $("btn-prev"), btnReset = $("btn-reset");
+  const packet = $("packet"), packetLabel = $("packet-label");
+  const router = $("router"), routerFormula = $("router-formula");
+  const clientReq = $("client-req");
+  const directory = $("directory");
+  const vStrat = $("v-strat"), vKey = $("v-key"), vRoute = $("v-route"), vHit = $("v-hit");
+
+  const shards = [0,1,2,3].map(i => ({
+    g: $("shard-"+i), load: $("load-"+i), stat: $("stat-"+i), range: $("range-"+i)
+  }));
+  const wires = [0,1,2,3].map(i => $("wire-"+i));
+  const wireCR = $("wire-cr");
+
+  // shard center x positions (for packet travel)
+  const SHARD_X = [80, 215, 350, 470];
+  const SHARD_Y = 230;
+
+  // load fill helper: pct 0..1, track is y=240 h=56 (bottom at 296)
+  function setLoad(i, pct, color) {
+    const h = Math.max(6, Math.round(56 * pct));
+    const y = 296 - h;
+    shards[i].load.setAttribute("height", h);
+    shards[i].load.setAttribute("y", y);
+    if (color) shards[i].load.setAttribute("fill", color);
+  }
+  function setHot(i, on) { shards[i].g.classList.toggle("hot", on); }
+  function setTarget(i, on) { shards[i].g.classList.toggle("target", on); }
+  function clearShardClasses() { shards.forEach(s => { s.g.classList.remove("hot","target"); }); }
+  function setRanges(labels) { shards.forEach((s,i)=> s.range.textContent = labels[i]); }
+  function setStats(labels) { shards.forEach((s,i)=> s.stat.textContent = labels[i]); }
+  function activeWire(idx) { wires.forEach((w,i)=> w.classList.toggle("active", i===idx)); }
+  function scatterWires(on) { wires.forEach(w => w.classList.toggle("scatter", on)); }
+  function clearWires() { wires.forEach(w => { w.classList.remove("active","scatter"); }); }
+
+  function movePacket(x, y, show) {
+    packet.style.opacity = show ? "1" : "0";
+    packet.setAttribute("transform", `translate(${x},${y})`);
+  }
+
+  // ---- steps ----
+  const steps = [
+    { // 0
+      name: "—", route: "—", hit: 0,
+      narrClass: "",
+      narr: `<b>1. The setup.</b> One dataset is split across <b>4 shards</b>, each an independent node owning a distinct slice. A <b>router</b> sits in front. The rule is always: read the <code>shard key</code> from the request, compute which shard owns it, send the request there.`,
+      apply() {
+        setRanges(["range","range","range","range"]);
+        setStats(["~5K wps","~5K wps","~5K wps","~5K wps"]);
+        shards.forEach((s,i)=> setLoad(i, 0.25, "#10b981"));
+        clearShardClasses(); clearWires();
+        routerFormula.textContent = "shard(key)?";
+        clientReq.textContent = "write user 42";
+        directory.style.opacity = "0";
+        movePacket(0,0,false);
+      }
+    },
+    { // 1  range routing
+      name: "Range", route: "Shard 2", hit: 1,
+      narrClass: "good",
+      narr: `<b>2. Range partitioning.</b> Keys map by interval: <code>0–1M → S0</code>, <code>1M–2M → S1</code>, <code>2M–3M → S2</code>, <code>3M–4M → S3</code>. A point write for <code>user_id = 42</code>… wait — small ids live in S0. Let's route a realistic <code>user_id = 2.4M</code>: the router sees it falls in <code>2M–3M</code> → <b>Shard 2</b>. Range queries (<code>BETWEEN</code>) are fast because neighbours sit together.`,
+      apply() {
+        setRanges(["0–1M","1–2M","2–3M","3–4M"]);
+        setStats(["~5K","~5K","~5K","~5K"]);
+        shards.forEach((s,i)=> setLoad(i, 0.25, "#10b981"));
+        clearShardClasses(); clearWires();
+        routerFormula.textContent = "2.4M ∈ 2M–3M";
+        clientReq.textContent = "write user 2.4M";
+        directory.style.opacity = "0";
+        activeWire(2); setTarget(2, true);
+        movePacket(SHARD_X[2], SHARD_Y, true);
+        packetLabel.textContent = "2.4M";
+      }
+    },
+    { // 2  hash routing
+      name: "Hash", route: "Shard 1", hit: 1,
+      narrClass: "good",
+      narr: `<b>3. Hash partitioning.</b> Instead of ranges, compute <code>shard = hash(user_id) % 4</code>. Say <code>hash(42) % 4 = 1</code> → <b>Shard 1</b>. Distribution is <b>uniform</b> — adjacent ids scatter to different shards, so no single shard absorbs sequential writes. Cost: a range query like "ids 40–50" no longer lives together; it scatters across shards.`,
+      apply() {
+        setRanges(["bucket 0","bucket 1","bucket 2","bucket 3"]);
+        setStats(["~5K","~5K","~5K","~5K"]);
+        shards.forEach((s,i)=> setLoad(i, 0.25, "#10b981"));
+        clearShardClasses(); clearWires();
+        routerFormula.textContent = "hash(42)%4 = 1";
+        clientReq.textContent = "write user 42";
+        directory.style.opacity = "0";
+        activeWire(1); setTarget(1, true);
+        movePacket(SHARD_X[1], SHARD_Y, true);
+        packetLabel.textContent = "42";
+      }
+    },
+    { // 3 directory
+      name: "Directory", route: "Shard 2", hit: 1,
+      narrClass: "good",
+      narr: `<b>4. Directory partitioning.</b> Keep an explicit <code>key → shard</code> lookup table. Router asks the table: <code>42 → S2</code>, then forwards. <b>Maximum flexibility</b> — any key can live anywhere, rebalancing is just a table edit — but the lookup service is an <b>extra hop</b> and a potential <b>single point of failure</b>.`,
+      apply() {
+        setRanges(["dir","dir","dir","dir"]);
+        setStats(["~5K","~5K","~5K","~5K"]);
+        shards.forEach((s,i)=> setLoad(i, 0.25, "#10b981"));
+        clearShardClasses(); clearWires();
+        routerFormula.textContent = "lookup(42) = S2";
+        clientReq.textContent = "write user 42";
+        directory.style.opacity = "1";
+        activeWire(2); setTarget(2, true);
+        movePacket(SHARD_X[2], SHARD_Y, true);
+        packetLabel.textContent = "42";
+      }
+    },
+    { // 4 hot shard via monotonic key
+      name: "Range", route: "Shard 3", hit: 1,
+      narrClass: "bad",
+      narr: `<b>5. The hotspot trap.</b> Shard on a <b>monotonic key</b> (auto-increment id or <code>created_at</code>) with <b>range</b> partitioning, and <b>every new write lands on the latest shard</b> — here S3 fills up while S0–S2 sit nearly idle. Same risk from a <b>celebrity</b> user (millions of followers) overloading their one shard even when data is even.`,
+      apply() {
+        setRanges(["old","old","old","NEWEST"]);
+        setStats(["idle","idle","idle","20K wps!"]);
+        clearShardClasses(); clearWires();
+        setLoad(0, 0.12, "#10b981"); setLoad(1, 0.12, "#10b981");
+        setLoad(2, 0.12, "#10b981"); setLoad(3, 0.97, "#ef4444");
+        setHot(3, true);
+        routerFormula.textContent = "latest → S3 always";
+        clientReq.textContent = "write id=now()";
+        directory.style.opacity = "0";
+        activeWire(3);
+        movePacket(SHARD_X[3], SHARD_Y, true);
+        packetLabel.textContent = "new";
+      }
+    },
+    { // 5 hash rebalances the heat
+      name: "Hash", route: "all even", hit: 0,
+      narrClass: "good",
+      narr: `<b>6. Hashing cools it down.</b> Switch the same monotonic key through <code>hash()</code> first and consecutive writes <b>scatter evenly</b> across all shards — each carries its fair <code>~5K wps</code> slice. This is why production prefers hashing (with <b>consistent hashing</b>) for write-heavy, sequentially-keyed data.`,
+      apply() {
+        setRanges(["bucket 0","bucket 1","bucket 2","bucket 3"]);
+        setStats(["~5K wps","~5K wps","~5K wps","~5K wps"]);
+        clearShardClasses(); clearWires();
+        shards.forEach((s,i)=> setLoad(i, 0.45, "#10b981"));
+        routerFormula.textContent = "hash() spreads load";
+        clientReq.textContent = "write id=now()";
+        directory.style.opacity = "0";
+        movePacket(0,0,false);
+      }
+    },
+    { // 6 scatter-gather
+      name: "Hash", route: "ALL shards", hit: 4,
+      narrClass: "move",
+      narr: `<b>7. Cross-shard = scatter-gather.</b> A query <b>not</b> keyed on the shard key — e.g. "count all users" or "search by name" — can't be routed to one shard. The router fans it out to <b>every shard</b>, then merges results. It's slow and <b>tail-latency heavy</b>: with more shards, the odds that one is slow rise. Best fix: keep each logical operation single-shard, or serve such reads from a separate index.`,
+      apply() {
+        setRanges(["bucket 0","bucket 1","bucket 2","bucket 3"]);
+        setStats(["scan","scan","scan","scan"]);
+        clearShardClasses();
+        shards.forEach((s,i)=> { setLoad(i, 0.55, "#f59e0b"); setTarget(i,true); });
+        scatterWires(true);
+        routerFormula.textContent = "SELECT count(*)";
+        clientReq.textContent = "count all users";
+        directory.style.opacity = "0";
+        movePacket(0,0,false);
+      }
+    }
+  ];
+
+  let cursor = 0;
+  function render() {
+    const s = steps[cursor];
+    s.apply();
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narr;
+    vStrat.textContent = s.name;
+    vRoute.textContent = s.route;
+    vHit.textContent = s.hit;
+    vHit.className = "value " + (s.hit >= 4 ? "red" : s.hit === 0 ? "green" : "amber");
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
