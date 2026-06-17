@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sliding Window Maximum — Monotonic Deque</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px 60px; gap: 28px; }
+  h1 { font-size: 1.55rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: #3b82f6; }
+
+  .analogy { background: #16213e; border: 1px solid #3b82f6; border-radius: 12px; padding: 18px 26px; max-width: 800px; width: 100%; display: flex; gap: 16px; align-items: flex-start; }
+  .analogy-icon { font-size: 2rem; line-height: 1; flex-shrink: 0; }
+  .analogy-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px; }
+  .analogy-text { font-size: 0.95rem; line-height: 1.5; color: #c0c0d0; }
+
+  .card { background: #16213e; border: 1px solid #2d3a5a; border-radius: 16px; padding: 30px; max-width: 860px; width: 100%; display: flex; flex-direction: column; gap: 26px; }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #7a8ab0; margin-bottom: 12px; }
+  .step-description { min-height: 56px; background: #0f172a; border-radius: 8px; padding: 14px 20px; font-size: 0.94rem; line-height: 1.55; color: #c8c8e0; border-left: 3px solid #3b82f6; transition: border-color 0.3s; }
+  .step-description.pop { border-color: #ef4444; }
+  .step-description.record { border-color: #10b981; }
+  .step-description.expire { border-color: #f59e0b; }
+
+  /* array with shaded window */
+  .arr-area { position: relative; padding-top: 30px; overflow-x: auto; }
+  .arr-row { display: flex; gap: 8px; align-items: center; justify-content: center; min-width: max-content; }
+  .cell-wrap { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .cell { width: 48px; height: 48px; border-radius: 9px; border: 2px solid #2d3a5a; background: #0f172a; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; font-weight: 700; color: #e0e0e0; transition: all 0.3s; }
+  .cell.inwin { border-color: #3b82f6; background: #16264a; color: #bcd4ff; }
+  .cell.cur { border-color: #3b82f6; background: #1e3a6e; box-shadow: 0 0 14px rgba(59,130,246,0.6); transform: translateY(-3px); color: #93c5fd; }
+  .cell.maxcell { border-color: #10b981; background: #0d2a1a; color: #86efac; box-shadow: 0 0 14px rgba(16,185,129,0.5); }
+  .cell.popped { border-color: #ef4444; background: #2a0d0d; color: #fca5a5; opacity: 0.85; }
+  .cell-idx { font-size: 0.58rem; color: #5a6a90; }
+  .ptr { position: absolute; top: -24px; left: 50%; transform: translateX(-50%); font-size: 0.58rem; font-weight: 700; padding: 2px 6px; border-radius: 5px; white-space: nowrap; opacity: 0; transition: opacity 0.25s; }
+  .ptr.show { opacity: 1; }
+  .ptr.l { background: #f59e0b; color: #1a1a2e; }
+  .ptr.r { background: #3b82f6; color: #fff; }
+
+  /* deque */
+  .deque-area { min-height: 76px; background: #0f172a; border: 1px dashed #2d3a5a; border-radius: 10px; padding: 14px 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .deque-empty { font-size: 0.85rem; color: #3a4a6a; font-style: italic; }
+  .dq-item { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .dq-chip { height: 44px; min-width: 44px; padding: 0 12px; border-radius: 8px; background: #1e3a6e; border: 1.5px solid #3b82f6; color: #93c5fd; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .dq-chip.front { background: #0d2a1a; border-color: #10b981; color: #86efac; }
+  .dq-meta { font-size: 0.56rem; color: #5a6a90; }
+  .dq-label { font-size: 0.56rem; font-weight: 700; color: #5a6a90; align-self: flex-start; }
+
+  .out-area { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .out-chip { height: 40px; min-width: 40px; padding: 0 12px; border-radius: 8px; background: #0d2a1a; border: 1.5px solid #10b981; color: #86efac; font-size: 1rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .out-empty { font-size: 0.85rem; color: #3a4a6a; font-style: italic; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 12px 26px; border-radius: 8px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+  .takeaway { background: #16213e; border: 1px solid #2d3a5a; border-radius: 12px; padding: 18px 26px; max-width: 800px; width: 100%; display: flex; gap: 16px; align-items: flex-start; }
+  .takeaway-icon { font-size: 1.6rem; flex-shrink: 0; }
+  .takeaway-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px; }
+  .takeaway p { font-size: 0.93rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: #e0e0e0; }
+</style>
+</head>
+<body>
+
+  <h1>Sliding Window Maximum &mdash; <span>Monotonic Deque</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🏆</div>
+    <div class="analogy-body">
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Ek leaderboard jisme sirf "abhi relevant + abhi sabse strong" players ki queue
+        hai, strongest <strong style="color:#10b981">front</strong> pe. Naya strong player
+        weaker players ko <strong style="color:#ef4444">back</strong> se nikaal deta;
+        time-out hua player <strong style="color:#f59e0b">front</strong> se hat-ta. Front
+        = current window ka max.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description &nbsp;<code style="color:#5a6a90;font-size:0.75rem">k = 3</code></div>
+      <div class="step-description" id="stepDesc">Press "Next Step". The deque holds indices with decreasing values; its front is always the current window's max.</div>
+    </div>
+
+    <div>
+      <div class="section-label">nums &nbsp;<code style="color:#5a6a90;font-size:0.75rem">[1, 3, -1, -3, 5, 3, 6, 7], k = 3</code></div>
+      <div class="arr-area"><div class="arr-row" id="arrRow"></div></div>
+    </div>
+
+    <div>
+      <div class="section-label">deque &mdash; indices, values decreasing (front = max)</div>
+      <div class="deque-area" id="dequeArea"><span class="deque-empty" id="dequeEmpty">empty</span></div>
+    </div>
+
+    <div>
+      <div class="section-label">output &mdash; max of each full window</div>
+      <div class="out-area" id="outArea"><span class="out-empty" id="outEmpty">no full window yet</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next Step</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div class="takeaway-body">
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Keep a <strong>decreasing deque of indices</strong>. Before adding, pop smaller
+        values off the <strong style="color:#ef4444">back</strong> (they can never be max
+        again); drop the <strong style="color:#f59e0b">front</strong> if it slid out of
+        the window. The front is the window max in O(1) &mdash; each index is pushed and
+        popped once, so <strong>O(n) total.</strong>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const nums = [1, 3, -1, -3, 5, 3, 6, 7];
+    const k = 3;
+
+    // Build a fine-grained step trace. Each step is a snapshot.
+    // phase: 'popback' | 'push' | 'expire' | 'record'
+    function buildSteps() {
+      const out = [];
+      const dq = [];          // indices
+      const output = [];
+      for (let i = 0; i < nums.length; i++) {
+        const n = nums[i];
+        // pop back
+        while (dq.length && nums[dq[dq.length - 1]] <= n) {
+          const popped = dq[dq.length - 1];
+          out.push({ phase: 'popback', i, dq: [...dq], output: [...output], poppedIdx: popped,
+            desc: `New element nums[${i}]=<strong style="color:#3b82f6">${n}</strong>. Back of deque is idx ${popped} (value ${nums[popped]}) ≤ ${n} &rarr; <strong style="color:#ef4444">pop it</strong>; it can never be the max while ${n} is around.` });
+          dq.pop();
+        }
+        dq.push(i);
+        out.push({ phase: 'push', i, dq: [...dq], output: [...output],
+          desc: `Push idx ${i} (value ${n}) to the back. Deque values stay decreasing front&rarr;back.` });
+        // expire front
+        if (dq[0] <= i - k) {
+          const exp = dq[0];
+          out.push({ phase: 'expire', i, dq: [...dq], output: [...output], expireIdx: exp,
+            desc: `Front idx ${exp} is now outside the window (≤ ${i} − ${k}) &rarr; <strong style="color:#f59e0b">drop from front</strong>.` });
+          dq.shift();
+        }
+        // record
+        if (i >= k - 1) {
+          output.push(nums[dq[0]]);
+          out.push({ phase: 'record', i, dq: [...dq], output: [...output], maxIdx: dq[0],
+            desc: `Window [${i - k + 1}..${i}] is full. Front idx ${dq[0]} &rarr; max = <strong style="color:#10b981">${nums[dq[0]]}</strong>. Append to output.` });
+        }
+      }
+      out.push({ done: true, output: [...output], desc: `Done. Window maxima: <strong style="color:#10b981">[${output.join(', ')}]</strong>.` });
+      return out;
+    }
+
+    const steps = buildSteps();
+    let currentStep = 0;
+
+    const arrRow = document.getElementById('arrRow');
+    for (let i = 0; i < nums.length; i++) {
+      const wrap = document.createElement('div'); wrap.className = 'cell-wrap';
+      const ptr = document.createElement('div'); ptr.className = 'ptr'; ptr.id = 'ptr-' + i;
+      const cell = document.createElement('div'); cell.className = 'cell'; cell.id = 'cell-' + i; cell.textContent = nums[i];
+      const idx = document.createElement('div'); idx.className = 'cell-idx'; idx.textContent = i;
+      wrap.appendChild(ptr); wrap.appendChild(cell); wrap.appendChild(idx); arrRow.appendChild(wrap);
+    }
+
+    const stepDesc = document.getElementById('stepDesc');
+    const dequeArea = document.getElementById('dequeArea');
+    const dequeEmpty = document.getElementById('dequeEmpty');
+    const outArea = document.getElementById('outArea');
+    const outEmpty = document.getElementById('outEmpty');
+    const stepCtr = document.getElementById('stepCounter');
+    const nextBtn = document.getElementById('nextBtn');
+
+    function clearCells() {
+      for (let i = 0; i < nums.length; i++) {
+        document.getElementById('cell-' + i).className = 'cell';
+        document.getElementById('ptr-' + i).className = 'ptr';
+      }
+    }
+    function setPtr(i, kind) {
+      if (i < 0 || i >= nums.length) return;
+      const p = document.getElementById('ptr-' + i);
+      if (kind === 'l') { p.textContent = '⬆ L'; p.className = 'ptr show l'; }
+      else { p.textContent = '⬆ R'; p.className = 'ptr show r'; }
+    }
+    function renderDeque(dq, step) {
+      dequeArea.querySelectorAll('.dq-item').forEach(e => e.remove());
+      if (dq.length === 0) { dequeEmpty.style.display = ''; return; }
+      dequeEmpty.style.display = 'none';
+      dq.forEach((idx, pos) => {
+        const item = document.createElement('div'); item.className = 'dq-item';
+        const lbl = document.createElement('div'); lbl.className = 'dq-label';
+        lbl.textContent = pos === 0 ? 'front' : (pos === dq.length - 1 ? 'back' : '');
+        const chip = document.createElement('div');
+        chip.className = 'dq-chip' + (pos === 0 ? ' front' : '');
+        chip.textContent = nums[idx];
+        const meta = document.createElement('div'); meta.className = 'dq-meta'; meta.textContent = 'i=' + idx;
+        item.appendChild(lbl); item.appendChild(chip); item.appendChild(meta);
+        dequeArea.appendChild(item);
+      });
+    }
+    function renderOutput(output) {
+      outArea.querySelectorAll('.out-chip').forEach(e => e.remove());
+      if (output.length === 0) { outEmpty.style.display = ''; return; }
+      outEmpty.style.display = 'none';
+      output.forEach(v => {
+        const c = document.createElement('div'); c.className = 'out-chip'; c.textContent = v;
+        outArea.appendChild(c);
+      });
+    }
+
+    function render(step) {
+      clearCells();
+      if (step.done) {
+        renderOutput(step.output);
+        stepDesc.innerHTML = step.desc; stepDesc.className = 'step-description record';
+        return;
+      }
+      const i = step.i;
+      // shade current window
+      const lo = Math.max(0, i - k + 1);
+      for (let j = lo; j <= i; j++) {
+        if (i - j < k) document.getElementById('cell-' + j).classList.add('inwin');
+      }
+      setPtr(lo, 'l'); setPtr(i, 'r');
+      document.getElementById('cell-' + i).classList.add('cur');
+      if (step.phase === 'popback') document.getElementById('cell-' + step.poppedIdx).classList.add('popped');
+      if (step.phase === 'record') document.getElementById('cell-' + step.maxIdx).classList.add('maxcell');
+      if (step.phase === 'expire') document.getElementById('cell-' + step.expireIdx).classList.add('popped');
+
+      renderDeque(step.dq, step);
+      renderOutput(step.output);
+      stepDesc.innerHTML = step.desc;
+      stepDesc.className = 'step-description ' + (step.phase === 'popback' ? 'pop' : step.phase === 'record' ? 'record' : step.phase === 'expire' ? 'expire' : '');
+    }
+
+    function advance() {
+      if (currentStep >= steps.length) return;
+      render(steps[currentStep]);
+      currentStep++;
+      stepCtr.textContent = 'Step ' + currentStep + ' / ' + steps.length;
+      if (currentStep >= steps.length) nextBtn.disabled = true;
+    }
+    function reset() {
+      currentStep = 0; clearCells();
+      renderDeque([], null); renderOutput([]);
+      stepDesc.innerHTML = 'Press "Next Step". The deque holds indices with decreasing values; its front is always the current window\'s max.';
+      stepDesc.className = 'step-description';
+      nextBtn.disabled = false;
+      stepCtr.textContent = 'Step 0 / ' + steps.length;
+    }
+    stepCtr.textContent = 'Step 0 / ' + steps.length;
+  </script>
+</body>
+</html>

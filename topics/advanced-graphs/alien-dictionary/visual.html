@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alien Dictionary — Topological Sort (Kahn's)</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444; --purple:#a855f7;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:30px 18px 70px;}
+  .wrap{max-width:940px;margin:0 auto;}
+  h1{font-size:1.7rem;margin:0 0 6px;}
+  h1 span{color:var(--amber);}
+  .subtitle{color:var(--muted);margin:0 0 24px;}
+  .analogy{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(168,85,247,.10));
+    border:1px solid rgba(245,158,11,.4);border-left:5px solid var(--amber);border-radius:12px;padding:16px 20px;margin-bottom:24px;}
+  .analogy h3{margin:0 0 6px;color:var(--amber);font-size:1.02rem;}
+  .analogy p{margin:0;}
+  .stage{display:grid;grid-template-columns:1fr 300px;gap:18px;background:var(--panel);
+    border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:18px 20px;margin-bottom:18px;}
+  @media(max-width:740px){.stage{grid-template-columns:1fr;}}
+  svg{width:100%;height:auto;background:#12182e;border-radius:10px;}
+  .side{display:flex;flex-direction:column;gap:14px;}
+  .panel-box{background:var(--panel2);border-radius:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);}
+  .panel-box h4{margin:0 0 8px;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);}
+  .words{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;}
+  .word{font-family:"SF Mono",monospace;font-size:1.05rem;background:#1b2748;border:1px solid rgba(255,255,255,.1);
+    border-radius:7px;padding:4px 10px;}
+  .word.cmp{border-color:var(--amber);background:rgba(245,158,11,.14);}
+  .word .hit{color:var(--amber);font-weight:700;text-decoration:underline;}
+  .indeg{display:flex;flex-wrap:wrap;gap:8px;}
+  .deg{font-family:"SF Mono",monospace;font-size:.95rem;background:#1b2748;border:1px solid rgba(255,255,255,.1);
+    border-radius:7px;padding:4px 10px;}
+  .deg.zero{border-color:var(--green);background:rgba(16,185,129,.14);color:#b6f0d8;}
+  .deg.dec{border-color:var(--amber);background:rgba(245,158,11,.16);color:#ffe3a8;}
+  .queue,.order{display:flex;flex-wrap:wrap;gap:7px;min-height:34px;align-items:center;}
+  .qchip{font-family:"SF Mono",monospace;font-weight:700;background:rgba(59,130,246,.2);border:1px solid var(--blue);
+    border-radius:7px;padding:4px 11px;color:#bcd4ff;}
+  .ochip{font-family:"SF Mono",monospace;font-weight:700;background:rgba(16,185,129,.18);border:1px solid var(--green);
+    border-radius:7px;padding:4px 11px;color:#b6f0d8;}
+  .empty{color:var(--muted);font-style:italic;font-size:.85rem;}
+  .caption{background:var(--panel2);border-left:4px solid var(--amber);border-radius:8px;
+    padding:12px 16px;margin:0 0 16px;font-size:.98rem;min-height:54px;}
+  .caption b{color:#ffe3a8;}
+  .controls{display:flex;align-items:center;gap:10px;margin:6px 0 22px;}
+  button{background:var(--amber);color:#3a2600;border:none;padding:10px 22px;border-radius:9px;font-size:.98rem;font-weight:700;cursor:pointer;transition:transform .12s,background .2s;}
+  button:hover{background:#fbb43a;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  button.ghost{background:var(--panel2);color:var(--text);font-weight:600;}
+  button.ghost:hover{background:#33457a;}
+  .stepind{color:var(--muted);font-size:.9rem;margin-left:auto;}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:4px 0 18px;font-size:.84rem;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:13px;height:13px;border-radius:50%;display:inline-block;}
+  .takeaway{background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(16,185,129,.12));
+    border:1px solid rgba(245,158,11,.4);border-radius:12px;padding:18px 22px;margin-top:26px;text-align:center;}
+  .takeaway h3{margin:0 0 6px;color:var(--amber);}
+  .takeaway p{margin:0;font-size:1.05rem;}
+  .nlabel{font:700 16px "SF Mono",monospace;fill:#fff;}
+  .edge{stroke:#5a6aa0;stroke-width:2.5;transition:all .3s;}
+  .edge.new{stroke:var(--amber);stroke-width:3.5;}
+  .edge.dead{stroke:#2c3a63;stroke-width:1.5;opacity:.5;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Alien Dictionary — <span>Topological Sort</span> (Kahn's BFS)</h1>
+  <p class="subtitle">Adjacent sorted words leak the hidden letter order. Build a precedence graph, then peel off in-degree-zero letters.</p>
+
+  <div class="analogy">
+    <h3>📖 The hidden-alphabet analogy</h3>
+    <p>Shabd sorted hain par alphabet ka order unknown. Do <b>lagatar words</b> compare karo — pehla differing char ek clue deta hai: jaise <code>"wrt"</code> phir <code>"wrf"</code> → <b>t aata hai f se pehle</b> → edge <code>t→f</code>. Phir yeh dependency graph topo-sort karo. Cycle bana = invalid → <code>""</code>.</p>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#3a4a78"></i>letter (indeg &gt; 0)</span>
+    <span><i class="dot" style="background:var(--green)"></i>indeg 0 / output</span>
+    <span><i class="dot" style="background:var(--blue)"></i>in queue</span>
+    <span><i class="dot" style="background:var(--amber)"></i>active</span>
+  </div>
+
+  <div class="stage">
+    <svg id="graph" viewBox="0 0 420 260"></svg>
+    <div class="side">
+      <div class="panel-box">
+        <h4>Words (comparing pairs)</h4>
+        <div class="words" id="words"></div>
+      </div>
+      <div class="panel-box">
+        <h4>In-degree</h4>
+        <div class="indeg" id="indeg"></div>
+      </div>
+      <div class="panel-box">
+        <h4>Queue (indeg 0)</h4>
+        <div class="queue" id="queue"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-box" style="margin-bottom:16px;">
+    <h4>Output order</h4>
+    <div class="order" id="order"><span class="empty">nothing yet</span></div>
+  </div>
+
+  <div class="caption" id="caption">Press <b>Next</b>. Phase 1 builds edges from adjacent words; Phase 2 runs Kahn's algorithm.</div>
+  <div class="controls">
+    <button id="prev" class="ghost">‹ Prev</button>
+    <button id="next">Next ›</button>
+    <button id="auto" class="ghost">▶ Auto</button>
+    <span class="stepind" id="ind"></span>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Only the <i>first</i> differing character between adjacent words gives an ordering edge. Repeatedly removing in-degree-zero letters yields a valid order — if any letters remain, there's a cycle and the input is contradictory.</p>
+  </div>
+</div>
+
+<script>
+const words=["wrt","wrf","er","ett","rftt"];
+// letters: w r t f e
+const letters=['w','e','r','t','f'];
+const pos={w:[60,60], e:[60,200], r:[190,60], t:[190,200], f:[330,130]};
+
+function buildSteps(){
+  const steps=[];
+  const adj={}; const indeg={};
+  letters.forEach(c=>{adj[c]=new Set();indeg[c]=0;});
+  const edges=[]; // [from,to]
+  const snap=(o)=>({
+    caption:o.caption,
+    edges:edges.map(e=>[...e]),
+    indeg:{...indeg},
+    cmpPair:o.cmpPair??null,    // [i,j] word indices
+    hit:o.hit??null,            // [wordIdx, charIdx]
+    newEdge:o.newEdge?[...o.newEdge]:null,
+    queue:o.queue?[...o.queue]:(curQueue?[...curQueue]:[]),
+    order:[...order],
+    active:o.active??null,
+    decTarget:o.decTarget??null,
+    phase:o.phase
+  });
+  let order=[]; let curQueue=null;
+  steps.push(snap({caption:`<b>Phase 1 — build edges.</b> Compare each adjacent pair of words; the first differing char gives a precedence edge.`,phase:1}));
+  for(let i=0;i<words.length-1;i++){
+    const w1=words[i],w2=words[i+1];
+    const L=Math.min(w1.length,w2.length);
+    let found=false;
+    for(let k=0;k<L;k++){
+      if(w1[k]!==w2[k]){
+        const a=w1[k],b=w2[k];
+        if(!adj[a].has(b)){adj[a].add(b);indeg[b]++;edges.push([a,b]);
+          steps.push(snap({caption:`"${w1}" vs "${w2}": first diff at pos ${k} → <b>${a}</b> ≠ <b>${b}</b>. Add edge <b>${a}→${b}</b>, indeg[${b}]++ = ${indeg[b]}.`,cmpPair:[i,i+1],hit:[k],newEdge:[a,b],phase:1}));
+        } else {
+          steps.push(snap({caption:`"${w1}" vs "${w2}": diff ${a}→${b} already known. No change.`,cmpPair:[i,i+1],hit:[k],phase:1}));
+        }
+        found=true;break;
+      }
+    }
+    if(!found){
+      steps.push(snap({caption:`"${w1}" vs "${w2}": shared prefix, no diff in overlap. (No invalid-prefix here.)`,cmpPair:[i,i+1],phase:1}));
+    }
+  }
+  // Phase 2 Kahn
+  curQueue=letters.filter(c=>indeg[c]===0);
+  steps.push(snap({caption:`<b>Phase 2 — Kahn's algorithm.</b> Seed the queue with all indeg-0 letters: [${curQueue.join(', ')}].`,phase:2}));
+  while(curQueue.length){
+    const c=curQueue.shift();
+    order.push(c);
+    steps.push(snap({caption:`Dequeue <b>${c}</b> (indeg 0). Append to output → "${order.join('')}". Now decrement its neighbours.`,active:c,phase:2}));
+    for(const nb of [...adj[c]]){
+      indeg[nb]--;
+      let cap=`Edge ${c}→${nb}: indeg[${nb}]-- = ${indeg[nb]}.`;
+      if(indeg[nb]===0){curQueue.push(nb);cap+=` Now 0 → enqueue <b>${nb}</b>.`;}
+      steps.push(snap({caption:cap,active:c,decTarget:nb,phase:2}));
+    }
+  }
+  const valid=order.length===letters.length;
+  steps.push(snap({caption:valid?`All ${letters.length} letters ordered with no cycle. Answer = <b>"${order.join('')}"</b>. ✅`:`Only ${order.length} letters output — a cycle remains → return "". ❌`,phase:2}));
+  return steps;
+}
+const steps=buildSteps();
+let cur=0,timer=null;
+const $=id=>document.getElementById(id);
+
+function drawGraph(s){
+  let h=`<defs><marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7a8ac0"/></marker><marker id="arrA" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#f59e0b"/></marker></defs>`;
+  s.edges.forEach(([a,b])=>{
+    const [x1,y1]=pos[a],[x2,y2]=pos[b];
+    const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),r=22;
+    const sx=x1+dx/len*r,sy=y1+dy/len*r,ex=x2-dx/len*r,ey=y2-dy/len*r;
+    const isNew=s.newEdge&&s.newEdge[0]===a&&s.newEdge[1]===b;
+    h+=`<line class="edge ${isNew?'new':''}" x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" marker-end="url(#${isNew?'arrA':'arr'})"/>`;
+  });
+  letters.forEach(c=>{
+    const [x,y]=pos[c];
+    let fill='#3a4a78',stroke='#5a6aa0';
+    if(s.indeg[c]===0){fill='#10b981';stroke='#0c8f63';}
+    if(s.queue.includes(c)){fill='#3b82f6';stroke='#2f6fd6';}
+    if(s.active===c){fill='#f59e0b';stroke='#d98a08';}
+    if(s.decTarget===c){stroke='#f59e0b';}
+    h+=`<circle cx="${x}" cy="${y}" r="22" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>`;
+    h+=`<text class="nlabel" x="${x}" y="${y+1}" text-anchor="middle">${c}</text>`;
+    h+=`<text x="${x}" y="${y+38}" text-anchor="middle" font-size="10" font-family="SF Mono,monospace" fill="#9fb0e0">in:${s.indeg[c]}</text>`;
+  });
+  $('graph').innerHTML=h;
+}
+function drawWords(s){
+  $('words').innerHTML=words.map((w,i)=>{
+    const cmp=s.cmpPair&&(i===s.cmpPair[0]||i===s.cmpPair[1]);
+    let html=w;
+    if(cmp && s.hit){
+      const k=s.hit[0];
+      html=w.split('').map((ch,j)=>j===k?`<span class="hit">${ch}</span>`:ch).join('');
+    }
+    return `<div class="word ${cmp?'cmp':''}">${html}</div>`;
+  }).join('');
+}
+function drawIndeg(s){
+  $('indeg').innerHTML=letters.map(c=>{
+    let cls='deg';
+    if(s.indeg[c]===0) cls+=' zero';
+    if(s.decTarget===c) cls+=' dec';
+    return `<div class="${cls}">${c}:${s.indeg[c]}</div>`;
+  }).join('');
+}
+function drawQueue(s){
+  $('queue').innerHTML=s.queue.length?s.queue.map(c=>`<span class="qchip">${c}</span>`).join(''):'<span class="empty">empty</span>';
+}
+function drawOrder(s){
+  $('order').innerHTML=s.order.length?s.order.map(c=>`<span class="ochip">${c}</span>`).join(''):'<span class="empty">nothing yet</span>';
+}
+function render(){
+  const s=steps[cur];
+  drawGraph(s);drawWords(s);drawIndeg(s);drawQueue(s);drawOrder(s);
+  $('caption').innerHTML=s.caption;
+  $('ind').textContent=`Step ${cur+1} / ${steps.length}`;
+  $('prev').disabled=cur===0; $('next').disabled=cur===steps.length-1;
+}
+$('next').onclick=()=>{if(cur<steps.length-1){cur++;render();}};
+$('prev').onclick=()=>{if(cur>0){cur--;render();}};
+$('auto').onclick=function(){
+  if(timer){clearInterval(timer);timer=null;this.textContent='▶ Auto';return;}
+  this.textContent='⏸ Pause';
+  timer=setInterval(()=>{if(cur<steps.length-1){cur++;render();}else{clearInterval(timer);timer=null;$('auto').textContent='▶ Auto';}},1000);
+};
+render();
+</script>
+</body>
+</html>

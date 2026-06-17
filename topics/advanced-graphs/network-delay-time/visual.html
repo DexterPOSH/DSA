@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Delay Time — Dijkstra step-by-step</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444; --purple:#a855f7;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:30px 18px 70px;}
+  .wrap{max-width:920px;margin:0 auto;}
+  h1{font-size:1.8rem;margin:0 0 6px;}
+  h1 span{color:var(--blue);}
+  .subtitle{color:var(--muted);margin:0 0 24px;}
+  .analogy{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(168,85,247,.10));
+    border:1px solid rgba(245,158,11,.4);border-left:5px solid var(--amber);border-radius:12px;padding:16px 20px;margin-bottom:24px;}
+  .analogy h3{margin:0 0 6px;color:var(--amber);font-size:1.02rem;}
+  .analogy p{margin:0;}
+  .stage{display:grid;grid-template-columns:1fr 320px;gap:18px;background:var(--panel);
+    border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:18px 20px;margin-bottom:18px;}
+  @media(max-width:740px){.stage{grid-template-columns:1fr;}}
+  svg{width:100%;height:auto;background:#12182e;border-radius:10px;}
+  .side{display:flex;flex-direction:column;gap:14px;}
+  .panel-box{background:var(--panel2);border-radius:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);}
+  .panel-box h4{margin:0 0 8px;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);}
+  .heap-item,.dist-item{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.95rem;
+    padding:5px 9px;border-radius:7px;margin:4px 0;background:#1b2748;border:1px solid rgba(255,255,255,.07);display:flex;justify-content:space-between;}
+  .heap-item.top{border-color:var(--amber);background:rgba(245,158,11,.16);color:#ffe3a8;}
+  .dist-item.locked{border-color:var(--green);background:rgba(16,185,129,.14);color:#b6f0d8;}
+  .dist-item.just{border-color:var(--blue);background:rgba(59,130,246,.18);}
+  .empty{color:var(--muted);font-style:italic;font-size:.85rem;}
+  .caption{background:var(--panel2);border-left:4px solid var(--blue);border-radius:8px;
+    padding:12px 16px;margin:0 0 16px;font-size:.98rem;min-height:54px;}
+  .caption b{color:#cfe0ff;}
+  .controls{display:flex;align-items:center;gap:10px;margin:6px 0 22px;}
+  button{background:var(--blue);color:#fff;border:none;padding:10px 22px;border-radius:9px;font-size:.98rem;font-weight:600;cursor:pointer;transition:transform .12s,background .2s;}
+  button:hover{background:#2f6fd6;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  button.ghost{background:var(--panel2);}
+  button.ghost:hover{background:#33457a;}
+  .stepind{color:var(--muted);font-size:.9rem;margin-left:auto;}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:4px 0 18px;font-size:.84rem;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:13px;height:13px;border-radius:50%;display:inline-block;}
+  .takeaway{background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(16,185,129,.12));
+    border:1px solid rgba(59,130,246,.4);border-radius:12px;padding:18px 22px;margin-top:26px;text-align:center;}
+  .takeaway h3{margin:0 0 6px;color:var(--blue);}
+  .takeaway p{margin:0;font-size:1.05rem;}
+  .node circle{transition:all .35s ease;}
+  .nlabel{font:700 15px 'Segoe UI';fill:#fff;}
+  .nsub{font:600 11px "SF Mono",monospace;}
+  .edge{stroke:#3a4a78;stroke-width:2;transition:all .35s;}
+  .edge.relax{stroke:var(--amber);stroke-width:3.5;}
+  .edge.tree{stroke:var(--green);stroke-width:3.5;}
+  .ew{font:600 12px "SF Mono",monospace;fill:#9fb0e0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Network Delay Time — <span>Dijkstra</span> step-by-step</h1>
+  <p class="subtitle">Single-source shortest paths on a non-negative weighted directed graph, with a live min-heap and distance table.</p>
+
+  <div class="analogy">
+    <h3>📡 The rumor analogy</h3>
+    <p>Node <b>k</b> se ek afwah phailti hai — har edge ek "dost-ko-batane" ka delay hai. Afwah hamesha sabse <b>tez raaste</b> se pahunchti hai. Min-heap se sabse jaldi pahunchne wala node pop karo, lock karo, neighbours relax karo. Sab tak pahunchne ka <b>max</b> time = network delay.</p>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#3a4a78"></i>unvisited</span>
+    <span><i class="dot" style="background:var(--amber)"></i>popped / relaxing</span>
+    <span><i class="dot" style="background:var(--green)"></i>locked (shortest found)</span>
+    <span><i class="dot" style="background:var(--blue)"></i>in heap</span>
+  </div>
+
+  <div class="stage">
+    <svg id="graph" viewBox="0 0 420 320"></svg>
+    <div class="side">
+      <div class="panel-box">
+        <h4>Min-heap (time, node)</h4>
+        <div id="heap"></div>
+      </div>
+      <div class="panel-box">
+        <h4>dist[] — locked distances</h4>
+        <div id="dist"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="caption" id="caption">Press <b>Next</b> to start Dijkstra from source node 2.</div>
+  <div class="controls">
+    <button id="prev" class="ghost">‹ Prev</button>
+    <button id="next">Next ›</button>
+    <button id="auto" class="ghost">▶ Auto</button>
+    <span class="stepind" id="ind"></span>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>The heap always hands you the closest unfinished node — so the first time a node is popped, its distance is final. Network delay = the largest of those final distances.</p>
+  </div>
+</div>
+
+<script>
+// ----- graph: nodes 1..4, source k=2.  times = [[2,1,1],[2,3,1],[3,4,1]] + extras -----
+const N = 4, SRC = 2;
+const pos = {1:[80,90], 2:[210,55], 3:[210,210], 4:[340,180]};
+const edges = [
+  [2,1,1],[2,3,1],[3,4,1],[1,3,4],[1,4,5]
+];
+const adj = {};
+for(let i=1;i<=N;i++) adj[i]=[];
+edges.forEach(([u,v,w])=>adj[u].push([v,w]));
+
+// ----- precompute discrete Dijkstra steps -----
+function buildSteps(){
+  const steps=[];
+  const dist={}; const inHeap=new Set();
+  let heap=[]; // array of [t,node]
+  const pushHeap=(t,node)=>{heap.push([t,node]); heap.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);};
+  pushHeap(0,SRC); inHeap.add(SRC);
+  const snap=(o)=>({
+    caption:o.caption,
+    heap:heap.map(h=>[...h]),
+    dist:{...dist},
+    active:o.active??null,
+    relax:o.relax?[...o.relax]:null,
+    tree:o.tree?[...o.tree]:null,
+    locked:new Set(Object.keys(dist).map(Number)),
+    top:o.top??null
+  });
+  steps.push(snap({caption:`Start: push <b>(0, ${SRC})</b> onto the heap. dist is empty.`}));
+  while(heap.length){
+    const [t,node]=heap[0];
+    steps.push(snap({caption:`Pop the smallest: <b>(${t}, node ${node})</b> — the closest unfinished node.`,active:node,top:node}));
+    heap.shift();
+    if(node in dist){
+      steps.push(snap({caption:`Node ${node} already locked at dist ${dist[node]}. This is a stale heap entry → <b>skip</b>.`,active:node}));
+      continue;
+    }
+    dist[node]=t;
+    steps.push(snap({caption:`Lock <b>dist[${node}] = ${t}</b>. First pop = shortest path, done forever.`,active:node}));
+    for(const [nei,w] of adj[node]){
+      if(nei in dist){
+        continue;
+      }
+      pushHeap(t+w,nei); inHeap.add(nei);
+      steps.push(snap({caption:`Relax edge ${node}→${nei} (w=${w}): push <b>(${t}+${w}=${t+w}, ${nei})</b> onto heap.`,active:node,relax:[node,nei],tree:[node,nei]}));
+    }
+  }
+  const finalDist = {...dist};
+  const maxd = Math.max(...Object.values(finalDist));
+  steps.push(snap({caption:`Heap empty. All ${N} nodes reached. Answer = <b>max(dist) = ${maxd}</b> (node took longest). ✅`}));
+  return steps;
+}
+const steps=buildSteps();
+let cur=0, timer=null;
+
+// ----- render -----
+const $=id=>document.getElementById(id);
+function edgeKey(u,v){return u+'-'+v;}
+function drawGraph(s){
+  const svg=$('graph');
+  let h='';
+  // edges
+  edges.forEach(([u,v,w])=>{
+    const [x1,y1]=pos[u],[x2,y2]=pos[v];
+    let cls='edge';
+    if(s.tree && s.tree[0]===u && s.tree[1]===v) cls='edge relax';
+    const mx=(x1+x2)/2,my=(y1+y2)/2;
+    // shorten to node radius
+    const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),r=20;
+    const sx=x1+dx/len*r, sy=y1+dy/len*r, ex=x2-dx/len*r, ey=y2-dy/len*r;
+    h+=`<line class="${cls}" x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" marker-end="url(#arr)"/>`;
+    h+=`<rect x="${mx-9}" y="${my-9}" width="18" height="16" rx="4" fill="#12182e"/>`;
+    h+=`<text class="ew" x="${mx}" y="${my+3}" text-anchor="middle">${w}</text>`;
+  });
+  // nodes
+  for(let i=1;i<=N;i++){
+    const [x,y]=pos[i];
+    let fill='#3a4a78', stroke='#5a6aa0';
+    if(s.locked.has(i)){fill='#10b981';stroke='#0c8f63';}
+    else if(s.heap.some(hh=>hh[1]===i)){fill='#3b82f6';stroke='#2f6fd6';}
+    if(s.active===i){fill='#f59e0b';stroke='#d98a08';}
+    const dv = (i in s.dist)? s.dist[i] : '∞';
+    h+=`<g class="node"><circle cx="${x}" cy="${y}" r="20" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>`;
+    h+=`<text class="nlabel" x="${x}" y="${y-1}" text-anchor="middle">${i}</text>`;
+    h+=`<text class="nsub" x="${x}" y="${y+34}" text-anchor="middle" fill="#9fb0e0">d=${dv}</text></g>`;
+  }
+  svg.innerHTML=`<defs><marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6678ad"/></marker></defs>`+h;
+}
+function drawHeap(s){
+  const el=$('heap');
+  if(!s.heap.length){el.innerHTML='<div class="empty">empty</div>';return;}
+  el.innerHTML=s.heap.map((h,i)=>{
+    const top=(i===0 && s.top!==null && s.top===h[1])?' top':(i===0?' top':'');
+    return `<div class="heap-item${top}"><span>node ${h[1]}</span><span>t=${h[0]}</span></div>`;
+  }).join('');
+}
+function drawDist(s){
+  const el=$('dist');
+  const keys=Object.keys(s.dist).map(Number).sort((a,b)=>a-b);
+  if(!keys.length){el.innerHTML='<div class="empty">nothing locked yet</div>';return;}
+  el.innerHTML=keys.map(k=>{
+    const j=(s.active===k)?' just':'';
+    return `<div class="dist-item locked${j}"><span>node ${k}</span><span>${s.dist[k]}</span></div>`;
+  }).join('');
+}
+function render(){
+  const s=steps[cur];
+  drawGraph(s); drawHeap(s); drawDist(s);
+  $('caption').innerHTML=s.caption;
+  $('ind').textContent=`Step ${cur+1} / ${steps.length}`;
+  $('prev').disabled=cur===0;
+  $('next').disabled=cur===steps.length-1;
+}
+$('next').onclick=()=>{if(cur<steps.length-1){cur++;render();}};
+$('prev').onclick=()=>{if(cur>0){cur--;render();}};
+$('auto').onclick=function(){
+  if(timer){clearInterval(timer);timer=null;this.textContent='▶ Auto';return;}
+  this.textContent='⏸ Pause';
+  timer=setInterval(()=>{
+    if(cur<steps.length-1){cur++;render();}
+    else{clearInterval(timer);timer=null;$('auto').textContent='▶ Auto';}
+  },1100);
+};
+render();
+</script>
+</body>
+</html>

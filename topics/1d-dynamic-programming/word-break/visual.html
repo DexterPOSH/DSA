@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Break — boolean reachability DP over string positions</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel); border-radius: 12px;
+    padding: 16px 22px; margin-bottom: 28px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: 'SF Mono', Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .stage {
+    background: var(--panel); border-radius: 14px;
+    padding: 22px 24px 26px; border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .secLabel { font-size: .82rem; color: var(--muted); letter-spacing:.04em; text-transform: uppercase; margin: 4px 0 8px; }
+
+  /* string with boundary dp gutters */
+  .strrow { display: flex; align-items: flex-end; flex-wrap: nowrap; overflow-x: auto; padding: 26px 0 6px; }
+  .gut { display: flex; flex-direction: column; align-items: center; flex: 0 0 auto; }
+  .dpdot {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: .8rem; font-weight: 700;
+    background: var(--panel2); border: 2px solid rgba(255,255,255,0.12);
+    font-family: 'SF Mono', Menlo, monospace;
+    transition: all .3s ease;
+  }
+  .dpdot.t { background: rgba(16,185,129,0.22); border-color: var(--green); color: #b6f0d8; }
+  .dpdot.f { color: var(--muted); }
+  .dpdot.j { box-shadow: 0 0 0 3px var(--amber); }
+  .dpdot.i { box-shadow: 0 0 0 3px var(--blue); }
+  .gutlbl { font-size: .66rem; color: var(--muted); margin-top: 4px; }
+  .ch {
+    width: 40px; height: 48px; flex: 0 0 auto;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 1.15rem;
+    font-family: 'SF Mono', Menlo, monospace;
+    background: var(--panel2);
+    border-top: 2px solid rgba(255,255,255,0.06);
+    border-bottom: 2px solid rgba(255,255,255,0.06);
+    transition: all .3s ease;
+    margin-bottom: 18px;
+  }
+  .ch.window { background: rgba(59,130,246,0.22); color: #bcd4ff; }
+  .ch.window.match { background: rgba(16,185,129,0.25); color: #b6f0d8; }
+  .ch.window.nomatch { background: rgba(239,68,68,0.18); color: #ffb4b4; }
+
+  .dict { margin: 18px 0 6px; }
+  .word {
+    display: inline-block; margin: 0 8px 8px 0; padding: 6px 14px;
+    border-radius: 8px; background: var(--panel2);
+    border: 1px solid rgba(255,255,255,0.1);
+    font-family: 'SF Mono', Menlo, monospace; font-weight: 600;
+  }
+  .word.hit { background: rgba(16,185,129,0.25); border-color: var(--green); color: #b6f0d8; }
+
+  .caption {
+    margin-top: 20px; background: var(--panel2); border-radius: 10px;
+    padding: 14px 18px; border-left: 4px solid var(--green);
+    font-size: 1rem; min-height: 24px;
+  }
+  .caption b.t { color: var(--green); }
+  .caption b.f { color: var(--red); }
+
+  .controls { text-align: center; margin: 24px 0 6px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 26px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .stepcount { color: var(--muted); margin: 0 14px; font-size: .92rem; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px;
+    padding: 18px 24px; margin-top: 30px; text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Word <span>Break</span> — reachable positions, one boundary at a time</h1>
+  <p class="subtitle">A position is reachable if some earlier reachable boundary jumps to it via a dictionary word.</p>
+
+  <div class="analogy">
+    <h3>🪨 Stepping stones</h3>
+    <p>Position <code>i</code> reachable hai agar koi pichhla reachable point <code>j</code> ho <b>aur</b> <code>s[j:i]</code> dictionary me ho. Start (boundary 0) hamesha reachable. Agar <b>last boundary</b> tak pahunch gaye → answer <b>True</b>.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> <code>s = "leetcode"</code>, dictionary <code>["leet", "code"]</code>.
+    <span class="arrow">→</span> Answer: <code>True</code> &nbsp;("leet" + "code")
+  </div>
+
+  <div class="stage">
+    <div class="secLabel">String with boundary flags &nbsp;(<span style="color:var(--green)">●</span> = dp True / reachable)</div>
+    <div class="strrow" id="strrow"></div>
+
+    <div class="secLabel" style="margin-top:14px;">Dictionary</div>
+    <div class="dict" id="dict"></div>
+
+    <div class="caption" id="cap">Press <b>Next</b> to start. dp[0] = True because the empty prefix is always reachable.</div>
+
+    <div class="controls">
+      <button class="ghost" id="prev" disabled>‹ Prev</button>
+      <span class="stepcount" id="cnt">step 0 / 0</span>
+      <button id="next">Next ›</button>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Fill <code>dp[i]</code> left to right: True if any split point <code>j</code> has <code>dp[j]</code> True and <code>s[j:i]</code> in the dictionary. The answer is <code>dp[len(s)]</code>.</p>
+  </div>
+</div>
+
+<script>
+const s = "leetcode";
+const dict = ["leet", "code"];
+const words = new Set(dict);
+const n = s.length;
+
+// Build trace: for each i (1..n), try each j (0..i-1).
+const steps = [];
+const dp = new Array(n + 1).fill(false);
+dp[0] = true;
+steps.push({
+  dp: dp.slice(), i: null, j: null, win: null, hit: false,
+  cap: 'Base case: dp[0] = True. The empty prefix is trivially segmentable.'
+});
+for (let i = 1; i <= n; i++) {
+  let became = false;
+  for (let j = 0; j < i; j++) {
+    const sub = s.slice(j, i);
+    const inDict = words.has(sub);
+    const reachable = dp[j] && inDict;
+    if (reachable) dp[i] = true;
+    steps.push({
+      dp: dp.slice(), i, j, win: [j, i], sub, inDict,
+      reachableNow: reachable, dpj: dp[j],
+      hit: reachable,
+      cap: reachable
+        ? `i=${i}, j=${j}: dp[${j}] is True AND "<b>${sub}</b>" is in the dictionary → set <b class="t">dp[${i}] = True</b>. Stop scanning this i.`
+        : (dp[j]
+            ? `i=${i}, j=${j}: dp[${j}] True, but "<b>${sub}</b>" is <b class="f">not</b> a dictionary word. Try next j.`
+            : `i=${i}, j=${j}: dp[${j}] is False (boundary ${j} not reachable) → skip.`)
+    });
+    if (reachable) { became = true; break; }   // matches the `break` in code
+  }
+  if (!became) {
+    steps.push({
+      dp: dp.slice(), i, j: null, win: null, hit: false,
+      cap: `No split point worked for i=${i}: dp[${i}] stays False.`
+    });
+  }
+}
+steps.push({
+  dp: dp.slice(), i: n, j: null, win: null, hit: dp[n],
+  cap: dp[n]
+    ? `Reached the end: <b class="t">dp[${n}] = True</b> → "${s}" can be segmented. Return True.`
+    : `dp[${n}] = False → cannot segment. Return False.`
+});
+
+const $ = id => document.getElementById(id);
+let idx = 0;
+
+function renderDict(st) {
+  $('dict').innerHTML = dict.map(w => {
+    const hit = st.sub && st.sub === w && st.inDict;
+    return `<span class="word ${hit ? 'hit' : ''}">${w}</span>`;
+  }).join('');
+}
+
+function renderStr(st) {
+  // boundaries 0..n interleaved with chars 0..n-1
+  let html = '';
+  for (let b = 0; b <= n; b++) {
+    const val = st.dp[b];
+    let dcls = 'dpdot ' + (val ? 't' : 'f');
+    if (st.j === b) dcls += ' j';
+    if (st.i === b) dcls += ' i';
+    html += `<div class="gut"><div class="${dcls}">${val ? 'T' : 'F'}</div><div class="gutlbl">dp[${b}]</div></div>`;
+    if (b < n) {
+      let ccls = 'ch';
+      if (st.win && b >= st.win[0] && b < st.win[1]) {
+        ccls += ' window ' + (st.inDict ? 'match' : (st.reachableNow === false && st.dpj ? 'nomatch' : ''));
+      }
+      html += `<div class="${ccls}">${s[b]}</div>`;
+    }
+  }
+  $('strrow').innerHTML = html;
+}
+
+function render() {
+  const st = steps[idx];
+  renderStr(st);
+  renderDict(st);
+  $('cap').innerHTML = st.cap;
+  $('cnt').textContent = `step ${idx} / ${steps.length - 1}`;
+  $('prev').disabled = idx === 0;
+  $('next').disabled = idx === steps.length - 1;
+}
+
+$('next').addEventListener('click', () => { if (idx < steps.length - 1) { idx++; render(); } });
+$('prev').addEventListener('click', () => { if (idx > 0) { idx--; render(); } });
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Generate Parentheses — Backtracking Stack</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #1e293b;
+    --text: #e0e0e0; --muted: #94a3b8;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; padding: 36px 20px 70px; }
+  .wrap { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  h1 { font-size: 1.7rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy { background: var(--panel); border: 1px solid var(--amber); border-left: 5px solid var(--amber); border-radius: 12px; padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start; }
+  .analogy .icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy .label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px; }
+  .analogy p { font-size: 0.95rem; color: #d8d8e8; }
+  .analogy strong { color: #fff; }
+
+  .card { background: var(--panel); border: 1px solid #2d3a5a; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 22px; }
+  .section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 10px; }
+
+  .step-desc { background: var(--panel2); border-left: 4px solid var(--blue); border-radius: 8px; padding: 14px 16px; font-size: 0.96rem; min-height: 64px; display: flex; align-items: center; }
+  .step-desc.add { border-left-color: var(--amber); }
+  .step-desc.back { border-left-color: var(--red); }
+  .step-desc.found { border-left-color: var(--green); }
+  .step-desc code { background: #0f172a; padding: 1px 6px; border-radius: 5px; color: #ffd479; font-family: 'Consolas', monospace; }
+  .step-desc strong { color: #fff; }
+
+  .main { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+
+  /* path / call stack */
+  .stack-col { flex: 0 0 150px; }
+  .counts { display: flex; gap: 8px; margin-bottom: 10px; }
+  .pill { flex: 1; text-align: center; padding: 6px 4px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 0.82rem; background: var(--panel2); border: 1px solid #2d3a5a; }
+  .pill b { display: block; font-size: 1.1rem; }
+  .pill.open b { color: var(--blue); }
+  .pill.close b { color: var(--amber); }
+  .stack-base { border: 2px solid #2d3a5a; border-top: none; border-radius: 0 0 10px 10px; min-height: 190px; display: flex; flex-direction: column-reverse; padding: 8px; gap: 8px; background: rgba(255,255,255,0.02); justify-content: flex-start; }
+  .stack-base .empty { color: #5a6a90; font-size: 0.8rem; text-align: center; margin: auto; }
+  .plate { height: 40px; border-radius: 8px; display: grid; place-items: center; font-family: 'Consolas', monospace; font-weight: 700; font-size: 1.3rem; animation: push-in 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+  .plate.open { background: rgba(59,130,246,0.22); border: 1px solid var(--blue); color: #bcd4ff; }
+  .plate.close { background: rgba(245,158,11,0.18); border: 1px solid var(--amber); color: #fcd34d; }
+  @keyframes push-in { 0% { transform: translateY(-22px) scale(0.6); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+  .stack-foot { text-align: center; font-size: 0.72rem; color: var(--muted); margin-top: 8px; }
+  .path-str { text-align: center; font-family: 'Consolas', monospace; font-size: 1.3rem; color: var(--text); margin-top: 6px; min-height: 1.6rem; letter-spacing: 2px; }
+
+  /* choices */
+  .choices { flex: 1; min-width: 220px; }
+  .choice { background: var(--panel2); border: 1px solid #2d3a5a; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; font-size: 0.88rem; transition: all 0.3s; }
+  .choice .head { font-family: 'Consolas', monospace; font-weight: 700; margin-bottom: 4px; }
+  .choice.allow { border-color: var(--green); }
+  .choice.allow .head { color: #6ee7b7; }
+  .choice.block { border-color: var(--red); opacity: 0.85; }
+  .choice.block .head { color: #fca5a5; }
+  .choice .why { color: var(--muted); font-size: 0.82rem; }
+
+  /* results */
+  .results { }
+  .results .section-label { margin-bottom: 8px; }
+  .res-row { display: flex; flex-wrap: wrap; gap: 10px; min-height: 44px; }
+  .res-chip { padding: 9px 16px; border-radius: 8px; font-family: 'Consolas', monospace; font-weight: 700; font-size: 1.05rem; background: rgba(16,185,129,0.14); border: 1.5px solid var(--green); color: #86efac; animation: pop 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .res-empty { color: #5a6a90; font-size: 0.82rem; align-self: center; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 11px 24px; border-radius: 8px; border: none; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: var(--muted); border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .counter { font-size: 0.82rem; color: #5a6a90; margin-left: auto; }
+
+  .takeaway { background: var(--panel); border: 1px solid var(--blue); border-left: 5px solid var(--blue); border-radius: 12px; padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start; }
+  .takeaway .icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway .label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .takeaway p { font-size: 0.94rem; color: #d8d8e8; }
+  .takeaway strong { color: #fff; }
+
+  .code-block { background: #0f172a; border: 1px solid #2d3a5a; border-radius: 10px; padding: 18px 22px; font-family: 'Consolas', monospace; font-size: 0.8rem; line-height: 1.7; color: #94a3b8; overflow-x: auto; white-space: pre; }
+  .kw { color: #818cf8; } .fn { color: #38bdf8; } .str { color: #34d399; } .cm { color: #475569; font-style: italic; } .num { color: #fb923c; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Generate Parentheses &mdash; <span>Backtracking Stack</span></h1>
+
+  <div class="analogy">
+    <div class="icon">🌳</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>Build the string one char at a time with two rules: add <code style="color:#ffd479">(</code>
+      only while <strong>open &lt; n</strong>, add <code style="color:#ffd479">)</code> only while
+      <strong>close &lt; open</strong>. The path itself is a <strong>stack</strong> — push a char,
+      recurse, then <strong>pop (backtrack)</strong> to try the other branch.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-desc" id="stepDesc">Press <strong>Next</strong> to explore the choice tree for <code style="color:#fcd34d">n = 2</code>.</div>
+    </div>
+
+    <div class="main">
+      <div class="stack-col">
+        <div class="counts">
+          <div class="pill open">open<b id="openCt">0</b></div>
+          <div class="pill close">close<b id="closeCt">0</b></div>
+        </div>
+        <div class="section-label" style="margin-bottom:6px;">path stack</div>
+        <div class="stack-base" id="stackBase"><span class="empty">empty</span></div>
+        <div class="stack-foot">▲ top (last pushed)</div>
+        <div class="path-str" id="pathStr"></div>
+      </div>
+
+      <div class="choices">
+        <div class="section-label">Choices at this node</div>
+        <div class="choice" id="choiceOpen">
+          <div class="head">add "("</div>
+          <div class="why" id="whyOpen">—</div>
+        </div>
+        <div class="choice" id="choiceClose">
+          <div class="head">add ")"</div>
+          <div class="why" id="whyClose">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="results">
+      <div class="section-label">Results collected &nbsp;<span style="color:#5a6a90;text-transform:none;font-weight:400">(length 2n = 4 → complete)</span></div>
+      <div class="res-row" id="resRow"><span class="res-empty">none yet</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn">◀ Prev</button>
+      <button class="btn btn-primary" id="nextBtn">Next ▶</button>
+      <span class="counter" id="counter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key takeaway</div>
+      <p>The guard <strong>close &lt; open</strong> is exactly the Valid-Parentheses
+      stack invariant, applied <em>during construction</em> — so every string we build is
+      already valid. Push → recurse → <strong>pop to backtrack</strong>. For n=2 this yields
+      the <strong>2 Catalan</strong> answers: <code style="color:#ffd479">(())</code> and
+      <code style="color:#ffd479">()()</code>.</p>
+    </div>
+  </div>
+
+  <div class="code-block"><span class="kw">def</span> <span class="fn">backtrack</span>(path, open_, close):
+    <span class="kw">if</span> <span class="fn">len</span>(path) == <span class="num">2</span>*n:
+        res.<span class="fn">append</span>(<span class="str">""</span>.<span class="fn">join</span>(path)); <span class="kw">return</span>
+    <span class="kw">if</span> open_ &lt; n:                 <span class="cm"># can open</span>
+        path.<span class="fn">append</span>(<span class="str">"("</span>); <span class="fn">backtrack</span>(path, open_+<span class="num">1</span>, close); path.<span class="fn">pop</span>()
+    <span class="kw">if</span> close &lt; open_:             <span class="cm"># can close an open one</span>
+        path.<span class="fn">append</span>(<span class="str">")"</span>); <span class="fn">backtrack</span>(path, open_, close+<span class="num">1</span>); path.<span class="fn">pop</span>()</div>
+</div>
+
+<script>
+  const n = 2;
+
+  // Run the real backtracking and record a snapshot at each meaningful event so
+  // Prev/Next can replay the exact same exploration order the recursion produces.
+  const steps = [];
+  (function build() {
+    const res = [];
+    function snap(path, open_, close, kind, note) {
+      // kind: 'enter' | 'add-open' | 'add-close' | 'found' | 'backtrack' | 'dead'
+      steps.push({
+        path: path.slice(), open: open_, close, kind, note,
+        res: res.slice(),
+        canOpen: open_ < n,
+        canClose: close < open_,
+      });
+    }
+    function bt(path, open_, close) {
+      if (path.length === 2 * n) {
+        res.push(path.join(""));
+        snap(path, open_, close, "found", `Length reached <strong>2n = 4</strong> → complete valid string <code>"${path.join("")}"</code>. Record it.`);
+        return;
+      }
+      snap(path, open_, close, "enter",
+        `At node <code>"${path.join("") || "ε"}"</code> (open=${open_}, close=${close}). Evaluate the two choices.`);
+      if (open_ < n) {
+        path.push("(");
+        snap(path, open_ + 1, close, "add-open", `<strong>open &lt; n</strong> (${open_}&lt;${n}) → push <code>"("</code>. Path is now <code>"${path.join("")}"</code>.`);
+        bt(path, open_ + 1, close);
+        path.pop();
+        snap(path, open_, close, "backtrack", `Backtrack: pop the <code>"("</code>. Path back to <code>"${path.join("") || "ε"}"</code>.`);
+      }
+      if (close < open_) {
+        path.push(")");
+        snap(path, open_, close + 1, "add-close", `<strong>close &lt; open</strong> (${close}&lt;${open_}) → push <code>")"</code>. Path is now <code>"${path.join("")}"</code>.`);
+        bt(path, open_, close + 1);
+        path.pop();
+        snap(path, open_, close, "backtrack", `Backtrack: pop the <code>")"</code>. Path back to <code>"${path.join("") || "ε"}"</code>.`);
+      }
+    }
+    bt([], 0, 0);
+    steps.push({ path: [], open: 0, close: 0, kind: "done", note:
+      `Exploration complete. All branches tried. <strong style="color:#10b981">Returned ${res.length} valid strings.</strong>`,
+      res: res.slice(), canOpen: false, canClose: false });
+  })();
+
+  const $ = id => document.getElementById(id);
+  const TOTAL = steps.length;
+  let cur = -1;
+
+  function render() {
+    if (cur < 0) {
+      $("openCt").textContent = "0"; $("closeCt").textContent = "0";
+      $("stackBase").querySelectorAll(".plate").forEach(p => p.remove());
+      $("stackBase").querySelector(".empty").style.display = "";
+      $("pathStr").textContent = "";
+      $("stepDesc").className = "step-desc";
+      $("stepDesc").innerHTML = `Press <strong>Next</strong> to explore the choice tree for <code style="color:#fcd34d">n = 2</code>.`;
+      $("choiceOpen").className = "choice"; $("whyOpen").textContent = "—";
+      $("choiceClose").className = "choice"; $("whyClose").textContent = "—";
+      $("resRow").innerHTML = `<span class="res-empty">none yet</span>`;
+      updateControls(); return;
+    }
+    const st = steps[cur];
+    $("openCt").textContent = st.open;
+    $("closeCt").textContent = st.close;
+
+    const base = $("stackBase");
+    base.querySelectorAll(".plate").forEach(p => p.remove());
+    base.querySelector(".empty").style.display = st.path.length ? "none" : "";
+    st.path.forEach(ch => {
+      const p = document.createElement("div");
+      p.className = "plate " + (ch === "(" ? "open" : "close");
+      p.textContent = ch;
+      base.appendChild(p);
+    });
+    $("pathStr").textContent = st.path.join("") || "ε";
+
+    const toneMap = { "add-open": "add", "add-close": "add", "found": "found", "backtrack": "back", "dead": "back", "done": "found", "enter": "" };
+    $("stepDesc").className = "step-desc " + (toneMap[st.kind] || "");
+    $("stepDesc").innerHTML = st.note;
+
+    // choices
+    $("choiceOpen").className = "choice " + (st.canOpen ? "allow" : "block");
+    $("whyOpen").innerHTML = st.canOpen
+      ? `allowed — open (${st.open}) &lt; n (${n})`
+      : `blocked — open (${st.open}) is not &lt; n (${n})`;
+    $("choiceClose").className = "choice " + (st.canClose ? "allow" : "block");
+    $("whyClose").innerHTML = st.canClose
+      ? `allowed — close (${st.close}) &lt; open (${st.open})`
+      : `blocked — close (${st.close}) is not &lt; open (${st.open})`;
+
+    // results
+    if (st.res.length) {
+      $("resRow").innerHTML = st.res.map(r => `<span class="res-chip">${r}</span>`).join("");
+    } else {
+      $("resRow").innerHTML = `<span class="res-empty">none yet</span>`;
+    }
+    updateControls();
+  }
+  function updateControls() {
+    $("counter").textContent = `Step ${cur + 1} / ${TOTAL}`;
+    $("prevBtn").disabled = cur < 0;
+    $("nextBtn").disabled = cur >= TOTAL - 1;
+  }
+  $("nextBtn").addEventListener("click", () => { if (cur < TOTAL - 1) { cur++; render(); } });
+  $("prevBtn").addEventListener("click", () => { if (cur >= 0) { cur--; render(); } });
+  $("resetBtn").addEventListener("click", () => { cur = -1; render(); });
+
+  render();
+</script>
+</body>
+</html>

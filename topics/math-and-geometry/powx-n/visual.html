@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pow(x, n) — Fast Exponentiation Visualized</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.85rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 7px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .stage {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 24px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+
+  /* binary bits row */
+  .binwrap { margin-bottom: 22px; }
+  .binlabel { color: var(--muted); font-size: .9rem; margin-bottom: 8px; }
+  .bits { display: flex; gap: 8px; flex-wrap: wrap; }
+  .bit {
+    min-width: 56px; padding: 8px 6px;
+    border-radius: 8px;
+    text-align: center;
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--panel2);
+    border: 1px solid rgba(255,255,255,0.10);
+    transition: all .35s ease;
+  }
+  .bit .b { font-size: 1.3rem; font-weight: 700; }
+  .bit .pw { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+  .bit.cur { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(245,158,11,0.25); }
+  .bit.one .b { color: var(--green); }
+  .bit.used { opacity: .4; }
+  .bit.taken { border-color: var(--green); background: rgba(16,185,129,0.12); }
+
+  /* state table */
+  .state { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 8px 0 4px; }
+  .sbox {
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all .3s ease;
+  }
+  .sbox h4 { margin: 0 0 6px; font-size: .82rem; color: var(--muted); font-weight: 600; }
+  .sbox .big { font-family: "SF Mono", Menlo, monospace; font-size: 1.35rem; font-weight: 700; }
+  .sbox.x .big { color: var(--blue); }
+  .sbox.res .big { color: var(--green); }
+  .sbox.n .big { color: var(--amber); }
+  .sbox.flash { box-shadow: 0 0 0 3px rgba(16,185,129,0.35); }
+
+  .caption {
+    margin: 26px 0 6px;
+    background: var(--panel2);
+    border-left: 4px solid var(--blue);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 1rem;
+    min-height: 64px;
+  }
+  .caption.win { border-left-color: var(--green); background: rgba(16,185,129,0.10); }
+  .caption b.amb { color: var(--amber); }
+  .caption b.grn { color: var(--green); }
+  .caption b.blu { color: var(--blue); }
+
+  .controls { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  button.nav {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button.nav:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button.nav:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); }
+  button.ghost:hover:not(:disabled) { background: #34345e; }
+  .counter { margin-left: auto; color: var(--muted); font-family: "SF Mono", Menlo, monospace; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-top: 30px;
+    text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+  @media (max-width: 560px){ .state { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pow(x, n) — climb the <span>squaring ladder</span></h1>
+  <p class="subtitle">Compute x<sup>n</sup> in O(log n) by reading n's binary bits and squaring as we go.</p>
+
+  <div class="analogy">
+    <h3>🪜 Squaring-ladder analogy</h3>
+    <p>Har step pe <code>x</code> ko <b>square</b> karo: x → x² → x⁴ → x⁸ … exponent har baar <b>double</b>. <code>n</code> ke binary me jahan bit <b class="amb">1</b> ho, wahan current rung ko answer me multiply karo. <code>13 = 1101 = 8+4+1</code> → <code>x¹³ = x⁸·x⁴·x¹</code>.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> Compute <code>x^n</code>. Example: <code>x = 2</code>, <code>n = 13</code>
+    <span class="arrow">→</span> <code>8192</code>. Naive does 12 multiplies; binary does just 4 squarings.
+  </div>
+
+  <div class="stage">
+    <div class="binwrap">
+      <div class="binlabel"><b>n = 13</b> in binary &nbsp;=&nbsp; <code>1101</code> &nbsp;=&nbsp; 8 + 4 + 1. We read bits from the right (least significant first):</div>
+      <div class="bits" id="bits"></div>
+    </div>
+
+    <div class="state" id="state"></div>
+
+    <div class="caption" id="caption">Press <b>Next ▸</b> to walk the loop.</div>
+    <div class="controls">
+      <button class="nav ghost" id="prevBtn" onclick="prev()">◂ Prev</button>
+      <button class="nav" id="nextBtn" onclick="next()">Next ▸</button>
+      <button class="nav ghost" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="counter" id="counter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Squaring doubles the exponent each step, so n's <b>~log₂(n)</b> binary bits are enough to build any power — turning O(n) multiplications into O(log n).</p>
+  </div>
+</div>
+
+<script>
+const X = 2, N = 13;
+// binary bits of N, least-significant first
+const bitsLSB = N.toString(2).split('').reverse().map(Number); // [1,0,1,1] for 13
+
+// Build steps by simulating the iterative algorithm.
+function buildSteps() {
+  const s = [];
+  let x = X, result = 1, n = N, idx = 0;
+  s.push({
+    x, result, n, bitIdx: -1, taken: [], action: 'init',
+    cap: `Start: <code>result = 1</code>, <code>x = ${X}</code>, <code>n = ${N}</code> (binary <code>${N.toString(2)}</code>). We process one bit per loop iteration.`
+  });
+
+  while (n > 0) {
+    const bit = n & 1;
+    const before = { x, result };
+    let taken = false;
+    if (bit) { result *= x; taken = true; }
+    const tookCap = bit
+      ? `Bit ${idx} is <b class="grn">1</b> → multiply this rung into the answer: <code>result = ${before.result} × ${before.x} = ${result}</code> (that's x<sup>${1<<idx}</sup>).`
+      : `Bit ${idx} is <b class="amb">0</b> → skip. We don't add this rung (x<sup>${1<<idx}</sup>) to the answer.`;
+    s.push({
+      x, result, n, bitIdx: idx, taken,
+      action: bit ? 'take' : 'skip', phase: 'read',
+      cap: tookCap
+    });
+
+    const oldX = x;
+    x = x * x;     // square for next rung
+    n >>= 1;
+    s.push({
+      x, result, n, bitIdx: idx, taken,
+      action: 'square', phase: 'square',
+      cap: `Climb the ladder: square x → <code>${oldX}² = ${x}</code> (next rung x<sup>${1<<(idx+1)}</sup>), and shift n right (drop the used bit). ${n>0 ? 'More bits remain.' : 'No bits left — loop ends.'}`
+    });
+    idx++;
+  }
+  s.push({
+    x, result, n: 0, bitIdx: -1, action: 'done', done: true,
+    cap: `Loop done. <b class="grn">result = ${result}</b> = ${X}<sup>${N}</sup>. ✅ Took only ${idx} squarings instead of ${N-1} naive multiplies.`
+  });
+  return s;
+}
+
+const steps = buildSteps();
+let cur = 0;
+
+function takenBitsSoFar(upToStep) {
+  // which bit indices have been 'taken' by the current step
+  const set = new Set();
+  for (let i = 1; i <= upToStep; i++) {
+    const st = steps[i];
+    if (st.taken && st.bitIdx >= 0) set.add(st.bitIdx);
+  }
+  return set;
+}
+
+function processedBits(upToStep) {
+  // bits whose square step has completed (fully consumed)
+  let maxProcessed = -1;
+  for (let i = 1; i <= upToStep; i++) {
+    if (steps[i].phase === 'square') maxProcessed = Math.max(maxProcessed, steps[i].bitIdx);
+  }
+  return maxProcessed;
+}
+
+function render() {
+  const step = steps[cur];
+  const taken = takenBitsSoFar(cur);
+  const processedMax = processedBits(cur);
+
+  // bits row
+  const bitsEl = document.getElementById('bits');
+  bitsEl.innerHTML = bitsLSB.map((b, i) => {
+    let cls = '';
+    if (b === 1) cls += ' one';
+    if (taken.has(i)) cls += ' taken';
+    if (i <= processedMax) cls += ' used';
+    if (step.bitIdx === i && !step.done) cls += ' cur';
+    return `<div class="bit${cls}">
+      <div class="b">${b}</div>
+      <div class="pw">bit ${i} · x<sup>${1<<i}</sup></div>
+    </div>`;
+  }).join('');
+
+  // state boxes
+  const stEl = document.getElementById('state');
+  const flashRes = step.action === 'take' ? ' flash' : '';
+  const flashX = step.action === 'square' ? ' flash' : '';
+  stEl.innerHTML = `
+    <div class="sbox res${flashRes}"><h4>result</h4><div class="big">${step.result}</div></div>
+    <div class="sbox x${flashX}"><h4>x (current rung)</h4><div class="big">${step.x}</div></div>
+    <div class="sbox n"><h4>n (remaining)</h4><div class="big">${step.n}<span style="font-size:.8rem;color:var(--muted)"> (${step.n.toString(2)})</span></div></div>
+  `;
+
+  const cap = document.getElementById('caption');
+  cap.innerHTML = step.cap;
+  cap.className = 'caption' + (step.done ? ' win' : '');
+
+  document.getElementById('counter').textContent = `Step ${cur} / ${steps.length - 1}`;
+  document.getElementById('prevBtn').disabled = cur === 0;
+  document.getElementById('nextBtn').disabled = cur === steps.length - 1;
+}
+
+function next() { if (cur < steps.length - 1) { cur++; render(); } }
+function prev() { if (cur > 0) { cur--; render(); } }
+function reset() { cur = 0; render(); }
+
+render();
+</script>
+</body>
+</html>

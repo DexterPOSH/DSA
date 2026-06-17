@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Best Time to Buy and Sell Stock — Running Minimum Walkthrough</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+    gap: 28px;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: #3b82f6; }
+
+  .analogy {
+    background: #16213e; border: 1px solid #3b82f6; border-radius: 12px;
+    padding: 18px 26px; max-width: 720px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 2rem; line-height: 1; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.98rem; line-height: 1.5; color: #c0c0d0; }
+
+  .card {
+    background: #16213e; border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 760px; width: 100%;
+    display: flex; flex-direction: column; gap: 26px;
+  }
+  .section-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #7a8ab0; margin-bottom: 12px;
+  }
+  .step-description {
+    min-height: 56px; background: #0f172a; border-radius: 8px;
+    padding: 14px 20px; font-size: 0.95rem; line-height: 1.55;
+    color: #c8c8e0; border-left: 3px solid #3b82f6; transition: border-color 0.3s;
+  }
+  .step-description.profit { border-color: #10b981; }
+  .step-description.newmin  { border-color: #f59e0b; }
+
+  /* chart-ish array of prices */
+  .array-area { position: relative; padding-top: 26px; }
+  .array-row { display: flex; gap: 12px; align-items: flex-end; justify-content: center; }
+  .bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; }
+  .bar {
+    width: 52px; border-radius: 8px 8px 4px 4px;
+    background: #243a63; border: 1px solid #34507f;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 6px; font-weight: 700; font-size: 1rem; color: #cdd9f0;
+    transition: background 0.35s, border-color 0.35s, box-shadow 0.35s, transform 0.35s;
+  }
+  .day-label { font-size: 0.66rem; color: #5a6a90; }
+  .bar.buy {
+    background: #3a2a0a; border-color: #f59e0b; color: #fcd34d;
+    box-shadow: 0 0 16px rgba(245,158,11,0.45);
+  }
+  .bar.sell {
+    background: #1e3a6e; border-color: #3b82f6; color: #93c5fd;
+    box-shadow: 0 0 16px rgba(59,130,246,0.5); transform: translateY(-4px);
+  }
+  .bar.win {
+    background: #0d2a1a; border-color: #10b981; color: #86efac;
+    box-shadow: 0 0 16px rgba(16,185,129,0.5);
+  }
+  .ptr {
+    position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+    font-size: 0.62rem; font-weight: 700; padding: 2px 7px; border-radius: 5px;
+    white-space: nowrap; opacity: 0; transition: opacity 0.25s;
+  }
+  .ptr.show { opacity: 1; }
+  .ptr.buy-ptr  { background: #f59e0b; color: #1a1a2e; }
+  .ptr.sell-ptr { background: #3b82f6; color: #fff; }
+
+  /* state panel */
+  .state-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+  .state-box {
+    flex: 1; min-width: 150px; background: #0f172a; border: 1px solid #2d3a5a;
+    border-radius: 10px; padding: 14px 18px;
+  }
+  .state-box .lbl { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: #7a8ab0; }
+  .state-box .val { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+  .state-box.minp .val  { color: #fcd34d; }
+  .state-box.prof .val  { color: #86efac; }
+
+  .result-badge {
+    display: none; align-items: center; gap: 12px; padding: 16px 22px;
+    border-radius: 10px; font-size: 1rem; font-weight: 600;
+    background: #0d2a1a; border: 1.5px solid #10b981; color: #86efac;
+  }
+  .result-badge.show { display: flex; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 12px 26px; border-radius: 8px; border: none;
+    font-size: 0.95rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+  .takeaway {
+    background: #16213e; border: 1px solid #2d3a5a; border-radius: 12px;
+    padding: 18px 26px; max-width: 720px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway-icon { font-size: 1.6rem; flex-shrink: 0; }
+  .takeaway-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.94rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: #e0e0e0; }
+</style>
+</head>
+<body>
+
+  <h1>Best Time to Buy and Sell Stock &mdash; <span>Running Minimum</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">📒</div>
+    <div class="analogy-body">
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Ek shopkeeper har din ka rate diary me likhta hai. Wo sirf
+        <strong>ab tak ka sabse sasta din</strong> yaad rakhta hai, aur har naye din
+        sochta hai: "agar aaj bechu to us cheapest day pe khareed kar kitna profit?"
+        Future nahi dikhta — bas ek running minimum chahiye.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press "Next Step" to begin. We scan prices left to right, tracking the cheapest day so far.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Prices &nbsp;<code style="color:#5a6a90;font-size:0.75rem">[7, 1, 5, 3, 6, 4]</code></div>
+      <div class="array-area">
+        <div class="array-row" id="arrayRow"></div>
+      </div>
+    </div>
+
+    <div class="state-grid">
+      <div class="state-box minp">
+        <div class="lbl">min_price (buy so far)</div>
+        <div class="val" id="minVal">∞</div>
+      </div>
+      <div class="state-box prof">
+        <div class="lbl">max_profit</div>
+        <div class="val" id="profVal">0</div>
+      </div>
+    </div>
+
+    <div class="result-badge" id="resultBadge">
+      <span style="font-size:1.3rem">🟢</span>
+      <span id="resultText"></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next Step</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div class="takeaway-body">
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Track only the <strong>minimum price seen so far</strong>. For each day,
+        either it becomes the new cheapest buy, or you compute the profit of selling
+        today against that minimum. <strong>O(n) time, O(1) space</strong> — no need
+        to look ahead, the best buy is always already behind you.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const prices = [7, 1, 5, 3, 6, 4];
+
+    // Precompute the algorithm trace.
+    // Each step: { i, newMin (bool), minPrice, profit, profitToday (or null), desc }
+    function buildSteps() {
+      const out = [];
+      let minPrice = Infinity, maxProfit = 0, buyIdx = -1;
+      for (let i = 0; i < prices.length; i++) {
+        const p = prices[i];
+        if (p < minPrice) {
+          minPrice = p; buyIdx = i;
+          out.push({
+            i, buyIdx, newMin: true, minPrice, profit: maxProfit, profitToday: null,
+            desc: `Day ${i}: price = <strong>${p}</strong>. This is cheaper than anything before (min was ${i === 0 ? '∞' : prices.slice(0,i).reduce((a,b)=>Math.min(a,b))}). Make it the new <strong style="color:#f59e0b">buy day</strong> — min_price = ${p}.`
+          });
+        } else {
+          const pt = p - minPrice;
+          const improved = pt > maxProfit;
+          maxProfit = Math.max(maxProfit, pt);
+          out.push({
+            i, buyIdx, newMin: false, minPrice, profit: maxProfit, profitToday: pt,
+            desc: `Day ${i}: price = <strong>${p}</strong>. Sell today against buy=${minPrice} &rarr; profit = ${p} - ${minPrice} = <strong style="color:#10b981">${pt}</strong>. ${improved ? `That's a new best! max_profit = ${maxProfit}.` : `Not better than ${maxProfit}, keep max_profit = ${maxProfit}.`}`
+          });
+        }
+      }
+      out.push({ done: true, minPrice, profit: maxProfit,
+        desc: `Scan complete. The best trade is buy at <strong style="color:#f59e0b">1</strong>, sell at <strong style="color:#3b82f6">6</strong> &rarr; <strong style="color:#10b981">max_profit = ${maxProfit}</strong>.` });
+      return out;
+    }
+
+    const steps = buildSteps();
+    let currentStep = 0;
+
+    const row = document.getElementById('arrayRow');
+    const maxP = Math.max(...prices);
+    prices.forEach((p, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'bar-wrap';
+      const ptr = document.createElement('div');
+      ptr.className = 'ptr';
+      ptr.id = 'ptr-' + i;
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.id = 'bar-' + i;
+      bar.style.height = (60 + (p / maxP) * 90) + 'px';
+      bar.textContent = p;
+      const day = document.createElement('div');
+      day.className = 'day-label';
+      day.textContent = 'day ' + i;
+      wrap.appendChild(ptr); wrap.appendChild(bar); wrap.appendChild(day);
+      row.appendChild(wrap);
+    });
+
+    const stepDesc = document.getElementById('stepDesc');
+    const minVal   = document.getElementById('minVal');
+    const profVal  = document.getElementById('profVal');
+    const stepCtr  = document.getElementById('stepCounter');
+    const nextBtn  = document.getElementById('nextBtn');
+    const resultBadge = document.getElementById('resultBadge');
+    const resultText  = document.getElementById('resultText');
+
+    function clearBars() {
+      prices.forEach((_, i) => {
+        document.getElementById('bar-' + i).className = 'bar';
+        document.getElementById('ptr-' + i).className = 'ptr';
+      });
+    }
+
+    function render(step) {
+      clearBars();
+      if (step.done) {
+        // highlight final best window
+        document.getElementById('bar-1').classList.add('buy');
+        document.getElementById('bar-4').classList.add('win');
+        setPtr(1, 'buy'); setPtr(4, 'sell');
+        minVal.textContent = step.minPrice;
+        profVal.textContent = step.profit;
+        stepDesc.innerHTML = step.desc;
+        stepDesc.className = 'step-description profit';
+        resultBadge.classList.add('show');
+        resultText.textContent = `return ${step.profit} — maximum achievable profit.`;
+        return;
+      }
+      // buy marker
+      document.getElementById('bar-' + step.buyIdx).classList.add('buy');
+      setPtr(step.buyIdx, 'buy');
+      // current day
+      const curBar = document.getElementById('bar-' + step.i);
+      if (step.newMin) {
+        // current IS the buy
+        stepDesc.className = 'step-description newmin';
+      } else {
+        curBar.classList.add('sell');
+        setPtr(step.i, 'sell');
+        if (step.profitToday > 0) curBar.classList.add('win');
+        stepDesc.className = 'step-description profit';
+      }
+      minVal.textContent = step.minPrice;
+      profVal.textContent = step.profit;
+      stepDesc.innerHTML = step.desc;
+    }
+
+    function setPtr(i, kind) {
+      const ptr = document.getElementById('ptr-' + i);
+      ptr.textContent = kind === 'buy' ? '⬆ buy' : '⬆ sell';
+      ptr.className = 'ptr show ' + (kind === 'buy' ? 'buy-ptr' : 'sell-ptr');
+    }
+
+    function advance() {
+      if (currentStep >= steps.length) return;
+      render(steps[currentStep]);
+      currentStep++;
+      stepCtr.textContent = 'Step ' + currentStep + ' / ' + steps.length;
+      if (currentStep >= steps.length) nextBtn.disabled = true;
+    }
+
+    function reset() {
+      currentStep = 0;
+      clearBars();
+      minVal.textContent = '∞';
+      profVal.textContent = '0';
+      stepDesc.innerHTML = 'Press "Next Step" to begin. We scan prices left to right, tracking the cheapest day so far.';
+      stepDesc.className = 'step-description';
+      resultBadge.classList.remove('show');
+      nextBtn.disabled = false;
+      stepCtr.textContent = 'Step 0 / ' + steps.length;
+    }
+
+    stepCtr.textContent = 'Step 0 / ' + steps.length;
+  </script>
+</body>
+</html>

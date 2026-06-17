@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Set Matrix Zeroes — First Row/Col as Markers</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px 70px; gap: 28px; line-height: 1.5;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue); border-radius: 12px;
+    padding: 18px 24px; max-width: 760px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy .icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy .label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .analogy p { color: #c0c0d0; font-size: 0.98rem; }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 760px; width: 100%;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .phase-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .phase-tab {
+    font-size: 0.74rem; font-weight: 600; padding: 6px 12px; border-radius: 18px;
+    background: var(--panel2); border: 1px solid #2d3a5a; color: var(--muted);
+  }
+  .phase-tab.active { background: #1e3a6e; border-color: var(--blue); color: #bcd4ff; }
+  .phase-tab.done { border-color: var(--green); color: #86efac; }
+
+  .step-desc {
+    min-height: 54px; background: var(--panel2); border-radius: 8px;
+    padding: 14px 18px; font-size: 0.94rem; color: #c8c8e0;
+    border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-desc.mark { border-color: var(--amber); }
+  .step-desc.apply { border-color: var(--green); }
+  .step-desc code { color: #ffd479; font-family: 'Consolas', monospace; }
+
+  .grid-wrap { display: flex; justify-content: center; }
+  .grid {
+    display: grid;
+    grid-template-columns: 22px repeat(4, 58px);
+    grid-template-rows: 22px repeat(4, 58px);
+    gap: 6px;
+  }
+  .hdr { display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; color: #5a6a90; font-family: 'Consolas', monospace; }
+  .cell {
+    border-radius: 9px; border: 2px solid #2d3a5a; background: var(--panel2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem; font-weight: 700; color: var(--text);
+    transition: all 0.35s ease; position: relative;
+  }
+  .cell.marker-zone { background: #1a2540; border-color: #3a4a6a; }
+  .cell.scan {
+    border-color: var(--blue); background: #1e3a6e; color: #93c5fd;
+    box-shadow: 0 0 14px rgba(59,130,246,0.4); transform: scale(1.06);
+  }
+  .cell.found-zero {
+    border-color: var(--red); background: #2a0d0d; color: #fca5a5;
+    box-shadow: 0 0 16px rgba(239,68,68,0.5);
+  }
+  .cell.marker-set {
+    border-color: var(--amber); background: #3a2a0a; color: #fcd34d;
+  }
+  .cell.zeroed {
+    border-color: var(--green); background: #0d2a1a; color: #86efac;
+  }
+  .cell .tag {
+    position: absolute; top: 2px; right: 4px; font-size: 0.5rem;
+    color: var(--amber); font-weight: 700;
+  }
+
+  .flags {
+    display: flex; gap: 16px; font-size: 0.82rem; color: var(--muted);
+    font-family: 'Consolas', monospace; background: var(--panel2);
+    border-radius: 8px; padding: 10px 16px; flex-wrap: wrap;
+  }
+  .flags b { color: var(--blue); }
+  .flags .yes { color: var(--red); }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.82rem; color: var(--muted); margin-left: auto; }
+
+  .takeaway {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 12px;
+    padding: 18px 24px; max-width: 760px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway .icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway .label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.93rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+  <h1>Set Matrix Zeroes &mdash; <span>First Row/Col as Markers</span></h1>
+
+  <div class="analogy">
+    <div class="icon">📋</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>Galti (0) milte hi turant row/column zero mat karo &mdash; naya 0 baad me original
+      jaisa dikhega aur chain reaction phaila dega. Pehle <strong>notebook me note</strong>
+      karo kya clear karna hai, phir apply. Aur clever trick: matrix ki <strong>pehli row &amp;
+      column ko hi notebook</strong> bana lo &mdash; zero extra space.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="phase-tabs">
+      <span class="phase-tab active" id="tab-0">1 · Scan first row/col</span>
+      <span class="phase-tab" id="tab-1">2 · Mark via row0/col0</span>
+      <span class="phase-tab" id="tab-2">3 · Apply markers</span>
+      <span class="phase-tab" id="tab-3">4 · Clear first row/col</span>
+    </div>
+
+    <div class="step-desc" id="stepDesc">Press &quot;Next Step&quot;. The two highlighted zeroes will wipe out their rows and columns &mdash; using row 0 and column 0 as scratch markers.</div>
+
+    <div class="grid-wrap"><div class="grid" id="grid"></div></div>
+
+    <div class="flags">
+      <span>first_row_has_zero = <b id="f-row">?</b></span>
+      <span>first_col_has_zero = <b id="f-col">?</b></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn">Reset</button>
+      <button class="btn btn-primary" id="nextBtn">Next Step</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key Takeaway</div>
+      <p><strong>Mark first, mutate later.</strong> Reusing row 0 and column 0 as the
+      zero-out log gives <strong>O(1) extra space</strong>. The two boolean flags are needed
+      because those marker lines can't record their own zero-status. O(m·n) time.</p>
+    </div>
+  </div>
+
+  <script>
+    const ROWS = 4, COLS = 4;
+    const ORIG = [
+      [1, 2, 3, 4],
+      [5, 0, 7, 8],
+      [9, 10, 11, 12],
+      [13, 14, 15, 0],
+    ];
+
+    // Build phases as a flat step list.
+    // Phase 0: scan first row + first col for zeros -> set flags
+    // Phase 1: scan inner (i>=1,j>=1); if 0, set matrix[i][0]=0 & matrix[0][j]=0 markers
+    // Phase 2: apply: for inner cells, if marker row0/col0 is 0 -> zero
+    // Phase 3: clear first row/col per flags
+    function buildSteps() {
+      const steps = [];
+      // phase 0 scan
+      for (let j = 0; j < COLS; j++) steps.push({ phase: 0, r: 0, c: j });
+      for (let i = 1; i < ROWS; i++) steps.push({ phase: 0, r: i, c: 0 });
+      // phase 1 inner scan + mark
+      for (let i = 1; i < ROWS; i++)
+        for (let j = 1; j < COLS; j++)
+          steps.push({ phase: 1, r: i, c: j });
+      // phase 2 apply inner
+      for (let i = 1; i < ROWS; i++)
+        for (let j = 1; j < COLS; j++)
+          steps.push({ phase: 2, r: i, c: j });
+      // phase 3 clear first row / col
+      steps.push({ phase: 3, which: 'row' });
+      steps.push({ phase: 3, which: 'col' });
+      return steps;
+    }
+    const steps = buildSteps();
+    const TOTAL = steps.length;
+
+    const gridEl   = document.getElementById('grid');
+    const stepDesc = document.getElementById('stepDesc');
+    const counter  = document.getElementById('stepCounter');
+    const nextBtn  = document.getElementById('nextBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const fRow = document.getElementById('f-row');
+    const fCol = document.getElementById('f-col');
+    const tabs = [0,1,2,3].map(i => document.getElementById('tab-' + i));
+
+    let mat, stepIdx, firstRowZero, firstColZero;
+
+    function buildGrid() {
+      gridEl.innerHTML = '';
+      // corner
+      const corner = document.createElement('div'); corner.className = 'hdr';
+      gridEl.appendChild(corner);
+      for (let j = 0; j < COLS; j++) {
+        const h = document.createElement('div'); h.className = 'hdr'; h.textContent = 'c'+j;
+        gridEl.appendChild(h);
+      }
+      for (let i = 0; i < ROWS; i++) {
+        const h = document.createElement('div'); h.className = 'hdr'; h.textContent = 'r'+i;
+        gridEl.appendChild(h);
+        for (let j = 0; j < COLS; j++) {
+          const c = document.createElement('div');
+          c.className = 'cell';
+          if (i === 0 || j === 0) c.classList.add('marker-zone');
+          c.id = `c-${i}-${j}`;
+          c.textContent = mat[i][j];
+          gridEl.appendChild(c);
+        }
+      }
+    }
+    function paintCell(i, j) {
+      const c = document.getElementById(`c-${i}-${j}`);
+      c.textContent = mat[i][j];
+    }
+    function clearScan() {
+      document.querySelectorAll('.cell.scan').forEach(c => {
+        c.classList.remove('scan');
+      });
+    }
+
+    function setTab(p) {
+      tabs.forEach((t, idx) => {
+        t.className = 'phase-tab' + (idx < p ? ' done' : idx === p ? ' active' : '');
+      });
+    }
+
+    function reset() {
+      mat = ORIG.map(r => r.slice());
+      stepIdx = 0;
+      firstRowZero = false; firstColZero = false;
+      buildGrid();
+      fRow.textContent = '?'; fRow.className = '';
+      fCol.textContent = '?'; fCol.className = '';
+      stepDesc.className = 'step-desc';
+      stepDesc.innerHTML = 'Press &quot;Next Step&quot;. The two highlighted zeroes will wipe out their rows and columns &mdash; using row 0 and column 0 as scratch markers.';
+      nextBtn.disabled = false;
+      setTab(0);
+      counter.textContent = `Step 0 / ${TOTAL}`;
+    }
+
+    function advance() {
+      if (stepIdx >= TOTAL) return;
+      const s = steps[stepIdx];
+      clearScan();
+      setTab(s.phase);
+
+      if (s.phase === 0) {
+        const c = document.getElementById(`c-${s.r}-${s.c}`);
+        c.classList.add('scan');
+        const isZero = mat[s.r][s.c] === 0;
+        if (isZero) {
+          c.classList.add('found-zero');
+          if (s.r === 0) { firstRowZero = true; fRow.textContent = 'True'; fRow.className = 'yes'; }
+          if (s.c === 0) { firstColZero = true; fCol.textContent = 'True'; fCol.className = 'yes'; }
+        }
+        stepDesc.className = 'step-desc mark';
+        stepDesc.innerHTML =
+          `<strong>Phase 1:</strong> scan the marker lines themselves. ` +
+          `<code>matrix[${s.r}][${s.c}] = ${mat[s.r][s.c]}</code>` +
+          (isZero ? ` &mdash; <span style="color:#ef4444">zero!</span> Record it in a flag.` : ` &mdash; not zero.`);
+        // finalize flags display on last phase-0 step
+        if (fRow.textContent === '?') { /* still scanning */ }
+
+      } else if (s.phase === 1) {
+        const c = document.getElementById(`c-${s.r}-${s.c}`);
+        c.classList.add('scan');
+        stepDesc.className = 'step-desc mark';
+        if (mat[s.r][s.c] === 0) {
+          mat[s.r][0] = 0; mat[0][s.c] = 0;
+          paintCell(s.r, 0); paintCell(0, s.c);
+          c.classList.add('found-zero');
+          const mr = document.getElementById(`c-${s.r}-0`); mr.classList.add('marker-set');
+          mr.innerHTML = `0<span class="tag">mark</span>`;
+          const mc = document.getElementById(`c-0-${s.c}`); mc.classList.add('marker-set');
+          mc.innerHTML = `0<span class="tag">mark</span>`;
+          stepDesc.innerHTML =
+            `<strong>Phase 2:</strong> found <code>matrix[${s.r}][${s.c}] = 0</code> &mdash; ` +
+            `stamp markers <code>matrix[${s.r}][0] = 0</code> and <code>matrix[0][${s.c}] = 0</code>.`;
+        } else {
+          stepDesc.innerHTML =
+            `<strong>Phase 2:</strong> <code>matrix[${s.r}][${s.c}] = ${mat[s.r][s.c]}</code> &ne; 0, no marker.`;
+        }
+
+      } else if (s.phase === 2) {
+        const c = document.getElementById(`c-${s.r}-${s.c}`);
+        c.classList.add('scan');
+        stepDesc.className = 'step-desc apply';
+        const rowMark = mat[s.r][0] === 0;
+        const colMark = mat[0][s.c] === 0;
+        if (rowMark || colMark) {
+          mat[s.r][s.c] = 0; paintCell(s.r, s.c);
+          c.classList.remove('scan'); c.classList.add('zeroed');
+          stepDesc.innerHTML =
+            `<strong>Phase 3:</strong> marker <code>matrix[${s.r}][0]=${mat[s.r][0]}</code> / ` +
+            `<code>matrix[0][${s.c}]=${mat[0][s.c]}</code> says clear &mdash; set ` +
+            `<code>matrix[${s.r}][${s.c}] = 0</code>.`;
+        } else {
+          stepDesc.innerHTML =
+            `<strong>Phase 3:</strong> neither marker set for <code>(${s.r},${s.c})</code> &mdash; keep <code>${mat[s.r][s.c]}</code>.`;
+        }
+
+      } else if (s.phase === 3) {
+        stepDesc.className = 'step-desc apply';
+        if (s.which === 'row') {
+          if (firstRowZero) {
+            for (let j = 0; j < COLS; j++) { mat[0][j] = 0; paintCell(0, j);
+              const el = document.getElementById(`c-0-${j}`); el.className = 'cell marker-zone zeroed'; el.textContent = '0'; }
+            stepDesc.innerHTML = `<strong>Phase 4:</strong> <code>first_row_has_zero = True</code> &mdash; zero the entire first row.`;
+          } else {
+            stepDesc.innerHTML = `<strong>Phase 4:</strong> <code>first_row_has_zero = False</code> &mdash; leave first row as is.`;
+          }
+        } else {
+          if (firstColZero) {
+            for (let i = 0; i < ROWS; i++) { mat[i][0] = 0; paintCell(i, 0);
+              const el = document.getElementById(`c-${i}-0`); el.className = 'cell marker-zone zeroed'; el.textContent = '0'; }
+            stepDesc.innerHTML = `<strong>Phase 4:</strong> <code>first_col_has_zero = True</code> &mdash; zero the entire first column.`;
+          } else {
+            stepDesc.innerHTML = `<strong>Phase 4:</strong> <code>first_col_has_zero = False</code> &mdash; leave first column as is.`;
+          }
+        }
+      }
+
+      stepIdx++;
+      counter.textContent = `Step ${stepIdx} / ${TOTAL}`;
+
+      if (stepIdx >= TOTAL) {
+        nextBtn.disabled = true;
+        setTab(4);
+        clearScan();
+        stepDesc.className = 'step-desc apply';
+        stepDesc.innerHTML = '✅ Done &mdash; every cell sharing a row or column with an original 0 is now 0, all in O(1) extra space.';
+      }
+    }
+
+    nextBtn.addEventListener('click', advance);
+    resetBtn.addEventListener('click', reset);
+    reset();
+  </script>
+</body>
+</html>

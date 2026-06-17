@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Binary Tree Level Order Traversal — BFS Queue Walkthrough</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a; --text: #e0e0e0;
+    --muted: #7a8ab0; --blue: #3b82f6; --amber: #f59e0b; --green: #10b981;
+    --red: #ef4444; --edge: #2d3a5a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 36px 18px 64px; gap: 26px;
+  }
+  h1 { font-size: 1.7rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue); border-radius: 12px;
+    padding: 16px 22px; max-width: 820px; width: 100%;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.96rem; line-height: 1.55; color: #c0c0d0; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--edge);
+    border-radius: 16px; padding: 26px; max-width: 880px; width: 100%;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .section-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+  .step-description {
+    min-height: 56px; background: var(--panel2); border-radius: 8px;
+    padding: 14px 18px; font-size: 0.95rem; line-height: 1.55;
+    color: #c8c8e0; border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-description.level { border-color: var(--green); }
+
+  .tree-box {
+    background: var(--panel2); border: 1px solid var(--edge);
+    border-radius: 12px; padding: 8px;
+  }
+  .node circle {
+    fill: var(--panel2); stroke: var(--edge); stroke-width: 2.5;
+    transition: fill 0.35s, stroke 0.35s;
+  }
+  .node text {
+    fill: var(--text); font-size: 16px; font-weight: 700;
+    text-anchor: middle; dominant-baseline: central;
+  }
+  .edge { stroke: var(--edge); stroke-width: 2.5; transition: stroke 0.35s; }
+  .node.inqueue circle { fill: #3a2e0d; stroke: var(--amber); }
+  .node.current circle { fill: #1e3a6e; stroke: var(--blue); }
+  .node.current circle { filter: drop-shadow(0 0 8px rgba(59,130,246,0.6)); }
+  .node.done circle    { fill: #0d2a1a; stroke: var(--green); }
+  .node.done text      { fill: #86efac; }
+  .levelband { fill: var(--green); opacity: 0; transition: opacity 0.3s; }
+  .levelband.show { opacity: 0.07; }
+
+  .panels { display: flex; gap: 20px; flex-wrap: wrap; }
+  .panel-box {
+    flex: 1 1 240px; background: var(--panel2);
+    border: 1px solid var(--edge); border-radius: 10px; padding: 14px 16px;
+  }
+  .queue-row, .res-levels { display: flex; gap: 8px; flex-wrap: wrap; min-height: 44px; align-items: center; }
+  .chip {
+    height: 38px; min-width: 38px; padding: 0 12px; border-radius: 8px;
+    background: #3a2e0d; border: 1.5px solid var(--amber); color: #fcd34d;
+    font-size: 1rem; font-weight: 700; display: flex; align-items: center;
+    justify-content: center; animation: pop 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .chip.current { background: #1e3a6e; border-color: var(--blue); color: #93c5fd; }
+  @keyframes pop { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .empty-hint { font-size: 0.85rem; color: #3a4a6a; font-style: italic; }
+  .level-line {
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    padding: 6px 0; width: 100%;
+  }
+  .level-line .lbl { font-size: 0.72rem; color: var(--muted); min-width: 56px; }
+  .level-line .gchip {
+    height: 32px; min-width: 32px; padding: 0 10px; border-radius: 7px;
+    background: #0d2a1a; border: 1.5px solid var(--green); color: #86efac;
+    font-size: 0.92rem; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid var(--edge); }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+
+  .takeaway {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 12px;
+    padding: 18px 24px; max-width: 820px; width: 100%;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.94rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+  code { color: #93c5fd; }
+</style>
+</head>
+<body>
+
+  <h1>Binary Tree Level Order Traversal &mdash; <span>BFS with a Queue</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🏢</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Building me <strong>floor-by-floor</strong> announcement: ground floor (root) ke logon ko
+        bulao, unke bachchon ko ek <strong>queue</strong> me lagao, phir agli floor.
+        Ek poori floor khatam, tabhi agli — yahi <strong>BFS</strong> hai.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press "Next". We enqueue the root, then process the queue one full level at a time.</div>
+    </div>
+
+    <div class="tree-box">
+      <svg id="treeSvg" viewBox="0 0 480 300" width="100%" height="260">
+        <rect id="band" class="levelband" x="0" y="0" width="480" height="60" rx="8"></rect>
+      </svg>
+    </div>
+
+    <div class="panels">
+      <div class="panel-box">
+        <div class="section-label">queue <code id="qlabel">(FIFO)</code></div>
+        <div class="queue-row" id="queueRow"><span class="empty-hint" id="qEmpty">empty</span></div>
+      </div>
+      <div class="panel-box">
+        <div class="section-label">result</div>
+        <div class="res-levels" id="resLevels"><span class="empty-hint" id="rEmpty">[ ]</span></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Snapshot <code>len(queue)</code> at the start of each level, then pop exactly that many.
+        New children enqueued during the loop belong to the <strong>next</strong> level.
+        <strong>O(n) time, O(n) space.</strong>
+      </p>
+    </div>
+  </div>
+
+<script>
+  // Tree:        3
+  //             / \
+  //            9   20
+  //               /  \
+  //              15   7
+  const nodes = {
+    n3:  { val: 3,  x: 240, y: 40,  level: 0 },
+    n9:  { val: 9,  x: 140, y: 130, level: 1, parent: 'n3' },
+    n20: { val: 20, x: 340, y: 130, level: 1, parent: 'n3' },
+    n15: { val: 15, x: 280, y: 230, level: 2, parent: 'n20' },
+    n7:  { val: 7,  x: 400, y: 230, level: 2, parent: 'n20' },
+  };
+  const order = ['n3','n9','n20','n15','n7'];
+
+  const svg = document.getElementById('treeSvg');
+  const ns = 'http://www.w3.org/2000/svg';
+  (function build() {
+    for (const id of order) {
+      const n = nodes[id];
+      if (n.parent) {
+        const p = nodes[n.parent];
+        const l = document.createElementNS(ns, 'line');
+        l.setAttribute('x1', p.x); l.setAttribute('y1', p.y);
+        l.setAttribute('x2', n.x); l.setAttribute('y2', n.y);
+        l.setAttribute('class', 'edge'); l.id = 'e-' + id;
+        svg.appendChild(l);
+      }
+    }
+    for (const id of order) {
+      const n = nodes[id];
+      const g = document.createElementNS(ns, 'g'); g.setAttribute('class', 'node'); g.id = id;
+      const c = document.createElementNS(ns, 'circle');
+      c.setAttribute('cx', n.x); c.setAttribute('cy', n.y); c.setAttribute('r', 24);
+      const t = document.createElementNS(ns, 'text');
+      t.setAttribute('x', n.x); t.setAttribute('y', n.y); t.textContent = n.val;
+      g.appendChild(c); g.appendChild(t); svg.appendChild(g);
+    }
+  })();
+
+  // ── Steps: full BFS trace ───────────────────────────────────────────────────
+  // state per step: desc, nodeClass{id:cls}, queue[ids], qCurrent (id or null),
+  //                 result[[...]], band(level or null), descClass
+  const steps = [
+    { desc: 'Enqueue the <strong>root (3)</strong>. Queue = [3]. Result is still empty.',
+      nodeClass: { n3: 'inqueue' }, queue: ['n3'], result: [] },
+    { desc: '<strong>Level 0</strong> begins. Snapshot len(queue)=1. Pop <strong>3</strong>, record it, and enqueue its children <strong>9, 20</strong>.',
+      nodeClass: { n3: 'current', n9: 'inqueue', n20: 'inqueue' }, qCurrent: 'n3',
+      queue: ['n9','n20'], result: [[3]], band: 0, descClass: 'level' },
+    { desc: 'Level 0 done → result = [[3]]. <strong>Level 1</strong> begins. Snapshot len(queue)=2. Pop <strong>9</strong> (no children).',
+      nodeClass: { n3: 'done', n9: 'current', n20: 'inqueue' }, qCurrent: 'n9',
+      queue: ['n20'], result: [[3],[9]], band: 1, descClass: 'level' },
+    { desc: 'Still level 1: pop <strong>20</strong>, enqueue its children <strong>15, 7</strong>. Level 1 collected → [9, 20].',
+      nodeClass: { n3: 'done', n9: 'done', n20: 'current', n15: 'inqueue', n7: 'inqueue' }, qCurrent: 'n20',
+      queue: ['n15','n7'], result: [[3],[9,20]], band: 1, descClass: 'level' },
+    { desc: '<strong>Level 2</strong> begins. Snapshot len(queue)=2. Pop <strong>15</strong> (leaf).',
+      nodeClass: { n3: 'done', n9: 'done', n20: 'done', n15: 'current', n7: 'inqueue' }, qCurrent: 'n15',
+      queue: ['n7'], result: [[3],[9,20],[15]], band: 2, descClass: 'level' },
+    { desc: 'Pop <strong>7</strong> (leaf). Level 2 collected → [15, 7]. Queue is now empty.',
+      nodeClass: { n3: 'done', n9: 'done', n20: 'done', n15: 'done', n7: 'current' }, qCurrent: 'n7',
+      queue: [], result: [[3],[9,20],[15,7]], band: 2, descClass: 'level' },
+    { desc: 'Queue empty → BFS complete. Final answer: <strong>[[3], [9, 20], [15, 7]]</strong> — one list per level, top to bottom.',
+      nodeClass: { n3: 'done', n9: 'done', n20: 'done', n15: 'done', n7: 'done' },
+      queue: [], result: [[3],[9,20],[15,7]], descClass: 'level', done: true },
+  ];
+
+  let cur = 0;
+  const stepDesc = document.getElementById('stepDesc');
+  const stepCtr = document.getElementById('stepCounter');
+  const queueRow = document.getElementById('queueRow');
+  const qEmpty = document.getElementById('qEmpty');
+  const resLevels = document.getElementById('resLevels');
+  const rEmpty = document.getElementById('rEmpty');
+  const band = document.getElementById('band');
+  const nextBtn = document.getElementById('nextBtn');
+  const prevBtn = document.getElementById('prevBtn');
+
+  function clearNodes() {
+    document.querySelectorAll('#treeSvg .node').forEach(g => g.setAttribute('class', 'node'));
+  }
+  function renderQueue(ids, currentId) {
+    queueRow.innerHTML = '';
+    if (!ids.length && !currentId) { queueRow.appendChild(qEmpty); qEmpty.style.display=''; return; }
+    if (currentId) {
+      const c = document.createElement('div'); c.className = 'chip current';
+      c.textContent = nodes[currentId].val + ' ↩'; queueRow.appendChild(c);
+    }
+    ids.forEach(id => {
+      const c = document.createElement('div'); c.className = 'chip';
+      c.textContent = nodes[id].val; queueRow.appendChild(c);
+    });
+  }
+  function renderResult(levels) {
+    resLevels.innerHTML = '';
+    if (!levels.length) { resLevels.appendChild(rEmpty); rEmpty.style.display=''; return; }
+    levels.forEach((lvl, i) => {
+      const row = document.createElement('div'); row.className = 'level-line';
+      const lbl = document.createElement('span'); lbl.className = 'lbl';
+      lbl.textContent = 'level ' + i; row.appendChild(lbl);
+      lvl.forEach(v => {
+        const ch = document.createElement('div'); ch.className = 'gchip'; ch.textContent = v;
+        row.appendChild(ch);
+      });
+      resLevels.appendChild(row);
+    });
+  }
+
+  function render() {
+    clearNodes();
+    band.setAttribute('class', 'levelband');
+    if (cur === 0) {
+      stepDesc.innerHTML = 'Press "Next". We enqueue the root, then process the queue one full level at a time.';
+      stepDesc.className = 'step-description';
+      renderQueue([], null); renderResult([]);
+      stepCtr.textContent = 'Step 0 / ' + steps.length;
+      prevBtn.disabled = true; nextBtn.disabled = false; return;
+    }
+    const s = steps[cur - 1];
+    stepDesc.innerHTML = s.desc;
+    stepDesc.className = 'step-description ' + (s.descClass || '');
+    for (const id in (s.nodeClass || {})) {
+      const g = document.getElementById(id); if (g) g.setAttribute('class', 'node ' + s.nodeClass[id]);
+    }
+    if (s.band !== undefined && s.band !== null) {
+      const y = [40, 130, 230][s.band] - 30;
+      band.setAttribute('y', y); band.setAttribute('class', 'levelband show');
+    }
+    renderQueue(s.queue || [], s.qCurrent || null);
+    renderResult(s.result || []);
+    stepCtr.textContent = 'Step ' + cur + ' / ' + steps.length;
+    prevBtn.disabled = false; nextBtn.disabled = (cur >= steps.length);
+  }
+
+  function next() { if (cur < steps.length) { cur++; render(); } }
+  function prev() { if (cur > 0) { cur--; render(); } }
+  function reset() { cur = 0; render(); }
+  reset();
+</script>
+</body>
+</html>

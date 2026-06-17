@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pacific Atlantic Water Flow — reverse multi-source flood</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#202a4d; --text:#e0e0e0; --muted:#9aa4c8;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444;
+    --pac:#3b82f6; --atl:#10b981;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;
+    line-height:1.6;padding:36px 18px 70px;}
+  .wrap{max-width:920px;margin:0 auto;}
+  h1{font-size:1.65rem;font-weight:700;margin-bottom:6px;letter-spacing:-.02em;}
+  h1 span{color:var(--blue);}
+  .subtitle{color:var(--muted);margin-bottom:26px;}
+  .analogy{background:var(--panel);border:1px solid var(--blue);border-left:5px solid var(--blue);
+    border-radius:12px;padding:16px 22px;margin-bottom:28px;}
+  .analogy h3{color:var(--blue);font-size:1rem;margin-bottom:4px;}
+  .analogy p{margin:0;}
+  .board-wrap{display:flex;gap:26px;flex-wrap:wrap;justify-content:center;align-items:flex-start;}
+  .gridbox{position:relative;padding:22px;}
+  .ocean-label{position:absolute;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
+  .pac-top{top:2px;left:50%;transform:translateX(-50%);color:var(--pac);}
+  .pac-left{left:-6px;top:50%;transform:translateY(-50%) rotate(-90deg);color:var(--pac);}
+  .atl-bot{bottom:2px;left:50%;transform:translateX(-50%);color:var(--atl);}
+  .atl-right{right:-10px;top:50%;transform:translateY(-50%) rotate(90deg);color:var(--atl);}
+  .grid{display:grid;grid-template-columns:repeat(5,52px);grid-gap:6px;background:var(--panel);
+    padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.06);}
+  .cell{width:52px;height:52px;border-radius:8px;display:grid;place-items:center;font-weight:800;
+    font-family:"SF Mono",Menlo,Consolas,monospace;font-size:1.15rem;transition:all .35s ease;
+    position:relative;background:var(--panel2);color:#cfe0ff;border:1px solid rgba(255,255,255,.08);}
+  .cell.cur{box-shadow:0 0 0 3px rgba(245,158,11,.55);transform:scale(1.06);z-index:2;}
+  .cell.frontier{outline:2px dashed var(--amber);outline-offset:-3px;}
+  .cell.pac{background:rgba(59,130,246,.32);border-color:var(--pac);}
+  .cell.atl{background:rgba(16,185,129,.3);border-color:var(--atl);}
+  .cell.both{background:linear-gradient(135deg,rgba(59,130,246,.45),rgba(16,185,129,.45));
+    border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.5);color:#fff;}
+  .cell .corner{position:absolute;width:0;height:0;}
+  .cell .tl{top:0;left:0;border-top:12px solid var(--pac);border-right:12px solid transparent;border-radius:8px 0 0 0;}
+  .cell .br{bottom:0;right:0;border-bottom:12px solid var(--atl);border-left:12px solid transparent;border-radius:0 0 8px 0;}
+  .panel{background:var(--panel);border-radius:12px;padding:16px 20px;min-width:240px;
+    border:1px solid rgba(255,255,255,.06);}
+  .phase{display:inline-block;font-size:.78rem;font-weight:700;padding:4px 12px;border-radius:20px;
+    background:var(--panel2);color:var(--muted);margin-bottom:12px;letter-spacing:.03em;}
+  .phase.pacP{background:rgba(59,130,246,.18);color:#bcd4ff;border:1px solid var(--pac);}
+  .phase.atlP{background:rgba(16,185,129,.18);color:#7fe6c0;border:1px solid var(--atl);}
+  .phase.bothP{background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(16,185,129,.2));color:#fff;border:1px solid #fff;}
+  .panel h4{font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+  .legend{display:flex;flex-direction:column;gap:7px;margin-top:6px;font-size:.84rem;}
+  .legend div{display:flex;align-items:center;gap:8px;}
+  .sw{width:18px;height:18px;border-radius:5px;flex:0 0 auto;}
+  .stack{margin-top:12px;font-family:"SF Mono",Menlo,monospace;font-size:.8rem;color:var(--muted);
+    background:var(--panel2);border-radius:8px;padding:8px 10px;min-height:40px;word-break:break-all;}
+  .caption{background:var(--panel);border-left:4px solid var(--amber);border-radius:10px;
+    padding:14px 18px;margin:24px 0 16px;min-height:62px;font-size:1.0rem;}
+  .caption b{color:var(--amber);}
+  .caption code{background:var(--panel2);padding:1px 6px;border-radius:5px;color:#ffd479;
+    font-family:"SF Mono",Menlo,monospace;}
+  .controls{text-align:center;margin-bottom:8px;}
+  button{background:var(--blue);color:#fff;border:none;padding:10px 24px;border-radius:9px;
+    font-size:.98rem;font-weight:600;cursor:pointer;transition:transform .12s,background .2s;}
+  button:hover:not(:disabled){background:#2f6fd6;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  button.ghost{background:var(--panel2);color:var(--text);margin:0 6px;}
+  button.ghost:hover:not(:disabled){background:#2c3766;}
+  .progress{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:22px;}
+  .takeaway{background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(16,185,129,.13));
+    border:1px solid rgba(59,130,246,.4);border-radius:12px;padding:18px 22px;margin-top:30px;text-align:center;}
+  .takeaway h3{color:var(--blue);margin-bottom:5px;}
+  .takeaway p{margin:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pacific Atlantic Water Flow — <span>reverse multi-source flood</span></h1>
+  <p class="subtitle">Flow uphill from each ocean's border; cells reached by both oceans are the answer.</p>
+
+  <div class="analogy">
+    <h3>🌊 Flip the flow</h3>
+    <p>Har cell se dono ocean tak trace karna mehnga hai. Ulta socho — <b>ocean ke kinaare se uphill</b> (neighbor height ≥ current) flood karo. Pacific-reachable aur Atlantic-reachable sets ka <b>intersection</b> = answer.</p>
+  </div>
+
+  <div class="board-wrap">
+    <div class="gridbox">
+      <span class="ocean-label pac-top">Pacific</span>
+      <span class="ocean-label pac-left">Pacific</span>
+      <span class="ocean-label atl-bot">Atlantic</span>
+      <span class="ocean-label atl-right">Atlantic</span>
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="panel">
+      <span class="phase" id="phaseTag">Phase —</span>
+      <h4>Reverse flood</h4>
+      <div class="stack" id="stack">DFS stack: —</div>
+      <div class="legend">
+        <div><span class="sw" style="background:rgba(59,130,246,.6)"></span> reaches Pacific</div>
+        <div><span class="sw" style="background:rgba(16,185,129,.6)"></span> reaches Atlantic</div>
+        <div><span class="sw" style="background:linear-gradient(135deg,#3b82f6,#10b981)"></span> reaches <b>both</b> → answer</div>
+        <div><span class="sw" style="outline:2px dashed var(--amber);background:transparent"></span> on DFS stack</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="caption" id="caption">Press <b>Next</b> to flood uphill from the Pacific border.</div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn" disabled>◀ Prev</button>
+    <button id="nextBtn">Next ▶</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+  </div>
+  <div class="progress" id="progress"></div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>When asked "which cells reach multiple sinks", <b>reverse the direction</b>: flood from each sink's border, then intersect the reachable sets — O(m·n).</p>
+  </div>
+</div>
+
+<script>
+const H = [
+  [1,2,2,3,5],
+  [3,2,3,4,4],
+  [2,4,5,3,1],
+  [6,7,1,4,5],
+  [5,1,1,2,4],
+];
+const ROWS=5, COLS=5;
+const gridEl=document.getElementById('grid');
+const cap=document.getElementById('caption');
+const stackEl=document.getElementById('stack');
+const phaseTag=document.getElementById('phaseTag');
+const prevBtn=document.getElementById('prevBtn');
+const nextBtn=document.getElementById('nextBtn');
+const resetBtn=document.getElementById('resetBtn');
+const progress=document.getElementById('progress');
+
+function buildSteps(){
+  const steps=[];
+  const pac=new Set(), atl=new Set();
+  const key=(r,c)=>r+","+c;
+  function snap(phase,curCell,stack,caption){
+    steps.push({
+      phase, pac:new Set(pac), atl:new Set(atl),
+      curCell:curCell?key(...curCell):null,
+      stack:[...stack].map(([r,c])=>`(${r},${c})`),
+      caption
+    });
+  }
+  // generic uphill flood from one ocean's border, recording snapshots
+  function flood(reach, sources, oceanName, phase){
+    for(const [sr,sc] of sources){
+      if(reach.has(key(sr,sc))) continue;
+      const stack=[[sr,sc]]; const onStack=new Set([key(sr,sc)]);
+      while(stack.length){
+        const [cr,cc]=stack.pop(); onStack.delete(key(cr,cc));
+        if(reach.has(key(cr,cc))) continue;
+        reach.add(key(cr,cc));
+        const nbrs=[[cr+1,cc],[cr-1,cc],[cr,cc+1],[cr,cc-1]];
+        for(const [nr,nc] of nbrs){
+          if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&!reach.has(key(nr,nc))&&!onStack.has(key(nr,nc))
+              && H[nr][nc] >= H[cr][cc]){          // uphill / equal => water could flow DOWN to here
+            stack.push([nr,nc]); onStack.add(key(nr,nc));
+          }
+        }
+        snap(phase,[cr,cc],stack.map(s=>s),
+          `${oceanName}: water at <b>(${cr},${cc})</b> h=${H[cr][cc]} can drain to ${oceanName}. Climb to neighbours with height ≥ ${H[cr][cc]}.`);
+      }
+    }
+  }
+
+  snap(0,null,[],"Heights shown in each cell. Phase 1: flood <b>uphill</b> from the <span style='color:var(--pac)'>Pacific</span> border (top row + left col).");
+
+  // Pacific sources: top row + left col
+  const pacSrc=[];
+  for(let c=0;c<COLS;c++) pacSrc.push([0,c]);
+  for(let r=0;r<ROWS;r++) pacSrc.push([r,0]);
+  flood(pac,pacSrc,'Pacific',1);
+  snap(1,null,[],"Pacific flood done — all blue cells can drain to the Pacific. Now flood from the <span style='color:var(--atl)'>Atlantic</span> border (bottom row + right col).");
+
+  // Atlantic sources: bottom row + right col
+  const atlSrc=[];
+  for(let c=0;c<COLS;c++) atlSrc.push([ROWS-1,c]);
+  for(let r=0;r<ROWS;r++) atlSrc.push([r,COLS-1]);
+  flood(atl,atlSrc,'Atlantic',2);
+
+  const both=[...pac].filter(k=>atl.has(k));
+  snap(3,null,[],`Both floods done. Cells in <b>both</b> sets reach both oceans: <b>${both.map(k=>'('+k+')').join(', ')}</b>. ✅`);
+  return steps;
+}
+
+const steps=buildSteps();
+let idx=0;
+
+function buildGrid(){
+  gridEl.innerHTML='';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const d=document.createElement('div');
+    d.className='cell'; d.id='c'+r+'_'+c;
+    d.innerHTML=`<span class="corner tl"></span><span class="corner br"></span>${H[r][c]}`;
+    gridEl.appendChild(d);
+  }
+}
+
+function render(){
+  const s=steps[idx];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const el=document.getElementById('c'+r+'_'+c);
+    const k=r+','+c;
+    el.className='cell';
+    const inP=s.pac.has(k), inA=s.atl.has(k);
+    if(inP&&inA) el.classList.add('both');
+    else if(inP) el.classList.add('pac');
+    else if(inA) el.classList.add('atl');
+    if(s.stack.includes(`(${r},${c})`)) el.classList.add('frontier');
+    if(s.curCell===k) el.classList.add('cur');
+  }
+  stackEl.innerHTML='DFS stack: '+(s.stack.length?s.stack.join(' '):'—');
+  const p = s.phase;
+  phaseTag.textContent = p===0?'Phase —':p===1?'Phase 1 · Pacific':p===2?'Phase 2 · Atlantic':'Result · intersection';
+  phaseTag.className='phase '+(p===1?'pacP':p===2?'atlP':p===3?'bothP':'');
+  cap.innerHTML=s.caption;
+  progress.textContent=`Step ${idx+1} / ${steps.length}`;
+  prevBtn.disabled=idx===0;
+  nextBtn.disabled=idx===steps.length-1;
+}
+
+function reset(){idx=0;render();}
+prevBtn.onclick=()=>{if(idx>0){idx--;render();}};
+nextBtn.onclick=()=>{if(idx<steps.length-1){idx++;render();}};
+resetBtn.onclick=reset;
+
+buildGrid();
+render();
+</script>
+</body>
+</html>

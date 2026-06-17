@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jump Game — Farthest Reach Visualized</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.85rem; margin: 0 0 6px; font-weight: 700; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.08));
+    border: 1px solid rgba(245,158,11,0.35);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1rem; }
+  .analogy p { margin: 0; }
+
+  .card {
+    background: var(--panel); border-radius: 14px;
+    padding: 22px 24px 26px; margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; }
+  .step-desc {
+    background: var(--panel2); border-left: 4px solid var(--blue);
+    border-radius: 8px; padding: 14px 16px; min-height: 58px;
+    font-size: 1.02rem; margin-bottom: 26px;
+  }
+  .step-desc code { background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 5px; color: #ffd479; font-family: "SF Mono", Menlo, monospace; }
+
+  /* track + reach bar */
+  .track-area { position: relative; padding-top: 34px; margin-bottom: 8px; }
+  .array-row { display: flex; gap: 10px; flex-wrap: nowrap; }
+  .cell {
+    position: relative;
+    flex: 1 1 0; min-width: 46px; height: 60px;
+    border-radius: 9px; display: grid; place-items: center;
+    font-weight: 700; font-size: 1.1rem;
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--panel2);
+    border: 2px solid rgba(255,255,255,0.08);
+    transition: all .3s ease;
+  }
+  .cell .idx { position: absolute; bottom: -20px; font-size: 0.72rem; color: #5a6a90; font-weight: 400; }
+  .cell.reachable { border-color: var(--blue); background: rgba(59,130,246,0.16); color: #bcd4ff; }
+  .cell.current   { border-color: var(--amber); background: rgba(245,158,11,0.22); box-shadow: 0 0 0 3px rgba(245,158,11,0.25); transform: translateY(-4px); }
+  .cell.last      { outline: 2px dashed var(--green); outline-offset: 3px; }
+  .cell.dead      { border-color: var(--red); background: rgba(239,68,68,0.2); color: #ffb4b4; }
+
+  /* reach marker line */
+  .reach-line {
+    position: absolute; top: 4px; left: 0;
+    height: 22px; border-right: 3px solid var(--green);
+    transition: width .4s ease;
+    pointer-events: none;
+  }
+  .reach-line::after {
+    content: 'reach'; position: absolute; right: -2px; top: -2px;
+    transform: translateX(100%); font-size: 0.72rem; color: var(--green);
+    font-family: "SF Mono", Menlo, monospace; white-space: nowrap; padding-left: 4px;
+  }
+  .reach-fill {
+    position: absolute; top: 6px; left: 0; height: 18px;
+    background: rgba(16,185,129,0.14); border-radius: 4px;
+    transition: width .4s ease; pointer-events: none;
+  }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 30px; }
+  .stat { background: var(--panel2); border-radius: 10px; padding: 14px 18px; border: 1px solid rgba(255,255,255,0.08); }
+  .stat h4 { margin: 0 0 4px; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+  .stat .big { font-family: "SF Mono", Menlo, monospace; font-size: 1.6rem; font-weight: 700; }
+  .stat.reach { border-color: var(--green); } .stat.reach .big { color: var(--green); }
+  .stat.idx { border-color: var(--amber); } .stat.idx .big { color: var(--amber); }
+
+  .verdict {
+    margin-top: 22px; border-radius: 10px; padding: 14px 18px;
+    font-weight: 700; font-size: 1.05rem; display: none;
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .verdict.ok { display: block; background: rgba(16,185,129,0.15); border: 1px solid var(--green); color: #b6f0d8; }
+  .verdict.fail { display: block; background: rgba(239,68,68,0.15); border: 1px solid var(--red); color: #ffb4b4; }
+
+  .controls { display: flex; align-items: center; gap: 12px; margin-top: 26px; flex-wrap: wrap; }
+  button { background: var(--blue); color: #fff; border: none; padding: 11px 24px; border-radius: 10px; font-size: 0.98rem; font-weight: 600; cursor: pointer; transition: transform .15s, background .2s; }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .counter { margin-left: auto; color: var(--muted); font-family: "SF Mono", Menlo, monospace; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px;
+    padding: 18px 24px; margin-top: 28px;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; }
+
+  .code-block {
+    background: #11111f; border-radius: 10px; padding: 16px 18px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 0.9rem;
+    line-height: 1.7; margin-top: 22px; overflow-x: auto; white-space: pre;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .kw { color: #c678dd; } .fn { color: #61afef; } .cm { color: #5a6a90; } .num { color: #d19a66; }
+  @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Jump Game — farthest <span>reach</span> marker</h1>
+  <p class="subtitle">Track one number — the farthest index reachable so far. If an index ever outruns it, you're stuck.</p>
+
+  <div class="analogy">
+    <h3>🪨 Real-world analogy: river stepping-stones</h3>
+    <p>Har stone par likha hai tum max kitna aage chhalang laga sakte ho. Path plan mat karo — bas <b>"abhi tak sabse door kaunsa stone reach kar sakta hu?"</b> track karo. Agar tum ek aise stone pe khade ho jo us reach se aage hai, beech me ek <code>0</code> ne raasta kaat diya.</p>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Step description</div>
+    <div class="step-desc" id="stepDesc">Press <b>Next</b> to start. We begin at index 0 with <code>reach = 0</code> and scan rightward.</div>
+
+    <div class="section-label">Input array &nbsp;<code style="color:#5a6a90;font-size:0.75rem;font-family:monospace">[2, 3, 1, 1, 4]</code> — value = max jump length</div>
+    <div class="track-area">
+      <div class="reach-fill" id="reachFill" style="width:0"></div>
+      <div class="reach-line" id="reachLine" style="width:0"></div>
+      <div class="array-row" id="arrayRow"></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat idx">
+        <h4>current index i</h4>
+        <div class="big" id="idxVal">—</div>
+      </div>
+      <div class="stat reach">
+        <h4>reach &nbsp;<span style="font-weight:400">= max(reach, i + nums[i])</span></h4>
+        <div class="big" id="reachVal">0</div>
+      </div>
+    </div>
+
+    <div class="verdict" id="verdict"></div>
+
+    <div class="controls">
+      <button class="ghost" id="prevBtn" onclick="prev()">◀ Prev</button>
+      <button id="nextBtn" onclick="next()">Next ▶</button>
+      <button class="ghost" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="counter" id="counter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="code-block"><span class="kw">def</span> <span class="fn">can_jump</span>(nums):
+    reach = <span class="num">0</span>
+    <span class="kw">for</span> i, jump <span class="kw">in</span> <span class="fn">enumerate</span>(nums):
+        <span class="kw">if</span> i &gt; reach:                  <span class="cm"># can't even stand here</span>
+            <span class="kw">return</span> <span class="fn">False</span>
+        reach = <span class="fn">max</span>(reach, i + jump)
+        <span class="kw">if</span> reach &gt;= <span class="fn">len</span>(nums) - <span class="num">1</span>:
+            <span class="kw">return</span> <span class="fn">True</span>
+    <span class="kw">return</span> <span class="fn">True</span></div>
+
+  <div class="takeaway">
+    <h3>💡 Key takeaway</h3>
+    <p>You don't need the path, only feasibility. One <code>reach</code> pointer captures every index any earlier jump can land on. Outrun it once → a <code>0</code> blocked you → <b>False</b>. Cover the last index → <b>True</b>. O(n) time, O(1) space.</p>
+  </div>
+</div>
+
+<script>
+// We demo the FALSE case so the dead-end is visible, then offer a note.
+const nums = [3, 2, 1, 0, 4];
+const n = nums.length;
+const LAST = n - 1;
+
+// Build trace. Step per index until we either return True/False.
+const trace = [];
+{
+  let reach = 0, done = false;
+  for (let i = 0; i < n && !done; i++) {
+    if (i > reach) {
+      trace.push({ i, reach, blocked: true, success: false,
+        desc: `<code>i = ${i}</code> but <code>reach = ${reach}</code> — <b style="color:#ef4444">i &gt; reach</b>. We can't even stand on this stone; a <code>0</code> earlier blocked the path. Return <b>False</b>.` });
+      done = true; break;
+    }
+    const before = reach;
+    reach = Math.max(reach, i + nums[i]);
+    const grew = reach > before;
+    if (reach >= LAST) {
+      trace.push({ i, reach, blocked: false, success: true,
+        desc: `<code>i = ${i}</code>, nums[i] = ${nums[i]} → reach = max(${before}, ${i + nums[i]}) = <b>${reach}</b>, which covers the last index ${LAST}. Return <b>True</b>.` });
+      done = true; break;
+    }
+    trace.push({ i, reach, blocked: false, success: null,
+      desc: `<code>i = ${i}</code>, nums[i] = ${nums[i]}. ${i <= before ? 'Reachable ✅. ' : ''}reach = max(${before}, ${i} + ${nums[i]}) = <b>${reach}</b>. ${grew ? 'Reach extended.' : 'No improvement — this stone is a <b style="color:#f59e0b">0-value trap</b>.'}` });
+  }
+}
+
+const $ = id => document.getElementById(id);
+let step = -1;
+const TOTAL = trace.length;
+
+function buildArray() {
+  $('arrayRow').innerHTML = nums.map((v, i) =>
+    `<div class="cell${i===LAST?' last':''}" id="c${i}">${v}<span class="idx">i=${i}</span></div>`).join('');
+}
+function cellWidthPct(uptoIndex) {
+  // reach line spans from start through cell[uptoIndex] center-ish; use full cells covered.
+  if (uptoIndex < 0) return 0;
+  const cells = Math.min(uptoIndex, LAST);
+  return ((cells + 0.9) / n) * 100;
+}
+
+function render() {
+  $('counter').textContent = step < 0 ? 'Step 0' : `Step ${step + 1} / ${TOTAL}`;
+  $('prevBtn').disabled = step < 0;
+  $('nextBtn').disabled = step >= TOTAL - 1;
+  $('verdict').className = 'verdict';
+
+  nums.forEach((_, i) => { $('c'+i).className = 'cell' + (i===LAST?' last':''); });
+
+  if (step < 0) {
+    $('stepDesc').innerHTML = 'Press <b>Next</b> to start. We begin at index 0 with <code>reach = 0</code> and scan rightward.';
+    $('idxVal').textContent = '—'; $('reachVal').textContent = '0';
+    $('reachLine').style.width = '0'; $('reachFill').style.width = '0';
+    return;
+  }
+
+  const s = trace[step];
+  $('stepDesc').innerHTML = s.desc;
+  $('idxVal').textContent = s.i;
+  $('reachVal').textContent = s.reach;
+
+  const w = cellWidthPct(s.reach) + '%';
+  $('reachLine').style.width = w;
+  $('reachFill').style.width = w;
+
+  // color reachable cells
+  for (let i = 0; i <= Math.min(s.reach, LAST); i++) $('c'+i).classList.add('reachable');
+  if (s.blocked) {
+    $('c'+s.i).classList.remove('reachable');
+    $('c'+s.i).classList.add('dead');
+  } else {
+    $('c'+s.i).classList.add('current');
+  }
+
+  if (s.success === true) {
+    const v = $('verdict'); v.className = 'verdict ok';
+    v.textContent = '✅ reach covers the last index → return True';
+  } else if (s.success === false) {
+    const v = $('verdict'); v.className = 'verdict fail';
+    v.textContent = '❌ i > reach → stuck behind a 0 → return False';
+  }
+}
+
+function next() { if (step < TOTAL - 1) { step++; render(); } }
+function prev() { if (step >= 0) { step--; render(); } }
+function reset() { step = -1; render(); }
+
+buildArray();
+render();
+</script>
+</body>
+</html>

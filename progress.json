@@ -1,0 +1,41 @@
+{
+  "current_category": null,
+  "problems": {
+    "contains-duplicate": {
+      "status": "done",
+      "quiz_score": 5,
+      "quiz_total": 5,
+      "pytest_passed": null,
+      "completed_at": "2026-04-08"
+    },
+    "valid-anagram": {
+      "status": "done",
+      "quiz_score": null,
+      "quiz_total": null,
+      "pytest_passed": true,
+      "completed_at": "2026-04-21"
+    },
+    "two-sum": {
+      "status": "done",
+      "quiz_score": null,
+      "quiz_total": null,
+      "pytest_passed": true,
+      "completed_at": "2026-04-24"
+    },
+    "group-anagrams": {
+      "status": "done",
+      "quiz_score": null,
+      "quiz_total": null,
+      "pytest_passed": true,
+      "completed_at": "2026-04-28"
+    },
+    "string-replacement": {
+      "status": "done",
+      "quiz_score": null,
+      "quiz_total": null,
+      "pytest_passed": true,
+      "completed_at": "2026-06-07"
+    }
+  },
+  "category_summary": {}
+}

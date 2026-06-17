@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kth Smallest in BST — inorder walk</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #232342;
+    --text: #e0e0e0; --muted: #9a9ac0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6; padding: 32px 20px 80px; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.85rem; margin: 0 0 6px; } h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; }
+
+  .analogy { background: var(--panel); border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1rem; }
+  .analogy p { margin: 0; }
+
+  .stage { background: var(--panel); border-radius: 14px; padding: 18px 22px 24px;
+    margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.07); }
+  svg { width: 100%; height: 380px; display: block; }
+  .edge { stroke: #44476a; stroke-width: 2.5; }
+  .node-circle { fill: var(--panel2); stroke: #44476a; stroke-width: 2.5; transition: all .35s; }
+  .node-circle.onstack { fill: rgba(245,158,11,0.16); stroke: var(--amber); }
+  .node-circle.active  { fill: rgba(59,130,246,0.32); stroke: var(--blue); stroke-width: 4; }
+  .node-circle.counted { fill: rgba(16,185,129,0.18); stroke: var(--green); }
+  .node-circle.answer  { fill: rgba(16,185,129,0.40); stroke: var(--green); stroke-width: 4.5; }
+  .node-val { fill: var(--text); font-size: 18px; font-weight: 700; text-anchor: middle; font-family: "SF Mono", Menlo, monospace; }
+  .order-tag { fill: var(--green); font-size: 12px; text-anchor: middle; font-family: "SF Mono", Menlo, monospace; opacity: 0; transition: opacity .35s; }
+  .order-tag.show { opacity: 1; }
+
+  .caption { margin-top: 16px; background: var(--panel2); border-radius: 10px; padding: 14px 16px;
+    border-left: 4px solid var(--blue); min-height: 60px; font-size: 0.98rem; }
+  .caption.ok { border-left-color: var(--green); }
+  .caption code { background: var(--bg); padding: 1px 6px; border-radius: 5px; color: #ffd479; font-family: "SF Mono", Menlo, monospace; }
+
+  .statebar { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+  .pill { background: var(--panel2); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+    padding: 8px 14px; font-family: "SF Mono", Menlo, monospace; font-size: 0.92rem; }
+  .pill b { color: var(--amber); }
+  .pill .ok { color: var(--green); }
+  .seq { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seq .chip { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center;
+    background: rgba(16,185,129,0.18); border: 1px solid var(--green); color: #b6f0d8;
+    font-family: "SF Mono", Menlo, monospace; font-weight: 700; }
+
+  .controls { text-align: center; margin: 20px 0 8px; }
+  button { background: var(--blue); color: #fff; border: none; padding: 10px 22px; border-radius: 10px;
+    font-size: 0.98rem; font-weight: 600; cursor: pointer; transition: transform .15s, background .2s; }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #34345c; }
+  .progress { color: var(--muted); font-size: 0.88rem; margin-top: 10px; }
+
+  .takeaway { background: var(--panel); border: 1px solid rgba(59,130,246,0.4); border-left: 5px solid var(--blue);
+    border-radius: 12px; padding: 18px 22px; margin-top: 26px; }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); } .takeaway p { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kth Smallest in a <span>BST</span> — the <span>inorder</span> walk</h1>
+  <p class="subtitle">Inorder (left → node → right) BST ko sorted order me visit karta hai. Count karo, k pe ruk jao. (k = 3)</p>
+
+  <div class="analogy">
+    <h3>📚 Analogy</h3>
+    <p>Library me books BST ki tarah arranged hain. Sabse left wali deepest book = smallest. Ek-ek karke gino: 1st, 2nd, 3rd… jaise hi count <b>k</b> pe pahuncha, wahi answer book hai.</p>
+  </div>
+
+  <div class="stage">
+    <svg viewBox="0 0 720 380" id="tree"></svg>
+    <div class="caption" id="caption">Press <b>Next ▶</b>. Stack me push karte hue leftmost (smallest) tak utarenge. Target: <code>k = 3</code>.</div>
+    <div class="statebar">
+      <div class="pill">k remaining: <b id="krem">3</b></div>
+      <div class="pill">Stack: <b id="stack">[ ]</b></div>
+      <div class="pill">Visited (sorted): <span class="seq" id="seq"></span></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prev" disabled>◀ Prev</button>
+    <button id="next">Next ▶</button>
+    <button class="ghost" id="reset">↺ Reset</button>
+    <div class="progress" id="prog">Step 0</div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>BST ka inorder = sorted sequence. Poori list banane ki zaroorat nahi — bas count karte jao aur <b>kth visited node</b> pe ruk jao. O(h + k) time.</p>
+  </div>
+</div>
+
+<script>
+// BST:                5
+//                   /   \
+//                  3     6
+//                 / \
+//                2   4
+//               /
+//              1
+// inorder = [1,2,3,4,5,6], k=3 -> 4
+const NODES = {
+  n5: { x: 420, y: 60,  val: 5, left: 'n3', right: 'n6' },
+  n3: { x: 250, y: 160, val: 3, left: 'n2', right: 'n4' },
+  n6: { x: 580, y: 160, val: 6, left: null, right: null },
+  n2: { x: 160, y: 260, val: 2, left: 'n1', right: null },
+  n4: { x: 340, y: 260, val: 4, left: null, right: null },
+  n1: { x: 100, y: 350, val: 1, left: null, right: null },
+};
+const EDGES = [['n5','n3'],['n5','n6'],['n3','n2'],['n3','n4'],['n2','n1']];
+const K = 3;
+
+// Hand-traced iterative inorder steps: stack contents + action at each step.
+const STEPS = [
+  { stack:['n5'], cap:'Push <code>5</code>, then go to its left child.', krem:3, counted:[] },
+  { stack:['n5','n3'], cap:'Push <code>3</code>, go left.', krem:3, counted:[] },
+  { stack:['n5','n3','n2'], cap:'Push <code>2</code>, go left.', krem:3, counted:[] },
+  { stack:['n5','n3','n2','n1'], cap:'Push <code>1</code>. Its left is null → stop descending.', krem:3, counted:[] },
+  { stack:['n5','n3','n2'], active:'n1', counted:['n1'], cap:'Pop <code>1</code> = smallest (1st). Decrement: <code>k → 2</code>. Right child null, so loop continues with the stack.', krem:2 },
+  { stack:['n5','n3'], active:'n2', counted:['n1','n2'], cap:'Pop <code>2</code> (2nd smallest). <code>k → 1</code>. Right null again.', krem:1 },
+  { stack:['n5'], active:'n3', counted:['n1','n2','n3'], cap:'Pop <code>3</code> (3rd visited). <code>k → 1</code>… not yet 0. Now visit 3\'s RIGHT child <code>4</code>.', krem:1 },
+  { stack:['n5','n4'], cap:'Push <code>4</code> (right subtree of 3). Its left is null → stop.', krem:1, counted:['n1','n2','n3'] },
+  { stack:['n5'], active:'n4', answer:'n4', counted:['n1','n2','n3','n4'],
+    cap:'Pop <code>4</code> = 4th in sorted order. <code>k → 0</code> 🎉 — this is the <b>kth smallest = 4</b>. Return immediately.', krem:0, done:true },
+];
+
+const svg = document.getElementById('tree');
+function buildSVG() {
+  let h = '';
+  EDGES.forEach(([a,b]) => {
+    h += `<line class="edge" x1="${NODES[a].x}" y1="${NODES[a].y}" x2="${NODES[b].x}" y2="${NODES[b].y}"/>`;
+  });
+  let order = {n1:1,n2:2,n3:3,n4:4,n5:5,n6:6};
+  for (const id in NODES) {
+    const n = NODES[id];
+    h += `<g>
+      <circle class="node-circle" id="c-${id}" cx="${n.x}" cy="${n.y}" r="25"/>
+      <text class="node-val" x="${n.x}" y="${n.y + 6}">${n.val}</text>
+      <text class="order-tag" id="o-${id}" x="${n.x + 32}" y="${n.y - 18}">#${order[id]}</text>
+    </g>`;
+  }
+  svg.innerHTML = h;
+}
+
+let i = -1;
+const $ = id => document.getElementById(id);
+
+function clearStates() {
+  for (const id in NODES) {
+    $('c-'+id).classList.remove('onstack','active','counted','answer');
+    $('o-'+id).classList.remove('show');
+  }
+}
+
+function render() {
+  clearStates();
+  if (i < 0) {
+    $('caption').className = 'caption';
+    $('caption').innerHTML = 'Press <b>Next ▶</b>. Stack me push karte hue leftmost (smallest) tak utarenge. Target: <code>k = 3</code>.';
+    $('krem').textContent = K; $('stack').textContent = '[ ]'; $('seq').innerHTML = '';
+    $('prog').textContent = 'Step 0';
+  } else {
+    const st = STEPS[i];
+    (st.counted || []).forEach(id => { $('c-'+id).classList.add('counted'); $('o-'+id).classList.add('show'); });
+    (st.stack || []).forEach(id => $('c-'+id).classList.add('onstack'));
+    if (st.active) $('c-'+st.active).classList.add('active');
+    if (st.answer) $('c-'+st.answer).classList.add('answer');
+    $('caption').className = 'caption ' + (st.done ? 'ok' : '');
+    $('caption').innerHTML = st.cap;
+    $('krem').textContent = st.krem;
+    $('stack').textContent = '[' + (st.stack||[]).map(id => NODES[id].val).join(', ') + ']';
+    $('seq').innerHTML = (st.counted||[]).map(id => `<span class="chip">${NODES[id].val}</span>`).join('');
+    $('prog').textContent = `Step ${i+1} / ${STEPS.length}`;
+  }
+  $('prev').disabled = i < 0;
+  $('next').disabled = i >= STEPS.length - 1;
+}
+
+$('next').onclick  = () => { if (i < STEPS.length-1) { i++; render(); } };
+$('prev').onclick  = () => { if (i >= 0) { i--; render(); } };
+$('reset').onclick = () => { i = -1; render(); };
+
+buildSVG();
+render();
+</script>
+</body>
+</html>

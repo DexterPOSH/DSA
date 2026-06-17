@@ -558,5 +558,1164 @@
   render();
 })();
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TLS HANDSHAKE DEEP DIVE — appended section
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── deep-dive section shell ── */
+#tls-deep { margin-top: 56px; }
+#tls-deep .section-header {
+  border-left: 4px solid #a78bfa;
+  padding: 18px 22px;
+  background: linear-gradient(135deg, #1e1b38 0%, #25204a 100%);
+  border-radius: 8px;
+  margin-bottom: 28px;
+}
+#tls-deep .section-header h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  color: #c4b5fd;
+  letter-spacing: -0.3px;
+}
+#tls-deep .section-header p {
+  margin: 0;
+  color: #a0a0b8;
+  font-size: 14px;
+}
+
+/* ── handshake flow card ── */
+.hs-card {
+  background: #1e1e38;
+  border: 1px solid #3a3a5c;
+  border-radius: 12px;
+  padding: 28px 28px 20px;
+  margin-bottom: 24px;
+}
+.hs-card h3 {
+  margin: 0 0 20px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #8888aa;
+}
+
+/* ── flow canvas ── */
+.flow-wrap {
+  display: grid;
+  grid-template-columns: 1fr 48px 1fr;
+  gap: 0;
+  align-items: start;
+  position: relative;
+}
+.flow-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.actor-head {
+  background: #2d2d50;
+  border: 2px solid #4c4c7a;
+  border-radius: 10px;
+  padding: 12px 24px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+  min-width: 120px;
+  margin-bottom: 0;
+}
+.actor-head .actor-sub-lbl {
+  font-size: 10px;
+  color: #8888aa;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-weight: 400;
+  margin-top: 2px;
+}
+.actor-lifeline {
+  width: 2px;
+  background: #3a3a5c;
+  flex: 1;
+  min-height: 32px;
+}
+.flow-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding-top: 60px;
+}
+
+/* ── step bubbles ── */
+.hs-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  width: 100%;
+}
+.hs-step {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  opacity: 0.22;
+  transition: opacity 0.4s ease, transform 0.3s ease;
+  transform: none;
+  position: relative;
+}
+.hs-step.active {
+  opacity: 1;
+  transform: scale(1.01);
+  z-index: 2;
+}
+.hs-step.done {
+  opacity: 0.55;
+}
+
+/* ── arrow rows ── */
+.arrow-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  position: relative;
+  min-height: 56px;
+  margin: 6px 0;
+}
+.arrow-row.to-server .arrow-shaft {
+  flex: 1;
+  height: 3px;
+  background: linear-gradient(90deg, var(--clr) 0%, var(--clr) 100%);
+  position: relative;
+}
+.arrow-row.to-client .arrow-shaft {
+  flex: 1;
+  height: 3px;
+  background: linear-gradient(270deg, var(--clr) 0%, var(--clr) 100%);
+  position: relative;
+}
+.arrow-row .arrow-label {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e1e38;
+  border: 1px solid var(--clr);
+  border-radius: 20px;
+  padding: 3px 12px;
+  font-size: 12px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  color: var(--clr);
+  white-space: nowrap;
+  z-index: 10;
+}
+.arrow-row .arrowhead-r {
+  width: 0; height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 11px solid var(--clr);
+  flex: none;
+}
+.arrow-row .arrowhead-l {
+  width: 0; height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-right: 11px solid var(--clr);
+  flex: none;
+}
+
+/* ── narration box ── */
+#hs-narration {
+  background: #16162e;
+  border-left: 4px solid #a78bfa;
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin-top: 14px;
+  font-size: 14px;
+  color: #d0d0e0;
+  min-height: 72px;
+  transition: border-color 0.3s ease, background 0.3s ease;
+  line-height: 1.6;
+}
+#hs-narration.key-moment {
+  border-left-color: #10b981;
+  background: #0a2218;
+}
+#hs-narration.verify-moment {
+  border-left-color: #f59e0b;
+  background: #201a08;
+}
+#hs-narration b { color: #fff; }
+#hs-narration code {
+  background: #2d2d50;
+  color: #fbbf24;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+#hs-narration .key-badge {
+  display: inline-block;
+  background: #10b981;
+  color: #000;
+  padding: 1px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 12px;
+  margin: 0 2px;
+}
+
+/* ── step counters ── */
+.hs-step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2d2d50;
+  border: 2px solid #4c4c7a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #8888aa;
+  flex: none;
+  margin: auto 12px;
+  transition: background 0.3s, border-color 0.3s, color 0.3s;
+}
+.hs-step.active .hs-step-num {
+  background: #a78bfa;
+  border-color: #c4b5fd;
+  color: #000;
+}
+.hs-step.done .hs-step-num {
+  background: #10b981;
+  border-color: #34d399;
+  color: #000;
+}
+
+/* ── step content pill ── */
+.hs-step-content {
+  flex: 1;
+  background: #24243e;
+  border: 1px solid #3a3a5c;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 6px 0;
+  transition: border-color 0.3s, background 0.3s;
+}
+.hs-step.active .hs-step-content {
+  border-color: #a78bfa;
+  background: #1e1b38;
+}
+.hs-step.done .hs-step-content {
+  border-color: #2a5a40;
+  background: #162a20;
+}
+.hs-step-content .title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #c4b5fd;
+  margin-bottom: 6px;
+}
+.hs-step.active .hs-step-content .title { color: #e9d5ff; }
+.hs-step.done .hs-step-content .title { color: #6ee7b7; }
+.hs-step-content .detail {
+  font-size: 12px;
+  color: #8888aa;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  line-height: 1.5;
+}
+.hs-step.active .hs-step-content .detail { color: #b0a8d0; }
+
+/* direction badge */
+.dir-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.dir-badge.c2s { background: #1e3a5f; color: #60a5fa; }
+.dir-badge.s2c { background: #3a2200; color: #fbbf24; }
+.dir-badge.both { background: #16322c; color: #34d399; }
+.dir-badge.local { background: #2d1e48; color: #c4b5fd; }
+
+/* ── controls row ── */
+.hs-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0 10px;
+  flex-wrap: wrap;
+}
+.hs-controls .step-ind {
+  color: #8888aa;
+  font-size: 13px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  min-width: 60px;
+  text-align: center;
+}
+.btn-purple {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  font-family: inherit;
+}
+.btn-purple:hover:not(:disabled) { background: #6d28d9; }
+.btn-purple:active:not(:disabled) { transform: translateY(1px); }
+.btn-purple:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #3a3a5c;
+  color: #a0a0b8;
+  padding: 9px 18px;
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+.btn-ghost:hover { background: #2d2d50; color: #e0e0e0; }
+
+/* ── Key moment callout ── */
+.key-callout {
+  background: linear-gradient(135deg, #0a2218 0%, #0d2e1e 100%);
+  border: 2px solid #10b981;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin: 20px 0;
+  position: relative;
+  overflow: hidden;
+}
+.key-callout::before {
+  content: "🔑";
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  font-size: 40px;
+  opacity: 0.15;
+}
+.key-callout h4 {
+  margin: 0 0 10px;
+  color: #10b981;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.key-callout p {
+  margin: 0 0 8px;
+  color: #c0e8d8;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.key-callout p:last-child { margin-bottom: 0; }
+.key-callout code {
+  background: #162e22;
+  color: #6ee7b7;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+.math-box {
+  background: #0d1e16;
+  border: 1px solid #1a5c3a;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 10px 0 4px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  color: #6ee7b7;
+  line-height: 1.8;
+}
+.math-box .comment { color: #2e7d52; }
+.math-box .highlight { color: #fbbf24; font-weight: 700; }
+.math-box .result { color: #10b981; font-weight: 700; font-size: 14px; }
+
+/* ── ECDH explainer ── */
+.ecdh-wrap {
+  display: grid;
+  grid-template-columns: 1fr 60px 1fr;
+  gap: 16px;
+  align-items: center;
+  margin: 16px 0;
+}
+@media (max-width: 680px) {
+  .ecdh-wrap { grid-template-columns: 1fr; }
+  .ecdh-arrow-col { display: none; }
+}
+.ecdh-person {
+  background: #1e1e38;
+  border: 1px solid #3a3a5c;
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+}
+.ecdh-person.alice { border-color: #3b82f6; }
+.ecdh-person.bob { border-color: #f59e0b; }
+.ecdh-person h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+.ecdh-person.alice h4 { color: #60a5fa; }
+.ecdh-person.bob h4 { color: #fbbf24; }
+.ecdh-key-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+.ecdh-key {
+  background: #2d2d50;
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.ecdh-key .lbl { color: #8888aa; font-size: 10px; }
+.ecdh-key .val { color: #c4b5fd; }
+.ecdh-key.pub .val { color: #34d399; }
+.ecdh-key.shared .val { color: #fbbf24; font-weight: 700; }
+.ecdh-key.secret .val { color: #f87171; }
+.ecdh-key.secret { opacity: 0.6; }
+.ecdh-arrow-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.ecdh-exchange-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 10px;
+  color: #34d399;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  gap: 2px;
+}
+.ecdh-exchange-arrow svg { width: 40px; height: 20px; }
+.ecdh-never {
+  background: #3a0e0e;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 12px;
+  color: #fca5a5;
+  margin-top: 12px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+.ecdh-result {
+  background: #0a2218;
+  border: 2px solid #10b981;
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: center;
+  margin-top: 12px;
+  font-size: 13px;
+  color: #6ee7b7;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-weight: 700;
+}
+
+/* ── RTT comparison ── */
+.rtt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 16px 0;
+}
+@media (max-width: 680px) { .rtt-grid { grid-template-columns: 1fr; } }
+.rtt-col {
+  background: #1e1e38;
+  border: 1px solid #3a3a5c;
+  border-radius: 10px;
+  padding: 18px 16px;
+}
+.rtt-col.v12 { border-color: #ef4444; background: #220e0e; }
+.rtt-col.v13 { border-color: #3b82f6; background: #0e1a2e; }
+.rtt-col.v13r { border-color: #10b981; background: #0a2218; }
+.rtt-col h4 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.rtt-col.v12 h4 { color: #fca5a5; }
+.rtt-col.v13 h4 { color: #93c5fd; }
+.rtt-col.v13r h4 { color: #6ee7b7; }
+.rtt-badge {
+  font-size: 32px;
+  font-weight: 900;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  margin-bottom: 4px;
+}
+.rtt-col.v12 .rtt-badge { color: #ef4444; }
+.rtt-col.v13 .rtt-badge { color: #3b82f6; }
+.rtt-col.v13r .rtt-badge { color: #10b981; }
+.rtt-sub { font-size: 11px; color: #8888aa; margin-bottom: 14px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+.rtt-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rtt-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+.rtt-bar-lbl { width: 80px; color: #8888aa; flex: none; font-size: 10px; }
+.rtt-bar {
+  height: 14px;
+  border-radius: 4px;
+  background: #3a3a5c;
+  transition: width 0.6s ease;
+  min-width: 4px;
+}
+.rtt-bar.tcp { background: #f59e0b; }
+.rtt-bar.tls { background: #a78bfa; }
+.rtt-bar.tls2 { background: #7c3aed; }
+.rtt-bar.app { background: #10b981; }
+.rtt-bar.resumed { background: #10b981; opacity: 0.6; }
+.rtt-bar-val { color: #c0c0d8; font-size: 10px; }
+
+/* ── Crypto cost ── */
+.cost-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+@media (max-width: 620px) { .cost-grid { grid-template-columns: 1fr; } }
+.cost-card {
+  background: #1e1e38;
+  border: 1px solid #3a3a5c;
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+.cost-card.asym { border-color: #ef4444; background: #200e0e; }
+.cost-card.sym { border-color: #10b981; background: #0a2218; }
+.cost-card h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.cost-card.asym h4 { color: #fca5a5; }
+.cost-card.sym h4 { color: #6ee7b7; }
+.cost-speed {
+  font-size: 28px;
+  font-weight: 900;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  margin: 4px 0 2px;
+}
+.cost-card.asym .cost-speed { color: #ef4444; }
+.cost-card.sym .cost-speed { color: #10b981; }
+.cost-unit { font-size: 11px; color: #8888aa; margin-bottom: 10px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+.cost-bar-bg {
+  background: #2d2d50;
+  border-radius: 6px;
+  height: 18px;
+  position: relative;
+  overflow: hidden;
+  margin: 6px 0 4px;
+}
+.cost-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 1s ease;
+}
+.cost-card.asym .cost-bar-fill { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.cost-card.sym .cost-bar-fill { background: linear-gradient(90deg, #10b981, #059669); }
+.cost-note { font-size: 12px; color: #a0a0b8; margin-top: 8px; line-height: 1.5; }
+.cost-note b { color: #fff; }
+.cost-why {
+  grid-column: 1 / -1;
+  background: #16162e;
+  border: 1px solid #3a3a5c;
+  border-radius: 10px;
+  padding: 16px 20px;
+  font-size: 13px;
+  color: #c0c0d8;
+  line-height: 1.6;
+}
+.cost-why b { color: #fff; }
+.cost-why code {
+  background: #2d2d50;
+  color: #fbbf24;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* ── animated packet in hs flow ── */
+@keyframes hsSlide {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.hs-step.active .hs-step-content {
+  animation: hsSlide 0.3s ease;
+}
+
+/* progress bar */
+.hs-progress {
+  height: 3px;
+  background: #2d2d50;
+  border-radius: 3px;
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.hs-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c3aed, #10b981);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+</style>
+
+<div id="tls-deep" class="wrap">
+
+  <!-- Section header -->
+  <div class="section-header">
+    <h2>🔐 TLS Handshake Deep Dive — How the Symmetric Key is Established</h2>
+    <p>Step through the full TLS 1.3 handshake, see the ECDH "magic" that creates a shared secret without transmitting it, compare TLS versions, and understand why asymmetric crypto is only used during setup.</p>
+  </div>
+
+  <!-- ── Part 1: Animated TLS 1.3 Handshake ── -->
+  <div class="hs-card">
+    <h3>① TLS 1.3 Handshake — Step by Step</h3>
+
+    <div class="hs-progress">
+      <div class="hs-progress-fill" id="hs-prog-fill" style="width:0%"></div>
+    </div>
+
+    <!-- Actor header -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:18px;">
+      <div class="actor-head" style="text-align:center;">
+        🖥️ Client
+        <div class="actor-sub-lbl">Browser / App</div>
+      </div>
+      <div class="actor-head" style="text-align:center;border-color:#f59e0b;">
+        🏦 Server
+        <div class="actor-sub-lbl">bank.com</div>
+      </div>
+    </div>
+
+    <!-- Steps list -->
+    <div class="hs-steps-list" id="hs-steps-list">
+      <!-- Step 0 -->
+      <div class="hs-step" data-step="0">
+        <div class="hs-step-num">0</div>
+        <div class="hs-step-content" style="flex:1;">
+          <div class="title">TCP Connection Established <span class="dir-badge both">← 1 RTT →</span></div>
+          <div class="detail">SYN → SYN-ACK → ACK (3-way handshake already complete)<br>TLS runs on top of an open TCP socket</div>
+        </div>
+      </div>
+
+      <!-- Step 1 -->
+      <div class="hs-step" data-step="1">
+        <div class="hs-step-num">1</div>
+        <div class="hs-step-content" style="flex:1;">
+          <div class="title">ClientHello <span class="dir-badge c2s">→ Server</span></div>
+          <div class="detail">
+            • TLS version: <span style="color:#c4b5fd">TLS 1.3</span><br>
+            • Cipher suites: <span style="color:#fbbf24">TLS_AES_256_GCM_SHA384</span>, …<br>
+            • client_random: <span style="color:#34d399">0x7f3a9c… (32 random bytes)</span><br>
+            • key_share: <span style="color:#60a5fa">A = g^a mod p</span> (ECDH public key)
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="hs-step" data-step="2">
+        <div class="hs-step-num">2</div>
+        <div class="hs-step-content" style="flex:1;">
+          <div class="title">ServerHello + Certificate <span class="dir-badge s2c">← Server</span></div>
+          <div class="detail">
+            • Chosen cipher: <span style="color:#fbbf24">TLS_AES_256_GCM_SHA384</span><br>
+            • server_random: <span style="color:#34d399">0xd4b21f… (32 random bytes)</span><br>
+            • key_share: <span style="color:#f97316">B = g^b mod p</span> (ECDH public key)<br>
+            • Certificate: <span style="color:#a78bfa">public key + CA signature (RSA/ECDSA)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="hs-step" data-step="3">
+        <div class="hs-step-num">3</div>
+        <div class="hs-step-content" style="flex:1;">
+          <div class="title">Client Verifies Certificate <span class="dir-badge local">⚙ local</span></div>
+          <div class="detail">
+            1. Check cert is signed by a trusted CA (browser's root store)<br>
+            2. Verify domain matches (<code>bank.com</code> ✓)<br>
+            3. Check expiry + revocation (OCSP)<br>
+            → <span style="color:#10b981;font-weight:700;">Server identity confirmed ✓</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="hs-step" data-step="4">
+        <div class="hs-step-num">4</div>
+        <div class="hs-step-content" style="flex:1;">
+          <div class="title">🔑 ECDH — Both Derive Pre-Master Secret <span class="dir-badge local">⚙ local</span></div>
+          <div class="detail">
+            Client computes: <span style="color:#10b981;font-weight:700;">B^a = (g^b)^a = g^(ab)</span><br>
+            Server computes: <span style="color:#10b981;font-weight:700;">A^b = (g^a)^b = g^(ab)</span><br>
+            <span style="color:#fbbf24;">Same result. Never sent over wire. ✨</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="hs-step" data-step="5">
+        <div class="hs-step-num">5</div>
+        <div class="hs-step-content" style="flex:1;">
+          <div class="title">Key Derivation via HKDF <span class="dir-badge local">⚙ local</span></div>
+          <div class="detail">
+            HKDF(pre_master_secret, client_random ‖ server_random)<br>
+            → <span style="color:#34d399;">master_secret</span><br>
+            → <span style="color:#fbbf24;">client_write_key</span> (AES-256-GCM)<br>
+            → <span style="color:#f97316;">server_write_key</span> (AES-256-GCM)<br>
+            → <span style="color:#a78bfa;">IV / MAC keys</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="hs-step" data-step="6">
+        <div class="hs-step-num">6</div>
+        <div class="hs-step-content" style="flex:1;">
+          <div class="title">Finished Messages <span class="dir-badge both">← both →</span></div>
+          <div class="detail">
+            Each side sends: <code>HMAC(master_secret, all_handshake_msgs)</code><br>
+            → Proves both sides derived the same keys<br>
+            → Detects any tampering with Hello messages<br>
+            → <span style="color:#10b981;font-weight:700;">Handshake authenticated ✓</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 7 -->
+      <div class="hs-step" data-step="7">
+        <div class="hs-step-num">7</div>
+        <div class="hs-step-content" style="flex:1;">
+          <div class="title">🚀 Encrypted Application Data <span class="dir-badge both">← AES-GCM →</span></div>
+          <div class="detail">
+            <span style="color:#10b981;font-weight:700;">HTTP/2 frames encrypted with AES-256-GCM</span><br>
+            Each record: nonce ‖ ciphertext ‖ auth_tag (16 bytes)<br>
+            Authentication tag ensures integrity — no HMAC step needed<br>
+            → Fast, authenticated, forward-secret 🔒
+          </div>
+        </div>
+      </div>
+    </div><!-- /hs-steps-list -->
+
+    <!-- Narration box -->
+    <div id="hs-narration">
+      Use <b>Next Step</b> to walk through the TLS 1.3 handshake, or press <b>Auto Play</b> to animate it.
+    </div>
+
+    <!-- Controls -->
+    <div class="hs-controls">
+      <button class="btn-ghost" id="hs-prev" disabled>◀ Prev</button>
+      <span class="step-ind" id="hs-step-ind">— / 7</span>
+      <button class="btn-purple" id="hs-next">Next Step ▶</button>
+      <button class="btn-ghost" id="hs-auto">⏵ Auto Play</button>
+      <button class="btn-ghost" id="hs-reset">↺ Reset</button>
+    </div>
+  </div><!-- /hs-card part1 -->
+
+
+  <!-- ── Part 2: ECDH "Magic" Explainer ── -->
+  <div class="hs-card">
+    <h3>② Why ECDH Works — The Shared Secret That Was Never Sent</h3>
+
+    <div class="key-callout">
+      <h4>The Core Insight</h4>
+      <p>Alice and Bob each pick a <b>private random number</b>. They exchange <b>public values</b> derived from those numbers. Due to the properties of elliptic-curve group operations, both can independently compute the <b>exact same shared secret</b> — but an eavesdropper who sees only the public values cannot.</p>
+      <p>The symmetric key <b>never crosses the wire</b>. It is independently <em>computed</em> on each side from the shared secret + the two random nonces.</p>
+    </div>
+
+    <div class="ecdh-wrap">
+      <!-- Alice -->
+      <div class="ecdh-person alice">
+        <h4>👤 Alice (Client)</h4>
+        <div class="ecdh-key-row">
+          <div class="ecdh-key secret">
+            <span class="lbl">PRIVATE (secret)</span>
+            <span class="val">a = 6 🔒</span>
+          </div>
+          <div class="ecdh-key pub">
+            <span class="lbl">PUBLIC (sent)</span>
+            <span class="val">A = g^a = 5^6 = 15625</span>
+          </div>
+          <div style="height:24px;border-left:2px dashed #3a3a5c;margin:4px auto;"></div>
+          <div style="font-size:11px;color:#8888aa;font-family:monospace;text-align:center;margin-bottom:4px;">Receives Bob's public key B</div>
+          <div class="ecdh-key shared">
+            <span class="lbl">SHARED SECRET</span>
+            <span class="val">B^a = 5^(7×6) = g^42</span>
+          </div>
+        </div>
+        <div class="ecdh-result">Shared = g^(ab) = g^42</div>
+      </div>
+
+      <!-- Middle arrows -->
+      <div class="ecdh-arrow-col">
+        <div class="ecdh-exchange-arrow">
+          <span>A →</span>
+          <svg viewBox="0 0 40 20" fill="none">
+            <line x1="0" y1="10" x2="32" y2="10" stroke="#34d399" stroke-width="2"/>
+            <polygon points="32,5 40,10 32,15" fill="#34d399"/>
+          </svg>
+        </div>
+        <div style="font-size:18px;color:#8888aa;text-align:center;">⇅</div>
+        <div class="ecdh-exchange-arrow">
+          <svg viewBox="0 0 40 20" fill="none">
+            <line x1="8" y1="10" x2="40" y2="10" stroke="#f59e0b" stroke-width="2"/>
+            <polygon points="8,5 0,10 8,15" fill="#f59e0b"/>
+          </svg>
+          <span>← B</span>
+        </div>
+        <div class="ecdh-never">
+          🚫 Shared secret<br>never transmitted
+        </div>
+      </div>
+
+      <!-- Bob -->
+      <div class="ecdh-person bob">
+        <h4>🏦 Bob (Server)</h4>
+        <div class="ecdh-key-row">
+          <div class="ecdh-key secret">
+            <span class="lbl">PRIVATE (secret)</span>
+            <span class="val">b = 7 🔒</span>
+          </div>
+          <div class="ecdh-key pub">
+            <span class="lbl">PUBLIC (sent)</span>
+            <span class="val">B = g^b = 5^7 = 78125</span>
+          </div>
+          <div style="height:24px;border-left:2px dashed #3a3a5c;margin:4px auto;"></div>
+          <div style="font-size:11px;color:#8888aa;font-family:monospace;text-align:center;margin-bottom:4px;">Receives Alice's public key A</div>
+          <div class="ecdh-key shared">
+            <span class="lbl">SHARED SECRET</span>
+            <span class="val">A^b = 5^(6×7) = g^42</span>
+          </div>
+        </div>
+        <div class="ecdh-result">Shared = g^(ab) = g^42</div>
+      </div>
+    </div><!-- /ecdh-wrap -->
+
+    <div class="math-box">
+      <span class="comment"># Simplified DH (real TLS uses Elliptic Curves over finite fields)</span><br>
+      g = 5  <span class="comment"># generator (public parameter)</span><br>
+      p = large_prime  <span class="comment"># modulus (public parameter)</span><br><br>
+      <span class="comment"># Each side keeps their private key SECRET:</span><br>
+      alice_private = a;  bob_private = b<br><br>
+      <span class="comment"># Exchange only PUBLIC keys:</span><br>
+      A = g<sup>a</sup> mod p  →  send to Bob<br>
+      B = g<sup>b</sup> mod p  →  send to Alice<br><br>
+      <span class="comment"># Each independently computes the same shared secret:</span><br>
+      alice: <span class="highlight">B<sup>a</sup> mod p = (g<sup>b</sup>)<sup>a</sup> mod p = g<sup>ab</sup> mod p</span><br>
+      bob:   <span class="highlight">A<sup>b</sup> mod p = (g<sup>a</sup>)<sup>b</sup> mod p = g<sup>ab</sup> mod p</span><br><br>
+      <span class="result">✓ Both get g^ab — attacker only sees g^a and g^b, cannot compute g^ab (DLP)</span>
+    </div>
+
+    <p style="font-size:13px;color:#8888aa;margin:8px 0 0;line-height:1.6;">
+      <b style="color:#e0e0e0;">Why is this hard to break?</b> The <b style="color:#c4b5fd;">Discrete Logarithm Problem (DLP)</b> — given <code style="background:#2d2d50;color:#fbbf24;padding:1px 5px;border-radius:3px;font-size:11px;">g^a mod p</code>, finding <code style="background:#2d2d50;color:#fbbf24;padding:1px 5px;border-radius:3px;font-size:11px;">a</code> is computationally infeasible for large primes. ECDH (Elliptic Curve DH) makes this even harder with smaller key sizes — a 256-bit ECDH key provides the same security as a 3072-bit RSA key.
+    </p>
+  </div><!-- /ecdh card -->
+
+
+  <!-- ── Part 3: TLS 1.2 vs 1.3 RTT comparison ── -->
+  <div class="hs-card">
+    <h3>③ TLS 1.2 vs TLS 1.3 — Round Trip Time Comparison</h3>
+
+    <div class="rtt-grid">
+      <!-- TLS 1.2 -->
+      <div class="rtt-col v12">
+        <h4>TLS 1.2</h4>
+        <div class="rtt-badge">2</div>
+        <div class="rtt-sub">RTTs for TLS (+ 1 TCP)</div>
+        <div class="rtt-timeline">
+          <div class="rtt-bar-row">
+            <span class="rtt-bar-lbl">TCP connect</span>
+            <div class="rtt-bar tcp" style="width:40px;"></div>
+            <span class="rtt-bar-val">1 RTT</span>
+          </div>
+          <div class="rtt-bar-row">
+            <span class="rtt-bar-lbl">TLS Hello</span>
+            <div class="rtt-bar tls" style="width:40px;"></div>
+            <span class="rtt-bar-val">1 RTT</span>
+          </div>
+          <div class="rtt-bar-row">
+            <span class="rtt-bar-lbl">Key Exchange</span>
+            <div class="rtt-bar tls2" style="width:40px;"></div>
+            <span class="rtt-bar-val">1 RTT</span>
+          </div>
+          <div class="rtt-bar-row">
+            <span class="rtt-bar-lbl">First data</span>
+            <div class="rtt-bar app" style="width:24px;"></div>
+            <span class="rtt-bar-val">→ sends</span>
+          </div>
+        </div>
+        <p style="font-size:11px;color:#fca5a5;margin:12px 0 0;line-height:1.5;">
+          Total: <b>3 RTTs</b> before first byte<br>
+          RSA key transport (no PFS)<br>
+          Must negotiate <em>then</em> exchange keys
+        </p>
+      </div>
+
+      <!-- TLS 1.3 -->
+      <div class="rtt-col v13">
+        <h4>TLS 1.3</h4>
+        <div class="rtt-badge">1</div>
+        <div class="rtt-sub">RTT for TLS (+ 1 TCP)</div>
+        <div class="rtt-timeline">
+          <div class="rtt-bar-row">
+            <span class="rtt-bar-lbl">TCP connect</span>
+            <div class="rtt-bar tcp" style="width:40px;"></div>
+            <span class="rtt-bar-val">1 RTT</span>
+          </div>
+          <div class="rtt-bar-row">
+            <span class="rtt-bar-lbl">Hello+KeyShare</span>
+            <div class="rtt-bar tls" style="width:80px;"></div>
+            <span class="rtt-bar-val">1 RTT</span>
+          </div>
+          <div class="rtt-bar-row">
+            <span class="rtt-bar-lbl">First data</span>
+            <div class="rtt-bar app" style="width:24px;"></div>
+            <span class="rtt-bar-val">→ sends</span>
+          </div>
+        </div>
+        <p style="font-size:11px;color:#93c5fd;margin:12px 0 0;line-height:1.5;">
+          Total: <b>2 RTTs</b> before first byte<br>
+          ECDHE only — always forward secret<br>
+          key_share sent in first Hello ✓
+        </p>
+      </div>
+
+      <!-- TLS 1.3 resumed / 0-RTT -->
+      <div class="rtt-col v13r">
+        <h4>TLS 1.3 Resumed</h4>
+        <div class="rtt-badge">0</div>
+        <div class="rtt-sub">RTT (0-RTT early data)</div>
+        <div class="rtt-timeline">
+          <div class="rtt-bar-row">
+            <span class="rtt-bar-lbl">TCP connect</span>
+            <div class="rtt-bar tcp" style="width:40px;"></div>
+            <span class="rtt-bar-val">1 RTT</span>
+          </div>
+          <div class="rtt-bar-row">
+            <span class="rtt-bar-lbl">Hello+Data</span>
+            <div class="rtt-bar resumed" style="width:80px;"></div>
+            <span class="rtt-bar-val">0-RTT!</span>
+          </div>
+        </div>
+        <p style="font-size:11px;color:#6ee7b7;margin:12px 0 0;line-height:1.5;">
+          Total: <b>1 RTT</b> (TCP only!)<br>
+          Uses PSK from prior session<br>
+          ⚠️ Replay risk — use only safe GETs
+        </p>
+      </div>
+    </div><!-- /rtt-grid -->
+
+    <div style="background:#1e1e38;border:1px solid #3a3a5c;border-radius:10px;padding:16px 20px;font-size:13px;color:#c0c0d8;line-height:1.6;margin-top:4px;">
+      <b style="color:#fff;">Why TLS 1.3 is faster:</b> It removed weak algorithms (RSA key exchange, SHA-1, RC4, DH < 1024 bits), merged the certificate and key exchange into a <b>single flight</b>, and <b>mandates</b> forward-secret ECDHE — meaning the client can send its key_share in the very first <code style="background:#2d2d50;color:#fbbf24;padding:1px 5px;border-radius:3px;font-size:11px;">ClientHello</code> without waiting for server capabilities. TLS 1.2 had to negotiate the cipher first, <em>then</em> exchange keys — a wasted round trip.
+    </div>
+  </div><!-- /rtt card -->
+
+
+  <!-- ── Part 4: Why asymmetric only for handshake ── -->
+  <div class="hs-card">
+    <h3>④ Why Asymmetric Crypto is Only for the Handshake</h3>
+
+    <div class="cost-grid">
+      <div class="cost-card asym">
+        <h4>🐢 Asymmetric (RSA / ECDH)</h4>
+        <div class="cost-speed">~1 MB/s</div>
+        <div class="cost-unit">throughput (software, single core)</div>
+        <div class="cost-bar-bg">
+          <div class="cost-bar-fill" style="width:1%;"></div>
+        </div>
+        <div class="cost-note">
+          <b>Used only during handshake</b><br>
+          RSA-2048 sign: ~1,000 ops/sec<br>
+          ECDH P-256: ~10,000 ops/sec<br>
+          Involves modular exponentiation over large numbers<br>
+          ~1000–3000× slower than AES
+        </div>
+      </div>
+
+      <div class="cost-card sym">
+        <h4>🚀 Symmetric (AES-256-GCM)</h4>
+        <div class="cost-speed">~3 GB/s</div>
+        <div class="cost-unit">throughput (AES-NI hardware, single core)</div>
+        <div class="cost-bar-bg">
+          <div class="cost-bar-fill" style="width:100%;"></div>
+        </div>
+        <div class="cost-note">
+          <b>Used for all application data</b><br>
+          AES-256-GCM: ~3,000 MB/s (with AES-NI)<br>
+          ~100 MB/s (software only)<br>
+          Simple XOR + S-box substitutions in hardware<br>
+          Authentication tag built-in (AEAD) ✓
+        </div>
+      </div>
+
+      <div class="cost-why">
+        <b>The design principle:</b> Use expensive asymmetric crypto <em>once</em> to securely agree on a short symmetric key (32 bytes), then switch to <b>blazing-fast symmetric AES-GCM</b> for everything else. <br><br>
+        Encrypting a 1 GB video with RSA would take <code>~17 minutes</code>. With AES-256-GCM it takes <code>~0.3 seconds</code>. TLS gives you the <b>authentication guarantees</b> of asymmetric crypto (only the real server can complete the handshake) with the <b>speed</b> of symmetric crypto (every byte of data). <br><br>
+        <b style="color:#10b981;">AEAD (Authenticated Encryption with Associated Data)</b> — AES-GCM provides both confidentiality AND integrity in one pass. No separate HMAC needed. The 16-byte authentication tag appended to each record ensures any tampering is detected before decryption.
+      </div>
+    </div><!-- /cost-grid -->
+
+    <div style="margin-top:8px;background:linear-gradient(135deg,#14321f,#0f2a1a);border-left:4px solid #10b981;border-radius:8px;padding:16px 20px;">
+      <b style="color:#10b981;font-size:14px;">🔑 Key Takeaway</b>
+      <p style="margin:8px 0 0;color:#c0e8d8;font-size:14px;line-height:1.6;">
+        The TLS handshake is a <b style="color:#fff;">one-time ceremony</b> that uses asymmetric cryptography to <em>authenticate</em> the server and <em>negotiate</em> a symmetric key — then steps aside. Every byte of your HTTPS traffic is protected by fast AES-256-GCM symmetric encryption, derived via ECDH so the key was <b style="color:#fbbf24;">never transmitted over the wire</b>. The combination of ECDH + HKDF + AES-GCM gives TLS 1.3 <b style="color:#fff;">perfect forward secrecy</b>: even if the server's private key is later compromised, past sessions cannot be decrypted.
+      </p>
+    </div>
+
+  </div><!-- /crypto cost card -->
+</div><!-- /#tls-deep -->
+
+<script>
+(function () {
+  "use strict";
+
+  /* ── TLS 1.3 Handshake Step Controller ── */
+  const steps = document.querySelectorAll("#hs-steps-list .hs-step");
+  const narBox = document.getElementById("hs-narration");
+  const btnNext = document.getElementById("hs-next");
+  const btnPrev = document.getElementById("hs-prev");
+  const btnAuto = document.getElementById("hs-auto");
+  const btnReset = document.getElementById("hs-reset");
+  const stepInd = document.getElementById("hs-step-ind");
+  const progFill = document.getElementById("hs-prog-fill");
+
+  const narrations = [
+    {
+      html: `<b>0 — TCP Connection.</b> Before TLS can even begin, TCP must complete its 3-way handshake (<code>SYN → SYN-ACK → ACK</code>). This costs <b>1 round trip</b>. Only after the TCP socket is open can the TLS handshake start. With HTTP/3 + QUIC, even this cost is eliminated.`,
+      cls: ""
+    },
+    {
+      html: `<b>1 — ClientHello.</b> The client fires the opening shot. It advertises: supported TLS versions, preferred <b>cipher suites</b> (algorithm choices), a <b>random nonce</b> (prevents replay attacks), and — this is the TLS 1.3 speedup — its <b>ECDH public key</b> (<code>key_share</code>). Sending the key upfront means we only need <b>1 TLS round-trip</b> instead of 2.`,
+      cls: ""
+    },
+    {
+      html: `<b>2 — ServerHello + Certificate.</b> The server picks the cipher suite, sends its own <b>random nonce</b> and <b>ECDH public key</b>. Crucially it also sends its <b>certificate</b> — signed by a Certificate Authority. This is the server proving its identity: <em>"I really am bank.com, and a CA you trust has verified that."</em>`,
+      cls: "verify-moment"
+    },
+    {
+      html: `<b>3 — Certificate Verification.</b> The client checks the cert against its <b>root CA trust store</b> (built into the OS/browser). It verifies: correct domain, not expired, not revoked. This is the authentication step — without it, an attacker could intercept and substitute their own keys. <span style="color:#10b981;">✓ Server identity confirmed.</span>`,
+      cls: "verify-moment"
+    },
+    {
+      html: `<b>4 — ECDH Magic. <span class="key-badge">KEY MOMENT</span></b> Both sides independently compute the same <b>Pre-Master Secret</b> using Elliptic Curve Diffie-Hellman. Client uses its private key + server's public key. Server uses its private key + client's public key. The math guarantees they arrive at <b>identical values</b>. The shared secret is <b>NEVER sent over the wire</b> — it cannot be intercepted because it doesn't travel anywhere.`,
+      cls: "key-moment"
+    },
+    {
+      html: `<b>5 — Key Derivation (HKDF).</b> The Pre-Master Secret isn't used directly. It's fed into <b>HKDF</b> (HMAC-based Key Derivation Function) along with both random nonces to produce multiple keys: a <code>client_write_key</code>, a <code>server_write_key</code>, and IVs. The random nonces ensure that even if the same ECDH pair were reused, different session keys would result. This is the <b>Master Secret → Session Keys</b> derivation.`,
+      cls: ""
+    },
+    {
+      html: `<b>6 — Finished Messages.</b> Each side sends a <b>MAC over every handshake message</b> seen so far. This proves two things: (1) both derived the same keys, and (2) the Hello messages weren't tampered with in transit. If an attacker modified a cipher suite to a weaker one, this check would fail and the connection would abort. <span style="color:#10b981;">✓ Handshake integrity verified.</span>`,
+      cls: "verify-moment"
+    },
+    {
+      html: `<b>7 — Encrypted Data. 🚀</b> The TLS handshake is complete. All HTTP traffic now flows through <b>AES-256-GCM</b> symmetric encryption — fast (~3 GB/s with hardware), authenticated (16-byte tag detects tampering), and forward-secret. The asymmetric crypto has done its job and steps aside. Welcome to the sealed envelope.`,
+      cls: "key-moment"
+    }
+  ];
+
+  let cursor = -1;
+  let autoTimer = null;
+
+  function render(n) {
+    cursor = n;
+    const total = steps.length - 1;
+
+    steps.forEach((s, i) => {
+      s.classList.remove("active", "done");
+      if (i < n) s.classList.add("done");
+      else if (i === n) s.classList.add("active");
+    });
+
+    if (n >= 0 && n < narrations.length) {
+      const nar = narrations[n];
+      narBox.innerHTML = nar.html;
+      narBox.className = nar.cls ? `nar ${nar.cls}` : "";
+      narBox.id = "hs-narration";
+      if (nar.cls) narBox.classList.add(nar.cls);
+    } else if (n < 0) {
+      narBox.innerHTML = `Use <b>Next Step</b> to walk through the TLS 1.3 handshake, or press <b>Auto Play</b> to animate it.`;
+      narBox.className = "";
+      narBox.id = "hs-narration";
+    }
+
+    const pct = n < 0 ? 0 : Math.round(((n + 1) / steps.length) * 100);
+    progFill.style.width = pct + "%";
+    stepInd.textContent = n < 0 ? `— / ${total}` : `${n} / ${total}`;
+    btnPrev.disabled = (n <= 0);
+    btnNext.disabled = (n >= total);
+  }
+
+  function next() { if (cursor < steps.length - 1) render(cursor + 1); }
+  function prev() { if (cursor > 0) render(cursor - 1); }
+  function reset() {
+    stopAuto();
+    render(-1);
+    btnPrev.disabled = true;
+    btnNext.disabled = false;
+    stepInd.textContent = `— / ${steps.length - 1}`;
+  }
+  function stopAuto() {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    btnAuto.textContent = "⏵ Auto Play";
+  }
+  function startAuto() {
+    if (cursor >= steps.length - 1) render(-1);
+    autoTimer = setInterval(() => {
+      if (cursor >= steps.length - 1) { stopAuto(); return; }
+      next();
+    }, 1800);
+    btnAuto.textContent = "⏸ Pause";
+  }
+
+  btnNext.addEventListener("click", () => { stopAuto(); next(); });
+  btnPrev.addEventListener("click", () => { stopAuto(); prev(); });
+  btnReset.addEventListener("click", reset);
+  btnAuto.addEventListener("click", () => {
+    if (autoTimer) stopAuto(); else startAuto();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (document.activeElement && document.activeElement !== document.body) return;
+    if (e.key === "ArrowRight" || e.key === "n") { stopAuto(); next(); }
+    else if (e.key === "ArrowLeft" || e.key === "p") { stopAuto(); prev(); }
+  });
+
+  render(-1);
+})();
+</script>
 </body>
 </html>

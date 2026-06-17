@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Find the Duplicate Number — Floyd's Cycle on an Array</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1a1a2e; color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 40px 20px 60px; gap: 32px;
+    }
+    h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+    h1 span { color: #3b82f6; }
+
+    .analogy {
+      background: #16213e; border: 1px solid #3b82f6; border-radius: 12px;
+      padding: 20px 28px; max-width: 820px; width: 100%;
+      display: flex; gap: 16px; align-items: flex-start;
+    }
+    .analogy-icon { font-size: 2rem; flex-shrink: 0; }
+    .analogy-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #3b82f6; }
+    .analogy-text { font-size: 1rem; line-height: 1.5; color: #c0c0d0; margin-top: 4px; }
+
+    .card {
+      background: #16213e; border: 1px solid #2d3a5a; border-radius: 16px;
+      padding: 32px; max-width: 900px; width: 100%;
+      display: flex; flex-direction: column; gap: 26px;
+    }
+    .step-description {
+      min-height: 56px; background: #0f172a; border-radius: 8px;
+      padding: 14px 20px; font-size: 0.95rem; line-height: 1.55;
+      color: #c8c8e0; border-left: 3px solid #3b82f6; transition: border-color 0.3s;
+    }
+    .step-description.phase2 { border-color: #f59e0b; }
+    .step-description.done { border-color: #10b981; }
+    .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #7a8ab0; margin-bottom: 12px; }
+
+    /* array view */
+    .array-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .cell {
+      width: 60px; height: 70px; border-radius: 10px;
+      border: 2px solid #2d3a5a; background: #0f172a;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      position: relative; transition: border-color 0.35s, background 0.35s, box-shadow 0.35s;
+    }
+    .cell .val { font-size: 1.4rem; font-weight: 700; }
+    .cell .idx { font-size: 0.62rem; color: #5a6a90; margin-top: 2px; }
+    .cell.dup-entry { border-color: #10b981; background: #0d2a1a; box-shadow: 0 0 16px rgba(16,185,129,0.45); }
+    .cell .ptr {
+      position: absolute; top: -26px; left: 50%; transform: translateX(-50%);
+      font-size: 0.7rem; font-weight: 700; padding: 1px 7px; border-radius: 6px; white-space: nowrap; opacity: 0; transition: opacity .2s;
+    }
+    .cell .p-slow { color: #3b82f6; background: rgba(59,130,246,0.15); }
+    .cell .p-fast { color: #f59e0b; background: rgba(245,158,11,0.15); top: -50px; }
+    .cell .p-s2   { color: #a78bfa; background: rgba(167,139,250,0.18); top: -50px; }
+    .cell.show-slow .p-slow { opacity: 1; }
+    .cell.show-fast .p-fast { opacity: 1; }
+    .cell.show-s2 .p-s2 { opacity: 1; }
+    .cell.slow-here { border-color: #3b82f6; }
+    .cell.fast-here { box-shadow: 0 0 14px rgba(245,158,11,0.4); }
+    .cell.slow-here.fast-here { border-color: #a78bfa; box-shadow: 0 0 16px rgba(167,139,250,0.55); }
+    .cell.meet { animation: pulse 0.6s ease; }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+    /* implicit linked list graph */
+    .graph-wrap { display: flex; justify-content: center; }
+    svg.graph { max-width: 100%; }
+    .gnode circle { transition: fill 0.3s, stroke 0.3s; }
+
+    .state-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+    .state-box { background: #0f172a; border: 1px solid #2d3a5a; border-radius: 10px; padding: 12px 18px; min-width: 120px; }
+    .state-box .k { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.08em; color: #7a8ab0; }
+    .state-box .v { font-size: 1.2rem; font-weight: 700; margin-top: 4px; }
+    .state-box.slow .v { color: #3b82f6; } .state-box.fast .v { color: #f59e0b; } .state-box.s2 .v { color: #a78bfa; }
+
+    .result-badge { display: none; align-items: center; gap: 12px; padding: 16px 22px; border-radius: 10px; font-size: 1rem; font-weight: 600; }
+    .result-badge.show { display: flex; }
+    .result-badge.ok { background: #0d2a1a; border: 1.5px solid #10b981; color: #86efac; }
+
+    .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .btn { padding: 12px 26px; border-radius: 8px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: #3b82f6; color: #fff; } .btn-primary:hover { background: #2563eb; }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; } .btn-secondary:hover { background: #263248; }
+    .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+    .phase-pill { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 12px; border-radius: 20px; }
+    .phase-pill.p1 { color: #93c5fd; background: rgba(59,130,246,0.15); }
+    .phase-pill.p2 { color: #fbbf24; background: rgba(245,158,11,0.15); }
+
+    .takeaway {
+      background: #16213e; border: 1px solid #2d3a5a; border-radius: 12px;
+      padding: 20px 28px; max-width: 820px; width: 100%; display: flex; gap: 16px; align-items: flex-start;
+    }
+    .takeaway-icon { font-size: 1.6rem; flex-shrink: 0; }
+    .takeaway-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #10b981; margin-bottom: 4px; }
+    .takeaway-body p { font-size: 0.95rem; line-height: 1.55; color: #c0c0d0; }
+    .takeaway-body strong { color: #e0e0e0; }
+  </style>
+</head>
+<body>
+
+  <h1>Find the Duplicate Number &mdash; <span>Floyd&rsquo;s Cycle on an Array</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🔁</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Array ko <strong>chhupi linked list</strong> maano: node <code>i</code> ka next = <code>nums[i]</code>.
+        Duplicate value hone se do index <em>same node</em> par point karte hain &rarr; <strong>cycle</strong> ban jaata hai,
+        aur <strong>cycle ka entry hi duplicate</strong> hai. Bas Tortoise &amp; Hare lagao.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="phase-pill p1" id="phasePill">Phase 1 — detect cycle</span>
+    </div>
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press &ldquo;Next&rdquo;. nums = [1, 3, 4, 2, 2]. Follow i → nums[i] starting at index 0.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Array &nbsp;<code style="color:#5a6a90;font-size:0.75rem">nums = [1, 3, 4, 2, 2]</code> &nbsp;(next of i is nums[i])</div>
+      <div class="array-row" id="arrayRow"></div>
+    </div>
+
+    <div>
+      <div class="section-label">Implicit linked list &nbsp;<code style="color:#5a6a90;font-size:0.75rem">0 → 1 → 3 → 2 → 4 → 2 → …</code></div>
+      <div class="graph-wrap">
+        <svg class="graph" id="graph" width="640" height="170" viewBox="0 0 640 170"></svg>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Pointers (these hold <em>indices</em>)</div>
+      <div class="state-grid">
+        <div class="state-box slow"><div class="k">slow = nums[slow]</div><div class="v" id="slowV">0</div></div>
+        <div class="state-box fast"><div class="k">fast = nums[nums[fast]]</div><div class="v" id="fastV">0</div></div>
+        <div class="state-box s2"><div class="k">slow2 (phase 2)</div><div class="v" id="s2V">—</div></div>
+      </div>
+    </div>
+
+    <div class="result-badge ok" id="resultBadge"><span style="font-size:1.4rem">✅</span><span id="resultText"></span></div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="back()">Prev</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <div class="takeaway-body"><p>
+        Treat <code>index → nums[index]</code> as a linked list: the repeated value forces a <strong>cycle</strong>, and the
+        <strong>cycle&rsquo;s entry equals the duplicate</strong>. Floyd&rsquo;s Tortoise &amp; Hare finds it in
+        <strong>O(n) time, O(1) space</strong> — no extra memory, array untouched.
+      </p></div>
+    </div>
+  </div>
+
+  <script>
+    const nums = [1, 3, 4, 2, 2];
+    const n = nums.length;
+
+    // ── Build array cells ─────────────────────────────────────
+    const arrayRow = document.getElementById('arrayRow');
+    nums.forEach((v, i) => {
+      const c = document.createElement('div'); c.className = 'cell'; c.id = 'cell-' + i;
+      c.innerHTML =
+        '<span class="ptr p-fast">fast</span>' +
+        '<span class="ptr p-s2">slow2</span>' +
+        '<span class="ptr p-slow">slow</span>' +
+        '<span class="val">' + v + '</span><span class="idx">i=' + i + '</span>';
+      arrayRow.appendChild(c);
+    });
+
+    // ── Build implicit-linked-list graph (sequence: 0,1,3,2,4,2,...) ──
+    // Layout the distinct visited indices in order: 0 ->1 ->3 ->2 ->4, with 4->2 closing the loop.
+    const seq = [0, 1, 3, 2, 4];   // distinct nodes laid left to right; edge from 4 back to 2 = cycle
+    const gx = { }; const gy = 95;
+    const startX = 60, dx = 130;
+    seq.forEach((node, k) => gx[node] = startX + k * dx);
+    const svg = document.getElementById('graph');
+    const SVGNS = 'http://www.w3.org/2000/svg';
+    function edge(a, b, curveUp) {
+      const x1 = gx[a], x2 = gx[b], r = 24;
+      const path = document.createElementNS(SVGNS, 'path');
+      if (curveUp) {
+        const midx = (x1 + x2) / 2, lift = 60;
+        path.setAttribute('d', `M ${x1} ${gy - r} C ${x1} ${gy - r - lift}, ${x2} ${gy - r - lift}, ${x2} ${gy - r}`);
+      } else {
+        path.setAttribute('d', `M ${x1 + r} ${gy} L ${x2 - r} ${gy}`);
+      }
+      path.setAttribute('fill', 'none'); path.setAttribute('stroke', '#3b5280'); path.setAttribute('stroke-width', '2');
+      svg.appendChild(path);
+      // arrowhead near b
+      const head = document.createElementNS(SVGNS, 'polygon');
+      if (curveUp) { head.setAttribute('points', `${x2-5},${gy-r-6} ${x2+5},${gy-r-6} ${x2},${gy-r+2}`); }
+      else { head.setAttribute('points', `${x2-r-2},${gy-5} ${x2-r-2},${gy+5} ${x2-r+6},${gy}`); }
+      head.setAttribute('fill', '#3b5280'); svg.appendChild(head);
+    }
+    // forward chain edges along the layout: 0->1,1->3,3->2,2->4
+    edge(0, 1, false); edge(1, 3, false); edge(3, 2, false); edge(2, 4, false);
+    // cycle back edge 4->2 (curve up)
+    edge(4, 2, true);
+    // nodes on top
+    seq.forEach(node => {
+      const g = document.createElementNS(SVGNS, 'g'); g.setAttribute('class', 'gnode'); g.id = 'g-' + node;
+      const c = document.createElementNS(SVGNS, 'circle');
+      c.setAttribute('cx', gx[node]); c.setAttribute('cy', gy); c.setAttribute('r', 24);
+      c.setAttribute('fill', '#0f172a'); c.setAttribute('stroke', '#2d3a5a'); c.setAttribute('stroke-width', '2');
+      g.appendChild(c);
+      const t = document.createElementNS(SVGNS, 'text');
+      t.setAttribute('x', gx[node]); t.setAttribute('y', gy + 6); t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('fill', '#e0e0e0'); t.setAttribute('font-size', '18'); t.setAttribute('font-weight', '700');
+      t.textContent = node; g.appendChild(t);
+      const sub = document.createElementNS(SVGNS, 'text');
+      sub.setAttribute('x', gx[node]); sub.setAttribute('y', gy + 44); sub.setAttribute('text-anchor', 'middle');
+      sub.setAttribute('fill', '#5a6a90'); sub.setAttribute('font-size', '10');
+      sub.textContent = 'val ' + nums[node]; g.appendChild(sub);
+      svg.appendChild(g);
+    });
+    function colorNode(node, fill, stroke) {
+      const c = document.querySelector('#g-' + node + ' circle');
+      if (c) { c.setAttribute('fill', fill); c.setAttribute('stroke', stroke); }
+    }
+
+    // ── Steps: simulate Floyd ─────────────────────────────────
+    // Phase 1
+    const steps = [{ phase: 1, slow: 0, fast: 0, desc: 'Both <span style="color:#3b82f6">slow</span> and <span style="color:#f59e0b">fast</span> start at index <strong>0</strong>. Index 0 can never be a target (values are 1..n), so it&rsquo;s a safe "head".' }];
+    let slow = 0, fast = 0, first = true;
+    // Floyd phase 1 (do-while)
+    do {
+      slow = nums[slow];
+      fast = nums[nums[fast]];
+      steps.push({ phase: 1, slow, fast,
+        desc: `slow takes 1 step → index <strong>${slow}</strong>. fast takes 2 steps → index <strong>${fast}</strong>.` + (slow === fast ? ' <strong style="color:#a78bfa">They meet!</strong> A cycle is confirmed.' : '') ,
+        meet: slow === fast });
+    } while (slow !== fast);
+    const meetIdx = slow;
+
+    // Phase 2
+    let s2 = 0; let s1 = meetIdx;
+    steps.push({ phase: 2, slow: s1, fast: s1, s2: 0, transition: true,
+      desc: `<strong>Phase 2.</strong> Reset one pointer (<span style="color:#a78bfa">slow2</span>) to index <strong>0</strong>; keep the other (<span style="color:#3b82f6">slow</span>) at the meeting point <strong>${meetIdx}</strong>. Now move <em>both one step at a time</em>.` });
+    while (s1 !== s2) {
+      s1 = nums[s1]; s2 = nums[s2];
+      steps.push({ phase: 2, slow: s1, s2,
+        desc: `Both advance one step. slow → <strong>${s1}</strong>, slow2 → <strong>${s2}</strong>.` + (s1 === s2 ? ` <strong style="color:#10b981">They meet at index ${s1}</strong> — the cycle entry.` : '') });
+    }
+    const dupIndex = s1;
+    steps.push({ phase: 2, slow: dupIndex, s2: dupIndex, done: true,
+      desc: `✅ Cycle entry = index <strong>${dupIndex}</strong>. The duplicate number is <strong style="color:#10b981">${nums[dupIndex] !== undefined ? dupIndex : dupIndex}</strong>. (Entry index equals the repeated value, here <strong>2</strong>.)` });
+
+    let cur = 0;
+
+    function clearCells() {
+      nums.forEach((_, i) => {
+        const c = document.getElementById('cell-' + i);
+        c.className = 'cell';
+      });
+      seq.forEach(node => colorNode(node, '#0f172a', '#2d3a5a'));
+    }
+
+    function render() {
+      const s = steps[cur];
+      clearCells();
+
+      // phase pill + desc styling
+      const pill = document.getElementById('phasePill');
+      if (s.phase === 2) { pill.className = 'phase-pill p2'; pill.textContent = 'Phase 2 — find cycle entry'; }
+      else { pill.className = 'phase-pill p1'; pill.textContent = 'Phase 1 — detect cycle'; }
+
+      // mark pointers on cells
+      if (s.slow !== undefined) {
+        const cs = document.getElementById('cell-' + s.slow);
+        cs.classList.add('slow-here', 'show-slow');
+        colorNode(s.slow, '#1e3a6e', '#3b82f6');
+        document.getElementById('slowV').textContent = s.slow;
+      }
+      if (s.fast !== undefined) {
+        const cf = document.getElementById('cell-' + s.fast);
+        cf.classList.add('fast-here', 'show-fast');
+        if (s.fast !== s.slow) colorNode(s.fast, '#3a2a0d', '#f59e0b');
+        document.getElementById('fastV').textContent = s.fast;
+      } else {
+        document.getElementById('fastV').textContent = '—';
+      }
+      if (s.s2 !== undefined) {
+        const c2 = document.getElementById('cell-' + s.s2);
+        c2.classList.add('show-s2');
+        document.getElementById('s2V').textContent = s.s2;
+      } else {
+        document.getElementById('s2V').textContent = '—';
+      }
+
+      if (s.meet) { const c = document.getElementById('cell-' + s.slow); c.classList.add('meet'); colorNode(s.slow, '#2a1a4a', '#a78bfa'); }
+
+      if (s.done) {
+        const c = document.getElementById('cell-' + s.slow); c.classList.add('dup-entry');
+        colorNode(s.slow, '#0d2a1a', '#10b981');
+      }
+
+      const desc = document.getElementById('stepDesc');
+      desc.innerHTML = s.desc;
+      desc.className = 'step-description' + (s.done ? ' done' : (s.phase === 2 ? ' phase2' : ''));
+
+      const rb = document.getElementById('resultBadge');
+      if (s.done) { rb.classList.add('show'); document.getElementById('resultText').textContent = 'Duplicate number = ' + dupIndex + '  (return ' + dupIndex + ')'; }
+      else rb.classList.remove('show');
+
+      document.getElementById('stepCounter').textContent = 'Step ' + cur + ' / ' + (steps.length - 1);
+      document.getElementById('nextBtn').disabled = cur >= steps.length - 1;
+      document.getElementById('prevBtn').disabled = cur <= 0;
+    }
+
+    function advance() { if (cur < steps.length - 1) { cur++; render(); } }
+    function back() { if (cur > 0) { cur--; render(); } }
+    function reset() { cur = 0; render(); }
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Container With Most Water — Greedy Two Pointers</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a;
+    --text: #e0e0e0; --muted: #7a8ab0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px 60px; gap: 26px; line-height: 1.5;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue); border-radius: 12px;
+    padding: 18px 24px; max-width: 820px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 2rem; flex-shrink: 0; line-height: 1; }
+  .analogy-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .analogy-text { font-size: 0.96rem; color: #c0c0d0; }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 880px; width: 100%;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+  .step-description {
+    min-height: 56px; background: var(--panel2); border-radius: 8px;
+    padding: 14px 18px; font-size: 0.95rem; color: #c8c8e0;
+    border-left: 3px solid var(--blue); transition: border-color .3s;
+  }
+  .step-description.move { border-color: var(--amber); }
+  .step-description.best { border-color: var(--green); }
+
+  /* Chart */
+  .chart {
+    position: relative; height: 280px; display: flex; gap: 10px;
+    align-items: flex-end; justify-content: center;
+    padding: 0 10px 24px; border-bottom: 2px solid #2d3a5a;
+  }
+  .bar-wrap { position: relative; width: 52px; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-end; height: 100%; }
+  .bar {
+    width: 100%; border-radius: 6px 6px 0 0; background: #34508c;
+    border: 2px solid #4a6aa8; border-bottom: none;
+    display: flex; align-items: flex-start; justify-content: center;
+    font-size: 0.85rem; font-weight: 700; color: #cfe0ff; padding-top: 4px;
+    transition: background .35s, border-color .35s, box-shadow .35s, opacity .35s;
+  }
+  .bar.pl { background: #1e3a6e; border-color: var(--blue); box-shadow: 0 0 16px rgba(59,130,246,0.5); }
+  .bar.pr { background: #3a2a08; border-color: var(--amber); box-shadow: 0 0 16px rgba(245,158,11,0.5); }
+  .bar.dim { opacity: 0.4; }
+  .bar-idx { position: absolute; bottom: -22px; font-size: 0.7rem; color: #5a6a90; }
+  .ptr-label { position: absolute; top: -22px; font-size: 0.7rem; font-weight: 700;
+    padding: 1px 6px; border-radius: 5px; }
+  .ptr-label.l { color: #bcd4ff; background: #1e3a6e; }
+  .ptr-label.r { color: #fcd9a0; background: #3a2a08; }
+  /* Water overlay */
+  .water {
+    position: absolute; background: rgba(16,185,129,0.22);
+    border: 1px solid rgba(16,185,129,0.55); border-radius: 4px;
+    pointer-events: none; transition: all .35s ease;
+    display: flex; align-items: center; justify-content: center;
+    color: #86efac; font-weight: 800; font-size: 1.1rem;
+  }
+
+  .stats { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 1rem; }
+  .pill { background: var(--panel2); border: 1px solid #2d3a5a; border-radius: 8px;
+    padding: 7px 14px; font-family: 'Consolas', monospace; }
+  .pill b { color: #ffd479; }
+  .pill.best { border-color: var(--green); }
+  .pill.best b { color: #86efac; }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn { padding: 11px 24px; border-radius: 8px; border: none; font-size: 0.92rem;
+    font-weight: 600; cursor: pointer; transition: background .2s, transform .1s, opacity .2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+
+  .takeaway { background: var(--panel); border: 1px solid #2d3a5a; border-radius: 12px;
+    padding: 18px 24px; max-width: 820px; width: 100%; display: flex; gap: 16px; align-items: flex-start; }
+  .takeaway-icon { font-size: 1.6rem; flex-shrink: 0; }
+  .takeaway-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .takeaway p { font-size: 0.94rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+  <h1>Container With Most Water &mdash; <span>Greedy Two Pointers</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🪣</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Paani sirf <strong>chhoti deewar</strong> tak ruk sakta, aur door deewaron me zyada chaudai.
+        Widest container se shuru karo, fir hamesha <strong>chhoti wali deewar ko andar lao</strong> &mdash;
+        sirf usi se bada area milne ka chance hai.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Heights: <code style="color:#ffd479">[1, 8, 6, 2, 5, 4, 8, 3, 7]</code>. Press &ldquo;Next&rdquo;.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Heights &mdash; blue = l, amber = r, green shading = water held</div>
+      <div class="chart" id="chart"></div>
+    </div>
+
+    <div class="stats">
+      <span class="pill" id="areaPill">area = min(h[l], h[r]) &times; (r &minus; l) = &mdash;</span>
+      <span class="pill best" id="bestPill">best = <b>0</b></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Start widest, then always shrink the <strong>shorter wall</strong> &mdash; the only move that can
+        beat the current area. One linear pass: <strong>O(n) time, O(1) space</strong>.
+      </p>
+    </div>
+  </div>
+
+<script>
+  const H = [1, 8, 6, 2, 5, 4, 8, 3, 7];
+  const MAXH = Math.max(...H);
+  const CHART_H = 256;   // px usable height for the tallest bar
+
+  function buildSteps() {
+    const steps = [];
+    let l = 0, r = H.length - 1, best = 0;
+    while (l < r) {
+      const area = Math.min(H[l], H[r]) * (r - l);
+      const newBest = Math.max(best, area);
+      const improved = area > best;
+      best = newBest;
+      const moveLeft = H[l] < H[r];
+      steps.push({
+        l, r, area, best, improved, moveLeft,
+        desc: `l=${l} (h=${H[l]}), r=${r} (h=${H[r]}). area = min(${H[l]},${H[r]}) &times; ${r - l} = <strong>${area}</strong>.` +
+          (improved ? ` <strong style="color:#10b981">New best!</strong>` : ` (best stays ${best}).`) +
+          ` Shorter wall is the ${moveLeft ? '<strong style="color:#3b82f6">left</strong>' : '<strong style="color:#f59e0b">right</strong>'} &mdash; move it inward.`
+      });
+      if (moveLeft) l++; else r--;
+    }
+    steps.push({ done: true, best,
+      desc: `Pointers met. <strong style="color:#10b981">Maximum water = ${best}</strong>.` });
+    return steps;
+  }
+
+  const steps = buildSteps();
+  const TOTAL = steps.length;
+  let cur = -1;
+
+  // Render bars once
+  const chart = document.getElementById('chart');
+  H.forEach((h, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'bar-wrap'; wrap.id = 'wrap-' + i;
+    const bar = document.createElement('div');
+    bar.className = 'bar'; bar.id = 'bar-' + i;
+    bar.style.height = ((h / MAXH) * CHART_H) + 'px';
+    bar.textContent = h;
+    const idx = document.createElement('span');
+    idx.className = 'bar-idx'; idx.textContent = i;
+    wrap.appendChild(bar); wrap.appendChild(idx);
+    chart.appendChild(wrap);
+  });
+  // Water overlay element
+  const water = document.createElement('div');
+  water.className = 'water'; water.style.display = 'none';
+  chart.appendChild(water);
+
+  const stepDesc = document.getElementById('stepDesc');
+  const stepCtr  = document.getElementById('stepCounter');
+  const nextBtn  = document.getElementById('nextBtn');
+  const prevBtn  = document.getElementById('prevBtn');
+  const areaPill = document.getElementById('areaPill');
+  const bestPill = document.getElementById('bestPill');
+
+  function clearBars() {
+    H.forEach((_, i) => {
+      const bar = document.getElementById('bar-' + i);
+      bar.className = 'bar';
+      const wrap = document.getElementById('wrap-' + i);
+      const lbl = wrap.querySelector('.ptr-label'); if (lbl) lbl.remove();
+    });
+    water.style.display = 'none';
+  }
+  function addLabel(i, which) {
+    const wrap = document.getElementById('wrap-' + i);
+    const sp = document.createElement('span');
+    sp.className = 'ptr-label ' + which; sp.textContent = which;
+    wrap.appendChild(sp);
+  }
+
+  function drawWater(l, r, area) {
+    // position the water rectangle spanning bar centers l..r at height min(h)
+    const wrapL = document.getElementById('wrap-' + l);
+    const wrapR = document.getElementById('wrap-' + r);
+    const chartRect = chart.getBoundingClientRect();
+    const lRect = wrapL.getBoundingClientRect();
+    const rRect = wrapR.getBoundingClientRect();
+    const minH = Math.min(H[l], H[r]);
+    const waterPx = (minH / MAXH) * CHART_H;
+    const left = (lRect.left - chartRect.left) + lRect.width / 2;
+    const right = (rRect.left - chartRect.left) + rRect.width / 2;
+    water.style.display = 'flex';
+    water.style.left = left + 'px';
+    water.style.width = (right - left) + 'px';
+    water.style.height = waterPx + 'px';
+    water.style.bottom = (24) + 'px';  // sit on the x-axis (chart padding-bottom)
+    water.textContent = area;
+  }
+
+  function renderTo(k) {
+    clearBars();
+    if (k < 0) {
+      stepDesc.innerHTML = 'Heights: <code style="color:#ffd479">[1, 8, 6, 2, 5, 4, 8, 3, 7]</code>. Pointers start at the two ends. Press &ldquo;Next&rdquo;.';
+      stepDesc.className = 'step-description';
+      areaPill.innerHTML = 'area = min(h[l], h[r]) &times; (r &minus; l) = &mdash;';
+      bestPill.innerHTML = 'best = <b>0</b>';
+      addLabel(0, 'l'); addLabel(H.length - 1, 'r');
+      document.getElementById('bar-0').classList.add('pl');
+      document.getElementById('bar-' + (H.length - 1)).classList.add('pr');
+      stepCtr.textContent = `Step 0 / ${TOTAL}`;
+      prevBtn.disabled = true; nextBtn.disabled = false;
+      return;
+    }
+    const s = steps[k];
+    if (s.done) {
+      stepDesc.className = 'step-description best';
+      bestPill.innerHTML = `best = <b>${s.best}</b>`;
+      areaPill.innerHTML = 'all pairs considered';
+    } else {
+      H.forEach((_, i) => { if (i < s.l || i > s.r) document.getElementById('bar-' + i).classList.add('dim'); });
+      document.getElementById('bar-' + s.l).classList.add('pl');
+      document.getElementById('bar-' + s.r).classList.add('pr');
+      addLabel(s.l, 'l'); addLabel(s.r, 'r');
+      drawWater(s.l, s.r, s.area);
+      areaPill.innerHTML = `area = min(${H[s.l]}, ${H[s.r]}) &times; (${s.r} &minus; ${s.l}) = <b>${s.area}</b>`;
+      bestPill.innerHTML = `best = <b>${s.best}</b>`;
+      stepDesc.className = 'step-description ' + (s.improved ? 'best' : 'move');
+    }
+    stepDesc.innerHTML = s.desc;
+    stepCtr.textContent = `Step ${k + 1} / ${TOTAL}`;
+    prevBtn.disabled = false;
+    nextBtn.disabled = (k >= TOTAL - 1);
+  }
+
+  function next() { if (cur < TOTAL - 1) { cur++; renderTo(cur); } }
+  function prev() { if (cur >= 0) { cur--; renderTo(cur); } }
+  function reset() { cur = -1; renderTo(cur); }
+
+  // redraw water on resize so geometry stays correct
+  window.addEventListener('resize', () => { if (cur >= 0) renderTo(cur); });
+
+  reset();
+</script>
+</body>
+</html>

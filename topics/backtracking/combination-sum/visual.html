@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Combination Sum — Recursion Tree with Reuse</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #232342;
+    --text: #e0e0e0; --muted: #9a9ac0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444; --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:'Segoe UI', system-ui, sans-serif; background:var(--bg);
+         color:var(--text); line-height:1.6; padding:32px 20px 80px; }
+  .wrap { max-width:940px; margin:0 auto; }
+  h1 { font-size:1.85rem; margin:0 0 6px; } h1 span { color:var(--green); }
+  .subtitle { color:var(--muted); margin:0 0 26px; }
+  code { font-family:"SF Mono", Menlo, Consolas, monospace; }
+
+  .analogy { background:linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border:1px solid rgba(245,158,11,0.4); border-left:5px solid var(--amber);
+    border-radius:12px; padding:16px 20px; margin-bottom:28px; }
+  .analogy h3 { margin:0 0 6px; color:var(--amber); }
+  .analogy p { margin:0; }
+
+  .panel { background:var(--panel); border:1px solid rgba(255,255,255,0.06);
+    border-radius:12px; padding:18px 22px; margin-bottom:22px; }
+  .panel h2 { margin:0 0 12px; font-size:1.1rem; }
+
+  .cands { display:flex; gap:10px; align-items:center; }
+  .coin { min-width:44px; height:44px; border-radius:50%; display:grid; place-items:center;
+    font-weight:700; font-family:"SF Mono",monospace; background:var(--panel2);
+    border:2px solid rgba(255,255,255,0.12); transition:all .3s; }
+  .coin.active { border-color:var(--green); background:rgba(16,185,129,0.25); color:#b6f0d8; }
+  .tbox { margin-left:auto; font-family:"SF Mono",monospace; }
+  .tbox b { color:var(--amber); font-size:1.3rem; }
+
+  .treewrap { overflow-x:auto; } svg { display:block; margin:0 auto; }
+
+  .stateRow { display:flex; gap:20px; flex-wrap:wrap; align-items:center; }
+  .pathbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; min-height:42px; }
+  .pchip { min-width:38px; height:38px; padding:0 6px; border-radius:8px; display:grid; place-items:center;
+    font-weight:700; font-family:"SF Mono",monospace; background:rgba(59,130,246,0.22);
+    border:2px solid var(--blue); color:#bcd4ff; }
+  .empty { color:var(--muted); font-style:italic; }
+  .remain { font-family:"SF Mono",monospace; font-size:1.05rem; }
+  .remain b { color:var(--amber); }
+
+  .caption { background:var(--panel2); border-left:4px solid var(--blue); border-radius:8px;
+    padding:14px 16px; margin-top:12px; font-size:.98rem; min-height:58px; }
+  .caption.hit { border-left-color:var(--green); }
+  .caption.over { border-left-color:var(--red); }
+  .caption.back { border-left-color:var(--amber); }
+  .caption b.g{color:var(--green);} .caption b.r{color:var(--red);}
+  .caption b.a{color:var(--amber);} .caption b.bl{color:var(--blue);}
+
+  .results { display:flex; flex-wrap:wrap; gap:8px; }
+  .subset { font-family:"SF Mono",monospace; font-size:.9rem; padding:6px 10px; border-radius:8px;
+    background:var(--panel2); border:1px solid rgba(255,255,255,0.1); color:var(--muted); transition:all .3s; }
+  .subset.new { background:rgba(16,185,129,0.18); border-color:var(--green); color:#b6f0d8; font-weight:700; }
+
+  .controls { display:flex; gap:10px; align-items:center; margin:14px 0 6px; }
+  button { background:var(--blue); color:#fff; border:none; padding:10px 22px; border-radius:10px;
+    font-size:.98rem; font-weight:600; cursor:pointer; transition:transform .15s, background .2s; }
+  button:hover:not(:disabled){ background:#2f6fd6; transform:translateY(-1px); }
+  button:disabled{ opacity:.4; cursor:not-allowed; }
+  button.ghost{ background:var(--panel2); } button.ghost:hover:not(:disabled){ background:#3a3a66; }
+  .counter{ color:var(--muted); font-size:.9rem; margin-left:auto; }
+
+  .takeaway { background:linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border:1px solid rgba(59,130,246,0.4); border-radius:12px; padding:18px 22px; margin-top:28px; text-align:center; }
+  .takeaway h3 { margin:0 0 6px; color:var(--blue); } .takeaway p { margin:0; font-size:1.06rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Combination Sum — <span>recursion tree</span> with reuse</h1>
+  <p class="subtitle">Unlimited coins. Pick, subtract from <code>remain</code>, recurse. Hit 0 → record. Go negative → backtrack.</p>
+
+  <div class="analogy">
+    <h3>🪙 Real-world analogy: unlimited coins</h3>
+    <p>Coins <code>[2,3,6,7]</code>, banao <b>exactly 7</b>. Ek coin uthao, remaining ghatao, recurse. Same coin dobara use kar sakte ho. <b>start</b> pointer aage hi badhta taaki <code>[2,3]</code> aur <code>[3,2]</code> double na ho.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Candidates &amp; target</h2>
+    <div class="cands" id="cands"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Recursion tree — each edge picks a coin <code>≥ start</code>, subtracting from <code>remain</code></h2>
+    <div class="treewrap"><svg id="tree" width="900" height="380" viewBox="0 0 900 380"></svg></div>
+  </div>
+
+  <div class="panel">
+    <h2>Current state</h2>
+    <div class="stateRow">
+      <div><div style="font-size:.8rem;color:var(--muted);margin-bottom:4px">path</div><div class="pathbar" id="pathBar"></div></div>
+      <div><div style="font-size:.8rem;color:var(--muted);margin-bottom:4px">remaining</div><div class="remain" id="remain"></div></div>
+    </div>
+    <div class="caption" id="caption">Press <b class="bl">Next</b> to start.</div>
+    <div class="controls">
+      <button class="ghost" id="prevBtn" disabled>◀ Prev</button>
+      <button id="nextBtn">Next ▶</button>
+      <span class="counter" id="counter"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Collected combinations</h2>
+    <div class="results" id="results"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Recurse with <code>start = i</code> (not <code>i+1</code>) to <b>reuse</b> a coin; loop from <code>start</code> to dodge duplicate orderings. <code>remain==0</code> records, <code>remain&lt;0</code> prunes.</p>
+  </div>
+</div>
+
+<script>
+const candidates = [2, 3, 6, 7];
+const target = 7;
+
+// ---- build recursion tree + steps via the real algorithm ----
+const nodes = [];   // {id, parent, label, remain, status, x, y, depth}
+const steps = [];
+const results = [];
+
+function backtrack(start, remain, path, parentId, depth, pickLabel) {
+  const id = nodes.length;
+  const node = { id, parent: parentId, label: pickLabel, remain, path:[...path], depth,
+                 status: 'open', x:0, y:0 };
+  nodes.push(node);
+
+  if (remain === 0) {
+    node.status = 'hit';
+    steps.push({ nodeId:id, type:'hit', path:[...path], remain, results:[...results] });
+    results.push([...path]);
+    steps.push({ nodeId:id, type:'record', path:[...path], remain, results:[...results], recorded:[...path] });
+    return id;
+  }
+  if (remain < 0) {
+    node.status = 'over';
+    steps.push({ nodeId:id, type:'over', path:[...path], remain, results:[...results] });
+    return id;
+  }
+  steps.push({ nodeId:id, type:'visit', path:[...path], remain, results:[...results] });
+  for (let i = start; i < candidates.length; i++) {
+    path.push(candidates[i]);
+    steps.push({ nodeId:id, type:'pick', pick:candidates[i], path:[...path], remain:remain-candidates[i],
+                 results:[...results] });
+    backtrack(i, remain - candidates[i], path, id, depth+1, '+'+candidates[i]);
+    path.pop();
+    steps.push({ nodeId:id, type:'back', pick:candidates[i], path:[...path], remain, results:[...results] });
+  }
+  return id;
+}
+backtrack(0, target, [], -1, 0, 'root');
+
+// ---- layout tree (assign x by in-order leaf spreading per depth) ----
+(function layout(){
+  const W = 900, byDepth = {};
+  nodes.forEach(n => { (byDepth[n.depth] = byDepth[n.depth]||[]).push(n); });
+  const maxD = Math.max(...nodes.map(n=>n.depth));
+  const yGap = 360 / (maxD + 1);
+  // place leaves of full DFS order evenly, parents centered over children
+  // simple approach: x by sequential index within depth
+  Object.keys(byDepth).forEach(d => {
+    const arr = byDepth[d];
+    arr.forEach((n, i) => {
+      n.x = (W) * (i + 1) / (arr.length + 1);
+      n.y = 30 + d * yGap;
+    });
+  });
+  // center parents over the mean of their children
+  for (let d = maxD - 1; d >= 0; d--) {
+    (byDepth[d]||[]).forEach(n => {
+      const kids = nodes.filter(c => c.parent === n.id);
+      if (kids.length) n.x = kids.reduce((s,c)=>s+c.x,0)/kids.length;
+    });
+  }
+})();
+
+const $ = id => document.getElementById(id);
+let cur = 0;
+
+function buildCands() {
+  $('cands').innerHTML = candidates.map((c,i)=>`<div class="coin" id="k${i}">${c}</div>`).join('')
+    + `<div class="tbox">target = <b>${target}</b></div>`;
+}
+
+function pathIds(id){ const ids=[]; let c=id; while(c>=0){ids.push(c); c=nodes[c].parent;} return ids; }
+
+function drawTree(activeId, visitedUpTo) {
+  const onPath = new Set(activeId>=0 ? pathIds(activeId) : []);
+  let s = '';
+  nodes.forEach(nd => {
+    if (nd.id > visitedUpTo) return;            // only reveal nodes seen so far
+    if (nd.parent >= 0 && nd.parent <= visitedUpTo) {
+      const p = nodes[nd.parent];
+      const lit = onPath.has(nd.id);
+      s += `<line x1="${p.x}" y1="${p.y}" x2="${nd.x}" y2="${nd.y}"
+            stroke="${lit?'#3b82f6':'rgba(255,255,255,0.12)'}" stroke-width="${lit?3:1.5}"/>`;
+      const mx=(p.x+nd.x)/2, my=(p.y+nd.y)/2;
+      s += `<text x="${mx}" y="${my}" text-anchor="middle" font-size="10"
+            fill="${lit?'#bcd4ff':'#777'}" font-family="SF Mono,monospace">${nd.label}</text>`;
+    }
+  });
+  nodes.forEach(nd => {
+    if (nd.id > visitedUpTo) return;
+    const active = nd.id === activeId;
+    let fill='#232342', stroke='rgba(255,255,255,0.2)';
+    if (nd.status==='hit'){ stroke='#10b981'; fill='rgba(16,185,129,0.30)'; }
+    else if (nd.status==='over'){ stroke='#ef4444'; fill='rgba(239,68,68,0.22)'; }
+    if (active){ stroke='#f59e0b'; fill='rgba(245,158,11,0.35)'; }
+    const r = 17;
+    s += `<g><circle cx="${nd.x}" cy="${nd.y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${active?3:2}"/>
+      <text x="${nd.x}" y="${nd.y+4}" text-anchor="middle" font-size="12" font-weight="700"
+            font-family="SF Mono,monospace" fill="${active?'#ffe2ab':'#e0e0e0'}">${nd.remain}</text></g>`;
+  });
+  $('tree').innerHTML = s;
+}
+
+function renderPath(path){
+  $('pathBar').innerHTML = path.length ? path.map(v=>`<div class="pchip">${v}</div>`).join('')
+    : '<span class="empty">[ ]</span>';
+}
+function renderResults(res, justRec){
+  $('results').innerHTML = res.map((sub,i)=>{
+    const isNew = justRec && i===res.length-1;
+    return `<div class="subset ${isNew?'new':''}">[${sub.join(',')}]</div>`;
+  }).join('') || '<span style="color:var(--muted)">none yet</span>';
+}
+
+function render(){
+  const st = steps[cur];
+  drawTree(st.nodeId, st.nodeId);
+  renderPath(st.path);
+  $('remain').innerHTML = `remain = <b>${st.remain}</b>`;
+  renderResults(st.results, st.type==='record' ? st.recorded : null);
+
+  // highlight active coin if a pick/back step
+  for(let i=0;i<candidates.length;i++) $('k'+i).classList.remove('active');
+  if ((st.type==='pick'||st.type==='back') && st.pick!=null){
+    const idx = candidates.indexOf(st.pick); if(idx>=0) $('k'+idx).classList.add('active');
+  }
+
+  const cap=$('caption'); cap.className='caption';
+  if (st.type==='visit')
+    cap.innerHTML = `At a node with <b class="bl">remain=${st.remain}</b>. Try each coin from <code>start</code> onward.`;
+  else if (st.type==='pick')
+    cap.innerHTML = `<b class="g">PICK</b> coin <code>${st.pick}</code> → push to path, new remain <b class="bl">${st.remain}</b>. Recurse (reuse allowed: <code>start=i</code>).`;
+  else if (st.type==='hit'){ cap.classList.add('hit');
+    cap.innerHTML = `<b class="g">remain == 0</b> 🎯 — the path sums to the target exactly!`; }
+  else if (st.type==='record'){ cap.classList.add('hit');
+    cap.innerHTML = `<b class="a">Record</b> a copy: <b class="a">[${st.recorded.join(',')}]</b>. ✅`; }
+  else if (st.type==='over'){ cap.classList.add('over');
+    cap.innerHTML = `<b class="r">remain &lt; 0</b> — overshot the target. <b class="r">Prune</b> this branch, return.`; }
+  else if (st.type==='back'){ cap.classList.add('back');
+    cap.innerHTML = `<b class="a">BACKTRACK</b> — <code>path.pop()</code> removes <code>${st.pick}</code>. Try the next coin at this level.`; }
+
+  $('counter').textContent = `step ${cur+1} / ${steps.length}`;
+  $('prevBtn').disabled = cur===0;
+  $('nextBtn').disabled = cur===steps.length-1;
+}
+
+buildCands(); render();
+$('nextBtn').addEventListener('click', ()=>{ if(cur<steps.length-1){cur++;render();} });
+$('prevBtn').addEventListener('click', ()=>{ if(cur>0){cur--;render();} });
+</script>
+</body>
+</html>

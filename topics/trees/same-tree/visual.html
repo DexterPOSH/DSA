@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Same Tree — Lockstep Comparison Visualized</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #232342;
+    --text: #e0e0e0; --muted: #9a9ac0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444; --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg);
+    color: var(--text); line-height: 1.6; padding: 32px 20px 80px; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.72rem; margin: 0 0 6px; font-weight: 700; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.0rem; }
+  .analogy { background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.10));
+    border: 1px solid rgba(245,158,11,0.4); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px; }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; font-size: .96rem; }
+  .stage { background: var(--panel); border-radius: 14px; padding: 20px 24px 26px;
+    border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+  .trees { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 600px) { .trees { grid-template-columns: 1fr; } }
+  .treecard { background: var(--panel2); border-radius: 10px; padding: 8px 6px 4px;
+    border: 1px solid rgba(255,255,255,0.06); }
+  .treecard h4 { text-align: center; margin: 4px 0 0; font-size: .9rem; color: var(--muted); }
+  .treecard.p h4 b { color: var(--blue); } .treecard.q h4 b { color: var(--green); }
+  svg { width: 100%; height: auto; }
+  .edge { stroke: #44446a; stroke-width: 2.5; transition: stroke .4s; }
+  .edge.active { stroke: var(--amber); stroke-width: 3.5; }
+  .node-circle { fill: #2c2c52; stroke: #44446a; stroke-width: 2.5; transition: fill .35s, stroke .35s; }
+  .node-circle.active { fill: rgba(245,158,11,0.4); stroke: var(--amber); }
+  .node-circle.match { fill: rgba(16,185,129,0.28); stroke: var(--green); }
+  .node-circle.bad { fill: rgba(239,68,68,0.42); stroke: var(--red); }
+  .node-circle.missing { fill: rgba(239,68,68,0.12); stroke: var(--red); stroke-dasharray: 4 3; }
+  .node-text { fill: var(--text); font-weight: 700; font-size: 17px;
+    font-family: 'Segoe UI', monospace; text-anchor: middle; dominant-baseline: central; }
+  .node-text.nil { fill: var(--red); font-size: 13px; }
+  .caption { margin-top: 14px; background: var(--panel2); border-radius: 10px; padding: 14px 18px;
+    border-left: 4px solid var(--blue); font-size: .97rem; min-height: 60px; }
+  .caption .lbl { color: var(--amber); font-weight: 700; }
+  .caption .ok { color: var(--green); font-weight: 700; }
+  .caption .er { color: var(--red); font-weight: 700; }
+  .caption code, .stage code { background: #2c2c52; padding: 1px 6px; border-radius: 5px;
+    color: #ffd479; font-family: "SF Mono", Menlo, monospace; }
+  .controls { text-align: center; margin: 22px 0 6px; }
+  button { background: var(--blue); color: #fff; border: none; padding: 11px 24px;
+    border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s; }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .stepcount { color: var(--muted); margin: 0 12px; font-variant-numeric: tabular-nums; font-size: .95rem; }
+  .toggle { text-align: center; margin: 14px 0 0; }
+  .toggle button { background: var(--panel2); font-size: .9rem; padding: 8px 16px; margin: 0 4px; }
+  .toggle button.on { background: var(--blue); }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin: 18px 0 0; font-size: .82rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; }
+  .dot.amber { background: var(--amber); } .dot.green { background: var(--green); } .dot.red { background: var(--red); }
+  .takeaway { background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px; padding: 18px 24px; margin-top: 30px; text-align: center; }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.04rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Same Tree — <span>walk both trees in lockstep</span></h1>
+  <p class="subtitle">At each matched position: both <code>None</code>? → match. One <code>None</code> or values differ? → fail. Else recurse on left & right together.</p>
+
+  <div class="analogy">
+    <h3>🏗️ Do buildings, same blueprint?</h3>
+    <p>Dono ke corresponding kamre ek saath check karo: dono khali plot? dono building with same number? Ek bhi mismatch (ek jagah room, doosri jagah nahi, ya value alag) → blueprint same nahi.</p>
+  </div>
+
+  <div class="stage">
+    <div class="trees">
+      <div class="treecard p"><h4>Tree <b>p</b></h4><svg id="svgP" viewBox="0 0 300 260"></svg></div>
+      <div class="treecard q"><h4>Tree <b>q</b></h4><svg id="svgQ" viewBox="0 0 300 260"></svg></div>
+    </div>
+    <div class="caption" id="caption">Pick a case, then press <b>Next</b> to compare node-by-node.</div>
+
+    <div class="toggle">
+      <button id="caseSame" class="on">✅ identical case</button>
+      <button id="caseDiff">❌ mismatch case</button>
+    </div>
+    <div class="controls">
+      <button class="ghost" id="prevBtn" disabled>◀ Prev</button>
+      <span class="stepcount" id="stepcount">Step 0 / 0</span>
+      <button id="nextBtn">Next ▶</button>
+    </div>
+    <div class="legend">
+      <span><i class="dot amber"></i> comparing this pair</span>
+      <span><i class="dot green"></i> matched</span>
+      <span><i class="dot red"></i> mismatch</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Two trees are equal iff <b>every corresponding pair</b> agrees — recurse on <code>(p.left, q.left)</code> and <code>(p.right, q.right)</code>; the first mismatch short-circuits to <code>False</code>.</p>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// Two scenarios. Layout coords are shared (perfect 3-level slots); missing nodes omitted.
+const slot = {
+  a:{x:150,y:34}, b:{x:78,y:120}, c:{x:222,y:120},
+  d:{x:38,y:206}, e:{x:118,y:206}, f:{x:182,y:206}, g:{x:262,y:206}
+};
+const edgeDefs = { a:[['a','b'],['a','c']], b:[['b','d'],['b','e']], c:[['c','f'],['c','g']] };
+
+// scenario.p / scenario.q : map slot -> value (absent slot = no node)
+const SCENARIOS = {
+  same: {
+    p: { a:1, b:2, c:3, e:4, f:5 },
+    q: { a:1, b:2, c:3, e:4, f:5 },
+    verdict: true
+  },
+  diff: {
+    // same shape until node c's children: p has f=5, q has f=9  -> value mismatch
+    p: { a:1, b:2, c:3, e:4, f:5 },
+    q: { a:1, b:2, c:3, e:4, f:9 },
+    verdict: false
+  }
+};
+// child relationships (structural) per slot
+const childOf = { a:['b','c'], b:['d','e'], c:['f','g'], d:[], e:[], f:[], g:[] };
+
+let scenario = 'same';
+let steps = [];
+
+function exists(map, s) { return map[s] !== undefined; }
+
+function buildSteps(name) {
+  const sc = SCENARIOS[name];
+  const P = sc.p, Q = sc.q;
+  const out = [];
+  const pState = {}, qState = {};
+  const settled = []; // list of {s, cls} applied permanently
+  const applySettled = () => { settled.forEach(({s,side,cls}) => (side==='p'?pState:qState)[s]=cls); };
+
+  const emit = (cap, activeP, activeQ, edgeP, edgeQ) => {
+    applySettled();
+    const ps = {...pState}, qs = {...qState};
+    if (activeP) ps[activeP.s] = activeP.cls;
+    if (activeQ) qs[activeQ.s] = activeQ.cls;
+    out.push({ cap, pState: ps, qState: qs, edgeP: edgeP||null, edgeQ: edgeQ||null,
+               showP:{...P}, showQ:{...Q} });
+  };
+
+  let failed = false;
+  function cmp(s, parent) {
+    if (failed) return false;
+    const inP = exists(P, s), inQ = exists(Q, s);
+    // show the pair being compared
+    if (!inP && !inQ) {
+      emit(`Compare slot — both sides are <code>None</code> here → <span class="ok">match</span>, return True for this branch.`,
+           null, null);
+      return true;
+    }
+    if (!inP || !inQ) {
+      emit(`Mismatch! One side has a node (<span class="lbl">${inP?P[s]:Q[s]}</span>), the other is <code>None</code> → <span class="er">structure differs, return False</span>. 🚫`,
+           inP?{s,cls:'bad'}:{s,cls:'missing'}, inQ?{s,cls:'bad'}:{s,cls:'missing'});
+      failed = true; return false;
+    }
+    // both present
+    if (P[s] !== Q[s]) {
+      emit(`Compare <span class="lbl">p=${P[s]}</span> vs <span class="lbl">q=${Q[s]}</span> → values differ → <span class="er">return False</span>. 🚫`,
+           {s,cls:'bad'}, {s,cls:'bad'});
+      pState[s]='bad'; qState[s]='bad'; failed=true; return false;
+    }
+    emit(`Compare <span class="lbl">p=${P[s]}</span> vs <span class="lbl">q=${Q[s]}</span> → equal ✓. Now recurse into their children.`,
+         {s,cls:'active'}, {s,cls:'active'});
+    settled.push({s, side:'p', cls:'match'}, {s, side:'q', cls:'match'});
+    // recurse children together
+    for (const c of childOf[s]) {
+      if (!cmp(c, s)) return false;
+    }
+    return true;
+  }
+  cmp('a', null);
+  // verdict step
+  emit(sc.verdict
+      ? `Every corresponding pair matched → <code>is_same_tree(p, q) = </code><span class="ok">True</span> 🎉`
+      : `A mismatch short-circuited the recursion → <code>is_same_tree(p, q) = </code><span class="er">False</span>.`,
+      null, null);
+  return out;
+}
+
+function renderTree(svg, slotVals, state) {
+  let h = '';
+  // edges: draw only where both endpoints exist
+  Object.values(edgeDefs).flat().forEach(([p,c]) => {
+    if (slotVals[p] !== undefined && slotVals[c] !== undefined) {
+      h += `<line class="edge" x1="${slot[p].x}" y1="${slot[p].y}" x2="${slot[c].x}" y2="${slot[c].y}" />`;
+    }
+  });
+  Object.keys(slot).forEach(s => {
+    const cls = state[s];
+    const present = slotVals[s] !== undefined;
+    if (!present && cls !== 'missing') return; // don't draw absent untouched slots
+    const c = slot[s];
+    const cc = cls ? ' ' + cls : '';
+    h += `<circle class="node-circle${cc}" cx="${c.x}" cy="${c.y}" r="20" />`;
+    h += present
+      ? `<text class="node-text" x="${c.x}" y="${c.y}">${slotVals[s]}</text>`
+      : `<text class="node-text nil" x="${c.x}" y="${c.y}">∅</text>`;
+  });
+  svg.innerHTML = h;
+}
+
+let cur = 0;
+function render(i) {
+  const st = steps[i];
+  renderTree($('svgP'), st.showP, st.pState);
+  renderTree($('svgQ'), st.showQ, st.qState);
+  $('caption').innerHTML = st.cap;
+  $('stepcount').textContent = `Step ${i+1} / ${steps.length}`;
+  $('prevBtn').disabled = i===0;
+  $('nextBtn').disabled = i===steps.length-1;
+}
+
+function loadScenario(name) {
+  scenario = name;
+  steps = buildSteps(name);
+  cur = 0;
+  $('caseSame').classList.toggle('on', name==='same');
+  $('caseDiff').classList.toggle('on', name==='diff');
+  render(0);
+}
+
+const go = d => { cur = Math.max(0, Math.min(steps.length-1, cur+d)); render(cur); };
+$('nextBtn').addEventListener('click', () => go(1));
+$('prevBtn').addEventListener('click', () => go(-1));
+$('caseSame').addEventListener('click', () => loadScenario('same'));
+$('caseDiff').addEventListener('click', () => loadScenario('diff'));
+loadScenario('same');
+</script>
+</body>
+</html>

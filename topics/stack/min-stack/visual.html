@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Min Stack — Two Parallel Stacks</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #1e293b;
+    --text: #e0e0e0; --muted: #94a3b8;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; padding: 36px 20px 70px; }
+  .wrap { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  h1 { font-size: 1.7rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy { background: var(--panel); border: 1px solid var(--amber); border-left: 5px solid var(--amber); border-radius: 12px; padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start; }
+  .analogy .icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy .label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px; }
+  .analogy p { font-size: 0.95rem; color: #d8d8e8; }
+  .analogy strong { color: #fff; }
+
+  .card { background: var(--panel); border: 1px solid #2d3a5a; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 22px; }
+  .section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 10px; }
+
+  .step-desc { background: var(--panel2); border-left: 4px solid var(--blue); border-radius: 8px; padding: 14px 16px; font-size: 0.96rem; min-height: 64px; display: flex; align-items: center; }
+  .step-desc code { background: #0f172a; padding: 1px 6px; border-radius: 5px; color: #ffd479; font-family: 'Consolas', monospace; }
+  .step-desc strong { color: #fff; }
+
+  /* op timeline */
+  .ops { display: flex; flex-wrap: wrap; gap: 8px; }
+  .op { padding: 7px 12px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 0.85rem; background: var(--panel2); border: 1px solid #2d3a5a; color: var(--muted); transition: all 0.3s; }
+  .op.active { border-color: var(--amber); background: rgba(245,158,11,0.16); color: #fcd34d; box-shadow: 0 0 0 2px rgba(245,158,11,0.3); }
+  .op.done { border-color: #2d3a5a; color: #64748b; opacity: 0.65; }
+
+  .stacks { display: flex; gap: 40px; justify-content: center; align-items: flex-end; padding: 6px 0; }
+  .stack-col { flex: 0 0 130px; }
+  .stack-col h4 { text-align: center; font-size: 0.82rem; margin-bottom: 8px; color: var(--muted); }
+  .stack-col.mins h4 { color: var(--green); }
+  .stack-base { border: 2px solid #2d3a5a; border-top: none; border-radius: 0 0 10px 10px; min-height: 210px; display: flex; flex-direction: column-reverse; padding: 8px; gap: 8px; background: rgba(255,255,255,0.02); justify-content: flex-start; }
+  .stack-base .empty { color: #5a6a90; font-size: 0.8rem; text-align: center; margin: auto; }
+  .plate { height: 42px; border-radius: 8px; display: grid; place-items: center; font-family: 'Consolas', monospace; font-weight: 700; font-size: 1.2rem; animation: push-in 0.32s cubic-bezier(0.34,1.56,0.64,1); }
+  .col-val .plate { background: rgba(59,130,246,0.22); border: 1px solid var(--blue); color: #bcd4ff; }
+  .col-min .plate { background: rgba(16,185,129,0.2); border: 1px solid var(--green); color: #6ee7b7; }
+  .plate.top { box-shadow: 0 0 0 2px rgba(245,158,11,0.55); }
+  @keyframes push-in { 0% { transform: translateY(-26px) scale(0.6); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+  .stack-foot { text-align: center; font-size: 0.72rem; color: var(--muted); margin-top: 8px; }
+
+  .getmin { display: flex; justify-content: center; }
+  .getmin-badge { display: inline-flex; gap: 10px; align-items: center; padding: 12px 22px; border-radius: 10px; background: rgba(16,185,129,0.14); border: 1.5px solid var(--green); color: #86efac; font-weight: 700; font-family: 'Consolas', monospace; font-size: 1.05rem; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 11px 24px; border-radius: 8px; border: none; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: var(--muted); border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .counter { font-size: 0.82rem; color: #5a6a90; margin-left: auto; }
+
+  .takeaway { background: var(--panel); border: 1px solid var(--blue); border-left: 5px solid var(--blue); border-radius: 12px; padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start; }
+  .takeaway .icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway .label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .takeaway p { font-size: 0.94rem; color: #d8d8e8; }
+  .takeaway strong { color: #fff; }
+
+  .code-block { background: #0f172a; border: 1px solid #2d3a5a; border-radius: 10px; padding: 18px 22px; font-family: 'Consolas', monospace; font-size: 0.8rem; line-height: 1.7; color: #94a3b8; overflow-x: auto; white-space: pre; }
+  .kw { color: #818cf8; } .fn { color: #38bdf8; } .cm { color: #475569; font-style: italic; } .num { color: #fb923c; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Min Stack &mdash; <span>Two Parallel Stacks</span></h1>
+
+  <div class="analogy">
+    <div class="icon">🧾</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>Stack receipts, but stick a <strong>sticky-note</strong> on each one saying
+      <em>"cheapest amount down to here"</em>. A new note = <code style="color:#ffd479">min(this value, note below)</code>.
+      Ask "cheapest so far?" → just read the <strong>top note</strong>. O(1).</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-desc" id="stepDesc">Press <strong>Next</strong> to run a sequence of operations.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Operation sequence</div>
+      <div class="ops" id="opsRow"></div>
+    </div>
+
+    <div class="stacks">
+      <div class="stack-col col-val">
+        <h4>value stack</h4>
+        <div class="stack-base" id="valBase"><span class="empty">empty</span></div>
+        <div class="stack-foot">▲ top</div>
+      </div>
+      <div class="stack-col col-min mins">
+        <h4>min stack &nbsp;(its top = current min)</h4>
+        <div class="stack-base" id="minBase"><span class="empty">empty</span></div>
+        <div class="stack-foot">▲ getMin() reads here</div>
+      </div>
+    </div>
+
+    <div class="getmin" id="getminWrap"></div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn">◀ Prev</button>
+      <button class="btn btn-primary" id="nextBtn">Next ▶</button>
+      <span class="counter" id="counter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key takeaway</div>
+      <p>Keep a <strong>second stack in lock-step</strong> whose top is always the
+      running minimum. Push two, pop two. <strong>getMin is just reading the top</strong>
+      of the min stack — O(1) for every operation, at the cost of O(n) extra space.</p>
+    </div>
+  </div>
+
+  <div class="code-block"><span class="kw">def</span> <span class="fn">push</span>(self, val):
+    self.stack.<span class="fn">append</span>(val)
+    m = val <span class="kw">if</span> <span class="kw">not</span> self.min_stack <span class="kw">else</span> <span class="fn">min</span>(val, self.min_stack[-<span class="num">1</span>])
+    self.min_stack.<span class="fn">append</span>(m)        <span class="cm"># lock-step</span>
+
+<span class="kw">def</span> <span class="fn">pop</span>(self):
+    self.stack.<span class="fn">pop</span>(); self.min_stack.<span class="fn">pop</span>()
+
+<span class="kw">def</span> <span class="fn">getMin</span>(self): <span class="kw">return</span> self.min_stack[-<span class="num">1</span>]   <span class="cm"># O(1)</span></div>
+</div>
+
+<script>
+  // Operation script. type: push(value) | pop | getMin
+  const SCRIPT = [
+    { type: "push", v: -2 },
+    { type: "push", v: 0 },
+    { type: "push", v: -3 },
+    { type: "getMin" },
+    { type: "pop" },
+    { type: "top" },
+    { type: "getMin" },
+  ];
+
+  // Build deterministic snapshots so Prev/Next replay cleanly.
+  const steps = [];
+  (function build() {
+    let val = [], mn = [];
+    SCRIPT.forEach(op => {
+      let desc = "", getmin = null, top = null;
+      if (op.type === "push") {
+        const m = mn.length === 0 ? op.v : Math.min(op.v, mn[mn.length - 1]);
+        val = val.concat([op.v]); mn = mn.concat([m]);
+        desc = `<strong>push(${op.v})</strong> → push ${op.v} on the value stack, and push <code>min(${op.v}, ${mn.length>1?mn[mn.length-2]:'∅'}) = ${m}</code> on the min stack.`;
+      } else if (op.type === "pop") {
+        const removed = val[val.length - 1];
+        val = val.slice(0, -1); mn = mn.slice(0, -1);
+        desc = `<strong>pop()</strong> → remove <code>${removed}</code> from both stacks. The min stack's new top now reflects the correct minimum automatically.`;
+      } else if (op.type === "top") {
+        top = val[val.length - 1];
+        desc = `<strong>top()</strong> → read the top of the value stack = <code>${top}</code>. (No change to either stack.)`;
+      } else if (op.type === "getMin") {
+        getmin = mn[mn.length - 1];
+        desc = `<strong>getMin()</strong> → just read the <strong>top of the min stack</strong> = <code>${getmin}</code>. No scan, O(1).`;
+      }
+      steps.push({ op: op.type, val: val.slice(), mn: mn.slice(), desc, getmin, top });
+    });
+  })();
+
+  const $ = id => document.getElementById(id);
+  const TOTAL = steps.length;
+  let cur = -1;
+
+  function opLabel(op) {
+    if (op.type === "push") return `push(${op.v})`;
+    if (op.type === "pop") return "pop()";
+    if (op.type === "top") return "top()";
+    return "getMin()";
+  }
+  function renderOps() {
+    $("opsRow").innerHTML = SCRIPT.map((op, i) => `<div class="op" id="op-${i}">${opLabel(op)}</div>`).join("");
+  }
+  function plates(arr, baseId, col) {
+    const base = $(baseId);
+    base.querySelectorAll(".plate").forEach(p => p.remove());
+    const emptyEl = base.querySelector(".empty");
+    emptyEl.style.display = arr.length ? "none" : "";
+    arr.forEach((v, i) => {
+      const p = document.createElement("div");
+      p.className = "plate" + (i === arr.length - 1 ? " top" : "");
+      p.textContent = v;
+      base.appendChild(p);
+    });
+  }
+  function render() {
+    SCRIPT.forEach((_, i) => {
+      const el = $("op-" + i);
+      el.className = "op" + (i === cur ? " active" : i < cur ? " done" : "");
+    });
+    if (cur < 0) {
+      plates([], "valBase"); plates([], "minBase");
+      $("stepDesc").innerHTML = `Press <strong>Next</strong> to run a sequence of operations.`;
+      $("getminWrap").innerHTML = "";
+      updateControls(); return;
+    }
+    const st = steps[cur];
+    plates(st.val, "valBase"); plates(st.mn, "minBase");
+    $("stepDesc").innerHTML = st.desc;
+    if (st.getmin !== null) {
+      $("getminWrap").innerHTML = `<div class="getmin-badge">getMin() ⟶ ${st.getmin}</div>`;
+    } else if (st.top !== null) {
+      $("getminWrap").innerHTML = `<div class="getmin-badge" style="background:rgba(59,130,246,0.14);border-color:#3b82f6;color:#bcd4ff;">top() ⟶ ${st.top}</div>`;
+    } else {
+      $("getminWrap").innerHTML = "";
+    }
+    updateControls();
+  }
+  function updateControls() {
+    $("counter").textContent = `Step ${cur + 1} / ${TOTAL}`;
+    $("prevBtn").disabled = cur < 0;
+    $("nextBtn").disabled = cur >= TOTAL - 1;
+  }
+  $("nextBtn").addEventListener("click", () => { if (cur < TOTAL - 1) { cur++; render(); } });
+  $("prevBtn").addEventListener("click", () => { if (cur >= 0) { cur--; render(); } });
+  $("resetBtn").addEventListener("click", () => { cur = -1; render(); });
+
+  renderOps();
+  render();
+</script>
+</body>
+</html>

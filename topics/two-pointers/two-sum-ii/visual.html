@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Two Sum II — Converging Pointers on a Sorted Array</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a;
+    --text: #e0e0e0; --muted: #7a8ab0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px 60px; gap: 28px; line-height: 1.5;
+  }
+  h1 { font-size: 1.75rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue); border-radius: 12px;
+    padding: 18px 24px; max-width: 760px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 2rem; flex-shrink: 0; line-height: 1; }
+  .analogy-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .analogy-text { font-size: 0.97rem; color: #c0c0d0; }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 860px; width: 100%;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+  .step-description {
+    min-height: 56px; background: var(--panel2); border-radius: 8px;
+    padding: 14px 18px; font-size: 0.95rem; color: #c8c8e0;
+    border-left: 3px solid var(--blue); transition: border-color .3s;
+  }
+  .step-description.up   { border-color: var(--green); }
+  .step-description.down { border-color: var(--amber); }
+  .step-description.hit  { border-color: var(--green); }
+
+  .arr-wrap { position: relative; padding-top: 30px; }
+  .arr-row { display: flex; gap: 12px; align-items: flex-end; justify-content: center; flex-wrap: wrap; }
+  .cell {
+    width: 60px; height: 64px; border-radius: 10px; border: 2px solid #2d3a5a;
+    background: var(--panel2); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 700;
+    position: relative;
+    transition: border-color .35s, background .35s, transform .35s, box-shadow .35s;
+  }
+  .cell .idx { position: absolute; bottom: 3px; font-size: 0.55rem; font-weight: 400; color: #5a6a90; }
+  .cell.pl { border-color: var(--blue); background: #1e3a6e; color: #bcd4ff;
+    box-shadow: 0 0 16px rgba(59,130,246,0.45); transform: translateY(-5px); }
+  .cell.pr { border-color: var(--amber); background: #3a2a08; color: #fcd9a0;
+    box-shadow: 0 0 16px rgba(245,158,11,0.45); transform: translateY(-5px); }
+  .cell.both { border-color: var(--green); background: #0d2a1a; color: #86efac;
+    box-shadow: 0 0 18px rgba(16,185,129,0.5); transform: translateY(-5px); }
+  .cell.dim { opacity: 0.4; }
+  .cell .ptr-label {
+    position: absolute; top: -26px; font-size: 0.72rem; font-weight: 700;
+    padding: 1px 7px; border-radius: 5px;
+  }
+  .cell .ptr-label.l { color: #bcd4ff; background: #1e3a6e; }
+  .cell .ptr-label.r { color: #fcd9a0; background: #3a2a08; }
+
+  .sumbar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 1.05rem; }
+  .sumbar .pill {
+    background: var(--panel2); border: 1px solid #2d3a5a; border-radius: 8px;
+    padding: 8px 16px; font-family: 'Consolas', monospace;
+  }
+  .sumbar .pill b { color: #ffd479; }
+  .cmp { font-size: 1.3rem; font-weight: 800; }
+  .cmp.lt { color: var(--green); } .cmp.gt { color: var(--amber); } .cmp.eq { color: var(--green); }
+
+  .result-badge { display: none; align-items: center; gap: 12px; padding: 15px 20px;
+    border-radius: 10px; font-size: 1rem; font-weight: 600; }
+  .result-badge.show { display: flex; }
+  .result-badge.ok { background: #0d2a1a; border: 1.5px solid var(--green); color: #86efac; }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn { padding: 11px 24px; border-radius: 8px; border: none; font-size: 0.92rem;
+    font-weight: 600; cursor: pointer; transition: background .2s, transform .1s, opacity .2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+
+  .takeaway { background: var(--panel); border: 1px solid #2d3a5a; border-radius: 12px;
+    padding: 18px 24px; max-width: 760px; width: 100%; display: flex; gap: 16px; align-items: flex-start; }
+  .takeaway-icon { font-size: 1.6rem; flex-shrink: 0; }
+  .takeaway-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .takeaway p { font-size: 0.94rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+  <h1>Two Sum II &mdash; <span>Converging Pointers</span> on a Sorted Array</h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">⚖️</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Ek <strong>taraazu</strong>: sabse halka item left palde me, sabse bhaari right me.
+        Sum <strong>zyada</strong> hai? right ko andar lao (halka karo). <strong>Kam</strong> hai?
+        left ko andar lao (bhaari karo). Sorted hone se yeh kaam karta.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press &ldquo;Next&rdquo;. target = <code style="color:#ffd479">10</code>.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Sorted array &mdash; <code style="color:#5a6a90">[2, 3, 4, 7, 8, 11]</code>, target = 10</div>
+      <div class="arr-wrap"><div class="arr-row" id="arrRow"></div></div>
+    </div>
+
+    <div>
+      <div class="section-label">Current sum vs target</div>
+      <div class="sumbar" id="sumBar">
+        <span class="pill" id="sumPill">numbers[l] + numbers[r] = &mdash;</span>
+        <span class="cmp" id="cmpSign">&mdash;</span>
+        <span class="pill">target = <b>10</b></span>
+      </div>
+    </div>
+
+    <div class="result-badge" id="resultBadge"><span id="resultIcon"></span><span id="resultText"></span></div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        On a <strong>sorted</strong> array, one move predictably grows or shrinks the sum &mdash;
+        so two pointers find the pair in <strong>O(n) time, O(1) space</strong>, beating the hash-map's O(n) space.
+      </p>
+    </div>
+  </div>
+
+<script>
+  const NUMS = [2, 3, 4, 7, 8, 11];
+  const TARGET = 10;
+
+  // Build steps deterministically.
+  function buildSteps() {
+    const steps = [];
+    let l = 0, r = NUMS.length - 1;
+    while (l < r) {
+      const s = NUMS[l] + NUMS[r];
+      if (s === TARGET) {
+        steps.push({ l, r, sum: s, type: 'hit',
+          desc: `<code>${NUMS[l]} + ${NUMS[r]} = ${s}</code> &mdash; <strong style="color:#10b981">equals target!</strong> Answer = 1-indexed <code>[${l + 1}, ${r + 1}]</code>.` });
+        break;
+      } else if (s < TARGET) {
+        steps.push({ l, r, sum: s, type: 'lt',
+          desc: `<code>${NUMS[l]} + ${NUMS[r]} = ${s}</code> &lt; target ${TARGET}. Need bigger &rarr; <code>l += 1</code>.` });
+        l++;
+      } else {
+        steps.push({ l, r, sum: s, type: 'gt',
+          desc: `<code>${NUMS[l]} + ${NUMS[r]} = ${s}</code> &gt; target ${TARGET}. Need smaller &rarr; <code>r -= 1</code>.` });
+        r--;
+      }
+    }
+    return steps;
+  }
+
+  const steps = buildSteps();
+  const TOTAL = steps.length;
+  let cur = -1;
+
+  // Render array cells once
+  const arrRow = document.getElementById('arrRow');
+  NUMS.forEach((v, i) => {
+    const d = document.createElement('div');
+    d.className = 'cell'; d.id = 'cell-' + i;
+    d.innerHTML = `${v}<span class="idx">i=${i + 1}</span>`;
+    arrRow.appendChild(d);
+  });
+
+  const stepDesc = document.getElementById('stepDesc');
+  const stepCtr  = document.getElementById('stepCounter');
+  const nextBtn  = document.getElementById('nextBtn');
+  const prevBtn  = document.getElementById('prevBtn');
+  const sumPill  = document.getElementById('sumPill');
+  const cmpSign  = document.getElementById('cmpSign');
+  const badge    = document.getElementById('resultBadge');
+  const rIcon    = document.getElementById('resultIcon');
+  const rText    = document.getElementById('resultText');
+
+  function clearCells() {
+    NUMS.forEach((_, i) => {
+      const el = document.getElementById('cell-' + i);
+      el.className = 'cell';
+      const lbl = el.querySelector('.ptr-label'); if (lbl) lbl.remove();
+    });
+  }
+  function addLabel(i, which) {
+    const el = document.getElementById('cell-' + i);
+    const sp = document.createElement('span');
+    sp.className = 'ptr-label ' + which;
+    sp.textContent = which === 'l' ? 'l' : 'r';
+    el.appendChild(sp);
+  }
+
+  function renderTo(k) {
+    clearCells();
+    badge.className = 'result-badge';
+    if (k < 0) {
+      stepDesc.innerHTML = 'Press &ldquo;Next&rdquo;. l starts at the smallest, r at the largest. target = <code style="color:#ffd479">10</code>.';
+      stepDesc.className = 'step-description';
+      sumPill.innerHTML = 'numbers[l] + numbers[r] = &mdash;';
+      cmpSign.textContent = '—'; cmpSign.className = 'cmp';
+      stepCtr.textContent = `Step 0 / ${TOTAL}`;
+      prevBtn.disabled = true; nextBtn.disabled = false;
+      // show initial pointers dimmed
+      addLabel(0, 'l'); addLabel(NUMS.length - 1, 'r');
+      document.getElementById('cell-0').classList.add('pl');
+      document.getElementById('cell-' + (NUMS.length - 1)).classList.add('pr');
+      return;
+    }
+    const s = steps[k];
+    NUMS.forEach((_, i) => {
+      if (i < s.l || i > s.r) document.getElementById('cell-' + i).classList.add('dim');
+    });
+    if (s.type === 'hit') {
+      document.getElementById('cell-' + s.l).classList.add('both');
+      document.getElementById('cell-' + s.r).classList.add('both');
+      badge.className = 'result-badge show ok';
+      rIcon.textContent = '🟢';
+      rText.textContent = `return [${s.l + 1}, ${s.r + 1}] — found the pair.`;
+      cmpSign.textContent = '='; cmpSign.className = 'cmp eq';
+      stepDesc.className = 'step-description hit';
+    } else {
+      document.getElementById('cell-' + s.l).classList.add('pl');
+      document.getElementById('cell-' + s.r).classList.add('pr');
+      if (s.type === 'lt') { cmpSign.textContent = '<'; cmpSign.className = 'cmp lt'; stepDesc.className = 'step-description up'; }
+      else { cmpSign.textContent = '>'; cmpSign.className = 'cmp gt'; stepDesc.className = 'step-description down'; }
+    }
+    addLabel(s.l, 'l'); addLabel(s.r, 'r');
+    sumPill.innerHTML = `numbers[${s.l + 1}] + numbers[${s.r + 1}] = ${NUMS[s.l]} + ${NUMS[s.r]} = <b>${s.sum}</b>`;
+    stepDesc.innerHTML = s.desc;
+    stepCtr.textContent = `Step ${k + 1} / ${TOTAL}`;
+    prevBtn.disabled = false;
+    nextBtn.disabled = (k >= TOTAL - 1);
+  }
+
+  function next() { if (cur < TOTAL - 1) { cur++; renderTo(cur); } }
+  function prev() { if (cur >= 0) { cur--; renderTo(cur); } }
+  function reset() { cur = -1; renderTo(cur); }
+
+  reset();
+</script>
+</body>
+</html>

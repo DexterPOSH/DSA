@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Daily Temperatures — Monotonic Stack Walkthrough</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --border: #2d3a5a;
+  }
+  * , *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6;
+    padding: 36px 20px 70px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+  h1 {
+    font-size: 1.7rem;
+    text-align: center;
+    letter-spacing: -0.01em;
+  }
+  h1 span { color: var(--amber); }
+  .wrap { width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 26px; }
+
+  .analogy {
+    background: var(--panel);
+    border: 1px solid var(--amber);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 18px 22px;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .analogy .icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px;
+  }
+  .analogy p { color: #c8c8e0; font-size: 0.97rem; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 26px 28px 30px;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+
+  .step-desc {
+    min-height: 62px;
+    background: var(--panel2);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 0.95rem;
+    color: #c8c8e0;
+    border-left: 3px solid var(--blue);
+    transition: border-color 0.3s;
+  }
+  .step-desc.pop  { border-color: var(--green); }
+  .step-desc.push { border-color: var(--amber); }
+  .step-desc code { color: #ffd479; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+  .section-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+
+  /* histogram-ish array of temperature bars */
+  .temps { display: flex; gap: 8px; align-items: flex-end; }
+  .tbar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .tbar .bar {
+    width: 100%;
+    border-radius: 6px 6px 0 0;
+    background: #243456;
+    border: 2px solid var(--border);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 6px;
+    font-weight: 700; font-size: 0.95rem;
+    color: #cdd7f0;
+    transition: all 0.35s ease;
+  }
+  .tbar.current .bar {
+    border-color: var(--blue);
+    background: #1e3a6e;
+    box-shadow: 0 0 16px rgba(59,130,246,0.45);
+  }
+  .tbar.instack .bar {
+    border-color: var(--amber);
+    background: #3a2e10;
+    color: #ffd479;
+  }
+  .tbar.resolved .bar {
+    border-color: var(--green);
+    background: #0d2a1a;
+    color: #86efac;
+  }
+  .tbar .idx { font-size: 0.66rem; color: #5a6a90; font-family: 'SF Mono', Menlo, monospace; }
+  .tbar .ans {
+    font-size: 0.78rem; font-weight: 700; min-height: 18px;
+    font-family: 'SF Mono', Menlo, monospace; color: #5a6a90;
+  }
+  .tbar .ans.set { color: var(--green); }
+
+  /* stack panel */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+  .stack-area {
+    background: var(--panel2);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    min-height: 150px;
+    display: flex; flex-direction: column-reverse; gap: 8px; justify-content: flex-start;
+  }
+  .stack-hint { font-size: 0.82rem; color: #3a4a6a; font-style: italic; text-align: center; margin: auto; }
+  .schip {
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: #3a2e10;
+    border: 1.5px solid var(--amber);
+    color: #ffd479;
+    font-size: 0.9rem; font-weight: 700;
+    font-family: 'SF Mono', Menlo, monospace;
+    display: flex; justify-content: space-between; gap: 10px;
+    animation: popin 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .schip.popping {
+    background: #0d2a1a; border-color: var(--green); color: #86efac;
+  }
+  @keyframes popin { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+  .ansbox {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    min-height: 150px;
+  }
+  .ansrow { display: flex; gap: 6px; flex-wrap: wrap; }
+  .acell {
+    width: 38px; height: 38px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'SF Mono', Menlo, monospace; font-weight: 700; font-size: 0.9rem;
+    background: #141e36; border: 1.5px solid var(--border); color: #5a6a90;
+    transition: all 0.3s;
+  }
+  .acell.filled { border-color: var(--green); background: #0d2a1a; color: #86efac; }
+  .acell.justset { box-shadow: 0 0 12px rgba(16,185,129,0.5); }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.93rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid var(--border); }
+  .btn-secondary:hover { background: #263248; }
+  .counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; font-family: 'SF Mono', Menlo, monospace; }
+
+  .takeaway {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--blue);
+    border-radius: 12px;
+    padding: 18px 22px;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .takeaway .icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.95rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+</style>
+</head>
+<body>
+  <h1>Daily Temperatures &mdash; <span>Monotonic Stack</span> Walkthrough</h1>
+
+  <div class="wrap">
+    <div class="analogy">
+      <div class="icon">🌡️</div>
+      <div>
+        <div class="label">Real-world analogy</div>
+        <p>Line me khade log puchh rahe: "mere aage pehla <strong>taller</strong> banda kaun, kitni door?"
+        Stack me un logon ko rakho jinhe abhi taller nahi mila (heights <strong>decreasing</strong>).
+        Naya taller banda aate hi unka jawab ban jaata — pop karo aur distance de do.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div>
+        <div class="section-label">Step description</div>
+        <div class="step-desc" id="stepDesc">Press <strong>Next</strong> to walk through. We push each day's index; a warmer day pops & resolves the days waiting below it.</div>
+      </div>
+
+      <div>
+        <div class="section-label">temperatures &nbsp;<code style="color:#5a6a90;font-size:0.75rem">[73, 74, 75, 71, 69, 72, 76, 73]</code></div>
+        <div class="temps" id="temps"></div>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <div class="section-label">stack &nbsp;<span style="color:#5a6a90;font-size:0.72rem">(indices, temps decreasing top↓bottom)</span></div>
+          <div class="stack-area" id="stackArea"><span class="stack-hint" id="stackHint">empty</span></div>
+        </div>
+        <div>
+          <div class="section-label">answer &nbsp;<span style="color:#5a6a90;font-size:0.72rem">(days to wait)</span></div>
+          <div class="ansbox"><div class="ansrow" id="ansRow"></div></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-secondary" id="prevBtn" onclick="prev()">◀ Prev</button>
+        <button class="btn btn-primary" id="nextBtn" onclick="next()">Next ▶</button>
+        <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+        <span class="counter" id="counter">Step 0 / 0</span>
+      </div>
+    </div>
+
+    <div class="takeaway">
+      <div class="icon">💡</div>
+      <div>
+        <div class="label">Key takeaway</div>
+        <p>Keep a stack of <strong>indices whose answer is still pending</strong>, with temperatures
+        decreasing. Each index is pushed once and popped once when a warmer day arrives, giving
+        <strong>O(n) time</strong> instead of the O(n²) brute force.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+const temps = [73, 74, 75, 71, 69, 72, 76, 73];
+const n = temps.length;
+const maxT = Math.max(...temps);
+
+// ── Precompute discrete steps by simulating the algorithm ──────────────────
+// Each step is a full snapshot: { stack, answer, current, desc, kind }
+function buildSteps() {
+  const steps = [];
+  const stack = [];
+  const answer = Array(n).fill(null);
+
+  steps.push({
+    stack: [], answer: answer.slice(), current: -1,
+    kind: 'init',
+    desc: 'Start. <code>stack</code> is empty, <code>answer</code> all 0. We scan left → right pushing indices.'
+  });
+
+  for (let i = 0; i < n; i++) {
+    // pop all colder days that just found their warmer day
+    while (stack.length && temps[i] > temps[stack[stack.length - 1]]) {
+      const prev = stack.pop();
+      answer[prev] = i - prev;
+      steps.push({
+        stack: stack.slice(), answer: answer.slice(), current: i, popped: prev,
+        kind: 'pop',
+        desc: `Day <code>${i}</code> (temp <code>${temps[i]}</code>) is warmer than day <code>${prev}</code> (temp <code>${temps[prev]}</code>) on the stack. ` +
+              `Pop it → its wait is <code>${i} − ${prev} = ${i - prev}</code> day(s).`
+      });
+    }
+    stack.push(i);
+    steps.push({
+      stack: stack.slice(), answer: answer.slice(), current: i, pushed: i,
+      kind: 'push',
+      desc: `Push day <code>${i}</code> (temp <code>${temps[i]}</code>). Its warmer day isn't found yet — it waits on the stack.`
+    });
+  }
+
+  steps.push({
+    stack: stack.slice(), answer: answer.slice(), current: -1,
+    kind: 'done',
+    desc: `Scan finished. Days still on the stack (<code>${stack.join(', ')}</code>) never found a warmer day → their answer stays <code>0</code>. ✅`
+  });
+  return steps;
+}
+
+const steps = buildSteps();
+let cur = 0;
+
+const $ = id => document.getElementById(id);
+
+// build static DOM
+(function buildDom() {
+  let th = '';
+  for (let i = 0; i < n; i++) {
+    const hpx = 40 + Math.round((temps[i] / maxT) * 70);
+    th += `<div class="tbar" id="tb${i}">
+      <div class="ans" id="ans${i}">·</div>
+      <div class="bar" id="bar${i}" style="height:${hpx}px">${temps[i]}</div>
+      <div class="idx">i=${i}</div>
+    </div>`;
+  }
+  $('temps').innerHTML = th;
+
+  let ah = '';
+  for (let i = 0; i < n; i++) ah += `<div class="acell" id="ac${i}">0</div>`;
+  $('ansRow').innerHTML = ah;
+})();
+
+function render() {
+  const s = steps[cur];
+
+  // temps bars
+  for (let i = 0; i < n; i++) {
+    const tb = $('tb' + i);
+    tb.className = 'tbar';
+    if (s.answer[i] !== null) tb.classList.add('resolved');
+    else if (s.stack.includes(i)) tb.classList.add('instack');
+    if (i === s.current && (s.kind === 'push' || s.kind === 'pop')) tb.classList.add('current');
+
+    const ansEl = $('ans' + i);
+    if (s.answer[i] !== null) { ansEl.textContent = '↑' + s.answer[i]; ansEl.classList.add('set'); }
+    else { ansEl.textContent = '·'; ansEl.classList.remove('set'); }
+  }
+
+  // stack
+  const sa = $('stackArea');
+  sa.innerHTML = '';
+  if (s.stack.length === 0) {
+    sa.innerHTML = '<span class="stack-hint">empty</span>';
+  } else {
+    s.stack.forEach(idx => {
+      const chip = document.createElement('div');
+      chip.className = 'schip';
+      chip.innerHTML = `<span>idx ${idx}</span><span>temp ${temps[idx]}</span>`;
+      sa.appendChild(chip);
+    });
+  }
+
+  // answer array
+  for (let i = 0; i < n; i++) {
+    const ac = $('ac' + i);
+    const v = s.answer[i] === null ? 0 : s.answer[i];
+    ac.textContent = v;
+    ac.classList.toggle('filled', s.answer[i] !== null);
+    ac.classList.toggle('justset', s.kind === 'pop' && s.popped === i);
+  }
+
+  // desc
+  const d = $('stepDesc');
+  d.className = 'step-desc' + (s.kind === 'pop' ? ' pop' : s.kind === 'push' ? ' push' : '');
+  d.innerHTML = s.desc;
+
+  $('counter').textContent = `Step ${cur} / ${steps.length - 1}`;
+  $('prevBtn').disabled = cur === 0;
+  $('nextBtn').disabled = cur === steps.length - 1;
+}
+
+function next() { if (cur < steps.length - 1) { cur++; render(); } }
+function prev() { if (cur > 0) { cur--; render(); } }
+function reset() { cur = 0; render(); }
+
+render();
+</script>
+</body>
+</html>

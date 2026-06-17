@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Construct Tree from Preorder + Inorder</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #232342;
+    --text: #e0e0e0; --muted: #9a9ac0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444; --purple:#a855f7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6; padding: 32px 20px 80px; }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; } h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; }
+
+  .analogy { background: var(--panel); border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1rem; } .analogy p { margin: 0; }
+
+  .stage { background: var(--panel); border-radius: 14px; padding: 18px 22px 22px;
+    margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.07); }
+
+  .arr-label { color: var(--muted); font-family: "SF Mono", Menlo, monospace; font-size: 0.85rem; margin: 6px 0 6px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .cell { min-width: 42px; height: 42px; border-radius: 8px; display: grid; place-items: center;
+    font-weight: 700; font-family: "SF Mono", Menlo, monospace; background: var(--panel2);
+    border: 1px solid rgba(255,255,255,0.1); transition: all .3s; position: relative; }
+  .cell.root    { background: rgba(59,130,246,0.32); border-color: var(--blue); color: #bcd4ff; }
+  .cell.leftwin { background: rgba(16,185,129,0.16); border-color: var(--green); }
+  .cell.rightwin{ background: rgba(168,85,247,0.16); border-color: var(--purple); }
+  .cell.dim     { opacity: 0.32; }
+
+  svg { width: 100%; height: 300px; display: block; margin-top: 6px; }
+  .edge { stroke: #44476a; stroke-width: 2.5; transition: opacity .3s; }
+  .edge.hidden { opacity: 0; }
+  .node-circle { fill: var(--panel2); stroke: #44476a; stroke-width: 2.5; transition: all .35s; opacity: 0; }
+  .node-circle.show { opacity: 1; }
+  .node-circle.new { fill: rgba(59,130,246,0.32); stroke: var(--blue); stroke-width: 4; }
+  .node-val { fill: var(--text); font-size: 17px; font-weight: 700; text-anchor: middle;
+    font-family: "SF Mono", Menlo, monospace; opacity: 0; transition: opacity .35s; }
+  .node-val.show { opacity: 1; }
+
+  .caption { margin-top: 8px; background: var(--panel2); border-radius: 10px; padding: 14px 16px;
+    border-left: 4px solid var(--blue); min-height: 60px; font-size: 0.97rem; }
+  .caption.ok { border-left-color: var(--green); }
+  .caption code { background: var(--bg); padding: 1px 6px; border-radius: 5px; color: #ffd479; font-family: "SF Mono", Menlo, monospace; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:0.82rem; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .sw { width:14px; height:14px; border-radius:4px; display:inline-block; }
+
+  .controls { text-align: center; margin: 20px 0 8px; }
+  button { background: var(--blue); color: #fff; border: none; padding: 10px 22px; border-radius: 10px;
+    font-size: 0.98rem; font-weight: 600; cursor: pointer; transition: transform .15s, background .2s; }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #34345c; }
+  .progress { color: var(--muted); font-size: 0.88rem; margin-top: 10px; }
+
+  .takeaway { background: var(--panel); border: 1px solid rgba(59,130,246,0.4); border-left: 5px solid var(--blue);
+    border-radius: 12px; padding: 18px 22px; margin-top: 26px; }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); } .takeaway p { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Construct Tree — <span>preorder</span> gives roots, <span>inorder</span> gives the split</h1>
+  <p class="subtitle">preorder = [3, 9, 20, 15, 7] · inorder = [9, 3, 15, 20, 7]</p>
+
+  <div class="analogy">
+    <h3>🌳 Analogy</h3>
+    <p>Preorder ka <b>pehla naam hamesha root</b>. Inorder me us root ke <b>left wale = left subtree</b>, <b>right wale = right subtree</b>. Root pakdo, inorder ko do parts me todo, dono pe dobara karo.</p>
+  </div>
+
+  <div class="stage">
+    <div class="arr-label">preorder (root pointer →)</div>
+    <div class="row" id="preRow"></div>
+    <div class="arr-label">inorder (current window)</div>
+    <div class="row" id="inRow"></div>
+
+    <div class="legend">
+      <span><i class="sw" style="background:rgba(59,130,246,0.5)"></i> root</span>
+      <span><i class="sw" style="background:rgba(16,185,129,0.4)"></i> left subtree window</span>
+      <span><i class="sw" style="background:rgba(168,85,247,0.4)"></i> right subtree window</span>
+    </div>
+
+    <svg viewBox="0 0 720 300" id="tree"></svg>
+    <div class="caption" id="caption">Press <b>Next ▶</b>. We process preorder left-to-right; each value becomes a root and splits its inorder window.</div>
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prev" disabled>◀ Prev</button>
+    <button id="next">Next ▶</button>
+    <button class="ghost" id="reset">↺ Reset</button>
+    <div class="progress" id="prog">Step 0</div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Preorder pointer ek-ek root deta hai; inorder me us root ki position left/right subtree windows me todti hai. <b>Left pehle build karo</b> (preorder = root, L, R). A hashmap of inorder indices makes it O(n).</p>
+  </div>
+</div>
+
+<script>
+const PRE = [3, 9, 20, 15, 7];
+const IN  = [9, 3, 15, 20, 7];
+// inorder index map
+const idx = {}; IN.forEach((v,i)=> idx[v]=i);
+
+// Final tree node positions for the resulting tree:
+//        3
+//       / \
+//      9   20
+//         /  \
+//        15   7
+const NODES = {
+  v3:  { x: 360, y: 50,  val: 3,  l:'v9',  r:'v20' },
+  v9:  { x: 200, y: 150, val: 9,  l:null,  r:null },
+  v20: { x: 520, y: 150, val: 20, l:'v15', r:'v7' },
+  v15: { x: 440, y: 250, val: 15, l:null,  r:null },
+  v7:  { x: 600, y: 250, val: 7,  l:null,  r:null },
+};
+const EDGES = [['v3','v9','e1'],['v3','v20','e2'],['v20','v15','e3'],['v20','v7','e4']];
+const key = v => 'v'+v;
+
+// Steps: preIdx = which preorder cell is current root, inLo..inHi window,
+// leftWin/rightWin = inorder cells split, placed = nodes shown so far, newNode = node to flash.
+const STEPS = [
+  { preIdx:0, inLo:0, inHi:4, root:3, mid:1,
+    cap:'Preorder[0] = <code>3</code> → ROOT. Find 3 in inorder (index 1). Left of it = <code>[9]</code> (left subtree), right = <code>[15,20,7]</code> (right subtree).',
+    placed:['v3'], newNode:'v3', edges:[] },
+  { preIdx:1, inLo:0, inHi:0, root:9, mid:0,
+    cap:'Recurse LEFT first. Next preorder value <code>9</code> → root of left subtree. Its inorder window is just <code>[9]</code> → it\'s a leaf. Attach under 3.',
+    placed:['v3','v9'], newNode:'v9', edges:['e1'] },
+  { preIdx:2, inLo:2, inHi:4, root:20, mid:3,
+    cap:'Left subtree done. Next preorder <code>20</code> → root of 3\'s RIGHT subtree, inorder window <code>[15,20,7]</code>. 20 sits at index 3 → left = <code>[15]</code>, right = <code>[7]</code>.',
+    placed:['v3','v9','v20'], newNode:'v20', edges:['e1','e2'] },
+  { preIdx:3, inLo:2, inHi:2, root:15, mid:2,
+    cap:'Recurse left of 20. Preorder <code>15</code>, window <code>[15]</code> → leaf. Attach as 20\'s left child.',
+    placed:['v3','v9','v20','v15'], newNode:'v15', edges:['e1','e2','e3'] },
+  { preIdx:4, inLo:4, inHi:4, root:7, mid:4,
+    cap:'Last preorder value <code>7</code>, window <code>[7]</code> → leaf, 20\'s right child. <b>Tree fully reconstructed!</b>',
+    placed:['v3','v9','v20','v15','v7'], newNode:'v7', edges:['e1','e2','e3','e4'], done:true },
+];
+
+const $ = id => document.getElementById(id);
+function buildStatic() {
+  $('preRow').innerHTML = PRE.map((v,i)=>`<div class="cell" id="p${i}">${v}</div>`).join('');
+  $('inRow').innerHTML  = IN.map((v,i)=>`<div class="cell" id="in${i}">${v}</div>`).join('');
+  let h = '';
+  EDGES.forEach(([a,b,e]) => {
+    h += `<line class="edge hidden" id="${e}" x1="${NODES[a].x}" y1="${NODES[a].y}" x2="${NODES[b].x}" y2="${NODES[b].y}"/>`;
+  });
+  for (const id in NODES) {
+    const n = NODES[id];
+    h += `<g>
+      <circle class="node-circle" id="c-${id}" cx="${n.x}" cy="${n.y}" r="25"/>
+      <text class="node-val" id="t-${id}" x="${n.x}" y="${n.y + 6}">${n.val}</text>
+    </g>`;
+  }
+  $('tree').innerHTML = h;
+}
+
+let i = -1;
+function clearStates() {
+  PRE.forEach((_,k)=> $('p'+k).className = 'cell');
+  IN.forEach((_,k)=> $('in'+k).className = 'cell');
+  EDGES.forEach(([,,e])=> $(e).classList.add('hidden'));
+  for (const id in NODES) {
+    $('c-'+id).classList.remove('show','new');
+    $('t-'+id).classList.remove('show');
+  }
+}
+
+function render() {
+  clearStates();
+  if (i < 0) {
+    $('caption').className = 'caption';
+    $('caption').innerHTML = 'Press <b>Next ▶</b>. We process preorder left-to-right; each value becomes a root and splits its inorder window.';
+    $('prog').textContent = 'Step 0';
+  } else {
+    const st = STEPS[i];
+    // preorder: dim all consumed except current root
+    PRE.forEach((_,k) => {
+      if (k < st.preIdx) $('p'+k).classList.add('dim');
+      if (k === st.preIdx) $('p'+k).classList.add('root');
+    });
+    // inorder window colouring
+    IN.forEach((_,k) => {
+      if (k < st.inLo || k > st.inHi) { $('in'+k).classList.add('dim'); return; }
+      if (k === st.mid) $('in'+k).classList.add('root');
+      else if (k < st.mid) $('in'+k).classList.add('leftwin');
+      else $('in'+k).classList.add('rightwin');
+    });
+    // tree
+    st.placed.forEach(id => { $('c-'+id).classList.add('show'); $('t-'+id).classList.add('show'); });
+    $('c-'+st.newNode).classList.add('new');
+    (st.edges||[]).forEach(e => $(e).classList.remove('hidden'));
+    $('caption').className = 'caption ' + (st.done ? 'ok' : '');
+    $('caption').innerHTML = st.cap;
+    $('prog').textContent = `Step ${i+1} / ${STEPS.length}`;
+  }
+  $('prev').disabled = i < 0;
+  $('next').disabled = i >= STEPS.length - 1;
+}
+
+$('next').onclick  = () => { if (i < STEPS.length-1) { i++; render(); } };
+$('prev').onclick  = () => { if (i >= 0) { i--; render(); } };
+$('reset').onclick = () => { i = -1; render(); };
+
+buildStatic();
+render();
+</script>
+</body>
+</html>

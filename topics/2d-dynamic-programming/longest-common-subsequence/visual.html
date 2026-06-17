@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Longest Common Subsequence — Filling the 2-D DP Table</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.85rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.05rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel); border-radius: 12px; padding: 16px 22px;
+    margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .controls { text-align: center; margin: 6px 0 22px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); margin: 0 6px; }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+
+  .stage {
+    background: var(--panel); border-radius: 14px; padding: 22px 22px 26px;
+    border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .tablewrap { display:flex; justify-content:center; overflow-x:auto; padding-bottom:6px; }
+  table.dp { border-collapse: separate; border-spacing: 6px; }
+  .dp th {
+    color: var(--muted); font-family:"SF Mono",Menlo,monospace; font-weight:700;
+    width: 50px; height: 38px; font-size: 1.05rem;
+  }
+  .dp th.chr { color: var(--amber); }
+  .dp th.corner { color: #555; }
+  .dp td {
+    width: 50px; height: 46px; border-radius: 9px; text-align:center; vertical-align:middle;
+    font-family:"SF Mono",Menlo,monospace; font-weight:700; font-size:1.15rem;
+    background: var(--panel2); border: 1px solid rgba(255,255,255,0.08);
+    color: #555; transition: all .3s ease; position: relative;
+  }
+  .dp td.base { background: rgba(59,130,246,0.14); border-color: rgba(59,130,246,0.4); color:#9bbcf5; }
+  .dp td.done { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.35); color:#b6f0d8; }
+  .dp td.active {
+    background: rgba(245,158,11,0.24); border-color: var(--amber); color:#ffe6b0;
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.4); transform: scale(1.08);
+  }
+  .dp td.dep { box-shadow: 0 0 0 3px var(--green); background: rgba(16,185,129,0.26); color:#d6ffe9; }
+  .dp td.diag { box-shadow: 0 0 0 3px var(--purple); background: rgba(168,85,247,0.26); color:#eed6ff; }
+
+  .caption {
+    margin-top: 18px; background: var(--panel2); border-radius: 10px;
+    padding: 14px 16px; border-left: 4px solid var(--amber); font-size:.98rem; min-height: 64px;
+  }
+  .caption .match { color: var(--green); font-weight:700; }
+  .caption .nomatch { color: var(--amber); font-weight:700; }
+  .caption .eq { color: #ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .stepcount { text-align:center; color:var(--muted); font-size:.85rem; margin-top:12px; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-top:16px; font-size:.82rem; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .swatch { width:14px; height:14px; border-radius:4px; display:inline-block; border:1px solid rgba(255,255,255,.15); }
+  .sw-active { background: var(--amber); }
+  .sw-diag { background: var(--purple); }
+  .sw-dep { background: var(--green); }
+  .sw-done { background: rgba(16,185,129,0.4); }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px;
+    padding: 18px 24px; margin-top: 28px; text-align:center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.05rem; }
+  .recurrence {
+    font-family:"SF Mono",Menlo,monospace; color:#ffd479; background: var(--panel2);
+    border-radius:8px; padding:10px 14px; margin: 4px 0 16px; font-size:.92rem; line-height:1.8;
+  }
+  .recurrence .m { color: var(--purple); }
+  .recurrence .nm { color: var(--green); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Longest Common Subsequence — <span>filling the 2-D table</span></h1>
+  <p class="subtitle">Longest sequence of characters appearing in <b>both</b> strings, in order (gaps allowed).</p>
+
+  <div class="analogy">
+    <h3>🎵 Analogy: comparing two playlists</h3>
+    <p>Dono playlists fixed order me. Current gaane same? <b>Match</b> — dono aage badho, count +1 (diagonal). Same nahi? Kisi ek playlist ka gaana skip karo — jisme aage lambi match mile (top ya left ka max). Table me yaad rakho taaki dobara na sochna pade.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> <code>text1 = "AGCAT"</code>, <code>text2 = "GAC"</code>.
+    Longest common subsequence length? <span class="arrow">→</span> Answer: <code>2</code> (e.g. <code>"GC"</code> or <code>"AC"</code>)
+  </div>
+
+  <div class="recurrence">
+    <span class="m">match</span> (text1[i-1]==text2[j-1]): &nbsp;dp[i][j] = dp[i-1][j-1] + 1 &nbsp;&nbsp;<span style="color:var(--muted)">(diagonal)</span><br>
+    <span class="nm">no match</span>: &nbsp;dp[i][j] = max( dp[i-1][j] , dp[i][j-1] ) &nbsp;&nbsp;<span style="color:var(--muted)">(top / left)</span>
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn">‹ Prev</button>
+    <button id="nextBtn">Next ›</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+  </div>
+
+  <div class="stage">
+    <div class="tablewrap"><table class="dp" id="dp"></table></div>
+    <div class="legend">
+      <span><i class="swatch sw-active"></i>computing now</span>
+      <span><i class="swatch sw-diag"></i>diagonal (match +1)</span>
+      <span><i class="swatch sw-dep"></i>top / left (max)</span>
+      <span><i class="swatch sw-done"></i>filled</span>
+    </div>
+    <div class="caption" id="caption">Press <b>Next</b>. Row 0 and column 0 are <b>0</b> — an empty prefix shares nothing.</div>
+    <div class="stepcount" id="stepcount"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>On a character <b>match</b> take the <b>diagonal + 1</b>; on a mismatch take the <b>best of top/left</b>. The bottom-right cell is the LCS length — built in <b>O(m·n)</b>.</p>
+  </div>
+</div>
+
+<script>
+const A = "AGCAT";   // text1 -> rows
+const B = "GAC";     // text2 -> cols
+const M = A.length, N = B.length;
+const dp = Array.from({length:M+1}, () => Array(N+1).fill(0));
+for (let i=1;i<=M;i++) for(let j=1;j<=N;j++){
+  if (A[i-1]===B[j-1]) dp[i][j]=dp[i-1][j-1]+1;
+  else dp[i][j]=Math.max(dp[i-1][j], dp[i][j-1]);
+}
+
+// steps
+const steps = [];
+steps.push({ filled:new Set(), active:null, deps:[], diag:null, base:true,
+  caption:`<b>Base case:</b> row 0 and column 0 are all <span class="eq">0</span> — comparing against an empty prefix gives no common characters.` });
+
+const filled = new Set();
+// base cells considered "filled" from the start (shown as 0)
+function key(i,j){ return i+','+j; }
+
+for (let i=1;i<=M;i++){
+  for (let j=1;j<=N;j++){
+    filled.add(key(i,j));
+    const match = A[i-1]===B[j-1];
+    let cap;
+    if (match){
+      cap = `<span class="eq">(${i},${j})</span>: <span class="match">'${A[i-1]}' == '${B[j-1]}' → MATCH</span>. Take diagonal <span class="eq">dp[${i-1}][${j-1}]=${dp[i-1][j-1]}</span> + 1 = <b><span class="eq">${dp[i][j]}</span></b>.`;
+    } else {
+      cap = `<span class="eq">(${i},${j})</span>: <span class="nomatch">'${A[i-1]}' ≠ '${B[j-1]}' → no match</span>. Take max( top <span class="eq">${dp[i-1][j]}</span>, left <span class="eq">${dp[i][j-1]}</span> ) = <b><span class="eq">${dp[i][j]}</span></b>.`;
+    }
+    if (i===M && j===N) cap += ` 🎯 Bottom-right — LCS length = <b>${dp[i][j]}</b>.`;
+    steps.push({
+      filled: new Set(filled),
+      active: [i,j],
+      deps: match ? [] : [[i-1,j],[i,j-1]],
+      diag: match ? [i-1,j-1] : null,
+      base: true,
+      caption: cap
+    });
+  }
+}
+
+const $ = id => document.getElementById(id);
+let cur = 0;
+
+function buildTable(){
+  let html = '';
+  // header row: corner, "", chars of B
+  html += '<tr><th class="corner"></th><th class="chr">∅</th>';
+  for (let j=0;j<N;j++) html += `<th class="chr">${B[j]}</th>`;
+  html += '</tr>';
+  for (let i=0;i<=M;i++){
+    html += '<tr>';
+    html += i===0 ? '<th class="chr">∅</th>' : `<th class="chr">${A[i-1]}</th>`;
+    for (let j=0;j<=N;j++){
+      html += `<td id="t${i}-${j}"></td>`;
+    }
+    html += '</tr>';
+  }
+  $('dp').innerHTML = html;
+}
+
+function render(){
+  const st = steps[cur];
+  const activeKey = st.active ? st.active[0]+','+st.active[1] : null;
+  const depKeys = new Set(st.deps.map(c=>c[0]+','+c[1]));
+  const diagKey = st.diag ? st.diag[0]+','+st.diag[1] : null;
+
+  for (let i=0;i<=M;i++){
+    for (let j=0;j<=N;j++){
+      const cell = $('t'+i+'-'+j);
+      cell.className = '';
+      const isBase = (i===0 || j===0);
+      const shown = isBase || st.filled.has(i+','+j);
+      cell.textContent = shown ? dp[i][j] : '';
+      const kk = i+','+j;
+      if (!shown) continue;
+      if (kk === activeKey) cell.classList.add('active');
+      else if (kk === diagKey) cell.classList.add('diag');
+      else if (depKeys.has(kk)) cell.classList.add('dep');
+      else if (isBase) cell.classList.add('base');
+      else cell.classList.add('done');
+    }
+  }
+  $('caption').innerHTML = st.caption;
+  $('stepcount').textContent = `Step ${cur} / ${steps.length-1}`;
+  $('prevBtn').disabled = cur === 0;
+  $('nextBtn').disabled = cur === steps.length-1;
+}
+
+$('nextBtn').addEventListener('click', ()=>{ if(cur<steps.length-1){cur++;render();}});
+$('prevBtn').addEventListener('click', ()=>{ if(cur>0){cur--;render();}});
+$('resetBtn').addEventListener('click', ()=>{ cur=0; render(); });
+
+buildTable();
+render();
+</script>
+</body>
+</html>

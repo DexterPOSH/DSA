@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Palindrome Partitioning — Cut & Backtrack</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #1e293b;
+    --text: #e0e0e0; --muted: #94a3b8;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; padding: 36px 20px 70px; }
+  .wrap { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+  h1 { font-size: 1.7rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy, .takeaway { background: var(--panel); border-radius: 12px; padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start; }
+  .analogy { border: 1px solid var(--amber); border-left: 5px solid var(--amber); }
+  .takeaway { border: 1px solid var(--blue); border-left: 5px solid var(--blue); }
+  .icon { font-size: 1.7rem; flex-shrink: 0; }
+  .label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+  .analogy .label { color: var(--amber); } .takeaway .label { color: var(--blue); }
+  .analogy p, .takeaway p { font-size: 0.95rem; color: #d8d8e8; }
+  .analogy strong, .takeaway strong { color: #fff; }
+  code { background: #0f172a; padding: 1px 6px; border-radius: 5px; color: #ffd479; font-family: 'Consolas', monospace; }
+
+  .card { background: var(--panel); border: 1px solid #2d3a5a; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 22px; }
+  .section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 10px; }
+
+  .step-desc { background: var(--panel2); border-left: 4px solid var(--blue); border-radius: 8px; padding: 14px 16px; font-size: 0.96rem; min-height: 66px; display: flex; align-items: center; }
+  .step-desc.try { border-left-color: var(--amber); }
+  .step-desc.bad { border-left-color: var(--red); }
+  .step-desc.back { border-left-color: var(--amber); }
+  .step-desc.found { border-left-color: var(--green); }
+  .step-desc strong { color: #fff; }
+
+  /* the string with cut markers */
+  .ribbon-wrap { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .ribbon { display: flex; align-items: center; }
+  .rch { width: 48px; height: 52px; border-radius: 8px; display: grid; place-items: center; font-family: 'Consolas', monospace; font-weight: 700; font-size: 1.5rem; background: var(--panel2); border: 1.5px solid #2d3a5a; color: #cbd5e1; transition: all 0.25s; }
+  .rch.locked { background: rgba(16,185,129,0.16); border-color: var(--green); color: #86efac; }
+  .rch.test   { background: rgba(245,158,11,0.22); border-color: var(--amber); color: #fcd34d; }
+  .rch.testbad{ background: rgba(239,68,68,0.20); border-color: var(--red); color: #fca5a5; }
+  .rch.rest   { opacity: 0.5; }
+  .cut { width: 0; align-self: stretch; border-left: 3px dashed var(--green); margin: 0 5px; }
+  .cut.cur { border-left-color: var(--amber); }
+
+  /* current partition chips */
+  .partition { display: flex; gap: 8px; flex-wrap: wrap; min-height: 40px; }
+  .pchip { padding: 7px 14px; border-radius: 8px; font-family: 'Consolas', monospace; font-weight: 700; font-size: 1.05rem; background: rgba(59,130,246,0.16); border: 1.5px solid var(--blue); color: #bcd4ff; animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .p-empty { color: #5a6a90; font-size: 0.82rem; align-self: center; }
+
+  .results .res-row { display: flex; flex-direction: column; gap: 8px; }
+  .res-line { font-family: 'Consolas', monospace; font-size: 1rem; color: #86efac; background: rgba(16,185,129,0.1); border: 1.5px solid var(--green); border-radius: 8px; padding: 8px 14px; animation: pop 0.35s ease; }
+  .res-empty { color: #5a6a90; font-size: 0.82rem; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 11px 22px; border-radius: 8px; border: none; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; } .btn-primary:hover { background: #2563eb; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: var(--muted); border: 1px solid #2d3a5a; } .btn-secondary:hover { background: #263248; }
+  .counter { font-size: 0.82rem; color: #5a6a90; margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Palindrome Partitioning &mdash; <span>Cut &amp; Backtrack</span></h1>
+
+  <div class="analogy">
+    <div class="icon">🎀</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>The string is a ribbon. Make a cut: the first piece must be a
+      <strong>palindrome</strong>. If so, lock it and recurse on the rest. Try
+      <strong>every</strong> cut length; when the ribbon is fully consumed you've
+      found one valid partition, then <strong>reopen the last cut</strong> and try
+      the next.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-desc" id="stepDesc">Partition <code>s = "aab"</code> into palindromes. Press <strong>Next</strong>.</div>
+    </div>
+
+    <div>
+      <div class="section-label">string &nbsp;<span style="color:#5a6a90;text-transform:none;font-weight:400">(green = locked palindrome prefix · amber = testing this prefix)</span></div>
+      <div class="ribbon-wrap"><div class="ribbon" id="ribbon"></div></div>
+    </div>
+
+    <div>
+      <div class="section-label">current partition (path)</div>
+      <div class="partition" id="partition"><span class="p-empty">empty</span></div>
+    </div>
+
+    <div class="results">
+      <div class="section-label">valid partitions collected</div>
+      <div class="res-row" id="resRow"><span class="res-empty">none yet</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn">◀ Prev</button>
+      <button class="btn btn-primary" id="nextBtn">Next ▶</button>
+      <span class="counter" id="counter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key takeaway</div>
+      <p>At each <code>start</code> we try every prefix; only
+      <strong>palindrome</strong> prefixes get locked and recursed on. Reaching
+      the end records a partition. <code>path.append → recurse → path.pop</code>
+      is the backtracking spine. For <code>"aab"</code> → <code>[a,a,b]</code> and
+      <code>[aa,b]</code>.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const s = "aab";
+  const N = s.length;
+  const isPal = (l, r) => { while (l < r) { if (s[l] !== s[r]) return false; l++; r--; } return true; };
+
+  // Record a real backtracking run.
+  const steps = [];
+  (function build() {
+    const res = [];     // array of arrays
+    const path = [];    // current pieces
+    function snap(start, testEnd, kind, note) {
+      // start = current recursion boundary; testEnd = exclusive end of prefix being tested (or null)
+      steps.push({
+        path: path.slice(),
+        locked: lockedLen(),          // chars consumed by path
+        testStart: start,
+        testEnd, kind, note,
+        res: res.map(r => r.slice())
+      });
+    }
+    function lockedLen() { return path.reduce((a, p) => a + p.length, 0); }
+
+    function dfs(start) {
+      if (start === N) {
+        res.push(path.slice());
+        snap(start, null, "found", `<code>start = ${N}</code> = end of string. Whole string consumed → record partition <strong>[${path.map(p=>'"'+p+'"').join(', ')}]</strong>. ✅`);
+        return;
+      }
+      snap(start, null, "enter", `At <code>start = ${start}</code> (remaining <code>"${s.slice(start)}"</code>). Try each prefix length.`);
+      for (let end = start + 1; end <= N; end++) {
+        const sub = s.slice(start, end);
+        const pal = isPal(start, end - 1);
+        if (pal) {
+          snap(start, end, "try", `Test prefix <code>"${sub}"</code> — <strong style="color:#6ee7b7">palindrome ✓</strong>. Lock it, recurse on <code>start = ${end}</code>.`);
+          path.push(sub);
+          dfs(end);
+          path.pop();
+          snap(start, null, "back", `Backtrack: pop <code>"${sub}"</code>, return to <code>start = ${start}</code> to try a longer prefix.`);
+        } else {
+          snap(start, end, "bad", `Test prefix <code>"${sub}"</code> — <strong style="color:#fca5a5">not a palindrome ✗</strong>. Skip (prune).`);
+        }
+      }
+    }
+    dfs(0);
+    const last = steps[steps.length - 1];
+    steps.push({ path: [], locked: 0, testStart: 0, testEnd: null, kind: "done",
+      note: `All cuts explored. <strong style="color:#10b981">Found ${res.length} palindrome partitions.</strong>`,
+      res: res.map(r => r.slice()) });
+  })();
+
+  const $ = id => document.getElementById(id);
+  const TOTAL = steps.length;
+  let cur = -1;
+
+  function buildRibbon(locked, testStart, testEnd, kind) {
+    let h = "";
+    for (let i = 0; i < N; i++) {
+      // cut marker before char i
+      if (i > 0) {
+        const cutHere = i <= locked; // locked boundaries
+        h += `<div class="cut${ (testEnd !== null && i === testStart) ? '' : (cutHere ? '' : ' invis')}" style="${cutHere ? '' : 'border-left-color:transparent;'}"></div>`;
+      }
+      let cls = "rch";
+      if (i < locked) cls += " locked";
+      else if (testEnd !== null && i >= testStart && i < testEnd) cls += (kind === "bad" ? " testbad" : " test");
+      else if (i >= locked) cls += " rest";
+      h += `<div class="${cls}">${s[i]}</div>`;
+    }
+    return h;
+  }
+
+  function render() {
+    if (cur < 0) {
+      $("ribbon").innerHTML = buildRibbon(0, 0, null, "");
+      $("partition").innerHTML = `<span class="p-empty">empty</span>`;
+      $("resRow").innerHTML = `<span class="res-empty">none yet</span>`;
+      $("stepDesc").className = "step-desc";
+      $("stepDesc").innerHTML = `Partition <code>s = "aab"</code> into palindromes. Press <strong>Next</strong>.`;
+      updateControls(); return;
+    }
+    const st = steps[cur];
+    $("ribbon").innerHTML = buildRibbon(st.locked, st.testStart, st.testEnd, st.kind);
+
+    $("partition").innerHTML = st.path.length
+      ? st.path.map(p => `<span class="pchip">"${p}"</span>`).join("")
+      : `<span class="p-empty">empty</span>`;
+
+    $("resRow").innerHTML = st.res.length
+      ? st.res.map(r => `<div class="res-line">[ ${r.map(p => `"${p}"`).join(", ")} ]</div>`).join("")
+      : `<span class="res-empty">none yet</span>`;
+
+    $("stepDesc").className = "step-desc " + (
+      st.kind === "found" || st.kind === "done" ? "found" :
+      st.kind === "bad" ? "bad" :
+      st.kind === "back" ? "back" :
+      st.kind === "try" ? "try" : "");
+    $("stepDesc").innerHTML = st.note;
+    updateControls();
+  }
+  function updateControls() {
+    $("counter").textContent = `Step ${cur + 1} / ${TOTAL}`;
+    $("prevBtn").disabled = cur < 0;
+    $("nextBtn").disabled = cur >= TOTAL - 1;
+  }
+  $("nextBtn").addEventListener("click", () => { if (cur < TOTAL - 1) { cur++; render(); } });
+  $("prevBtn").addEventListener("click", () => { if (cur >= 0) { cur--; render(); } });
+  $("resetBtn").addEventListener("click", () => { cur = -1; render(); });
+  render();
+</script>
+</body>
+</html>

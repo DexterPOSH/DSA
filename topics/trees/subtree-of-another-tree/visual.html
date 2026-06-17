@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Subtree of Another Tree — DFS + Same-Tree Walkthrough</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --edge: #2d3a5a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 36px 18px 64px;
+    gap: 26px;
+  }
+  h1 { font-size: 1.7rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel);
+    border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue);
+    border-radius: 12px;
+    padding: 16px 22px;
+    max-width: 760px;
+    width: 100%;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .analogy-icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.96rem; line-height: 1.55; color: #c0c0d0; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 16px;
+    padding: 26px;
+    max-width: 860px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .section-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+  .step-description {
+    min-height: 56px;
+    background: var(--panel2);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: #c8c8e0;
+    border-left: 3px solid var(--blue);
+    transition: border-color 0.3s;
+  }
+  .step-description.good { border-color: var(--green); }
+  .step-description.bad  { border-color: var(--red); }
+
+  .trees-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px;
+    justify-content: center;
+  }
+  .tree-box {
+    background: var(--panel2);
+    border: 1px solid var(--edge);
+    border-radius: 12px;
+    padding: 12px 10px 6px;
+    flex: 1 1 380px;
+    min-width: 300px;
+  }
+  .tree-box.sub { flex: 0 1 250px; min-width: 220px; }
+  .tree-title {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted); text-align: center;
+    margin-bottom: 4px;
+  }
+  .tree-title code { color: #5a6a90; font-weight: 400; }
+
+  /* SVG node styling driven by classes on <g> */
+  .node circle {
+    fill: var(--panel2);
+    stroke: var(--edge);
+    stroke-width: 2.5;
+    transition: fill 0.35s, stroke 0.35s, r 0.3s;
+  }
+  .node text {
+    fill: var(--text); font-size: 16px; font-weight: 700;
+    text-anchor: middle; dominant-baseline: central;
+  }
+  .edge { stroke: var(--edge); stroke-width: 2.5; transition: stroke 0.35s; }
+
+  .node.candidate circle { fill: #3a2e0d; stroke: var(--amber); }
+  .node.matching circle  { fill: #1e3a6e; stroke: var(--blue); }
+  .node.matched circle   { fill: #0d2a1a; stroke: var(--green); }
+  .node.matched text     { fill: #86efac; }
+  .node.mismatch circle  { fill: #2a0d0d; stroke: var(--red); }
+  .node.mismatch text    { fill: #fca5a5; }
+  .edge.matched { stroke: var(--green); }
+  .edge.matching { stroke: var(--blue); }
+
+  .sub .node circle { stroke-width: 2.5; }
+  .sub .node.active circle { fill: #3a2e0d; stroke: var(--amber); }
+
+  .result-badge {
+    display: none;
+    align-items: center; gap: 12px;
+    padding: 14px 20px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600;
+  }
+  .result-badge.show { display: flex; }
+  .result-badge.ok { background: #0d2a1a; border: 1.5px solid var(--green); color: #86efac; }
+  .result-badge.no { background: #2a0d0d; border: 1.5px solid var(--red); color: #fca5a5; }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid var(--edge); }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+
+  .takeaway {
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 12px;
+    padding: 18px 24px;
+    max-width: 760px; width: 100%;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.94rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+  <h1>Subtree of Another Tree &mdash; <span>DFS + Same-Tree Check</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🌳</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Ek bade <strong>family tree</strong> me ek chhote cousin-tree ko dhoondhna —
+        har person pe ruk ke poochna: "yahan se neeche poora ped <em>hu-ba-hu</em> wahi
+        chhota tree banta hai?" Match ka matlab node + <strong>saare descendants</strong>, aadha nahi.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press "Next" to walk the DFS. We test each node of <code>root</code> as a candidate start for matching <code>subRoot</code>.</div>
+    </div>
+
+    <div class="trees-wrap">
+      <div class="tree-box">
+        <div class="tree-title">root</div>
+        <svg id="rootSvg" viewBox="0 0 420 260" width="100%" height="240"></svg>
+      </div>
+      <div class="tree-box sub">
+        <div class="tree-title">subRoot</div>
+        <svg id="subSvg" viewBox="0 0 240 200" width="100%" height="200"></svg>
+      </div>
+    </div>
+
+    <div class="result-badge" id="resultBadge">
+      <span id="resultText"></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        DFS visits <strong>every node of root as a candidate</strong>; at each one,
+        a <strong>sameTree</strong> check verifies an exact structural + value match against
+        <code>subRoot</code>. First full match wins. <strong>O(n·m) time, O(n) space.</strong>
+      </p>
+    </div>
+  </div>
+
+<script>
+  // ── Tree data ─────────────────────────────────────────────────────────────
+  // root:                 subRoot:
+  //        3                  4
+  //       / \                / \
+  //      4   5              1   2
+  //     / \
+  //    1   2
+  //
+  // The subtree rooted at root's left child (4,1,2) matches subRoot exactly.
+
+  // node layout: id -> {val, x, y, parent}
+  const rootNodes = {
+    r3: { val: 3, x: 210, y: 36 },
+    r4: { val: 4, x: 120, y: 120, parent: 'r3' },
+    r5: { val: 5, x: 300, y: 120, parent: 'r3' },
+    r1: { val: 1, x:  70, y: 210, parent: 'r4' },
+    r2: { val: 2, x: 170, y: 210, parent: 'r4' },
+  };
+  const subNodes = {
+    s4: { val: 4, x: 120, y: 36 },
+    s1: { val: 1, x:  60, y: 130, parent: 's4' },
+    s2: { val: 2, x: 180, y: 130, parent: 's4' },
+  };
+
+  // edgePrefix tags the <line> ids so root/sub edges don't collide.
+  function buildSvg(svg, nodes, edgePrefix) {
+    svg.innerHTML = '';
+    const ns = 'http://www.w3.org/2000/svg';
+    // edges first (so nodes draw on top)
+    for (const id in nodes) {
+      const n = nodes[id];
+      if (n.parent) {
+        const p = nodes[n.parent];
+        const line = document.createElementNS(ns, 'line');
+        line.setAttribute('x1', p.x); line.setAttribute('y1', p.y);
+        line.setAttribute('x2', n.x); line.setAttribute('y2', n.y);
+        line.setAttribute('class', 'edge');
+        line.id = edgePrefix + 'edge-' + id;   // e.g. rootedge-r1 / subedge-s1
+        svg.appendChild(line);
+      }
+    }
+    // nodes — ids are used as-is (r3, s4, ...) so step maps reference them directly
+    for (const id in nodes) {
+      const n = nodes[id];
+      const g = document.createElementNS(ns, 'g');
+      g.setAttribute('class', 'node');
+      g.id = id;
+      const c = document.createElementNS(ns, 'circle');
+      c.setAttribute('cx', n.x); c.setAttribute('cy', n.y); c.setAttribute('r', 22);
+      const t = document.createElementNS(ns, 'text');
+      t.setAttribute('x', n.x); t.setAttribute('y', n.y); t.textContent = n.val;
+      g.appendChild(c); g.appendChild(t);
+      svg.appendChild(g);
+    }
+  }
+
+  const rootSvg = document.getElementById('rootSvg');
+  const subSvg  = document.getElementById('subSvg');
+
+  // ── Steps ──────────────────────────────────────────────────────────────────
+  // Each step is a snapshot: { desc, rootClasses{id:cls}, subClasses{id:cls},
+  //                            edges{id:cls}, descClass, result }
+  const steps = [
+    {
+      desc: 'Start DFS at <strong>root = 3</strong>. Treat it as a candidate: run sameTree(node 3, subRoot 4). First compare values: <strong>3 ≠ 4</strong> → not a match here.',
+      rootClasses: { r3: 'mismatch' }, subClasses: { s4: 'active' },
+      descClass: 'bad',
+    },
+    {
+      desc: 'Recurse left. New candidate: <strong>root.left = 4</strong>. Run sameTree(node 4, subRoot 4). Values match: <strong>4 == 4</strong> ✓ — now we must verify the whole subtree.',
+      rootClasses: { r4: 'matching' }, subClasses: { s4: 'matching' },
+      descClass: '',
+    },
+    {
+      desc: 'Compare left children: root\'s <strong>1</strong> vs subRoot\'s <strong>1</strong>. <strong>1 == 1</strong> ✓ and both have no children below → this branch matches.',
+      rootClasses: { r4: 'matching', r1: 'matched' },
+      subClasses:  { s4: 'matching', s1: 'matched' },
+      edges: { 'r1': 'matched' }, subEdges: { 's1': 'matched' },
+      descClass: '',
+    },
+    {
+      desc: 'Compare right children: root\'s <strong>2</strong> vs subRoot\'s <strong>2</strong>. <strong>2 == 2</strong> ✓ and both leaves. Every node lined up — <strong>sameTree returns True</strong>!',
+      rootClasses: { r4: 'matched', r1: 'matched', r2: 'matched' },
+      subClasses:  { s4: 'matched', s1: 'matched', s2: 'matched' },
+      edges: { 'r1': 'matched', 'r2': 'matched' }, subEdges: { 's1': 'matched', 's2': 'matched' },
+      descClass: 'good',
+    },
+    {
+      desc: 'A full structural + value match was found at root.left. We can stop — <strong>return True</strong>. The highlighted green subtree is identical to subRoot.',
+      rootClasses: { r4: 'matched', r1: 'matched', r2: 'matched' },
+      subClasses:  { s4: 'matched', s1: 'matched', s2: 'matched' },
+      edges: { 'r1': 'matched', 'r2': 'matched' }, subEdges: { 's1': 'matched', 's2': 'matched' },
+      descClass: 'good', result: true,
+    },
+  ];
+
+  let cur = 0;
+  const stepDesc = document.getElementById('stepDesc');
+  const stepCtr  = document.getElementById('stepCounter');
+  const nextBtn  = document.getElementById('nextBtn');
+  const prevBtn  = document.getElementById('prevBtn');
+  const badge    = document.getElementById('resultBadge');
+  const badgeTxt = document.getElementById('resultText');
+
+  function clearClasses() {
+    document.querySelectorAll('#rootSvg .node, #subSvg .node')
+      .forEach(g => g.setAttribute('class', 'node'));
+    document.querySelectorAll('#rootSvg .edge, #subSvg .edge')
+      .forEach(e => e.setAttribute('class', 'edge'));
+  }
+
+  function render() {
+    clearClasses();
+    badge.className = 'result-badge';
+    if (cur === 0) {
+      stepDesc.innerHTML = 'Press "Next" to walk the DFS. We test each node of <code>root</code> as a candidate start for matching <code>subRoot</code>.';
+      stepDesc.className = 'step-description';
+      stepCtr.textContent = 'Step 0 / ' + steps.length;
+      prevBtn.disabled = true; nextBtn.disabled = false;
+      return;
+    }
+    const s = steps[cur - 1];
+    stepDesc.innerHTML = s.desc;
+    stepDesc.className = 'step-description ' + (s.descClass || '');
+    // apply root node classes
+    for (const id in (s.rootClasses || {})) {
+      const g = document.getElementById(id);
+      if (g) g.setAttribute('class', 'node ' + s.rootClasses[id]);
+    }
+    for (const id in (s.subClasses || {})) {
+      const g = document.getElementById(id);
+      if (g) g.setAttribute('class', 'node ' + s.subClasses[id]);
+    }
+    for (const id in (s.edges || {})) {
+      const e = document.getElementById('rootedge-' + id);
+      if (e) e.setAttribute('class', 'edge ' + s.edges[id]);
+    }
+    for (const id in (s.subEdges || {})) {
+      const e = document.getElementById('subedge-' + id);
+      if (e) e.setAttribute('class', 'edge ' + s.subEdges[id]);
+    }
+    stepCtr.textContent = 'Step ' + cur + ' / ' + steps.length;
+    prevBtn.disabled = false;
+    nextBtn.disabled = (cur >= steps.length);
+    if (s.result === true) {
+      badge.className = 'result-badge show ok';
+      badgeTxt.textContent = 'return True — subRoot is a subtree of root.';
+    }
+  }
+
+  function next() { if (cur < steps.length) { cur++; render(); } }
+  function prev() { if (cur > 0) { cur--; render(); } }
+  function reset() { cur = 0; render(); }
+
+  buildSvg(rootSvg, rootNodes, 'root');  // edges -> rootedge-<childId>
+  buildSvg(subSvg, subNodes, 'sub');     // edges -> subedge-<childId>
+  reset();
+</script>
+</body>
+</html>

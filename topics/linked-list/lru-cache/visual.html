@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LRU Cache — Hashmap + Doubly Linked List Walkthrough</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --border: #2d3a5a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 70px;
+    gap: 28px;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel);
+    border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue);
+    border-radius: 12px;
+    padding: 18px 24px;
+    max-width: 860px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 1.9rem; line-height: 1; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.98rem; line-height: 1.55; color: #c0c0d0; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 30px;
+    max-width: 860px; width: 100%;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+  .section-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+  .op-line {
+    font-family: 'JetBrains Mono','Fira Code','Consolas',monospace;
+    font-size: 1.05rem; font-weight: 700; color: var(--amber);
+    background: var(--panel2); border-radius: 8px; padding: 10px 16px;
+    border-left: 3px solid var(--amber);
+  }
+  .step-description {
+    min-height: 56px;
+    background: var(--panel2);
+    border-radius: 8px;
+    padding: 14px 20px;
+    font-size: 0.95rem; line-height: 1.55; color: #c8c8e0;
+    border-left: 3px solid var(--blue);
+    transition: border-color 0.3s;
+  }
+  .step-description.evict { border-color: var(--red); }
+  .step-description strong { color: #fff; }
+
+  /* ── DLL ── */
+  .dll-wrap { overflow-x: auto; padding: 8px 2px 4px; }
+  .dll {
+    display: flex; align-items: center; gap: 4px; min-height: 96px;
+  }
+  .terminus {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    width: 58px; height: 70px; border-radius: 10px;
+    border: 2px dashed var(--border); background: var(--panel2);
+    color: var(--muted); font-size: 0.72rem; font-weight: 700; text-align: center;
+    flex-shrink: 0;
+  }
+  .terminus small { display:block; font-size: 0.58rem; font-weight: 400; color:#5a6a90; margin-top:2px; }
+  .node {
+    position: relative;
+    width: 74px; height: 70px; border-radius: 10px;
+    border: 2px solid var(--blue); background: #1e3a6e;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.35s ease;
+  }
+  .node .nkey { font-size: 0.62rem; color: #93c5fd; font-weight: 600; }
+  .node .nval { font-size: 1.35rem; font-weight: 700; color: #fff; }
+  .node.touched {
+    border-color: var(--amber); background: #3a2c10;
+    box-shadow: 0 0 16px rgba(245,158,11,0.5); transform: translateY(-5px);
+  }
+  .node.touched .nkey { color: #fcd34d; }
+  .node.fresh { animation: pop 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  .node.evicting {
+    border-color: var(--red); background: #2a0d0d;
+    box-shadow: 0 0 18px rgba(239,68,68,0.55);
+    animation: fade-out 0.5s ease forwards;
+  }
+  .node.evicting .nval { color: #fca5a5; }
+  @keyframes pop { 0% { transform: scale(0.4); opacity:0;} 60%{transform:scale(1.12);} 100%{transform:scale(1);opacity:1;} }
+  @keyframes fade-out { to { opacity: 0.15; transform: translateY(10px) scale(0.85);} }
+  .arrow {
+    color: var(--muted); font-size: 1.2rem; flex-shrink: 0;
+    display: flex; flex-direction: column; line-height: 0.7;
+  }
+
+  /* ── Hashmap ── */
+  .map-area {
+    background: var(--panel2);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex; gap: 10px; flex-wrap: wrap; min-height: 64px; align-items: center;
+  }
+  .map-empty { color: #3a4a6a; font-style: italic; font-size: 0.85rem; }
+  .map-entry {
+    font-family: 'JetBrains Mono','Consolas',monospace;
+    background: #18233f; border: 1.5px solid var(--blue); border-radius: 8px;
+    padding: 7px 12px; font-size: 0.9rem; font-weight: 700;
+    animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .map-entry .mk { color: #fcd34d; }
+  .map-entry .ma { color: #93c5fd; }
+  .map-entry.gone { border-color: var(--red); opacity: 0.35; }
+
+  /* ── Controls ── */
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid var(--border); }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+
+  .legend { display:flex; gap:18px; flex-wrap:wrap; font-size:0.78rem; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:12px;height:12px;border-radius:3px;display:inline-block; }
+  .dot.mru { background: var(--blue);} .dot.touch{background:var(--amber);} .dot.ev{background:var(--red);}
+
+  .takeaway {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 24px;
+    max-width: 860px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--green); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.95rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: #fff; }
+</style>
+</head>
+<body>
+
+  <h1>LRU Cache &mdash; <span>Hashmap + Doubly Linked List</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">📚</div>
+    <div class="analogy-body">
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Ek chhoti <strong>study table</strong> jisme sirf 2 kitaabein aati hain. Jise abhi chhua,
+        wo <strong>top</strong> pe (MRU). Nayi kitaab aaye aur table full ho → <strong>sabse neeche</strong>
+        padi (LRU) hata do. Hashmap = naam se turant dhoondho · DLL = order maintain + beech se nikaalo. Dono O(1).
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Operation &nbsp;<span style="color:var(--muted)">(capacity = 2)</span></div>
+      <div class="op-line" id="opLine">cache = LRUCache(2)</div>
+    </div>
+
+    <div>
+      <div class="section-label">What happens</div>
+      <div class="step-description" id="stepDesc">Press &ldquo;Next&rdquo; to run a sequence of cache operations.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Doubly Linked List &nbsp;<span style="color:var(--muted)">head = MRU &nbsp;·&nbsp; tail = LRU</span></div>
+      <div class="dll-wrap">
+        <div class="dll" id="dll"></div>
+      </div>
+      <div class="legend" style="margin-top:10px;">
+        <span><span class="dot mru"></span> in cache (MRU → LRU left→right)</span>
+        <span><span class="dot touch"></span> just touched</span>
+        <span><span class="dot ev"></span> evicting</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Hashmap &nbsp;<code style="color:var(--muted);font-size:0.75rem">key → node</code></div>
+      <div class="map-area" id="mapArea"><span class="map-empty">empty</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">‹ Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next ›</button>
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="step-counter" id="stepCounter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div class="takeaway-body">
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        The <strong>hashmap finds any node in O(1)</strong>, and the <strong>doubly linked list
+        reorders / evicts in O(1)</strong> using two dummy sentinels. Together every
+        <code>get</code> and <code>put</code> is O(1). head = most-recently-used, tail = least.
+      </p>
+    </div>
+  </div>
+
+<script>
+  // ── Each "step" is a full snapshot of cache state after one logical action. ──
+  // dll: array of {key, val} ordered MRU(left) -> LRU(right)
+  // map: keys present
+  // op : the call being made
+  // desc: explanation
+  // highlight: key just touched (amber) | evict: key being evicted (red, shown still present)
+  const CAP = 2;
+  const steps = [
+    {
+      op: 'cache = LRUCache(2)',
+      dll: [], map: [], highlight: null, evict: null, evictClass: false,
+      desc: 'Create an empty cache with <strong>capacity 2</strong>. Two dummy sentinels (head &amp; tail) bracket the list — not shown as data.'
+    },
+    {
+      op: 'cache.put(1, 1)',
+      dll: [{k:1,v:1}], map: [1], highlight: 1, evict: null, evictClass:false,
+      desc: 'Insert key <strong>1</strong>. New node goes right after <em>head</em> = most-recently-used. Add <code>1 → node</code> to the hashmap.'
+    },
+    {
+      op: 'cache.put(2, 2)',
+      dll: [{k:2,v:2},{k:1,v:1}], map: [2,1], highlight: 2, evict:null, evictClass:false,
+      desc: 'Insert key <strong>2</strong> at the front. Order is now <strong>2 (MRU) → 1 (LRU)</strong>. Cache is full (size 2 = capacity).'
+    },
+    {
+      op: 'cache.get(1)  → 1',
+      dll: [{k:1,v:1},{k:2,v:2}], map: [1,2], highlight: 1, evict:null, evictClass:false,
+      desc: 'Lookup key <strong>1</strong> via hashmap (O(1)), return value <strong>1</strong>. Then <em>unlink</em> it and re-insert at front → 1 becomes MRU. Now <strong>2</strong> is the LRU.'
+    },
+    {
+      op: 'cache.put(3, 3)  ⟶ evict 2',
+      dll: [{k:1,v:1},{k:2,v:2}], map: [1,2], highlight: null, evict: 2, evictClass:true, phase:'before',
+      desc: 'Insert key <strong>3</strong>, but cache is full. The LRU node is <code>tail.prev</code> = key <strong style="color:#ef4444">2</strong>. Evict it: unlink from DLL and <code>del map[2]</code>.'
+    },
+    {
+      op: 'cache.put(3, 3)',
+      dll: [{k:3,v:3},{k:1,v:1}], map: [3,1], highlight: 3, evict:null, evictClass:false,
+      desc: 'With key 2 gone, insert <strong>3</strong> at the front. Order: <strong>3 (MRU) → 1 (LRU)</strong>. Both insert &amp; evict were O(1).'
+    },
+    {
+      op: 'cache.get(2)  → -1',
+      dll: [{k:3,v:3},{k:1,v:1}], map: [3,1], highlight: null, evict:null, evictClass:false, miss:2,
+      desc: 'Lookup key <strong>2</strong>: not in hashmap → return <strong style="color:#ef4444">-1</strong>. It was evicted earlier. The list order is unchanged.'
+    },
+  ];
+
+  let cur = 0;
+  const dllEl   = document.getElementById('dll');
+  const mapEl   = document.getElementById('mapArea');
+  const opEl    = document.getElementById('opLine');
+  const descEl  = document.getElementById('stepDesc');
+  const ctrEl   = document.getElementById('stepCounter');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+
+  function arrow() {
+    const a = document.createElement('div');
+    a.className = 'arrow';
+    a.innerHTML = '⇄';
+    return a;
+  }
+
+  function render(animateFresh) {
+    const s = steps[cur];
+    opEl.textContent = s.op;
+    descEl.innerHTML = s.desc;
+    descEl.className = 'step-description' + (s.evict ? ' evict' : '');
+
+    // ── DLL ──
+    dllEl.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'terminus';
+    head.innerHTML = 'head<small>MRU side</small>';
+    dllEl.appendChild(head);
+    dllEl.appendChild(arrow());
+
+    s.dll.forEach((nd, i) => {
+      const n = document.createElement('div');
+      let cls = 'node';
+      if (s.highlight === nd.k) cls += ' touched';
+      if (s.evict === nd.k) cls += ' evicting';
+      if (animateFresh && s.highlight === nd.k && i === 0) cls += ' fresh';
+      n.className = cls;
+      n.innerHTML = `<span class="nkey">key ${nd.k}</span><span class="nval">${nd.v}</span>`;
+      dllEl.appendChild(n);
+      dllEl.appendChild(arrow());
+    });
+
+    const tail = document.createElement('div');
+    tail.className = 'terminus';
+    tail.innerHTML = 'tail<small>LRU side</small>';
+    dllEl.appendChild(tail);
+
+    // ── Hashmap ──
+    mapEl.innerHTML = '';
+    if (s.map.length === 0) {
+      mapEl.innerHTML = '<span class="map-empty">empty</span>';
+    } else {
+      // show in key-sorted order for stability
+      [...s.map].sort((a,b)=>a-b).forEach(k => {
+        const node = s.dll.find(d => d.k === k);
+        const e = document.createElement('div');
+        e.className = 'map-entry';
+        e.innerHTML = `<span class="mk">${k}</span> → <span class="ma">node(${node ? node.v : '?'})</span>`;
+        mapEl.appendChild(e);
+      });
+      if (s.evict) {
+        const e = document.createElement('div');
+        e.className = 'map-entry gone';
+        e.innerHTML = `<span class="mk">${s.evict}</span> → <span class="ma">✕ del</span>`;
+        mapEl.appendChild(e);
+      }
+    }
+
+    ctrEl.textContent = `Step ${cur} / ${steps.length - 1}`;
+    prevBtn.disabled = cur === 0;
+    nextBtn.disabled = cur === steps.length - 1;
+  }
+
+  function next() { if (cur < steps.length - 1) { cur++; render(true); } }
+  function prev() { if (cur > 0) { cur--; render(false); } }
+  function reset() { cur = 0; render(false); }
+
+  render(false);
+</script>
+</body>
+</html>

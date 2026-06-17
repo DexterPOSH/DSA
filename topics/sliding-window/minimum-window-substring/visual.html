@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Minimum Window Substring — Expand & Contract</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px 60px; gap: 28px; }
+  h1 { font-size: 1.55rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: #3b82f6; }
+
+  .analogy { background: #16213e; border: 1px solid #3b82f6; border-radius: 12px; padding: 18px 26px; max-width: 800px; width: 100%; display: flex; gap: 16px; align-items: flex-start; }
+  .analogy-icon { font-size: 2rem; line-height: 1; flex-shrink: 0; }
+  .analogy-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px; }
+  .analogy-text { font-size: 0.95rem; line-height: 1.5; color: #c0c0d0; }
+
+  .card { background: #16213e; border: 1px solid #2d3a5a; border-radius: 16px; padding: 30px; max-width: 860px; width: 100%; display: flex; flex-direction: column; gap: 26px; }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #7a8ab0; margin-bottom: 12px; }
+  .step-description { min-height: 56px; background: #0f172a; border-radius: 8px; padding: 14px 20px; font-size: 0.94rem; line-height: 1.55; color: #c8c8e0; border-left: 3px solid #3b82f6; transition: border-color 0.3s; }
+  .step-description.expand { border-color: #3b82f6; }
+  .step-description.contract { border-color: #f59e0b; }
+  .step-description.valid { border-color: #10b981; }
+
+  .str-area { position: relative; padding-top: 30px; overflow-x: auto; }
+  .str-row { display: flex; gap: 6px; align-items: center; justify-content: center; min-width: max-content; }
+  .ch-wrap { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .ch { width: 40px; height: 40px; border-radius: 8px; border: 2px solid #2d3a5a; background: #0f172a; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 700; color: #e0e0e0; transition: all 0.3s; }
+  .ch.inwin { border-color: #3b82f6; background: #1e3a6e; color: #93c5fd; }
+  .ch.valid { border-color: #10b981; background: #0d2a1a; color: #86efac; }
+  .ch.best { box-shadow: 0 0 14px rgba(16,185,129,0.55); }
+  .ch.right-cur { border-color: #3b82f6; box-shadow: 0 0 14px rgba(59,130,246,0.6); transform: translateY(-3px); }
+  .ch.left-drop { border-color: #ef4444; background: #2a0d0d; color: #fca5a5; }
+  .ch-idx { font-size: 0.55rem; color: #5a6a90; }
+  .ptr { position: absolute; top: -24px; left: 50%; transform: translateX(-50%); font-size: 0.58rem; font-weight: 700; padding: 2px 6px; border-radius: 5px; white-space: nowrap; opacity: 0; transition: opacity 0.25s; }
+  .ptr.show { opacity: 1; }
+  .ptr.l { background: #f59e0b; color: #1a1a2e; }
+  .ptr.r { background: #3b82f6; color: #fff; }
+
+  .state-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+  .state-box { flex: 1; min-width: 110px; background: #0f172a; border: 1px solid #2d3a5a; border-radius: 10px; padding: 12px 14px; }
+  .state-box .lbl { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: #7a8ab0; }
+  .state-box .val { font-size: 1.25rem; font-weight: 700; margin-top: 2px; }
+  .state-box.formed .val { color: #93c5fd; }
+  .state-box.formed.full .val { color: #86efac; }
+  .state-box.best .val { color: #86efac; }
+
+  .counts-wrap { display: flex; gap: 26px; flex-wrap: wrap; }
+  .count-block { flex: 1; min-width: 200px; }
+  .count-block .ttl { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .count-block.need .ttl { color: #f59e0b; }
+  .count-block.have .ttl { color: #3b82f6; }
+  .freq-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .freq { background: #0f172a; border: 1px solid #2d3a5a; border-radius: 8px; padding: 7px 12px; font-family: 'Consolas', monospace; font-size: 0.9rem; }
+  .freq .k { color: #cdd9f0; font-weight: 700; }
+  .freq.ok { border-color: #10b981; background: #0d2a1a; }
+
+  .result-badge { display: none; align-items: center; gap: 12px; padding: 16px 22px; border-radius: 10px; font-size: 1rem; font-weight: 600; background: #0d2a1a; border: 1.5px solid #10b981; color: #86efac; }
+  .result-badge.show { display: flex; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 12px 26px; border-radius: 8px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+  .takeaway { background: #16213e; border: 1px solid #2d3a5a; border-radius: 12px; padding: 18px 26px; max-width: 800px; width: 100%; display: flex; gap: 16px; align-items: flex-start; }
+  .takeaway-icon { font-size: 1.6rem; flex-shrink: 0; }
+  .takeaway-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px; }
+  .takeaway p { font-size: 0.93rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: #e0e0e0; }
+</style>
+</head>
+<body>
+
+  <h1>Minimum Window Substring &mdash; <span>Expand & Contract</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🛒</div>
+    <div class="analogy-body">
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        <strong>t</strong> ek shopping list hai. Aisle (<strong>s</strong>) me chalte
+        hue items uthao (<strong style="color:#3b82f6">right</strong>). Jaise hi list
+        poori cover ho, <strong style="color:#f59e0b">left</strong> se extra items
+        shelf pe wapas rakho — basket jitni chhoti rahe. Sabse chhoti valid basket = answer.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press "Next Step". Expand right until the window covers all of t, then contract left to minimize it.</div>
+    </div>
+
+    <div>
+      <div class="section-label">s &nbsp;<code style="color:#5a6a90;font-size:0.75rem">"ADOBECODEBANC" &nbsp;·&nbsp; t = "ABC"</code></div>
+      <div class="str-area"><div class="str-row" id="strRow"></div></div>
+    </div>
+
+    <div class="state-grid">
+      <div class="state-box formed" id="formedBox"><div class="lbl">formed / required</div><div class="val" id="formedVal">0 / 3</div></div>
+      <div class="state-box"><div class="lbl">window</div><div class="val" id="winVal">"-"</div></div>
+      <div class="state-box best"><div class="lbl">best window</div><div class="val" id="bestVal">none</div></div>
+    </div>
+
+    <div class="counts-wrap">
+      <div class="count-block need"><div class="ttl">need (t)</div><div class="freq-row" id="needRow"></div></div>
+      <div class="count-block have"><div class="ttl">have (window, only chars of t)</div><div class="freq-row" id="haveRow"></div></div>
+    </div>
+
+    <div class="result-badge" id="resultBadge">
+      <span style="font-size:1.3rem">🟢</span><span id="resultText"></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next Step</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div class="takeaway-body">
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Two phases per cycle: <strong style="color:#3b82f6">expand right</strong> to make
+        the window valid (covers all of t), then <strong style="color:#f59e0b">contract
+        left</strong> to shrink it while still valid — recording the smallest. The
+        <strong>formed == required</strong> counter tells you validity in O(1).
+        <strong>O(|s| + |t|) time.</strong>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const s = "ADOBECODEBANC", t = "ABC";
+
+    function counter(str) { const c = {}; for (const ch of str) c[ch] = (c[ch]||0)+1; return c; }
+    const need = counter(t);
+    const required = Object.keys(need).length;
+
+    // Build a step trace mirroring the expand/contract algorithm.
+    function buildSteps() {
+      const out = [];
+      const have = {};
+      let formed = 0, left = 0;
+      let bestLen = Infinity, bestL = 0, bestR = -1;
+      for (let right = 0; right < s.length; right++) {
+        const ch = s[right];
+        have[ch] = (have[ch] || 0) + 1;
+        if (need[ch] && have[ch] === need[ch]) formed += 1;
+        out.push({
+          type: 'expand', left, right, formed, have: filterNeed(have),
+          bestL, bestR, bestLen,
+          desc: `<strong style="color:#3b82f6">Expand</strong>: take s[${right}]='${ch}'. ${need[ch] ? `It's needed; have['${ch}']=${have[ch]}${have[ch]===need[ch]?` reaches need — formed=${formed}.`:'.'}` : `Not in t, ignore for matching.`} Window "${s.slice(left,right+1)}".`
+        });
+        while (formed === required) {
+          if (right - left + 1 < bestLen) { bestLen = right - left + 1; bestL = left; bestR = right; }
+          const lc = s[left];
+          out.push({
+            type: 'contract', left, right, formed, have: filterNeed(have),
+            bestL, bestR, bestLen, dropIdx: left,
+            desc: `<strong style="color:#10b981">Valid!</strong> Window "${s.slice(left,right+1)}" (len ${right-left+1}) covers t. Best so far: "${s.slice(bestL,bestR+1)}". <strong style="color:#f59e0b">Contract</strong>: try dropping s[${left}]='${lc}'.`
+          });
+          have[lc] -= 1;
+          if (need[lc] && have[lc] < need[lc]) formed -= 1;
+          left += 1;
+        }
+      }
+      out.push({ done: true, bestL, bestR, bestLen, found: bestLen !== Infinity,
+        desc: bestLen !== Infinity
+          ? `Scan complete. Smallest valid window is <strong style="color:#10b981">"${s.slice(bestL,bestR+1)}"</strong> (length ${bestLen}).`
+          : `No window covers all of t. Return "".` });
+      return out;
+    }
+    function filterNeed(have) { const o = {}; for (const kk in need) o[kk] = have[kk] || 0; return o; }
+
+    const steps = buildSteps();
+    let currentStep = 0;
+
+    const row = document.getElementById('strRow');
+    for (let i = 0; i < s.length; i++) {
+      const wrap = document.createElement('div'); wrap.className = 'ch-wrap';
+      const ptr = document.createElement('div'); ptr.className = 'ptr'; ptr.id = 'ptr-' + i;
+      const cell = document.createElement('div'); cell.className = 'ch'; cell.id = 'ch-' + i; cell.textContent = s[i];
+      const idx = document.createElement('div'); idx.className = 'ch-idx'; idx.textContent = i;
+      wrap.appendChild(ptr); wrap.appendChild(cell); wrap.appendChild(idx); row.appendChild(wrap);
+    }
+    const needRow = document.getElementById('needRow');
+    Object.keys(need).sort().forEach(kk => {
+      const d = document.createElement('div'); d.className = 'freq';
+      d.innerHTML = `<span class="k">${kk}</span>: ${need[kk]}`; needRow.appendChild(d);
+    });
+
+    const stepDesc = document.getElementById('stepDesc');
+    const formedVal = document.getElementById('formedVal');
+    const formedBox = document.getElementById('formedBox');
+    const winVal = document.getElementById('winVal');
+    const bestVal = document.getElementById('bestVal');
+    const haveRow = document.getElementById('haveRow');
+    const resultBadge = document.getElementById('resultBadge');
+    const resultText = document.getElementById('resultText');
+    const stepCtr = document.getElementById('stepCounter');
+    const nextBtn = document.getElementById('nextBtn');
+
+    function clearCells() {
+      for (let i = 0; i < s.length; i++) {
+        document.getElementById('ch-' + i).className = 'ch';
+        document.getElementById('ptr-' + i).className = 'ptr';
+      }
+    }
+    function setPtr(i, kind) {
+      const p = document.getElementById('ptr-' + i);
+      if (kind === 'l') { p.textContent = '⬆ L'; p.className = 'ptr show l'; }
+      else { p.textContent = '⬆ R'; p.className = 'ptr show r'; }
+    }
+    function renderHave(have, formed) {
+      haveRow.innerHTML = '';
+      Object.keys(have).sort().forEach(kk => {
+        const ok = have[kk] >= need[kk];
+        const d = document.createElement('div'); d.className = 'freq' + (ok ? ' ok' : '');
+        d.innerHTML = `<span class="k">${kk}</span>: ${have[kk]}/${need[kk]}`;
+        haveRow.appendChild(d);
+      });
+    }
+
+    function render(step) {
+      clearCells();
+      if (step.done) {
+        if (step.found) {
+          for (let i = step.bestL; i <= step.bestR; i++)
+            document.getElementById('ch-' + i).classList.add('valid', 'best');
+          setPtr(step.bestL, 'l'); setPtr(step.bestR, 'r');
+          bestVal.textContent = '"' + s.slice(step.bestL, step.bestR + 1) + '"';
+          resultText.textContent = 'return "' + s.slice(step.bestL, step.bestR + 1) + '" — the minimum window.';
+        } else {
+          resultText.textContent = 'return "" — no valid window exists.';
+        }
+        resultBadge.classList.add('show');
+        stepDesc.innerHTML = step.desc; stepDesc.className = 'step-description valid';
+        return;
+      }
+      const valid = step.formed === required;
+      for (let i = step.left; i <= step.right; i++)
+        document.getElementById('ch-' + i).classList.add(valid ? 'valid' : 'inwin');
+      if (step.type === 'expand') document.getElementById('ch-' + step.right).classList.add('right-cur');
+      if (step.type === 'contract') document.getElementById('ch-' + step.dropIdx).classList.add('left-drop');
+      setPtr(step.left, 'l'); setPtr(step.right, 'r');
+
+      formedVal.textContent = step.formed + ' / ' + required;
+      formedBox.className = 'state-box formed' + (valid ? ' full' : '');
+      winVal.textContent = '"' + s.slice(step.left, step.right + 1) + '"';
+      bestVal.textContent = step.bestLen === Infinity ? 'none' : '"' + s.slice(step.bestL, step.bestR + 1) + '"';
+      renderHave(step.have, step.formed);
+      stepDesc.innerHTML = step.desc;
+      stepDesc.className = 'step-description ' + step.type;
+    }
+
+    function advance() {
+      if (currentStep >= steps.length) return;
+      render(steps[currentStep]);
+      currentStep++;
+      stepCtr.textContent = 'Step ' + currentStep + ' / ' + steps.length;
+      if (currentStep >= steps.length) nextBtn.disabled = true;
+    }
+    function reset() {
+      currentStep = 0; clearCells(); haveRow.innerHTML = '';
+      formedVal.textContent = '0 / ' + required; formedBox.className = 'state-box formed';
+      winVal.textContent = '"-"'; bestVal.textContent = 'none';
+      resultBadge.classList.remove('show');
+      stepDesc.innerHTML = 'Press "Next Step". Expand right until the window covers all of t, then contract left to minimize it.';
+      stepDesc.className = 'step-description';
+      nextBtn.disabled = false;
+      stepCtr.textContent = 'Step 0 / ' + steps.length;
+    }
+    stepCtr.textContent = 'Step 0 / ' + steps.length;
+  </script>
+</body>
+</html>

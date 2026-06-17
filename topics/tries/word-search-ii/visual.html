@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Search II — Trie-guided Grid DFS</title>
+<style>
+  :root {
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#232342;
+    --text:#e0e0e0; --muted:#9a9ac0;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444; --purple:#a855f7;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.6; padding:32px 20px 80px;
+  }
+  .wrap { max-width:980px; margin:0 auto; }
+  h1 { font-size:1.8rem; margin:0 0 6px; }
+  h1 span { color:var(--green); }
+  .subtitle { color:var(--muted); margin:0 0 24px; font-size:1.0rem; }
+  code {
+    background:var(--panel2); padding:2px 7px; border-radius:6px;
+    color:#ffd479; font-family:"SF Mono",Menlo,Consolas,monospace; font-size:.9em;
+  }
+  .analogy {
+    background:linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border:1px solid rgba(245,158,11,0.4); border-left:5px solid var(--amber);
+    border-radius:12px; padding:16px 22px; margin-bottom:24px;
+  }
+  .analogy h3 { margin:0 0 6px; color:var(--amber); font-size:1.0rem; }
+  .analogy p { margin:0; font-size:.96rem; }
+  .panel {
+    background:var(--panel); border-radius:12px; padding:20px 22px;
+    border:1px solid rgba(255,255,255,0.06); margin-bottom:22px;
+  }
+  .opbtns { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  .opbtn { background:var(--panel2); border:1px solid rgba(255,255,255,0.1); color:var(--text);
+    padding:8px 14px; font-size:.9rem; border-radius:9px; cursor:pointer; font-weight:600; }
+  .opbtn.active { background:var(--purple); border-color:var(--purple); }
+  .opbtn:hover { background:#3a3a66; }
+  .opbtn.active:hover { background:var(--purple); }
+
+  .stage { display:flex; gap:30px; flex-wrap:wrap; align-items:flex-start; margin:6px 0 6px; }
+  .col { flex:1; min-width:260px; }
+  .col h4 { margin:0 0 10px; font-size:.95rem; color:var(--muted); font-weight:600; letter-spacing:.3px; }
+
+  /* grid */
+  .grid { display:grid; grid-template-columns:repeat(4, 64px); gap:8px; }
+  .cell {
+    width:64px; height:64px; border-radius:10px;
+    display:grid; place-items:center; position:relative;
+    font-family:"SF Mono",Menlo,monospace; font-weight:700; font-size:1.5rem;
+    background:var(--panel2); border:2px solid rgba(255,255,255,0.08);
+    transition: all .3s; color:var(--text);
+  }
+  .cell.path { border-color:var(--blue); background:rgba(59,130,246,0.28); color:#bcd4ff; }
+  .cell.cur  { border-color:var(--amber); background:rgba(245,158,11,0.30); color:#ffe2ad; transform:scale(1.06); box-shadow:0 0 0 3px rgba(245,158,11,0.25); }
+  .cell.matched { border-color:var(--green); background:rgba(16,185,129,0.30); color:#b6f0d8; }
+  .cell.dead { border-color:var(--red); background:rgba(239,68,68,0.22); color:#ffc9c9; }
+  .cell .order {
+    position:absolute; top:3px; right:5px; font-size:.62rem; color:var(--muted); font-weight:600;
+  }
+
+  /* trie SVG */
+  svg { width:100%; height:auto; display:block; }
+  .edge { stroke:#3a3a66; stroke-width:2.5; transition:stroke .3s, stroke-width .3s; }
+  .edge.lit { stroke:var(--blue); stroke-width:4; }
+  .edge.amber { stroke:var(--amber); stroke-width:4; }
+  .edge.green { stroke:var(--green); stroke-width:4; }
+  .node circle { fill:var(--panel2); stroke:#4a4a7a; stroke-width:2.5; transition:all .3s; }
+  .node.lit circle { fill:rgba(59,130,246,0.32); stroke:var(--blue); stroke-width:4; }
+  .node.amber circle { fill:rgba(245,158,11,0.30); stroke:var(--amber); stroke-width:4; }
+  .node.green circle { fill:rgba(16,185,129,0.34); stroke:var(--green); stroke-width:4.5; }
+  .node text { fill:var(--text); font-family:"SF Mono",Menlo,monospace; font-weight:700; font-size:15px; text-anchor:middle; dominant-baseline:central; }
+  .node text.rootlbl { fill:var(--muted); font-size:11px; }
+  .wordtag { fill:var(--green); font-size:11px; font-weight:700; text-anchor:middle; opacity:0; transition:opacity .3s; }
+  .wordtag.show { opacity:1; }
+
+  .controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:18px 0 6px; }
+  button.nav {
+    background:var(--blue); color:#fff; border:none; padding:10px 20px; border-radius:10px;
+    font-size:.95rem; font-weight:600; cursor:pointer; transition:transform .15s, background .2s;
+  }
+  button.nav:hover:not(:disabled) { background:#2f6fd6; transform:translateY(-1px); }
+  button.nav:disabled { opacity:.4; cursor:not-allowed; }
+  button.ghost { background:var(--panel2); }
+  button.ghost:hover:not(:disabled) { background:#3a3a66; }
+  .stepcount { color:var(--muted); font-size:.9rem; margin-left:auto; }
+
+  .caption {
+    background:var(--panel2); border-left:4px solid var(--blue); border-radius:10px;
+    padding:14px 18px; margin-top:12px; font-size:.97rem; min-height:26px;
+  }
+  .caption.amber { border-left-color:var(--amber); }
+  .caption.green { border-left-color:var(--green); }
+  .caption.red { border-left-color:var(--red); }
+  .caption b.k { color:#ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .found {
+    margin-top:12px; font-family:"SF Mono",Menlo,monospace; font-size:.95rem; color:var(--green);
+  }
+  .verdict { font-weight:700; }
+  .verdict.t { color:var(--green); } .verdict.f { color:var(--red); }
+
+  .legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; font-size:.84rem; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:7px; }
+  .sw { width:14px; height:14px; border-radius:4px; border:2px solid; }
+  .sw.blue { border-color:var(--blue); background:rgba(59,130,246,0.28); }
+  .sw.amber { border-color:var(--amber); background:rgba(245,158,11,0.30); }
+  .sw.green { border-color:var(--green); background:rgba(16,185,129,0.30); }
+  .sw.red { border-color:var(--red); background:rgba(239,68,68,0.22); }
+
+  .takeaway {
+    background:linear-gradient(135deg, rgba(16,185,129,0.15), rgba(59,130,246,0.12));
+    border:1px solid rgba(16,185,129,0.4); border-radius:12px;
+    padding:18px 24px; margin-top:28px; text-align:center;
+  }
+  .takeaway h3 { margin:0 0 6px; color:var(--green); }
+  .takeaway p { margin:0; font-size:1.02rem; }
+  @media (max-width:680px){ .stage { gap:18px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Word Search II — one <span>trie-guided</span> grid DFS</h1>
+  <p class="subtitle">Words: <code>oath</code>, <code>eat</code>, <code>pea</code>, <code>rain</code>. The trie prunes every direction that can't spell a word.</p>
+
+  <div class="analogy">
+    <h3>🎲 Analogy: Boggle with a GPS</h3>
+    <p>Saare words ek <b>trie</b> me daal do. Board pe <b>ek hi DFS</b> chalao, trie ko saath le ke chalte hue. Board ka char trie node ke children me hai tabhi aage badho — <b style="color:var(--red)">warna turant ruk jao</b> (us direction me koi word ban hi nahi sakta).</p>
+  </div>
+
+  <div class="panel">
+    <div class="opbtns" id="opbtns"></div>
+
+    <div class="stage">
+      <div class="col">
+        <h4>BOARD (DFS path)</h4>
+        <div class="grid" id="grid"></div>
+        <div class="found" id="found"></div>
+      </div>
+      <div class="col">
+        <h4>TRIE (search pointer)</h4>
+        <svg id="svg" viewBox="0 0 420 380" role="img" aria-label="Trie of words"></svg>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="nav ghost" id="prevBtn">‹ Prev</button>
+      <button class="nav" id="nextBtn">Next ›</button>
+      <button class="nav ghost" id="resetBtn">↺ Reset</button>
+      <span class="stepcount" id="stepcount"></span>
+    </div>
+
+    <div class="caption" id="caption">Pick a walkthrough above, then step with Next.</div>
+
+    <div class="legend">
+      <span><span class="sw blue"></span> on current DFS path</span>
+      <span><span class="sw amber"></span> current cell / trie node</span>
+      <span><span class="sw green"></span> completed word</span>
+      <span><span class="sw red"></span> pruned dead end</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Merging all words into a <b>single trie</b> turns N separate board searches into <b>one DFS</b> — and every board cell whose letter isn't a trie child is pruned instantly, so you only ever walk paths that are real word prefixes.</p>
+  </div>
+</div>
+
+<script>
+// ---- Board ----
+const BOARD = [
+  ['o','a','a','n'],
+  ['e','t','a','e'],
+  ['i','h','k','r'],
+  ['i','f','l','v'],
+];
+
+// ---- Trie (words: oath, eat, pea, rain) drawn as SVG ----
+// Layout positions inside 420x380
+const TNODES = {
+  root:{x:210,y:30,label:'•',root:true},
+  // oath
+  o:{x:70,y:100,label:'o'}, oa:{x:70,y:170,label:'a'}, oat:{x:70,y:240,label:'t'}, oath:{x:70,y:310,label:'h',word:'oath'},
+  // eat
+  e:{x:175,y:100,label:'e'}, ea:{x:175,y:170,label:'a'}, eat:{x:175,y:240,label:'t',word:'eat'},
+  // pea
+  p:{x:280,y:100,label:'p'}, pe:{x:280,y:170,label:'e'}, pea:{x:280,y:240,label:'a',word:'pea'},
+  // rain
+  r:{x:370,y:100,label:'r'}, ra:{x:370,y:170,label:'a'}, rai:{x:370,y:240,label:'i'}, rain:{x:370,y:310,label:'n',word:'rain'},
+};
+const TEDGES = [
+  ['root','o'],['o','oa'],['oa','oat'],['oat','oath'],
+  ['root','e'],['e','ea'],['ea','eat'],
+  ['root','p'],['p','pe'],['pe','pea'],
+  ['root','r'],['r','ra'],['ra','rai'],['rai','rain'],
+];
+
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+
+// ---- build grid ----
+function buildGrid() {
+  let h='';
+  for (let r=0;r<4;r++) for (let c=0;c<4;c++)
+    h += `<div class="cell" id="g-${r}-${c}"><span class="order" id="o-${r}-${c}"></span>${BOARD[r][c]}</div>`;
+  $('grid').innerHTML = h;
+}
+
+// ---- build trie svg ----
+function buildTrie() {
+  const svg=$('svg'); svg.innerHTML='';
+  for (const [u,v] of TEDGES) {
+    const a=TNODES[u], b=TNODES[v];
+    const l=document.createElementNS(NS,'line');
+    l.setAttribute('x1',a.x); l.setAttribute('y1',a.y+18);
+    l.setAttribute('x2',b.x); l.setAttribute('y2',b.y-18);
+    l.setAttribute('class','edge'); l.id='te-'+u+'-'+v; svg.appendChild(l);
+  }
+  for (const id in TNODES) {
+    const n=TNODES[id];
+    const g=document.createElementNS(NS,'g'); g.setAttribute('class','node'); g.id='tn-'+id;
+    const c=document.createElementNS(NS,'circle');
+    c.setAttribute('cx',n.x); c.setAttribute('cy',n.y); c.setAttribute('r',18); g.appendChild(c);
+    const t=document.createElementNS(NS,'text');
+    t.setAttribute('x',n.x); t.setAttribute('y',n.y);
+    if(n.root) t.setAttribute('class','rootlbl');
+    t.textContent=n.root?'root':n.label; g.appendChild(t);
+    if (n.word) {
+      const w=document.createElementNS(NS,'text');
+      w.setAttribute('x',n.x); w.setAttribute('y',n.y+32);
+      w.setAttribute('class','wordtag'); w.id='tw-'+id; w.textContent='"'+n.word+'"';
+      g.appendChild(w);
+    }
+    svg.appendChild(g);
+  }
+}
+
+function clearAll() {
+  document.querySelectorAll('.cell').forEach(c=>{ c.className='cell'; });
+  document.querySelectorAll('.order').forEach(o=>o.textContent='');
+  document.querySelectorAll('.node').forEach(n=>n.className.baseVal='node');
+  document.querySelectorAll('.edge').forEach(e=>e.setAttribute('class','edge'));
+  document.querySelectorAll('.wordtag').forEach(w=>w.classList.remove('show'));
+}
+
+// vis state applier
+function caption(kind, html, v) {
+  $('caption').className='caption '+(kind==='blue'?'':kind);
+  $('caption').innerHTML=html;
+  render(v||{});
+}
+function render(v) {
+  clearAll();
+  // grid path cells with order numbers
+  (v.path||[]).forEach((p,i)=>{
+    const [r,c]=p; const cell=$(`g-${r}-${c}`);
+    cell.classList.add('path'); $(`o-${r}-${c}`).textContent=(i+1);
+  });
+  if (v.cur) { const [r,c]=v.cur; const cell=$(`g-${r}-${c}`); cell.classList.remove('path'); cell.classList.add('cur'); }
+  (v.matched||[]).forEach(p=>{ const [r,c]=p; const cell=$(`g-${r}-${c}`); cell.classList.remove('path','cur'); cell.classList.add('matched'); });
+  if (v.dead) { const [r,c]=v.dead; const cell=$(`g-${r}-${c}`); cell.classList.add('dead'); }
+  // trie
+  (v.tlitE||[]).forEach(e=>{const x=$('te-'+e); if(x) x.setAttribute('class','edge '+(v.tcls||'lit'));});
+  (v.tlit||[]).forEach(id=>tmk(id,'lit'));
+  if (v.tcur) tmk(v.tcur,'amber');
+  (v.tgreen||[]).forEach(id=>tmk(id,'green'));
+  (v.twords||[]).forEach(id=>{const w=$('tw-'+id); if(w) w.classList.add('show');});
+  // found list
+  $('found').innerHTML = (v.found&&v.found.length) ? 'found: [ '+v.found.map(w=>'"'+w+'"').join(', ')+' ]' : '';
+}
+function tmk(id,cls){const n=$('tn-'+id); if(n) n.setAttribute('class','node '+cls);}
+
+// ---- WALKTHROUGH 1: build "eat" starting at (1,0)='e' ----
+// e(1,0) -> a(1,2)? not adjacent. Use e(1,0)->a? neighbors of (1,0): (0,0)o,(2,0)i,(1,1)t.
+// Hmm need 'a' adjacent to an 'e'. Board e at (1,0) and (1,3). (1,3)e neighbors: (0,3)n,(2,3)r,(1,2)a -> a! then (1,2)a neighbors include (1,1)t -> "eat"? e(1,3)->a(1,2)->t(1,1). Yes!
+function makeEat() {
+  const tE='te-root-e', tEA='te-e-ea', tEAT='te-ea-eat';
+  const s=[];
+  s.push(()=>caption('blue',
+    `Start DFS at cell <b class="k">(1,3)='e'</b>. Root's children include <b class="k">'e'</b> → step into trie node <b class="k">e</b>.`,
+    {cur:[1,3], tcur:'e', tlit:['root'], tlitE:['root-e']}));
+  s.push(()=>caption('blue',
+    `Neighbors of e: look for a trie child. <b class="k">(1,2)='a'</b> matches child <b class="k">a</b> of node e → descend.`,
+    {path:[[1,3]], cur:[1,2], tlit:['root','e'], tcur:'ea', tlitE:['root-e','e-ea']}));
+  s.push(()=>caption('amber',
+    `At trie node <b class="k">ea</b>. Neighbor <b class="k">(1,1)='t'</b> matches child <b class="k">t</b> → descend to node <b class="k">eat</b>.`,
+    {path:[[1,3],[1,2]], cur:[1,1], tlit:['root','e','ea'], tcur:'eat', tlitE:['root-e','e-ea','ea-eat']}));
+  s.push(()=>caption('green',
+    `Node <b class="k">eat</b> stores a word ('#': "eat") → <b>collect "eat"</b>. → <span class="verdict t">"eat" found</span>`,
+    {matched:[[1,3],[1,2],[1,1]], tgreen:['root','e','ea','eat'], tlitE:['root-e','e-ea','ea-eat'], tcls:'green', twords:['eat'], found:['eat']}));
+  return s;
+}
+
+// ---- WALKTHROUGH 2: pruning. Start at p? no 'p' on board -> show 'pea' dead at root.
+// Better: start DFS at (1,0)='e', try to extend toward 't'(1,1): node e has child a only, board gives 't' -> no child 't' under e -> prune.
+function makePrune() {
+  const s=[];
+  s.push(()=>caption('blue',
+    `Start DFS at cell <b class="k">(1,0)='e'</b>. Root has child <b class="k">'e'</b> → enter trie node <b class="k">e</b> (prefix "e").`,
+    {cur:[1,0], tcur:'e', tlit:['root'], tlitE:['root-e']}));
+  s.push(()=>caption('amber',
+    `Node <b class="k">e</b>'s only trie child is <b class="k">'a'</b> (for "eat"). Now check neighbors of (1,0): <b class="k">(0,0)='o'</b>, <b class="k">(2,0)='i'</b>, <b class="k">(1,1)='t'</b>.`,
+    {path:[[1,0]], tlit:['root'], tcur:'e', tlitE:['root-e']}));
+  s.push(()=>caption('red',
+    `None of o / i / t is a child of node <b class="k">e</b> (it only has 'a'). Every direction is <b>pruned</b> — no word starts "eo", "ei", or "et". DFS from here <b>dead-ends instantly</b>.`,
+    {path:[[1,0]], dead:[1,1], tlit:['root'], tcur:'e', tlitE:['root-e']}));
+  s.push(()=>caption('amber',
+    `This is the whole point of the trie: without it we'd blindly recurse in all 3 directions. The trie says "node e has no child here" → <b>cut the branch</b> in O(1).`,
+    {path:[[1,0]], tlit:['root','e'], tlitE:['root-e']}));
+  return s;
+}
+
+// ---- WALKTHROUGH 3: oath starting at (0,0)='o' ----
+// o(0,0)->a(0,1)->t(1,1)->h(2,1) = "oath". Check adjacency: (0,0)-(0,1) ok, (0,1)-(1,1) ok, (1,1)-(2,1) ok. h at (2,1). Yes!
+function makeOath() {
+  const s=[];
+  s.push(()=>caption('blue',
+    `Start at <b class="k">(0,0)='o'</b> → trie node <b class="k">o</b> (prefix of "oath").`,
+    {cur:[0,0], tcur:'o', tlit:['root'], tlitE:['root-o']}));
+  s.push(()=>caption('blue',
+    `Neighbor <b class="k">(0,1)='a'</b> matches child <b class="k">a</b> → descend ("oa").`,
+    {path:[[0,0]], cur:[0,1], tlit:['root','o'], tcur:'oa', tlitE:['root-o','o-oa']}));
+  s.push(()=>caption('blue',
+    `Neighbor <b class="k">(1,1)='t'</b> matches child <b class="k">t</b> → descend ("oat").`,
+    {path:[[0,0],[0,1]], cur:[1,1], tlit:['root','o','oa'], tcur:'oat', tlitE:['root-o','o-oa','oa-oat']}));
+  s.push(()=>caption('amber',
+    `Neighbor <b class="k">(2,1)='h'</b> matches child <b class="k">h</b> → descend to node <b class="k">oath</b>.`,
+    {path:[[0,0],[0,1],[1,1]], cur:[2,1], tlit:['root','o','oa','oat'], tcur:'oath', tlitE:['root-o','o-oa','oa-oat','oat-oath']}));
+  s.push(()=>caption('green',
+    `Node <b class="k">oath</b> stores a word → <b>collect "oath"</b>. → <span class="verdict t">"oath" found</span>`,
+    {matched:[[0,0],[0,1],[1,1],[2,1]], tgreen:['root','o','oa','oat','oath'], tlitE:['root-o','o-oa','oa-oat','oat-oath'], tcls:'green', twords:['oath'], found:['oath']}));
+  return s;
+}
+
+const OPS=[
+  {key:'oath', label:'find "oath"  (0,0)', build:makeOath},
+  {key:'eat',  label:'find "eat"  (1,3)', build:makeEat},
+  {key:'prune',label:'prune demo  (1,0)', build:makePrune},
+];
+function buildOps() {
+  $('opbtns').innerHTML=OPS.map(o=>`<button class="opbtn" data-k="${o.key}">${o.label}</button>`).join('');
+  document.querySelectorAll('.opbtn').forEach(b=>b.addEventListener('click',()=>selectOp(b.dataset.k)));
+}
+
+let current=null, steps=[], idx=0;
+function selectOp(key) {
+  current=OPS.find(o=>o.key===key);
+  document.querySelectorAll('.opbtn').forEach(b=>b.classList.toggle('active',b.dataset.k===key));
+  steps=current.build(); idx=0; apply();
+}
+function apply() {
+  steps[idx]();
+  $('stepcount').textContent=`step ${idx+1} / ${steps.length}`;
+  $('prevBtn').disabled=idx===0; $('nextBtn').disabled=idx===steps.length-1;
+}
+$('nextBtn').addEventListener('click',()=>{if(idx<steps.length-1){idx++;apply();}});
+$('prevBtn').addEventListener('click',()=>{if(idx>0){idx--;apply();}});
+$('resetBtn').addEventListener('click',()=>{if(current)selectOp(current.key);});
+
+buildGrid(); buildTrie(); render({});
+buildOps();
+$('prevBtn').disabled=true; $('nextBtn').disabled=true;
+</script>
+</body>
+</html>

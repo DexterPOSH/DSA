@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Min Cost to Connect All Points — Prim's MST</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444; --purple:#a855f7;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:30px 18px 70px;}
+  .wrap{max-width:920px;margin:0 auto;}
+  h1{font-size:1.8rem;margin:0 0 6px;}
+  h1 span{color:var(--green);}
+  .subtitle{color:var(--muted);margin:0 0 24px;}
+  .analogy{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(168,85,247,.10));
+    border:1px solid rgba(245,158,11,.4);border-left:5px solid var(--amber);border-radius:12px;padding:16px 20px;margin-bottom:24px;}
+  .analogy h3{margin:0 0 6px;color:var(--amber);font-size:1.02rem;}
+  .analogy p{margin:0;}
+  .stage{display:grid;grid-template-columns:1fr 300px;gap:18px;background:var(--panel);
+    border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:18px 20px;margin-bottom:18px;}
+  @media(max-width:740px){.stage{grid-template-columns:1fr;}}
+  svg{width:100%;height:auto;background:#12182e;border-radius:10px;}
+  .side{display:flex;flex-direction:column;gap:14px;}
+  .panel-box{background:var(--panel2);border-radius:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);}
+  .panel-box h4{margin:0 0 8px;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);}
+  .heap-item{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.92rem;
+    padding:5px 9px;border-radius:7px;margin:4px 0;background:#1b2748;border:1px solid rgba(255,255,255,.07);display:flex;justify-content:space-between;}
+  .heap-item.top{border-color:var(--amber);background:rgba(245,158,11,.16);color:#ffe3a8;}
+  .heap-item.stale{opacity:.45;text-decoration:line-through;}
+  .total{font-family:"SF Mono",monospace;font-size:1.5rem;font-weight:700;color:var(--green);}
+  .empty{color:var(--muted);font-style:italic;font-size:.85rem;}
+  .caption{background:var(--panel2);border-left:4px solid var(--green);border-radius:8px;
+    padding:12px 16px;margin:0 0 16px;font-size:.98rem;min-height:54px;}
+  .caption b{color:#b6f0d8;}
+  .controls{display:flex;align-items:center;gap:10px;margin:6px 0 22px;}
+  button{background:var(--green);color:#06281c;border:none;padding:10px 22px;border-radius:9px;font-size:.98rem;font-weight:700;cursor:pointer;transition:transform .12s,background .2s;}
+  button:hover{background:#0fce8c;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  button.ghost{background:var(--panel2);color:var(--text);font-weight:600;}
+  button.ghost:hover{background:#33457a;}
+  .stepind{color:var(--muted);font-size:.9rem;margin-left:auto;}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:4px 0 18px;font-size:.84rem;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:13px;height:13px;border-radius:50%;display:inline-block;}
+  .takeaway{background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(59,130,246,.12));
+    border:1px solid rgba(16,185,129,.4);border-radius:12px;padding:18px 22px;margin-top:26px;text-align:center;}
+  .takeaway h3{margin:0 0 6px;color:var(--green);}
+  .takeaway p{margin:0;font-size:1.05rem;}
+  .nlabel{font:700 13px 'Segoe UI';fill:#fff;}
+  .nsub{font:600 10px "SF Mono",monospace;fill:#9fb0e0;}
+  .ew{font:600 11px "SF Mono",monospace;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Min Cost to Connect All Points — <span>Prim's MST</span></h1>
+  <p class="subtitle">Grow a tree one cheapest edge at a time until every point is connected. Edge weight = Manhattan distance.</p>
+
+  <div class="analogy">
+    <h3>🔌 The villages-and-wires analogy</h3>
+    <p>Kuch gaon ko bijli ki taar se jodna hai, kam se kam kharch me. Ek gaon se shuru karo (cluster). Har baar cluster se <b>sabse sasti taar</b> jo kisi bahar wale gaon tak jaati hai — wahi jodo. Cluster badhta jaata hai jab tak sab andar na aa jaayein.</p>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#3a4a78"></i>not in MST</span>
+    <span><i class="dot" style="background:var(--amber)"></i>just added</span>
+    <span><i class="dot" style="background:var(--green)"></i>in MST</span>
+    <span><i class="dot" style="width:18px;height:4px;border-radius:2px;background:var(--green)"></i>MST edge</span>
+    <span><i class="dot" style="width:18px;height:4px;border-radius:2px;background:var(--amber)"></i>candidate edge</span>
+  </div>
+
+  <div class="stage">
+    <svg id="graph" viewBox="0 0 440 320"></svg>
+    <div class="side">
+      <div class="panel-box">
+        <h4>Min-heap (cost, point)</h4>
+        <div id="heap"></div>
+      </div>
+      <div class="panel-box">
+        <h4>Total MST cost</h4>
+        <div class="total" id="total">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="caption" id="caption">Press <b>Next</b> to start Prim's from point 0.</div>
+  <div class="controls">
+    <button id="prev" class="ghost">‹ Prev</button>
+    <button id="next">Next ›</button>
+    <button id="auto" class="ghost">▶ Auto</button>
+    <span class="stepind" id="ind"></span>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Always pulling the cheapest edge that reaches a <i>new</i> point grows a minimum spanning tree. Stale heap entries (to already-connected points) are simply skipped.</p>
+  </div>
+</div>
+
+<script>
+// points[i]=[x,y]; expected MST cost = 20
+const points=[[0,0],[2,2],[3,10],[5,2],[7,0]];
+const N=points.length;
+// map data coords to svg coords
+const pos=points.map(([x,y])=>[40+x*52, 290-y*26]);
+function manh(i,j){return Math.abs(points[i][0]-points[j][0])+Math.abs(points[i][1]-points[j][1]);}
+
+function buildSteps(){
+  const steps=[];
+  const visited=new Set();
+  let heap=[]; // [cost, from, to]
+  const mstEdges=[]; let total=0;
+  const pushNeighbors=(i)=>{
+    for(let j=0;j<N;j++) if(!visited.has(j)){heap.push([manh(i,j),i,j]);}
+    heap.sort((a,b)=>a[0]-b[0]||a[2]-b[2]);
+  };
+  const snap=(o)=>({
+    caption:o.caption,
+    heap:heap.map(h=>[...h]),
+    total, mst:mstEdges.map(e=>[...e]),
+    visited:new Set(visited),
+    active:o.active??null,
+    candidate:o.candidate?[...o.candidate]:null,
+    topStale:o.topStale??false
+  });
+  // start
+  heap.push([0,-1,0]);
+  steps.push(snap({caption:`Push <b>(cost 0, point 0)</b> as the seed. Heap has one candidate.`}));
+  while(heap.length && visited.size<N){
+    const [cost,from,to]=heap[0];
+    if(visited.has(to)){
+      steps.push(snap({caption:`Heap top is <b>(${cost}, p${to})</b> but p${to} is already in the MST → <b>stale, skip</b> it.`,candidate:from>=0?[from,to]:null,topStale:true}));
+      heap.shift();
+      continue;
+    }
+    steps.push(snap({caption:`Heap top = <b>(cost ${cost}, point ${to})</b>${from>=0?` via p${from}`:''}. p${to} is new → take it.`,candidate:from>=0?[from,to]:null}));
+    heap.shift();
+    visited.add(to); total+=cost;
+    if(from>=0) mstEdges.push([from,to,cost]);
+    steps.push(snap({caption:`Add p${to} to MST. ${from>=0?`Edge p${from}–p${to} (cost ${cost}) joins the tree. `:''}Total = <b>${total}</b>.`,active:to}));
+    pushNeighbors(to);
+    steps.push(snap({caption:`Push p${to}'s edges to every unconnected point into the heap. Re-sort by cost.`,active:to}));
+  }
+  steps.push(snap({caption:`All ${N} points connected. Minimum spanning tree cost = <b>${total}</b>. ✅`}));
+  return steps;
+}
+const steps=buildSteps();
+let cur=0,timer=null;
+const $=id=>document.getElementById(id);
+
+function drawGraph(s){
+  let h='';
+  // MST edges (green) + candidate (amber)
+  s.mst.forEach(([u,v,w])=>{
+    const [x1,y1]=pos[u],[x2,y2]=pos[v];
+    h+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#10b981" stroke-width="3.5"/>`;
+    const mx=(x1+x2)/2,my=(y1+y2)/2;
+    h+=`<rect x="${mx-9}" y="${my-9}" width="18" height="15" rx="4" fill="#0d2b22"/>`;
+    h+=`<text class="ew" x="${mx}" y="${my+2}" text-anchor="middle" fill="#7ff0c8">${w}</text>`;
+  });
+  if(s.candidate){
+    const [u,v]=s.candidate;const [x1,y1]=pos[u],[x2,y2]=pos[v];
+    if(!s.mst.some(e=>(e[0]===u&&e[1]===v)||(e[0]===v&&e[1]===u)))
+      h+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#f59e0b" stroke-width="3" stroke-dasharray="6 5"/>`;
+  }
+  // nodes
+  for(let i=0;i<N;i++){
+    const [x,y]=pos[i];
+    let fill='#3a4a78',stroke='#5a6aa0';
+    if(s.visited.has(i)){fill='#10b981';stroke='#0c8f63';}
+    if(s.active===i){fill='#f59e0b';stroke='#d98a08';}
+    h+=`<circle cx="${x}" cy="${y}" r="17" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>`;
+    h+=`<text class="nlabel" x="${x}" y="${y+1}" text-anchor="middle">${i}</text>`;
+    h+=`<text class="nsub" x="${x}" y="${y-23}" text-anchor="middle">(${points[i][0]},${points[i][1]})</text>`;
+  }
+  $('graph').innerHTML=h;
+}
+function drawHeap(s){
+  const el=$('heap');
+  if(!s.heap.length){el.innerHTML='<div class="empty">empty</div>';return;}
+  el.innerHTML=s.heap.slice(0,8).map((h,i)=>{
+    let cls='heap-item';
+    if(i===0) cls+= s.topStale?' stale':' top';
+    else if(s.visited.has(h[2])) cls+=' stale';
+    const via=h[1]>=0?`p${h[1]}→`:'seed ';
+    return `<div class="${cls}"><span>${via}p${h[2]}</span><span>cost ${h[0]}</span></div>`;
+  }).join('') + (s.heap.length>8?`<div class="empty">… +${s.heap.length-8} more</div>`:'');
+}
+function render(){
+  const s=steps[cur];
+  drawGraph(s); drawHeap(s);
+  $('total').textContent=s.total;
+  $('caption').innerHTML=s.caption;
+  $('ind').textContent=`Step ${cur+1} / ${steps.length}`;
+  $('prev').disabled=cur===0; $('next').disabled=cur===steps.length-1;
+}
+$('next').onclick=()=>{if(cur<steps.length-1){cur++;render();}};
+$('prev').onclick=()=>{if(cur>0){cur--;render();}};
+$('auto').onclick=function(){
+  if(timer){clearInterval(timer);timer=null;this.textContent='▶ Auto';return;}
+  this.textContent='⏸ Pause';
+  timer=setInterval(()=>{if(cur<steps.length-1){cur++;render();}else{clearInterval(timer);timer=null;$('auto').textContent='▶ Auto';}},1000);
+};
+render();
+</script>
+</body>
+</html>

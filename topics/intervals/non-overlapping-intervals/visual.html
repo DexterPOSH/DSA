@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Non-Overlapping Intervals — greedy by earliest end</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444; --purple:#a855f7;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:30px 18px 70px;}
+  .wrap{max-width:920px;margin:0 auto;}
+  h1{font-size:1.7rem;margin:0 0 6px;}
+  h1 span{color:var(--blue);}
+  .subtitle{color:var(--muted);margin:0 0 24px;}
+  .analogy{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(168,85,247,.10));
+    border:1px solid rgba(245,158,11,.4);border-left:5px solid var(--amber);border-radius:12px;padding:16px 20px;margin-bottom:24px;}
+  .analogy h3{margin:0 0 6px;color:var(--amber);font-size:1.02rem;}
+  .analogy p{margin:0;}
+  .problem{background:var(--panel);border-radius:12px;padding:14px 20px;margin-bottom:22px;border:1px solid rgba(255,255,255,.06);}
+  .problem code{background:var(--panel2);padding:2px 8px;border-radius:6px;color:#ffd479;font-family:"SF Mono",Menlo,monospace;}
+  .arrow{color:var(--green);font-weight:bold;}
+
+  .stage{background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:20px 22px 24px;margin-bottom:18px;}
+  .timeline{position:relative;height:215px;margin:10px 0 6px;}
+  .axis{position:absolute;left:0;right:0;bottom:30px;height:2px;background:rgba(255,255,255,.15);}
+  .fence{position:absolute;bottom:32px;top:6px;width:0;border-left:2px dashed var(--green);transition:left .4s ease;}
+  .fence::after{content:'prev_end';position:absolute;top:-2px;left:5px;font-size:.62rem;color:var(--green);white-space:nowrap;}
+  .tick{position:absolute;bottom:14px;transform:translateX(-50%);font-size:.72rem;color:var(--muted);font-family:"SF Mono",Menlo,monospace;}
+  .tick::before{content:'';position:absolute;left:50%;top:-16px;width:1px;height:10px;background:rgba(255,255,255,.18);}
+  .bar{position:absolute;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    font-family:"SF Mono",Menlo,monospace;font-weight:700;font-size:.8rem;border:2px solid;transition:all .4s ease;}
+  .bar.base{background:rgba(148,163,184,.16);border-color:#586387;color:#c3cbe6;}
+  .bar.testing{background:rgba(245,158,11,.22);border-color:var(--amber);color:#ffe3a8;box-shadow:0 0 0 3px rgba(245,158,11,.28);}
+  .bar.kept{background:rgba(16,185,129,.20);border-color:var(--green);color:#b6f0d8;}
+  .bar.removed{background:rgba(239,68,68,.18);border-color:var(--red);color:#ffc7c7;text-decoration:line-through;opacity:.75;}
+
+  .counters{display:flex;gap:14px;margin-top:6px;}
+  .counter{flex:1;background:var(--panel2);border-radius:10px;padding:10px 14px;border:1px solid rgba(255,255,255,.08);text-align:center;}
+  .counter .lbl{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .counter .num{font-family:"SF Mono",Menlo,monospace;font-size:1.5rem;font-weight:700;}
+  .counter.kept .num{color:var(--green);}
+  .counter.rem .num{color:var(--red);}
+  .counter.fen .num{color:#b6f0d8;}
+
+  .caption{background:var(--panel2);border-left:4px solid var(--blue);border-radius:8px;padding:12px 16px;margin:14px 0 16px;font-size:.98rem;min-height:50px;}
+  .caption b{color:#bcd4ff;}
+  .controls{display:flex;align-items:center;gap:10px;margin:6px 0 22px;}
+  button{background:var(--blue);color:#fff;border:none;padding:10px 22px;border-radius:9px;font-size:.98rem;font-weight:600;cursor:pointer;transition:transform .12s,background .2s;}
+  button:hover{background:#2f6fd6;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  button.ghost{background:var(--panel2);}
+  button.ghost:hover{background:#33457a;}
+  .stepind{color:var(--muted);font-size:.9rem;margin-left:auto;font-family:"SF Mono",Menlo,monospace;}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:4px 0 14px;font-size:.82rem;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid rgba(255,255,255,.2);}
+  .takeaway{background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(16,185,129,.12));
+    border:1px solid rgba(59,130,246,.4);border-radius:12px;padding:18px 22px;margin-top:26px;text-align:center;}
+  .takeaway h3{margin:0 0 6px;color:var(--blue);}
+  .takeaway p{margin:0;font-size:1.05rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Non-Overlapping Intervals — <span>greedy</span> by earliest end</h1>
+  <p class="subtitle">Remove the fewest intervals so none overlap. Sort by END and always keep the one that finishes first.</p>
+
+  <div class="analogy">
+    <h3>🎤 The conference-room analogy</h3>
+    <p>Ek hi room, bahut saari talks. Maximum talks schedule karni hain → hamesha woh talk pick karo jo <b>sabse jaldi khatam</b> ho. Jaldi-khatam talk room ko early free karti hai, isliye aage zyada talks fit hoti hain. Jo nahi fit hotin, unhe remove karo — wahi answer.</p>
+  </div>
+
+  <div class="problem">
+    <b>Input.</b> <code>[[1,2],[2,3],[3,4],[1,3]]</code>
+    <span class="arrow">→</span> remove <code>1</code> interval (drop <code>[1,3]</code>)
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#586387"></i>pending</span>
+    <span><i class="dot" style="background:var(--amber)"></i>testing now</span>
+    <span><i class="dot" style="background:var(--green)"></i>kept</span>
+    <span><i class="dot" style="background:var(--red)"></i>removed</span>
+  </div>
+
+  <div class="stage">
+    <div class="timeline" id="timeline"></div>
+    <div class="counters">
+      <div class="counter fen"><div class="lbl">prev_end (fence)</div><div class="num" id="cFence">−∞</div></div>
+      <div class="counter kept"><div class="lbl">kept</div><div class="num" id="cKept">0</div></div>
+      <div class="counter rem"><div class="lbl">removed</div><div class="num" id="cRem">0</div></div>
+    </div>
+  </div>
+
+  <div class="caption" id="caption">Press <b>Next</b> to sort by end, then sweep.</div>
+  <div class="controls">
+    <button id="prev" class="ghost">‹ Prev</button>
+    <button id="next">Next ›</button>
+    <button id="auto" class="ghost">▶ Auto</button>
+    <span class="stepind" id="ind"></span>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Sort by <b>end</b>, keep an interval only if it starts at/after the fence (<code>start ≥ prev_end</code>), then push the fence to its end. Everything that fails is a removal — this greedy is provably optimal (activity selection).</p>
+  </div>
+</div>
+
+<script>
+const raw=[[1,2],[2,3],[3,4],[1,3]];
+const sorted=[...raw].sort((a,b)=>a[1]-b[1]);   // by end: [[1,2],[1,3],[2,3],[3,4]]
+const MIN=0, MAX=5, SPAN=MAX-MIN;
+const $=id=>document.getElementById(id);
+
+function buildSteps(){
+  const steps=[];
+  let prevEnd=-Infinity, kept=0, removed=0;
+  const state={}; // index in sorted -> 'kept'|'removed'
+  const snap=o=>({
+    sorted:o.sorted??false, testing:o.testing??-1,
+    state:{...state}, prevEnd, kept, removed,
+    fenceShown:o.fenceShown??(prevEnd!==-Infinity),
+    caption:o.caption
+  });
+
+  steps.push(snap({caption:`Input: [[1,2],[2,3],[3,4],[1,3]]. The greedy trick is to sort by <b>END</b> time, not start.`}));
+  steps.push(snap({sorted:true,caption:`Sorted by end → <b>[[1,2],[1,3],[2,3],[3,4]]</b>. Fence <code>prev_end = −∞</code>. Sweep left→right.`}));
+
+  for(let i=0;i<sorted.length;i++){
+    const [s,e]=sorted[i];
+    steps.push(snap({sorted:true,testing:i,caption:`Test <b>[${s},${e}]</b>: does it start at/after the fence? Check <code>start ${s} ≥ prev_end ${prevEnd===-Infinity?'−∞':prevEnd}</code>.`}));
+    if(s>=prevEnd){
+      state[i]='kept'; kept++; prevEnd=e;
+      steps.push(snap({sorted:true,testing:i,caption:`Yes → <b>KEEP</b> [${s},${e}]. Move the fence to its end: <code>prev_end = ${e}</code>.`,fenceShown:true}));
+    }else{
+      state[i]='removed'; removed++;
+      steps.push(snap({sorted:true,testing:i,caption:`No — <code>${s} &lt; ${prevEnd}</code>, it overlaps the kept set. <b>REMOVE</b> it (removed = ${removed}). Fence stays at ${prevEnd}.`}));
+    }
+  }
+  steps.push(snap({sorted:true,caption:`Done. Kept ${kept}, removed <b>${removed}</b>. Minimum removals = <b>${removed}</b>. ✅`}));
+  return steps;
+}
+const steps=buildSteps();
+let cur=0, timer=null;
+
+function x(t){return ((t-MIN)/SPAN)*100;}
+function drawTimeline(s){
+  let h='';
+  for(let t=MIN;t<=MAX;t++) h+=`<div class="tick" style="left:${x(t)}%">${t}</div>`;
+  h+=`<div class="axis"></div>`;
+  const arr=s.sorted?sorted:raw;
+  arr.forEach((iv,idx)=>{
+    let cls='bar base';
+    if(s.sorted){
+      if(s.state[idx]==='kept') cls='bar kept';
+      else if(s.state[idx]==='removed') cls='bar removed';
+      if(s.testing===idx && !s.state[idx]) cls='bar testing';
+    }
+    const left=x(iv[0]), w=Math.max(x(iv[1])-x(iv[0]),5);
+    h+=`<div class="${cls}" style="left:${left}%;width:${w}%;top:${10+idx*34}px;">[${iv[0]},${iv[1]}]</div>`;
+  });
+  if(s.fenceShown && s.prevEnd!==-Infinity){
+    h+=`<div class="fence" style="left:${x(s.prevEnd)}%"></div>`;
+  }
+  $('timeline').innerHTML=h;
+}
+function render(){
+  const s=steps[cur];
+  drawTimeline(s);
+  $('cFence').textContent = s.prevEnd===-Infinity?'−∞':s.prevEnd;
+  $('cKept').textContent = s.kept;
+  $('cRem').textContent = s.removed;
+  $('caption').innerHTML=s.caption;
+  $('ind').textContent=`Step ${cur+1} / ${steps.length}`;
+  $('prev').disabled=cur===0; $('next').disabled=cur===steps.length-1;
+}
+$('next').onclick=()=>{if(cur<steps.length-1){cur++;render();}};
+$('prev').onclick=()=>{if(cur>0){cur--;render();}};
+$('auto').onclick=function(){
+  if(timer){clearInterval(timer);timer=null;this.textContent='▶ Auto';return;}
+  this.textContent='⏸ Pause';
+  timer=setInterval(()=>{if(cur<steps.length-1){cur++;render();}else{clearInterval(timer);timer=null;$('auto').textContent='▶ Auto';}},1100);
+};
+render();
+</script>
+</body>
+</html>

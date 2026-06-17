@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Array Equal Partition — Backtracking into K Buckets</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+
+  h1 {
+    margin: 0 0 6px;
+    color: #ffffff;
+    font-size: 28px;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    color: #a0a0b8;
+    margin-bottom: 28px;
+    font-size: 15px;
+  }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px;
+    border-radius: 8px;
+    margin-bottom: 24px;
+  }
+  .analogy h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #3b82f6;
+  }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy p + p { margin-top: 8px; }
+
+  .problem {
+    background: #24243e;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .line + .line { margin-top: 8px; }
+  .problem .ok { color: #10b981; }
+  .problem .bad { color: #ef4444; }
+
+  .stage {
+    background: #24243e;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .section-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #8888aa;
+    margin: 0 0 14px;
+  }
+
+  /* Phase 1: total / target computation */
+  .compute {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 8px;
+  }
+  .compute-card {
+    background: #2d2d50;
+    border: 1px solid #3a3a5c;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .compute-card .label {
+    font-size: 11px; color: #8888aa; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 6px;
+  }
+  .compute-card .value {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 17px; color: #e0e0e0;
+  }
+  .compute-card .value .num { color: #3b82f6; font-weight: 600; }
+  .compute-card .value .target { color: #10b981; font-weight: 700; }
+  .compute-card .value .bad { color: #ef4444; font-weight: 700; }
+
+  /* Array of elements (largest-first) */
+  .array {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+  }
+  .cell {
+    position: relative;
+    min-width: 54px;
+    padding: 16px 8px 8px;
+    background: #2d2d50;
+    border: 2px solid #3a3a5c;
+    border-radius: 8px;
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+  .cell .idx {
+    position: absolute; top: -10px; left: 50%;
+    transform: translateX(-50%); background: #1a1a2e;
+    font-size: 11px; color: #8888aa; padding: 0 6px;
+  }
+  .cell .val { font-size: 19px; font-weight: 600; color: #e0e0e0; }
+  .cell.current {
+    background: #1e3a8a; border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    transform: translateY(-4px);
+  }
+  .cell.current .val { color: #ffffff; }
+  .cell.placed { background: #14532d; border-color: #10b981; }
+  .cell.placed .val { color: #c8f7d8; }
+  .cell.placed.justplaced {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+  }
+
+  /* Buckets */
+  .buckets {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .bucket {
+    flex: 1 1 180px;
+    min-width: 160px;
+    background: #1f1f3a;
+    border: 2px dashed #3a3a5c;
+    border-radius: 10px;
+    padding: 12px;
+    transition: all 0.3s ease;
+  }
+  .bucket.try {
+    border-color: #fbbf24;
+    border-style: solid;
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.18);
+  }
+  .bucket.full {
+    border-color: #10b981;
+    border-style: solid;
+    background: #122c1d;
+  }
+  .bucket.skip {
+    opacity: 0.45;
+    border-color: #ef4444;
+  }
+  .bucket .bhead {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .bucket .bname {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+    color: #8888aa; font-weight: 600;
+  }
+  .bucket .bsum {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px; color: #a0a0b8;
+  }
+  .bucket .bsum b { color: #e0e0e0; }
+  .bucket.full .bsum b { color: #10b981; }
+  .bucket .bbar {
+    height: 6px; background: #2d2d50; border-radius: 3px;
+    overflow: hidden; margin-bottom: 10px;
+  }
+  .bucket .bfill {
+    height: 100%; background: #3b82f6; border-radius: 3px;
+    transition: width 0.35s ease, background 0.35s ease;
+  }
+  .bucket.full .bfill { background: #10b981; }
+  .bucket.try .bfill { background: #fbbf24; }
+  .bucket .chips {
+    display: flex; gap: 6px; flex-wrap: wrap; min-height: 34px;
+  }
+  .chip {
+    padding: 6px 10px; background: #2d2d50; border: 1px solid #3a3a5c;
+    border-radius: 6px; font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px; color: #e0e0e0; animation: popin 0.25s ease;
+  }
+  .chip.ghost {
+    border-style: dashed; opacity: 0.85;
+  }
+  .chip.ghost.bad { border-color: #ef4444; color: #ef4444; background: #2a1620; }
+  .chip.ghost.good { border-color: #fbbf24; color: #fbbf24; background: #2a2410; }
+  .chips:empty::after {
+    content: "(empty)"; color: #555570; font-style: italic; font-size: 12px;
+  }
+  @keyframes popin {
+    from { transform: scale(0.8); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* Narration */
+  .narration {
+    background: #1f1f3a;
+    border-left: 3px solid #3b82f6;
+    padding: 14px 18px;
+    border-radius: 4px;
+    font-size: 14.5px;
+    color: #d0d0e0;
+    min-height: 56px;
+    transition: border-color 0.3s ease, background 0.3s ease;
+  }
+  .narration.try { border-left-color: #fbbf24; }
+  .narration.place { border-left-color: #10b981; }
+  .narration.fail { border-left-color: #ef4444; background: #2a1620; }
+  .narration.backtrack { border-left-color: #ef4444; }
+  .narration.win { border-left-color: #10b981; background: #14321f; }
+  .narration code {
+    background: #2d2d50; color: #fbbf24; padding: 1px 6px;
+    border-radius: 3px; font-size: 13px;
+  }
+  .narration .tag {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 2px 8px; border-radius: 4px; margin-right: 8px;
+    vertical-align: middle;
+  }
+  .tag.t-try { background: #3f2e0d; color: #fbbf24; }
+  .tag.t-place { background: #0f2a1a; color: #10b981; }
+  .tag.t-prune { background: #2a1620; color: #ef4444; }
+  .tag.t-back { background: #2a1620; color: #ff8a8a; }
+  .tag.t-win { background: #0f2a1a; color: #10b981; }
+
+  /* Controls */
+  .controls {
+    display: flex; gap: 10px; justify-content: center; align-items: center;
+    margin: 22px 0 8px; flex-wrap: wrap;
+  }
+  button {
+    background: #3b82f6; color: #ffffff; border: none;
+    padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+    font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator {
+    color: #8888aa; font-size: 13px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-top: 14px; font-size: 12px; color: #8888aa;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  /* Side panels grid */
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 24px; }
+  @media (max-width: 760px) { .panels { grid-template-columns: 1fr; } .compute { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: #20203a; border: 1px solid #2f2f4e;
+    border-radius: 10px; padding: 18px 20px;
+  }
+  .panel h3 {
+    margin: 0 0 12px; font-size: 13px; text-transform: uppercase;
+    letter-spacing: 1px; color: #c0c0d8;
+  }
+  .panel ul { margin: 0; padding-left: 18px; }
+  .panel li { margin-bottom: 9px; font-size: 13.5px; color: #c8c8da; }
+  .panel li b { color: #fbbf24; }
+  .panel code {
+    background: #2d2d50; color: #93c5fd; padding: 1px 5px;
+    border-radius: 3px; font-size: 12.5px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .panel .big {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 15px; color: #e0e0e0; margin: 4px 0 12px;
+  }
+  .panel .big .hi { color: #ef4444; font-weight: 700; }
+  .panel .big .lo { color: #10b981; font-weight: 700; }
+
+  /* Takeaway */
+  .takeaway {
+    margin-top: 24px;
+    background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981;
+    padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 {
+    margin: 0 0 8px; font-size: 14px; text-transform: uppercase;
+    letter-spacing: 1px; color: #10b981;
+  }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Array Equal Partition — K Equal-Sum Subsets</h1>
+  <div class="subtitle">LeetCode 698. Backtracking se array ko <b>k</b> buckets mein baanto, har bucket ka sum exactly <code>target</code> ho. Pruning ke saath exponential search tractable ban jaati hai.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy</h3>
+    <p>Socho <b>k = 4</b> dost restaurant mein hain aur bill ko exactly equally split karna hai — har dost ko <b>same amount</b> dena hai (yahan amount = <code>target = total / k</code>). Items (dishes) ek-ek karke uthate ho aur har item ko kisi ek dost ke "share" mein daalte ho.</p>
+    <p>Agar kisi dost ka share <code>target</code> se zyada ho jaye → woh combination galat hai, item wapas uthao (<b>backtrack</b>) aur dusre dost ki taraf try karo. Agar saare items baant diye aur sab shares barabar nikle → bill perfectly split ho gaya.</p>
+  </div>
+
+  <div class="problem">
+    <div class="line"><span class="label">Input:</span><code>nums = [4, 3, 2, 3, 5, 2, 1]</code> &nbsp;&nbsp; <span class="label">k:</span><code>4</code></div>
+    <div class="line"><span class="label">total:</span><code>20</code> &nbsp; <span class="label">target = 20 / 4 =</span><code>5</code> &nbsp; <span class="ok">→ divisible, chalo aage</span></div>
+    <div class="line"><span class="label">Answer:</span><span class="ok">true</span> &nbsp; — buckets: <code>(5) (1,4) (2,3) (2,3)</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="section-title">Step 1 — Total sum &amp; feasibility check</div>
+    <div class="compute">
+      <div class="compute-card">
+        <div class="label">Sum of all elements</div>
+        <div class="value">total = <span class="num">20</span></div>
+      </div>
+      <div class="compute-card">
+        <div class="label">total % k</div>
+        <div class="value" id="mod-card">20 % 4 = <span class="num">0</span></div>
+      </div>
+      <div class="compute-card">
+        <div class="label">Each bucket must reach</div>
+        <div class="value">target = <span class="target">5</span></div>
+      </div>
+    </div>
+    <p style="font-size:13px;color:#8888aa;margin:6px 0 0">
+      Agar <code style="color:#fbbf24">total % k != 0</code> hota → answer turant <b style="color:#ef4444">false</b> (equal split possible hi nahi). Yahan remainder 0 hai, toh proceed.
+    </p>
+  </div>
+
+  <div class="stage">
+    <div class="section-title">Elements — sorted descending (largest-first optimization)</div>
+    <div class="array" id="array"></div>
+    <p style="font-size:13px;color:#8888aa;margin:8px 0 0">
+      Descending sort: <code style="color:#fbbf24">[5, 4, 3, 3, 2, 2, 1]</code>. Bade numbers pehle place karne se dead-ends jaldi pakde jaate hain (kam branching). Agar koi single element <code style="color:#fbbf24">&gt; target</code> ho → seedha <b style="color:#ef4444">false</b>.
+    </p>
+
+    <div class="section-title" style="margin-top:22px">K Buckets — har ek ko reach karna hai target = 5</div>
+    <div class="buckets" id="buckets"></div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>current element</div>
+      <div class="legend-item"><span class="swatch" style="background:#fbbf24"></span>bucket being tried</div>
+      <div class="legend-item"><span class="swatch" style="background:#10b981"></span>bucket full (= target)</div>
+      <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>pruned / backtrack</div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to begin. Hum <code>[5,4,3,3,2,2,1]</code> ko largest-first place karenge.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <h3>Pruning rules (yahi tractability deti hain)</h3>
+      <ul>
+        <li><b>Capacity prune:</b> agar <code>bucket + val &gt; target</code> → us bucket mein daalo hi mat, skip.</li>
+        <li><b>Duplicate empty buckets:</b> agar current bucket <b>empty</b> tha aur usme place karne se aage fail hua, toh baaki <b>empty</b> buckets try mat karo — woh identical hain, same fail dega. (Yahan se sabse bada saving aata hai.)</li>
+        <li><b>Sorted descending:</b> bade elements pehle → branching factor girta hai, dead-ends jaldi.</li>
+        <li><b>Exact-fit shortcut:</b> agar <code>bucket + val == target</code>, woh bucket "full" lock ho jaata hai aur seedha agle element pe recurse.</li>
+        <li><b>Early reject:</b> koi single <code>val &gt; target</code> → immediately <b>false</b>.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Complexity</h3>
+      <div class="big">Brute force: <span class="hi">O(k · 2<sup>n</sup>)</span></div>
+      <p style="font-size:13px;color:#a0a0b8;margin:0 0 14px">
+        Har element ke liye <code>k</code> buckets ka choice → search space exponential. <code>n</code> elements, har ek <code>k</code> options.
+      </p>
+      <div class="big">Pruning ke saath: <span class="lo">practically tractable</span></div>
+      <ul>
+        <li>Duplicate-empty-bucket prune symmetric branches kaat deta hai.</li>
+        <li>Descending sort + capacity prune dead-ends jaldi expose karta hai.</li>
+        <li><b>Space:</b> <code>O(k + n)</code> — buckets array + recursion depth.</li>
+        <li>Worst case still exponential, par real inputs pe yeh fast nikalta hai.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Har element ko har bucket mein "try → recurse → backtrack" karo. Teen pruning — <b>capacity overflow skip</b>, <b>identical-empty-bucket skip</b>, aur <b>descending sort</b> — naive <code>O(k·2<sup>n</sup>)</code> ko real inputs pe tezi se solvable bana dete hain.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const TARGET = 5;
+  const K = 4;
+  // process order: largest-first
+  const order = [5, 4, 3, 3, 2, 2, 1];
+
+  // ---- Build the step timeline by hand for a clear, illustrative trace.
+  // Each step carries a full snapshot: buckets (array of arrays), the element
+  // currently in hand, which bucket is being tried/skipped/filled, a placed
+  // flag set, narration text + class + tag.
+  //
+  // We illustrate a SUCCESSFUL path but deliberately show a PRUNED branch and
+  // a BACKTRACK so all the concepts appear.
+
+  function snap(b) { return b.map(x => x.slice()); }
+
+  const steps = [];
+  function push(s) { steps.push(s); }
+
+  // empty buckets
+  let B = [[], [], [], []];
+
+  push({
+    buckets: snap(B), inHand: null, placedCount: 0,
+    tryBucket: -1, skipBuckets: [], fullBuckets: [], ghost: null,
+    narr: `Shuru: 4 empty buckets, har ek ko <code>target = 5</code> tak bharna hai. Element order (descending): <code>[5,4,3,3,2,2,1]</code>.`,
+    cls: "", tag: ""
+  });
+
+  // ---- place 5 into bucket 0 (exact fit -> full)
+  push({
+    buckets: snap(B), inHand: 0, placedCount: 0,
+    tryBucket: 0, skipBuckets: [], fullBuckets: [],
+    ghost: { bucket: 0, val: 5, kind: "good" },
+    narr: `<span class="tag t-try">try</span> Element <code>5</code> uthaya. Bucket A try karo: <code>0 + 5 = 5 ≤ 5</code> ✓. Exact fit!`,
+    cls: "try", tag: ""
+  });
+  B[0] = [5];
+  push({
+    buckets: snap(B), inHand: 0, placedCount: 1,
+    tryBucket: -1, skipBuckets: [], fullBuckets: [0], ghost: null,
+    narr: `<span class="tag t-place">place</span> <code>5</code> → Bucket A. Sum = <code>5 = target</code>, Bucket A <b>full</b> &amp; lock. Agle element pe recurse.`,
+    cls: "place", tag: ""
+  });
+
+  // ---- element 4: try bucket A (full -> overflow), then bucket B
+  push({
+    buckets: snap(B), inHand: 1, placedCount: 1,
+    tryBucket: 0, skipBuckets: [0], fullBuckets: [0],
+    ghost: { bucket: 0, val: 4, kind: "bad" },
+    narr: `<span class="tag t-prune">prune</span> Element <code>4</code>. Bucket A: <code>5 + 4 = 9 &gt; 5</code> — capacity overflow, <b>skip</b> A.`,
+    cls: "fail", tag: ""
+  });
+  push({
+    buckets: snap(B), inHand: 1, placedCount: 1,
+    tryBucket: 1, skipBuckets: [0], fullBuckets: [0],
+    ghost: { bucket: 1, val: 4, kind: "good" },
+    narr: `<span class="tag t-try">try</span> Bucket B (empty): <code>0 + 4 = 4 ≤ 5</code> ✓. Place karke aage badho.`,
+    cls: "try", tag: ""
+  });
+  B[1] = [4];
+  push({
+    buckets: snap(B), inHand: 1, placedCount: 2,
+    tryBucket: -1, skipBuckets: [0], fullBuckets: [0], ghost: null,
+    narr: `<span class="tag t-place">place</span> <code>4</code> → Bucket B. Sum = <code>4</code> (target 5 tak 1 aur chahiye). Recurse.`,
+    cls: "place", tag: ""
+  });
+
+  // ---- element 3 (first): A full skip, B 4+3=7 overflow skip, C empty try
+  push({
+    buckets: snap(B), inHand: 2, placedCount: 2,
+    tryBucket: 1, skipBuckets: [0, 1], fullBuckets: [0],
+    ghost: { bucket: 1, val: 3, kind: "bad" },
+    narr: `<span class="tag t-prune">prune</span> Element <code>3</code>. Bucket A full (skip). Bucket B: <code>4 + 3 = 7 &gt; 5</code> — overflow, <b>skip</b>.`,
+    cls: "fail", tag: ""
+  });
+  push({
+    buckets: snap(B), inHand: 2, placedCount: 2,
+    tryBucket: 2, skipBuckets: [0, 1], fullBuckets: [0],
+    ghost: { bucket: 2, val: 3, kind: "good" },
+    narr: `<span class="tag t-try">try</span> Bucket C (empty): <code>0 + 3 = 3 ≤ 5</code> ✓.`,
+    cls: "try", tag: ""
+  });
+  B[2] = [3];
+  push({
+    buckets: snap(B), inHand: 2, placedCount: 3,
+    tryBucket: -1, skipBuckets: [0], fullBuckets: [0], ghost: null,
+    narr: `<span class="tag t-place">place</span> <code>3</code> → Bucket C. Sum = <code>3</code>. Recurse.`,
+    cls: "place", tag: ""
+  });
+
+  // ---- element 3 (second): A skip(full), B 4+3=7 skip, C 3+3=6 skip, D empty try
+  push({
+    buckets: snap(B), inHand: 3, placedCount: 3,
+    tryBucket: 2, skipBuckets: [0, 1, 2], fullBuckets: [0],
+    ghost: { bucket: 2, val: 3, kind: "bad" },
+    narr: `<span class="tag t-prune">prune</span> Dusra <code>3</code>. A full; B <code>4+3=7&gt;5</code>; C <code>3+3=6&gt;5</code> — sab overflow, <b>skip</b>.`,
+    cls: "fail", tag: ""
+  });
+  push({
+    buckets: snap(B), inHand: 3, placedCount: 3,
+    tryBucket: 3, skipBuckets: [0, 1, 2], fullBuckets: [0],
+    ghost: { bucket: 3, val: 3, kind: "good" },
+    narr: `<span class="tag t-try">try</span> Bucket D (empty, last): <code>0 + 3 = 3 ≤ 5</code> ✓.`,
+    cls: "try", tag: ""
+  });
+  B[3] = [3];
+  push({
+    buckets: snap(B), inHand: 3, placedCount: 4,
+    tryBucket: -1, skipBuckets: [0], fullBuckets: [0], ghost: null,
+    narr: `<span class="tag t-place">place</span> <code>3</code> → Bucket D. Sum = <code>3</code>. State: A=5✓ B=4 C=3 D=3. Recurse.`,
+    cls: "place", tag: ""
+  });
+
+  // ---- element 2 (first): A full skip, B 4+2=6 overflow ... hmm wait B=4, 4+2=6>5 skip
+  // Actually B needs 1 more, so 2 overflows B. C=3, 3+2=5 exact! place into C.
+  push({
+    buckets: snap(B), inHand: 4, placedCount: 4,
+    tryBucket: 1, skipBuckets: [0, 1], fullBuckets: [0],
+    ghost: { bucket: 1, val: 2, kind: "bad" },
+    narr: `<span class="tag t-prune">prune</span> Element <code>2</code>. A full; Bucket B: <code>4 + 2 = 6 &gt; 5</code> — overflow, <b>skip</b> B.`,
+    cls: "fail", tag: ""
+  });
+  push({
+    buckets: snap(B), inHand: 4, placedCount: 4,
+    tryBucket: 2, skipBuckets: [0, 1], fullBuckets: [0],
+    ghost: { bucket: 2, val: 2, kind: "good" },
+    narr: `<span class="tag t-try">try</span> Bucket C: <code>3 + 2 = 5 = target</code> ✓. Exact fit — Bucket C bharke full ho jaayega.`,
+    cls: "try", tag: ""
+  });
+  B[2] = [3, 2];
+  push({
+    buckets: snap(B), inHand: 4, placedCount: 5,
+    tryBucket: -1, skipBuckets: [0], fullBuckets: [0, 2], ghost: null,
+    narr: `<span class="tag t-place">place</span> <code>2</code> → Bucket C. Sum = <code>5 = target</code>, Bucket C <b>full</b>! Ab A &amp; C done.`,
+    cls: "place", tag: ""
+  });
+
+  // ---- element 2 (second): A full, B 4+2=6 overflow skip, C full skip, D 3+2=5 exact
+  push({
+    buckets: snap(B), inHand: 5, placedCount: 5,
+    tryBucket: 1, skipBuckets: [0, 1, 2], fullBuckets: [0, 2],
+    ghost: { bucket: 1, val: 2, kind: "bad" },
+    narr: `<span class="tag t-prune">prune</span> Dusra <code>2</code>. A full; B <code>4+2=6&gt;5</code> overflow; C full — sab <b>skip</b>.`,
+    cls: "fail", tag: ""
+  });
+  push({
+    buckets: snap(B), inHand: 5, placedCount: 5,
+    tryBucket: 3, skipBuckets: [0, 1, 2], fullBuckets: [0, 2],
+    ghost: { bucket: 3, val: 2, kind: "good" },
+    narr: `<span class="tag t-try">try</span> Bucket D: <code>3 + 2 = 5 = target</code> ✓. Exact fit!`,
+    cls: "try", tag: ""
+  });
+  B[3] = [3, 2];
+  push({
+    buckets: snap(B), inHand: 5, placedCount: 6,
+    tryBucket: -1, skipBuckets: [], fullBuckets: [0, 2, 3], ghost: null,
+    narr: `<span class="tag t-place">place</span> <code>2</code> → Bucket D. Sum = <code>5 = target</code>, Bucket D <b>full</b>! Sirf B (=4) bachi.`,
+    cls: "place", tag: ""
+  });
+
+  // ---- element 1 (last): only B has room, 4+1=5 exact -> all full -> WIN
+  push({
+    buckets: snap(B), inHand: 6, placedCount: 6,
+    tryBucket: 1, skipBuckets: [0, 2, 3], fullBuckets: [0, 2, 3],
+    ghost: { bucket: 1, val: 1, kind: "good" },
+    narr: `<span class="tag t-try">try</span> Last element <code>1</code>. A, C, D full (skip). Bucket B: <code>4 + 1 = 5 = target</code> ✓.`,
+    cls: "try", tag: ""
+  });
+  B[1] = [4, 1];
+  push({
+    buckets: snap(B), inHand: 6, placedCount: 7,
+    tryBucket: -1, skipBuckets: [], fullBuckets: [0, 1, 2, 3], ghost: null,
+    narr: `<span class="tag t-place">place</span> <code>1</code> → Bucket B. Sum = <code>5</code>. <b>Saare elements placed</b> aur saare buckets = 5.`,
+    cls: "place", tag: ""
+  });
+  push({
+    buckets: snap(B), inHand: -1, placedCount: 7,
+    tryBucket: -1, skipBuckets: [], fullBuckets: [0, 1, 2, 3], ghost: null,
+    narr: `<span class="tag t-win">success</span> Buckets: <code>(5) (4,1) (3,2) (3,2)</code> — sab equal to <code>5</code>. Return <b style="color:#10b981">true</b> ✓`,
+    cls: "win", tag: ""
+  });
+
+  // ---- BONUS: a small illustration of a backtrack (separate scenario note)
+  push({
+    buckets: snap(B), inHand: -1, placedCount: 7,
+    tryBucket: -1, skipBuckets: [], fullBuckets: [0, 1, 2, 3], ghost: null,
+    narr: `<span class="tag t-back">backtrack idea</span> Counter-example <code>[3,3,3,3,4]</code>, k=4 → total 16, target 4. Element <code>3</code> kisi empty bucket mein jaata hai par <code>4</code> ko 3 ke saath rakho toh <code>7&gt;4</code>, akela rakho toh fourth bucket exact — par 3s bachte hi nahi. Har branch fail → <b>backtrack</b> → answer <b style="color:#ef4444">false</b>.`,
+    cls: "backtrack", tag: ""
+  });
+
+  // ---- DOM
+  const bucketsEl = document.getElementById("buckets");
+  const arrayEl = document.getElementById("array");
+  const narrEl = document.getElementById("narration");
+  const stepIndicatorEl = document.getElementById("step-indicator");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  const bucketNames = ["A", "B", "C", "D"];
+
+  function buildArray() {
+    arrayEl.innerHTML = "";
+    order.forEach((n, i) => {
+      const c = document.createElement("div");
+      c.className = "cell";
+      c.dataset.idx = i;
+      c.innerHTML = `<span class="idx">#${i}</span><span class="val">${n}</span>`;
+      arrayEl.appendChild(c);
+    });
+  }
+  buildArray();
+
+  let cursor = 0;
+
+  function render() {
+    const s = steps[cursor];
+
+    // array cells: highlight current element in hand, mark placed ones
+    [...arrayEl.children].forEach((cell, idx) => {
+      cell.classList.remove("current", "placed", "justplaced");
+      if (idx < s.placedCount) cell.classList.add("placed");
+      if (idx === s.inHand) {
+        cell.classList.add("current");
+      }
+    });
+
+    // buckets
+    bucketsEl.innerHTML = "";
+    for (let bi = 0; bi < K; bi++) {
+      const items = s.buckets[bi];
+      const sum = items.reduce((a, b) => a + b, 0);
+      const div = document.createElement("div");
+      div.className = "bucket";
+
+      const isFull = s.fullBuckets.includes(bi);
+      const isTry = s.tryBucket === bi;
+      const isSkip = s.skipBuckets.includes(bi) && !isFull && !isTry;
+      if (isFull) div.classList.add("full");
+      if (isTry) div.classList.add("try");
+      if (isSkip) div.classList.add("skip");
+
+      const pct = Math.min(100, (sum / TARGET) * 100);
+
+      let chipsHtml = items.map(v => `<span class="chip">${v}</span>`).join("");
+      // ghost chip (the value being tried/rejected in this bucket)
+      if (s.ghost && s.ghost.bucket === bi) {
+        chipsHtml += `<span class="chip ghost ${s.ghost.kind}">${s.ghost.kind === "bad" ? "✗" : "+"}${s.ghost.val}</span>`;
+      }
+
+      div.innerHTML = `
+        <div class="bhead">
+          <span class="bname">Bucket ${bucketNames[bi]}</span>
+          <span class="bsum"><b>${sum}</b> / ${TARGET}</span>
+        </div>
+        <div class="bbar"><div class="bfill" style="width:${pct}%"></div></div>
+        <div class="chips">${chipsHtml}</div>
+      `;
+      bucketsEl.appendChild(div);
+    }
+
+    // narration
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+
+    stepIndicatorEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

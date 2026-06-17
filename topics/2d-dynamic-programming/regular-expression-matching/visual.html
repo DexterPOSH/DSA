@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Regular Expression Matching — Boolean DP Table</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #1e293b;
+    --text: #e0e0e0;
+    --muted: #94a3b8;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6; padding: 40px 20px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  h1 { font-size: 1.7rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--amber);
+    border-left: 5px solid var(--amber); border-radius: 12px;
+    padding: 18px 24px; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy .icon { font-size: 1.8rem; }
+  .analogy .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px;
+  }
+  .analogy p { color: #cdd3e0; font-size: 0.96rem; }
+  .analogy code { background:#0f172a;padding:1px 6px;border-radius:5px;color:#ffd479;font-family:'JetBrains Mono',monospace; }
+
+  .problem {
+    background: var(--panel2); border: 1px solid #2d3a5a;
+    border-radius: 12px; padding: 16px 22px; font-size: 0.95rem;
+  }
+  .problem code {
+    background: #0f172a; padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: 'JetBrains Mono', Consolas, monospace;
+  }
+  .problem .arrow { color: var(--green); font-weight: bold; }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a;
+    border-radius: 14px; padding: 24px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .section-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+  .step-desc {
+    background: var(--panel2); border-left: 4px solid var(--blue);
+    border-radius: 8px; padding: 14px 18px; font-size: 0.95rem;
+    min-height: 70px; color: #d4dae6;
+  }
+  .step-desc strong { color: #fff; }
+  .step-desc code { background:#0f172a;padding:1px 6px;border-radius:5px;color:#ffd479;font-family:'JetBrains Mono',monospace; }
+  .step-desc .star { color: var(--amber); font-weight: 700; }
+  .step-desc .dot { color: var(--purple); font-weight: 700; }
+
+  .grid-scroll { overflow-x: auto; }
+  table.dp { border-collapse: collapse; margin: 0 auto; font-family: 'JetBrains Mono', monospace; }
+  table.dp th, table.dp td {
+    width: 50px; height: 48px; text-align: center;
+    border: 1px solid #2d3a5a; font-size: 0.95rem; position: relative;
+    transition: all 0.3s;
+  }
+  table.dp th { color: var(--blue); font-weight: 700; background: #131c33; border: none; }
+  table.dp th.phead { color: #ffd479; }
+  table.dp th.star { color: var(--amber); }
+  table.dp th.dot { color: var(--purple); }
+  td.cell { background: #0f172a; color: #3a4663; }
+  td.cell.filled.T { background: rgba(16,185,129,0.16); color: #6ee7b7; font-weight: 700; }
+  td.cell.filled.F { background: #15223f; color: #5a6a90; }
+  td.cell.base { box-shadow: inset 0 0 0 1px rgba(148,163,184,0.25); }
+  td.cell.current {
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.6); transform: scale(1.08); z-index: 3;
+  }
+  td.cell.dep-skip { box-shadow: inset 0 0 0 2px var(--amber); background: rgba(245,158,11,0.18); }
+  td.cell.dep-one  { box-shadow: inset 0 0 0 2px var(--purple); background: rgba(168,85,247,0.20); }
+  td.cell.dep-diag { box-shadow: inset 0 0 0 2px var(--blue); background: rgba(59,130,246,0.16); }
+  td.cell.answer-t { background: var(--green); color: #06281b; font-weight: 800; box-shadow: 0 0 0 3px rgba(16,185,129,0.6); }
+  td.cell.answer-f { background: var(--red); color: #fff; font-weight: 800; box-shadow: 0 0 0 3px rgba(239,68,68,0.6); }
+
+  /* branch panel */
+  .branches { display: flex; gap: 10px; flex-wrap: wrap; }
+  .branch {
+    flex: 1; min-width: 180px; background: var(--panel2);
+    border: 1px solid #2d3a5a; border-radius: 10px; padding: 12px 14px;
+    font-size: 0.82rem; opacity: 0.4; transition: all 0.3s;
+  }
+  .branch.live { opacity: 1; }
+  .branch.win { border-color: var(--green); background: rgba(16,185,129,0.1); }
+  .branch .t { font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .branch.skip .t { color: var(--amber); }
+  .branch.one .t  { color: var(--purple); }
+  .branch.diag .t { color: var(--blue); }
+  .branch .v { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: var(--muted); border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+  .sw-skip { background: var(--amber); } .sw-one { background: var(--purple); }
+  .sw-diag { background: var(--blue); } .sw-t { background: var(--green); }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.14), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px;
+    padding: 20px 26px; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway .icon { font-size: 1.6rem; }
+  .takeaway .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.97rem; color: #cdd3e0; }
+  .takeaway strong { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Regular Expression Matching &mdash; <span>Boolean DP Table</span></h1>
+
+  <div class="analogy">
+    <div class="icon">🛂</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>Ek strict immigration officer passport <code>s</code> ko rulebook <code>p</code> ke against verify karta hai. <span style="color:#a855f7;font-weight:700">.</span> = "koi bhi ek char chalega". <span style="color:#f59e0b;font-weight:700">*</span> = "pichla rule zero ya jitni baar bhi repeat ho sakta hai" — yahin branching aati hai, jo DP table cache kar leti hai.</p>
+    </div>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> Does <code>s = "aab"</code> fully match <code>p = "c*a*b"</code>?
+    <span class="arrow">→</span> <code>True</code>
+    &nbsp;(<code>c*</code>→zero c, <code>a*</code>→"aa", <code>b</code>→"b").
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">What's happening</div>
+      <div class="step-desc" id="stepDesc">Press <b>Next</b> to fill <code>dp[i][j]</code> = does <code>s[:i]</code> match <code>p[:j]</code>? Green = True.</div>
+    </div>
+
+    <div>
+      <div class="section-label">dp[i][j] — rows = s "aab", columns = pattern "c*a*b"</div>
+      <div class="grid-scroll"><table class="dp" id="dpTable"></table></div>
+    </div>
+
+    <div>
+      <div class="section-label">How this cell is decided</div>
+      <div class="branches">
+        <div class="branch diag" id="brDiag"><div class="t">↖ char / · match</div><div class="v" id="vDiag">—</div></div>
+        <div class="branch skip" id="brSkip"><div class="t">★ zero of preceding (j-2)</div><div class="v" id="vSkip">—</div></div>
+        <div class="branch one" id="brOne"><div class="t">★ one more (i-1)</div><div class="v" id="vOne">—</div></div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><i class="swatch sw-t"></i> True</span>
+      <span><i class="swatch sw-diag"></i> ↖ diagonal match</span>
+      <span><i class="swatch sw-skip"></i> ★ zero (skip x*)</span>
+      <span><i class="swatch sw-one"></i> ★ one more</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">‹ Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next ›</button>
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key Takeaway</div>
+      <p>Plain char / <strong>.</strong> → copy the diagonal if chars match. A <strong>*</strong> is never alone: it forks into <strong>zero of the preceding</strong> (look left two, <code>dp[i][j-2]</code>) <strong>OR one more</strong> (look up, <code>dp[i-1][j]</code>, if the preceding char matches). Fill the grid in <strong>O(m·n)</strong>; <strong>dp[m][n]</strong> is the verdict.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const s = "aab";
+const p = "c*a*b";
+const m = s.length, n = p.length;
+
+// Precompute the full dp table.
+const dp = Array.from({length: m + 1}, () => Array(n + 1).fill(false));
+dp[0][0] = true;
+for (let j = 1; j <= n; j++) {
+  if (p[j-1] === '*') dp[0][j] = dp[0][j-2];
+}
+for (let i = 1; i <= m; i++) {
+  for (let j = 1; j <= n; j++) {
+    if (p[j-1] === '*') {
+      dp[i][j] = dp[i][j-2];
+      if (p[j-2] === s[i-1] || p[j-2] === '.') dp[i][j] = dp[i][j] || dp[i-1][j];
+    } else {
+      dp[i][j] = dp[i-1][j-1] && (p[j-1] === s[i-1] || p[j-1] === '.');
+    }
+  }
+}
+
+// Steps in row-major fill order over ALL cells (including base row/col), so the
+// viewer watches boundaries first then the interior.
+const steps = [];
+for (let i = 0; i <= m; i++)
+  for (let j = 0; j <= n; j++)
+    steps.push({ i, j });
+const TOTAL = steps.length;
+let cur = 0;
+
+const table = document.getElementById('dpTable');
+const stepDesc = document.getElementById('stepDesc');
+const stepCounter = document.getElementById('stepCounter');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
+function buildTable() {
+  let html = '<tr><th></th><th class="phead">∅</th>';
+  for (let j = 0; j < n; j++) {
+    const cls = p[j] === '*' ? 'star' : p[j] === '.' ? 'dot' : 'phead';
+    html += `<th class="${cls}">${p[j]}</th>`;
+  }
+  html += '</tr>';
+  for (let i = 0; i <= m; i++) {
+    const rc = i === 0 ? '∅' : s[i-1];
+    html += `<tr><th class="phead">${rc}</th>`;
+    for (let j = 0; j <= n; j++) html += `<td class="cell" id="c-${i}-${j}"></td>`;
+    html += '</tr>';
+  }
+  table.innerHTML = html;
+}
+function cellEl(i, j) { return document.getElementById(`c-${i}-${j}`); }
+
+function clearDecor() {
+  document.querySelectorAll('td.cell').forEach(c => {
+    c.classList.remove('current','dep-skip','dep-one','dep-diag','answer-t','answer-f');
+  });
+}
+function setBranch(box, valId, live, win, text) {
+  const b = document.getElementById(box);
+  b.classList.toggle('live', !!live);
+  b.classList.toggle('win', !!win);
+  document.getElementById(valId).textContent = text;
+}
+function resetBranches() {
+  setBranch('brDiag','vDiag', false, false, '—');
+  setBranch('brSkip','vSkip', false, false, '—');
+  setBranch('brOne','vOne', false, false, '—');
+}
+const TF = v => v ? 'T' : 'F';
+
+function render() {
+  clearDecor();
+  resetBranches();
+
+  for (let st = 0; st < cur; st++) {
+    const { i, j } = steps[st];
+    const el = cellEl(i, j);
+    const v = dp[i][j];
+    el.textContent = TF(v);
+    el.classList.add('filled', v ? 'T' : 'F');
+    if (i === 0 || j === 0) el.classList.add('base');
+  }
+
+  if (cur === 0) {
+    stepDesc.innerHTML = 'Press <b>Next</b> to fill <code>dp[i][j]</code> = does <code>s[:i]</code> match <code>p[:j]</code>? Green = True.';
+  } else {
+    const { i, j } = steps[cur - 1];
+    const el = cellEl(i, j);
+    el.classList.add('current');
+
+    if (i === 0 && j === 0) {
+      stepDesc.innerHTML = '<strong>dp[0][0] = T</strong> — empty string matches empty pattern. The seed.';
+    } else if (i === 0) {
+      const pc = p[j-1];
+      if (pc === '*') {
+        cellEl(0, j-2).classList.add('dep-skip');
+        setBranch('brSkip','vSkip', true, true, `dp[0][${j-2}] = ${TF(dp[0][j-2])}`);
+        stepDesc.innerHTML = `Empty <code>s</code>, pattern ends in <span class="star">*</span>. The <code>${p[j-2]}*</code> can match <b>zero</b> times → look back two: <strong>dp[0][${j}] = dp[0][${j-2}] = ${TF(dp[0][j])}</strong>.`;
+      } else {
+        setBranch('brDiag','vDiag', true, false, 'no match possible');
+        stepDesc.innerHTML = `Empty <code>s</code> vs a non-<span class="star">*</span> char <code>${pc}</code> → it must consume a character that isn't there. <strong>dp[0][${j}] = F</strong>.`;
+      }
+    } else if (j === 0) {
+      stepDesc.innerHTML = `Pattern is empty but <code>s</code> has ${i} char(s) left to match → impossible. <strong>dp[${i}][0] = F</strong>.`;
+    } else {
+      const pc = p[j-1], sc = s[i-1];
+      if (pc === '*') {
+        const prev = p[j-2];
+        const skip = dp[i][j-2];
+        const matches = (prev === sc || prev === '.');
+        const one = matches ? dp[i-1][j] : false;
+        cellEl(i, j-2).classList.add('dep-skip');
+        setBranch('brSkip','vSkip', true, skip, `dp[${i}][${j-2}] = ${TF(skip)}`);
+        if (matches) {
+          cellEl(i-1, j).classList.add('dep-one');
+          setBranch('brOne','vOne', true, one, `'${prev}'~'${sc}' → dp[${i-1}][${j}] = ${TF(dp[i-1][j])}`);
+        } else {
+          setBranch('brOne','vOne', true, false, `'${prev}' ≠ '${sc}' → blocked`);
+        }
+        const winner = skip ? 'skip' : (one ? 'one' : '');
+        stepDesc.innerHTML = `Pattern char <span class="star">*</span> over <code>${prev}*</code>. <b>Zero</b>: dp[${i}][${j-2}]=${TF(skip)}. <b>One more</b>: ${matches ? `'${prev}' matches '${sc}', dp[${i-1}][${j}]=${TF(dp[i-1][j])}` : `'${prev}'≠'${sc}', blocked`}. OR → <strong>dp[${i}][${j}] = ${TF(dp[i][j])}</strong>.`;
+      } else {
+        const matches = (pc === sc || pc === '.');
+        cellEl(i-1, j-1).classList.add('dep-diag');
+        setBranch('brDiag','vDiag', true, dp[i][j], `'${pc}'${pc==='.'?' (any)':''} ~ '${sc}' & dp[${i-1}][${j-1}]=${TF(dp[i-1][j-1])}`);
+        const symbol = pc === '.' ? '<span class="dot">.</span>' : `'${pc}'`;
+        stepDesc.innerHTML = `Plain char ${symbol} vs '${sc}': ${matches ? 'they match' : 'mismatch'} ${matches ? `→ inherit diagonal dp[${i-1}][${j-1}]=${TF(dp[i-1][j-1])}` : '→ False'}. <strong>dp[${i}][${j}] = ${TF(dp[i][j])}</strong>.`;
+      }
+    }
+
+    if (cur === TOTAL && i === m && j === n) {
+      el.classList.remove('current');
+      el.classList.add(dp[m][n] ? 'answer-t' : 'answer-f');
+      stepDesc.innerHTML = `🎉 Table complete. <strong>dp[${m}][${n}] = ${dp[m][n] ? 'True' : 'False'}</strong> — <code>"${s}"</code> ${dp[m][n] ? 'fully matches' : 'does NOT match'} <code>"${p}"</code>.`;
+    }
+  }
+
+  stepCounter.textContent = `Step ${cur} / ${TOTAL}`;
+  prevBtn.disabled = cur === 0;
+  nextBtn.disabled = cur === TOTAL;
+}
+
+function next() { if (cur < TOTAL) { cur++; render(); } }
+function prev() { if (cur > 0) { cur--; render(); } }
+function reset() { cur = 0; render(); }
+
+buildTable();
+render();
+</script>
+</body>
+</html>

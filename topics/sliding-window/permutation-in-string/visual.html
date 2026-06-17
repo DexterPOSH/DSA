@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Permutation in String — Fixed Window Frequency Match</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px 60px; gap: 28px; }
+  h1 { font-size: 1.6rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: #3b82f6; }
+
+  .analogy { background: #16213e; border: 1px solid #3b82f6; border-radius: 12px; padding: 18px 26px; max-width: 760px; width: 100%; display: flex; gap: 16px; align-items: flex-start; }
+  .analogy-icon { font-size: 2rem; line-height: 1; flex-shrink: 0; }
+  .analogy-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px; }
+  .analogy-text { font-size: 0.96rem; line-height: 1.5; color: #c0c0d0; }
+
+  .card { background: #16213e; border: 1px solid #2d3a5a; border-radius: 16px; padding: 30px; max-width: 800px; width: 100%; display: flex; flex-direction: column; gap: 26px; }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #7a8ab0; margin-bottom: 12px; }
+  .step-description { min-height: 56px; background: #0f172a; border-radius: 8px; padding: 14px 20px; font-size: 0.95rem; line-height: 1.55; color: #c8c8e0; border-left: 3px solid #3b82f6; transition: border-color 0.3s; }
+  .step-description.match { border-color: #10b981; }
+  .step-description.nomatch { border-color: #f59e0b; }
+
+  .str-area { position: relative; padding-top: 30px; overflow-x: auto; }
+  .str-row { display: flex; gap: 8px; align-items: center; justify-content: center; min-width: max-content; }
+  .ch-wrap { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .ch { width: 46px; height: 46px; border-radius: 10px; border: 2px solid #2d3a5a; background: #0f172a; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: 700; color: #e0e0e0; transition: all 0.35s; }
+  .ch.inwin { border-color: #3b82f6; background: #1e3a6e; color: #93c5fd; }
+  .ch.win-match { border-color: #10b981; background: #0d2a1a; color: #86efac; box-shadow: 0 0 16px rgba(16,185,129,0.5); }
+  .ch.entering { border-color: #10b981; }
+  .ch.leaving { border-color: #ef4444; background: #2a0d0d; color: #fca5a5; }
+  .ch-idx { font-size: 0.6rem; color: #5a6a90; }
+  .ptr { position: absolute; top: -24px; left: 50%; transform: translateX(-50%); font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 5px; white-space: nowrap; opacity: 0; transition: opacity 0.25s; }
+  .ptr.show { opacity: 1; }
+  .ptr.l { background: #f59e0b; color: #1a1a2e; }
+  .ptr.r { background: #3b82f6; color: #fff; }
+
+  .counts-wrap { display: flex; gap: 26px; flex-wrap: wrap; }
+  .count-block { flex: 1; min-width: 240px; }
+  .count-block .ttl { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .count-block.need .ttl { color: #f59e0b; }
+  .count-block.win .ttl { color: #3b82f6; }
+  .freq-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .freq { background: #0f172a; border: 1px solid #2d3a5a; border-radius: 8px; padding: 7px 12px; font-family: 'Consolas', monospace; font-size: 0.9rem; }
+  .freq .k { color: #cdd9f0; font-weight: 700; }
+  .freq .v { color: #e0e0e0; }
+  .freq.ok { border-color: #10b981; background: #0d2a1a; }
+  .freq.off { border-color: #ef4444; background: #2a0d0d; }
+
+  .result-badge { display: none; align-items: center; gap: 12px; padding: 16px 22px; border-radius: 10px; font-size: 1rem; font-weight: 600; }
+  .result-badge.show { display: flex; }
+  .result-badge.yes { background: #0d2a1a; border: 1.5px solid #10b981; color: #86efac; }
+  .result-badge.no { background: #2a0d0d; border: 1.5px solid #ef4444; color: #fca5a5; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 12px 26px; border-radius: 8px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+  .takeaway { background: #16213e; border: 1px solid #2d3a5a; border-radius: 12px; padding: 18px 26px; max-width: 760px; width: 100%; display: flex; gap: 16px; align-items: flex-start; }
+  .takeaway-icon { font-size: 1.6rem; flex-shrink: 0; }
+  .takeaway-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px; }
+  .takeaway p { font-size: 0.94rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: #e0e0e0; }
+</style>
+</head>
+<body>
+
+  <h1>Permutation in String &mdash; <span>Fixed Window Anagram Check</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🧺</div>
+    <div class="analogy-body">
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        <strong>s1</strong> ek recipe hai with fixed quantities. Ek
+        <strong>fixed-size basket</strong> (window = len(s1)) ko s2 pe slide karo.
+        Har position pe poocho: basket ke counts recipe ke counts se bilkul match karte?
+        Order matter nahi — sirf counts.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press "Next Step". The window has fixed size len(s1)=2; it slides across s2 comparing letter counts.</div>
+    </div>
+
+    <div>
+      <div class="section-label">s2 &nbsp;<code style="color:#5a6a90;font-size:0.75rem">"eidbaooo" &nbsp;·&nbsp; s1 = "ab"</code></div>
+      <div class="str-area"><div class="str-row" id="strRow"></div></div>
+    </div>
+
+    <div class="counts-wrap">
+      <div class="count-block need">
+        <div class="ttl">need (s1 counts)</div>
+        <div class="freq-row" id="needRow"></div>
+      </div>
+      <div class="count-block win">
+        <div class="ttl">window counts</div>
+        <div class="freq-row" id="winRow"><span style="color:#3a4a6a;font-style:italic">empty</span></div>
+      </div>
+    </div>
+
+    <div class="result-badge" id="resultBadge">
+      <span style="font-size:1.3rem" id="resIcon"></span>
+      <span id="resultText"></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next Step</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div class="takeaway-body">
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        A <strong>fixed-size window</strong> (length = len(s1)) slides across s2. Each
+        slide changes only <strong>two</strong> letters — one enters on the right, one
+        leaves on the left — so each comparison is O(1). When window counts equal
+        <strong style="color:#f59e0b">need</strong>, an anagram exists. <strong>O(n) time.</strong>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const s1 = "ab", s2 = "eidbaooo";
+    const W = s1.length;
+
+    function counter(str) { const c = {}; for (const ch of str) c[ch] = (c[ch]||0)+1; return c; }
+    function eq(a, b) {
+      const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+      for (const kk of keys) if ((a[kk]||0) !== (b[kk]||0)) return false;
+      return true;
+    }
+    const need = counter(s1);
+
+    function buildSteps() {
+      const out = [];
+      const win = counter(s2.slice(0, W));
+      let matched = eq(win, need);
+      out.push({ left: 0, right: W - 1, win: { ...win }, matched, enter: null, leave: null,
+        desc: `First window <strong style="color:#3b82f6">"${s2.slice(0,W)}"</strong>. Compare its counts to need=${fmt(need)}. ${matched ? 'They match!' : 'No match — slide right.'}` });
+      if (matched) { out.push({ done: true, found: true, left: 0, right: W-1 }); return out; }
+      for (let i = W; i < s2.length; i++) {
+        const enter = s2[i], leave = s2[i - W];
+        win[enter] = (win[enter]||0) + 1;
+        win[leave] -= 1;
+        if (win[leave] === 0) delete win[leave];
+        matched = eq(win, need);
+        out.push({ left: i - W + 1, right: i, win: { ...win }, matched, enter, leave,
+          desc: `Slide: <strong style="color:#10b981">'${enter}'</strong> enters (right), <strong style="color:#ef4444">'${leave}'</strong> leaves (left). Window <strong style="color:#3b82f6">"${s2.slice(i-W+1, i+1)}"</strong>, counts ${fmt(win)}. ${matched ? 'Matches need — permutation found!' : 'Still no match.'}` });
+        if (matched) { out.push({ done: true, found: true, left: i-W+1, right: i }); return out; }
+      }
+      out.push({ done: true, found: false });
+      return out;
+    }
+    function fmt(c) { const parts = Object.keys(c).filter(k=>c[k]>0).sort().map(k=>`${k}:${c[k]}`); return '{' + parts.join(', ') + '}'; }
+
+    const steps = buildSteps();
+    let currentStep = 0;
+
+    const row = document.getElementById('strRow');
+    for (let i = 0; i < s2.length; i++) {
+      const wrap = document.createElement('div'); wrap.className = 'ch-wrap';
+      const ptr = document.createElement('div'); ptr.className = 'ptr'; ptr.id = 'ptr-' + i;
+      const cell = document.createElement('div'); cell.className = 'ch'; cell.id = 'ch-' + i; cell.textContent = s2[i];
+      const idx = document.createElement('div'); idx.className = 'ch-idx'; idx.textContent = i;
+      wrap.appendChild(ptr); wrap.appendChild(cell); wrap.appendChild(idx); row.appendChild(wrap);
+    }
+    // render need
+    const needRow = document.getElementById('needRow');
+    Object.keys(need).sort().forEach(kk => {
+      const d = document.createElement('div'); d.className = 'freq';
+      d.innerHTML = `<span class="k">${kk}</span>: <span class="v">${need[kk]}</span>`;
+      needRow.appendChild(d);
+    });
+
+    const stepDesc = document.getElementById('stepDesc');
+    const winRow = document.getElementById('winRow');
+    const resultBadge = document.getElementById('resultBadge');
+    const resIcon = document.getElementById('resIcon');
+    const resultText = document.getElementById('resultText');
+    const stepCtr = document.getElementById('stepCounter');
+    const nextBtn = document.getElementById('nextBtn');
+
+    function clearCells() {
+      for (let i = 0; i < s2.length; i++) {
+        document.getElementById('ch-' + i).className = 'ch';
+        document.getElementById('ptr-' + i).className = 'ptr';
+      }
+    }
+    function setPtr(i, kind) {
+      const p = document.getElementById('ptr-' + i);
+      if (kind === 'l') { p.textContent = '⬆ L'; p.className = 'ptr show l'; }
+      else { p.textContent = '⬆ R'; p.className = 'ptr show r'; }
+    }
+    function renderWin(win, matched) {
+      winRow.innerHTML = '';
+      const keys = Object.keys(win).filter(k=>win[k]>0).sort();
+      if (keys.length === 0) { winRow.innerHTML = '<span style="color:#3a4a6a;font-style:italic">empty</span>'; return; }
+      keys.forEach(kk => {
+        const ok = (need[kk]||0) === win[kk];
+        const d = document.createElement('div');
+        d.className = 'freq ' + (matched ? 'ok' : (ok ? '' : 'off'));
+        d.innerHTML = `<span class="k">${kk}</span>: <span class="v">${win[kk]}</span>`;
+        winRow.appendChild(d);
+      });
+    }
+
+    function render(step) {
+      clearCells();
+      if (step.done) {
+        // keep last window highlighted
+        if (step.left !== undefined) {
+          for (let i = step.left; i <= step.right; i++)
+            document.getElementById('ch-' + i).classList.add(step.found ? 'win-match' : 'inwin');
+          setPtr(step.left, 'l'); setPtr(step.right, 'r');
+        }
+        resultBadge.className = 'result-badge show ' + (step.found ? 'yes' : 'no');
+        resIcon.textContent = step.found ? '🟢' : '🔴';
+        resultText.textContent = step.found
+          ? 'return True — a permutation of s1 is a substring of s2.'
+          : 'return False — no window of s2 is an anagram of s1.';
+        stepDesc.innerHTML = step.found
+          ? 'A window matched need exactly — answer is <strong style="color:#10b981">True</strong>.'
+          : 'No window ever matched need — answer is <strong style="color:#ef4444">False</strong>.';
+        stepDesc.className = 'step-description ' + (step.found ? 'match' : 'nomatch');
+        return;
+      }
+      for (let i = step.left; i <= step.right; i++)
+        document.getElementById('ch-' + i).classList.add(step.matched ? 'win-match' : 'inwin');
+      if (step.enter !== null) document.getElementById('ch-' + step.right).classList.add('entering');
+      setPtr(step.left, 'l'); setPtr(step.right, 'r');
+      renderWin(step.win, step.matched);
+      stepDesc.innerHTML = step.desc;
+      stepDesc.className = 'step-description ' + (step.matched ? 'match' : 'nomatch');
+    }
+
+    function advance() {
+      if (currentStep >= steps.length) return;
+      render(steps[currentStep]);
+      currentStep++;
+      stepCtr.textContent = 'Step ' + currentStep + ' / ' + steps.length;
+      if (currentStep >= steps.length) nextBtn.disabled = true;
+    }
+    function reset() {
+      currentStep = 0; clearCells();
+      winRow.innerHTML = '<span style="color:#3a4a6a;font-style:italic">empty</span>';
+      resultBadge.className = 'result-badge';
+      stepDesc.innerHTML = 'Press "Next Step". The window has fixed size len(s1)=2; it slides across s2 comparing letter counts.';
+      stepDesc.className = 'step-description';
+      nextBtn.disabled = false;
+      stepCtr.textContent = 'Step 0 / ' + steps.length;
+    }
+    stepCtr.textContent = 'Step 0 / ' + steps.length;
+  </script>
+</body>
+</html>

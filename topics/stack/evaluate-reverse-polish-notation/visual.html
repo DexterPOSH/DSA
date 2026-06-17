@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Evaluate RPN — Operand Stack</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #1e293b;
+    --text: #e0e0e0; --muted: #94a3b8;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; padding: 36px 20px 70px; }
+  .wrap { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  h1 { font-size: 1.7rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy { background: var(--panel); border: 1px solid var(--amber); border-left: 5px solid var(--amber); border-radius: 12px; padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start; }
+  .analogy .icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy .label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px; }
+  .analogy p { font-size: 0.95rem; color: #d8d8e8; }
+  .analogy strong { color: #fff; }
+
+  .card { background: var(--panel); border: 1px solid #2d3a5a; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 22px; }
+  .section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 10px; }
+
+  .step-desc { background: var(--panel2); border-left: 4px solid var(--blue); border-radius: 8px; padding: 14px 16px; font-size: 0.96rem; min-height: 64px; display: flex; align-items: center; }
+  .step-desc.op { border-left-color: var(--amber); }
+  .step-desc code { background: #0f172a; padding: 1px 6px; border-radius: 5px; color: #ffd479; font-family: 'Consolas', monospace; }
+  .step-desc strong { color: #fff; }
+
+  .tokens { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tok { min-width: 42px; height: 44px; padding: 0 10px; border-radius: 8px; display: grid; place-items: center; font-family: 'Consolas', monospace; font-weight: 700; font-size: 1.1rem; background: var(--panel2); border: 1px solid #2d3a5a; transition: all 0.3s; }
+  .tok.num { color: #bcd4ff; }
+  .tok.opr { color: #fcd34d; border-color: rgba(245,158,11,0.4); }
+  .tok.current { box-shadow: 0 0 0 2px rgba(245,158,11,0.55); background: rgba(245,158,11,0.16); }
+  .tok.done { opacity: 0.5; }
+
+  .stack-zone { display: flex; gap: 30px; align-items: flex-end; }
+  .stack-col { flex: 0 0 130px; }
+  .stack-base { border: 2px solid #2d3a5a; border-top: none; border-radius: 0 0 10px 10px; min-height: 200px; display: flex; flex-direction: column-reverse; padding: 8px; gap: 8px; background: rgba(255,255,255,0.02); justify-content: flex-start; }
+  .stack-base .empty { color: #5a6a90; font-size: 0.8rem; text-align: center; margin: auto; }
+  .plate { height: 42px; border-radius: 8px; display: grid; place-items: center; font-family: 'Consolas', monospace; font-weight: 700; font-size: 1.2rem; background: rgba(59,130,246,0.22); border: 1px solid var(--blue); color: #bcd4ff; animation: push-in 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+  .plate.pick { box-shadow: 0 0 0 2px rgba(245,158,11,0.6); background: rgba(245,158,11,0.16); border-color: var(--amber); color: #fcd34d; }
+  .plate.result { background: rgba(16,185,129,0.2); border-color: var(--green); color: #6ee7b7; }
+  @keyframes push-in { 0% { transform: translateY(-26px) scale(0.6); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+  .stack-foot { text-align: center; font-size: 0.72rem; color: var(--muted); margin-top: 8px; }
+
+  .calc { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .calc-box { background: var(--panel2); border: 1px solid #2d3a5a; border-radius: 10px; padding: 16px 22px; font-family: 'Consolas', monospace; font-size: 1.15rem; text-align: center; }
+  .calc-box.show-op { border-color: var(--amber); }
+  .calc-box .small { font-size: 0.78rem; color: var(--muted); display: block; margin-bottom: 6px; font-family: 'Segoe UI', sans-serif; }
+  .calc-box .eq { color: var(--green); }
+  .calc-box .dim { color: #5a6a90; }
+
+  .result-badge { display: none; justify-content: center; }
+  .result-badge.show { display: flex; }
+  .result-badge .b { display: inline-flex; gap: 10px; align-items: center; padding: 12px 24px; border-radius: 10px; background: rgba(16,185,129,0.14); border: 1.5px solid var(--green); color: #86efac; font-weight: 700; font-family: 'Consolas', monospace; font-size: 1.1rem; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 11px 24px; border-radius: 8px; border: none; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: var(--muted); border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .counter { font-size: 0.82rem; color: #5a6a90; margin-left: auto; }
+
+  .takeaway { background: var(--panel); border: 1px solid var(--blue); border-left: 5px solid var(--blue); border-radius: 12px; padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start; }
+  .takeaway .icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway .label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .takeaway p { font-size: 0.94rem; color: #d8d8e8; }
+  .takeaway strong { color: #fff; }
+
+  .code-block { background: #0f172a; border: 1px solid #2d3a5a; border-radius: 10px; padding: 18px 22px; font-family: 'Consolas', monospace; font-size: 0.8rem; line-height: 1.7; color: #94a3b8; overflow-x: auto; white-space: pre; }
+  .kw { color: #818cf8; } .fn { color: #38bdf8; } .str { color: #34d399; } .cm { color: #475569; font-style: italic; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Evaluate RPN &mdash; <span>Operand Stack</span></h1>
+
+  <div class="analogy">
+    <div class="icon">🍱</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>A <strong>tray stack</strong>: numbers go on as trays. An operator says
+      "take the <strong>top two trays</strong>, apply me, put one result tray back".
+      At the end exactly <strong>one tray</strong> remains — the answer. No precedence,
+      no parentheses needed.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-desc" id="stepDesc">Press <strong>Next</strong> to evaluate the postfix expression left to right.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Tokens &nbsp;<code style="color:#5a6a90;font-size:0.78rem">["2","1","+","3","*"]  →  (2+1)*3 = 9</code></div>
+      <div class="tokens" id="tokRow"></div>
+    </div>
+
+    <div class="stack-zone">
+      <div class="stack-col">
+        <div class="section-label" style="margin-bottom:6px;">Operand stack</div>
+        <div class="stack-base" id="stackBase"><span class="empty">empty</span></div>
+        <div class="stack-foot">▲ top</div>
+      </div>
+      <div class="calc" id="calcWrap"></div>
+    </div>
+
+    <div class="result-badge" id="resultBadge"><span class="b" id="resultB"></span></div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn">◀ Prev</button>
+      <button class="btn btn-primary" id="nextBtn">Next ▶</button>
+      <span class="counter" id="counter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key takeaway</div>
+      <p>Push numbers; on an operator <strong>pop two operands</strong>, compute
+      <code style="color:#ffd479">left op right</code>, push the result. The first pop is
+      the <strong>right</strong> operand — order matters for <code style="color:#ffd479">-</code>
+      and <code style="color:#ffd479">/</code>. One O(n) pass, the lone remaining value is the answer.</p>
+    </div>
+  </div>
+
+  <div class="code-block"><span class="kw">for</span> tok <span class="kw">in</span> tokens:
+    <span class="kw">if</span> tok <span class="kw">in</span> ops:
+        right = stack.<span class="fn">pop</span>()       <span class="cm"># first pop = right operand</span>
+        left  = stack.<span class="fn">pop</span>()
+        stack.<span class="fn">append</span>(<span class="fn">apply</span>(left, tok, right))
+    <span class="kw">else</span>:
+        stack.<span class="fn">append</span>(<span class="fn">int</span>(tok))      <span class="cm"># number → push</span>
+<span class="kw">return</span> stack[<span class="str">0</span>]</div>
+</div>
+
+<script>
+  const tokens = ["2", "1", "+", "3", "*"];
+  const OPS = { "+": (a,b)=>a+b, "-": (a,b)=>a-b, "*": (a,b)=>a*b, "/": (a,b)=>Math.trunc(a/b) };
+
+  // Pre-compute snapshots for clean Prev/Next replay.
+  const steps = [];
+  (function build() {
+    let stack = [];
+    tokens.forEach((tok, i) => {
+      if (tok in OPS) {
+        const right = stack[stack.length - 1];
+        const left = stack[stack.length - 2];
+        const out = OPS[tok](left, right);
+        stack = stack.slice(0, -2).concat([out]);
+        steps.push({
+          idx: i, stack: stack.slice(), isOp: true,
+          calc: { left, op: tok, right, out },
+          desc: `Token <strong>'${tok}'</strong> is an operator. Pop <strong>${right}</strong> (right) then <strong>${left}</strong> (left), compute <code>${left} ${tok} ${right} = ${out}</code>, push the result.`,
+          done: i === tokens.length - 1, answer: out
+        });
+      } else {
+        stack = stack.concat([Number(tok)]);
+        steps.push({
+          idx: i, stack: stack.slice(), isOp: false, calc: null,
+          desc: `Token <strong>'${tok}'</strong> is a number — push it onto the stack.`,
+          done: i === tokens.length - 1, answer: stack[stack.length-1]
+        });
+      }
+    });
+  })();
+
+  const $ = id => document.getElementById(id);
+  const TOTAL = steps.length;
+  let cur = -1;
+
+  function renderTokens() {
+    $("tokRow").innerHTML = tokens.map((t, i) => {
+      const isOp = t in OPS;
+      return `<div class="tok ${isOp ? "opr" : "num"}" id="tok-${i}">${t}</div>`;
+    }).join("");
+  }
+  function render() {
+    tokens.forEach((_, i) => {
+      const el = $("tok-" + i);
+      el.classList.remove("current", "done");
+      if (cur >= 0) {
+        if (i === steps[cur].idx) el.classList.add("current");
+        else if (i < steps[cur].idx) el.classList.add("done");
+      }
+    });
+    const base = $("stackBase");
+    base.querySelectorAll(".plate").forEach(p => p.remove());
+    const emptyEl = base.querySelector(".empty");
+
+    if (cur < 0) {
+      emptyEl.style.display = "";
+      $("stepDesc").className = "step-desc";
+      $("stepDesc").innerHTML = `Press <strong>Next</strong> to evaluate the postfix expression left to right.`;
+      $("calcWrap").innerHTML = "";
+      $("resultBadge").className = "result-badge";
+      updateControls(); return;
+    }
+    const st = steps[cur];
+    emptyEl.style.display = st.stack.length ? "none" : "";
+    st.stack.forEach((v, i) => {
+      const p = document.createElement("div");
+      const isResult = st.isOp && i === st.stack.length - 1;
+      p.className = "plate" + (isResult ? " result" : "");
+      p.textContent = v;
+      base.appendChild(p);
+    });
+
+    $("stepDesc").className = "step-desc" + (st.isOp ? " op" : "");
+    $("stepDesc").innerHTML = st.desc;
+
+    if (st.calc) {
+      const c = st.calc;
+      $("calcWrap").innerHTML = `<div class="calc-box show-op">
+        <span class="small">apply operator</span>
+        <span class="dim">${c.left}</span> ${c.op} <span class="dim">${c.right}</span> <span class="eq">= ${c.out}</span>
+      </div>`;
+    } else {
+      $("calcWrap").innerHTML = "";
+    }
+
+    if (st.done) {
+      $("resultBadge").className = "result-badge show";
+      $("resultB").textContent = `return ${st.answer}`;
+    } else {
+      $("resultBadge").className = "result-badge";
+    }
+    updateControls();
+  }
+  function updateControls() {
+    $("counter").textContent = `Step ${cur + 1} / ${TOTAL}`;
+    $("prevBtn").disabled = cur < 0;
+    $("nextBtn").disabled = cur >= TOTAL - 1;
+  }
+  $("nextBtn").addEventListener("click", () => { if (cur < TOTAL - 1) { cur++; render(); } });
+  $("prevBtn").addEventListener("click", () => { if (cur >= 0) { cur--; render(); } });
+  $("resetBtn").addEventListener("click", () => { cur = -1; render(); });
+
+  renderTokens();
+  render();
+</script>
+</body>
+</html>

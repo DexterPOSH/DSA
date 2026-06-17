@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reverse Nodes in K-Group — Linked List Walkthrough</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+    --border: #2d3a5a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px 70px; gap: 26px;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue);
+    border-radius: 12px; padding: 18px 24px;
+    max-width: 920px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 1.9rem; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.98rem; line-height: 1.55; color: #c0c0d0; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; padding: 26px 30px;
+    max-width: 920px; width: 100%;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .section-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+  .step-description {
+    min-height: 60px; background: var(--panel2); border-radius: 8px;
+    padding: 14px 20px; font-size: 0.95rem; line-height: 1.55; color: #c8c8e0;
+    border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-description.done { border-color: var(--green); }
+  .step-description.skip { border-color: var(--amber); }
+  .step-description strong { color: #fff; }
+
+  /* ── Linked list (SVG-ish via flex) ── */
+  .list-wrap { overflow-x: auto; padding: 26px 4px 10px; }
+  .list {
+    display: flex; align-items: center; gap: 0; min-height: 110px;
+    position: relative;
+  }
+  .nodebox {
+    position: relative;
+    display: flex; align-items: center;
+  }
+  .node {
+    position: relative;
+    width: 56px; height: 56px; border-radius: 12px;
+    border: 2px solid var(--border); background: var(--panel2);
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 1.25rem; color: var(--text);
+    font-family: 'JetBrains Mono','Consolas',monospace;
+    transition: all 0.35s ease; flex-shrink: 0; z-index: 2;
+  }
+  .node.dummy { border-style: dashed; color: var(--muted); font-size: 0.8rem; background: var(--panel); }
+  .node.in-group { border-color: var(--blue); background: #1e3a6e; color: #bcd4ff; }
+  .node.reversed { border-color: var(--green); background: #0d2a1a; color: #86efac; }
+  .node.kth { box-shadow: 0 0 16px rgba(245,158,11,0.55); border-color: var(--amber); }
+  .node.skiptail { border-color: var(--amber); background: #3a2c10; color: #fcd34d; }
+
+  /* pointer badge above node */
+  .ptr {
+    position: absolute; top: -26px; left: 50%; transform: translateX(-50%);
+    font-size: 0.62rem; font-weight: 700; white-space: nowrap;
+    padding: 2px 6px; border-radius: 5px;
+    font-family: 'JetBrains Mono','Consolas',monospace;
+  }
+  .ptr.gp { color: var(--purple); background: rgba(168,85,247,0.15); border:1px solid var(--purple); }
+  .ptr.kth { color: var(--amber); background: rgba(245,158,11,0.15); border:1px solid var(--amber); }
+  .ptr.gn { color: var(--muted); background: rgba(122,138,176,0.12); border:1px solid var(--border); }
+
+  /* arrow connector */
+  .link {
+    width: 38px; height: 2px; position: relative; flex-shrink: 0;
+    background: var(--muted); margin: 0 2px; transition: all 0.4s ease; z-index: 1;
+  }
+  .link::after {
+    content: ''; position: absolute; right: -1px; top: -4px;
+    border-left: 8px solid var(--muted); border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  }
+  .link.rev { background: var(--green); }
+  .link.rev::after { border-left-color: var(--green); }
+  .link.rev.back::after {            /* arrow points left */
+    right: auto; left: -1px;
+    border-left: none; border-right: 8px solid var(--green);
+    border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  }
+  .nullend { color:#3a4a6a; font-size:0.9rem; font-style:italic; margin-left:6px; flex-shrink:0; }
+
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:0.76rem; color:var(--muted); margin-top:6px; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:12px;height:12px;border-radius:3px;display:inline-block; }
+  .dot.ig{background:var(--blue);} .dot.rv{background:var(--green);} .dot.gp{background:var(--purple);} .dot.k{background:var(--amber);}
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid var(--border); }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+  .kpill {
+    font-family:'JetBrains Mono','Consolas',monospace; font-weight:700;
+    color: var(--amber); background: var(--panel2); border:1px solid var(--border);
+    border-radius: 6px; padding: 4px 10px; font-size: 0.85rem;
+  }
+
+  .takeaway {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 24px;
+    max-width: 920px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--green); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.95rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: #fff; }
+  code { font-family:'JetBrains Mono','Consolas',monospace; color:#fcd34d; font-size:0.86rem; }
+</style>
+</head>
+<body>
+
+  <h1>Reverse Nodes in K-Group &mdash; <span>Linked List Walkthrough</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🚆</div>
+    <div class="analogy-body">
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Ek <strong>train</strong> ke dabbe (nodes) line me jude hain. Har <strong>k dabbon ka group</strong> uthao
+        aur usse <strong>ulta</strong> karke wapas jodo — but train continuous rehni chahiye. Agar last me
+        <strong>k se kam</strong> dabbe bache → unhe as-is chhod do. Asli mehnat: groups ke beech ke connections sambhalna.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">What happens &nbsp;<span class="kpill" id="kpill">k = 2</span></div>
+      <div class="step-description" id="stepDesc">Press &ldquo;Next&rdquo; to reverse the list in groups of k = 2.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Linked list &nbsp;<span style="color:var(--muted)">dummy → 1 → 2 → 3 → 4 → 5</span></div>
+      <div class="list-wrap"><div class="list" id="list"></div></div>
+      <div class="legend">
+        <span><span class="dot gp"></span> group_prev</span>
+        <span><span class="dot k"></span> kth (group end)</span>
+        <span><span class="dot ig"></span> current group</span>
+        <span><span class="dot rv"></span> reversed</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">‹ Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next ›</button>
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="step-counter" id="stepCounter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div class="takeaway-body">
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Use a <strong>dummy head</strong>, count <strong>k nodes ahead</strong> to confirm a full group exists,
+        reverse it in place with three pointers, then <strong>reconnect both boundaries</strong> and move
+        <code>group_prev</code> to the group's new tail. A leftover group of size &lt; k is left untouched.
+        <strong>O(N)</strong> time, <strong>O(1)</strong> space.
+      </p>
+    </div>
+  </div>
+
+<script>
+  // We animate k=2 on 1->2->3->4->5  => 2->1->4->3->5
+  // List rendered as ordered array of {id, val}; "order" is the array order;
+  // each step provides: order, roles {gp, kth, gn}, groupSet (ids in current group window),
+  // reversedSet (ids already finalized), desc, skip flag, done flag.
+  const K = 2;
+  const D = {id:'d', val:'dummy'};
+  const N1={id:1,val:1}, N2={id:2,val:2}, N3={id:3,val:3}, N4={id:4,val:4}, N5={id:5,val:5};
+
+  // hand-authored steps for clarity
+  const steps = [
+    {
+      order:[D,N1,N2,N3,N4,N5],
+      gp:'d', kth:null, gn:null, group:[], reversed:[],
+      desc:'Start. A <strong>dummy</strong> node sits before head — first group will reverse the head, so dummy keeps reconnect clean. <code>group_prev = dummy</code>.'
+    },
+    {
+      order:[D,N1,N2,N3,N4,N5],
+      gp:'d', kth:2, gn:3, group:[1,2], reversed:[],
+      desc:'Count <strong>k = 2</strong> nodes from group_prev: reach <code>kth = node 2</code>. Full group <strong>[1, 2]</strong> exists. <code>group_next = node 3</code> (saved).'
+    },
+    {
+      order:[D,N2,N1,N3,N4,N5],
+      gp:'d', kth:1, gn:3, group:[1,2], reversed:[], reversing:true,
+      desc:'Reverse the group in place: <strong>1 → 2</strong> becomes <strong>2 → 1</strong>. Pointers flipped; <code>node 1</code> is now the group tail.'
+    },
+    {
+      order:[D,N2,N1,N3,N4,N5],
+      gp:1, kth:null, gn:null, group:[], reversed:[1,2],
+      desc:'Reconnect: <code>group_prev(dummy).next = node 2</code> (new head), and old head <code>node 1</code> links to group_next (node 3). Move <code>group_prev = node 1</code>.'
+    },
+    {
+      order:[D,N2,N1,N3,N4,N5],
+      gp:1, kth:4, gn:5, group:[3,4], reversed:[1,2],
+      desc:'Next group. Count k = 2 from group_prev(node 1): reach <code>kth = node 4</code>. Group <strong>[3, 4]</strong> is full. <code>group_next = node 5</code>.'
+    },
+    {
+      order:[D,N2,N1,N4,N3,N5],
+      gp:1, kth:3, gn:5, group:[3,4], reversed:[1,2], reversing:true,
+      desc:'Reverse <strong>[3, 4]</strong> → <strong>4 → 3</strong> in place. <code>node 3</code> becomes this group\'s tail.'
+    },
+    {
+      order:[D,N2,N1,N4,N3,N5],
+      gp:3, kth:null, gn:null, group:[], reversed:[1,2,3,4],
+      desc:'Reconnect: <code>node 1.next = node 4</code> (new head), and <code>node 3.next = node 5</code>. Move <code>group_prev = node 3</code>.'
+    },
+    {
+      order:[D,N2,N1,N4,N3,N5],
+      gp:3, kth:null, gn:null, group:[], reversed:[1,2,3,4], skip:true, skiptail:5,
+      desc:'Count k = 2 from group_prev(node 3): only <strong>node 5</strong> remains, then <code>None</code> — fewer than k. <strong>Stop. Leave node 5 as-is.</strong>'
+    },
+    {
+      order:[D,N2,N1,N4,N3,N5],
+      gp:null, kth:null, gn:null, group:[], reversed:[1,2,3,4,5], done:true,
+      desc:'Done. Result: <strong>2 → 1 → 4 → 3 → 5</strong>. Each node was touched a constant number of times → <strong>O(N)</strong> time, <strong>O(1)</strong> space.'
+    },
+  ];
+
+  let cur = 0;
+  const listEl  = document.getElementById('list');
+  const descEl  = document.getElementById('stepDesc');
+  const ctrEl   = document.getElementById('stepCounter');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+
+  function render() {
+    const s = steps[cur];
+    descEl.innerHTML = s.desc;
+    descEl.className = 'step-description' + (s.done ? ' done' : (s.skip ? ' skip' : ''));
+
+    listEl.innerHTML = '';
+    s.order.forEach((nd, idx) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'nodebox';
+
+      const node = document.createElement('div');
+      let cls = 'node';
+      if (nd.id === 'd') cls += ' dummy';
+      if (s.reversed.includes(nd.id)) cls += ' reversed';
+      if (s.group.includes(nd.id)) cls += ' in-group';
+      if (s.kth === nd.id) cls += ' kth';
+      if (s.skiptail === nd.id) cls += ' skiptail';
+      node.className = cls;
+      node.textContent = nd.val;
+
+      // pointer badges
+      if (s.gp === nd.id) { const p=document.createElement('div'); p.className='ptr gp'; p.textContent='group_prev'; node.appendChild(p); }
+      if (s.kth === nd.id) { const p=document.createElement('div'); p.className='ptr kth'; p.textContent='kth'; p.style.top='-44px'; node.appendChild(p); }
+      if (s.gn === nd.id) { const p=document.createElement('div'); p.className='ptr gn'; p.textContent='group_next'; node.appendChild(p); }
+
+      wrap.appendChild(node);
+      listEl.appendChild(wrap);
+
+      if (idx < s.order.length - 1) {
+        const link = document.createElement('div');
+        let lc = 'link';
+        // highlight links inside a freshly reversed group
+        if (s.reversing && s.group.includes(nd.id) && s.group.includes(s.order[idx+1].id)) {
+          lc += ' rev';
+        }
+        link.className = lc;
+        listEl.appendChild(link);
+      }
+    });
+    const nul = document.createElement('span');
+    nul.className = 'nullend'; nul.textContent = '→ None';
+    listEl.appendChild(nul);
+
+    ctrEl.textContent = `Step ${cur} / ${steps.length - 1}`;
+    prevBtn.disabled = cur === 0;
+    nextBtn.disabled = cur === steps.length - 1;
+  }
+
+  function next() { if (cur < steps.length - 1) { cur++; render(); } }
+  function prev() { if (cur > 0) { cur--; render(); } }
+  function reset() { cur = 0; render(); }
+
+  render();
+</script>
+</body>
+</html>

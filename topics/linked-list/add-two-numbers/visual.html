@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Add Two Numbers — Carry-Propagation Walkthrough</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1a1a2e; color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 40px 20px 60px; gap: 32px;
+    }
+    h1 { font-size: 1.75rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+    h1 span { color: #3b82f6; }
+
+    .analogy {
+      background: #16213e; border: 1px solid #3b82f6; border-radius: 12px;
+      padding: 20px 28px; max-width: 800px; width: 100%;
+      display: flex; gap: 16px; align-items: flex-start;
+    }
+    .analogy-icon { font-size: 2rem; flex-shrink: 0; }
+    .analogy-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #3b82f6; }
+    .analogy-text { font-size: 1rem; line-height: 1.5; color: #c0c0d0; margin-top: 4px; }
+
+    .card {
+      background: #16213e; border: 1px solid #2d3a5a; border-radius: 16px;
+      padding: 32px; max-width: 880px; width: 100%;
+      display: flex; flex-direction: column; gap: 26px;
+    }
+    .step-description {
+      min-height: 56px; background: #0f172a; border-radius: 8px;
+      padding: 14px 20px; font-size: 0.95rem; line-height: 1.55;
+      color: #c8c8e0; border-left: 3px solid #3b82f6; transition: border-color 0.3s;
+    }
+    .step-description.done { border-color: #10b981; }
+    .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #7a8ab0; margin-bottom: 12px; }
+
+    .list-block { display: flex; align-items: center; gap: 14px; }
+    .list-name { width: 42px; font-size: 0.95rem; font-weight: 700; color: #93c5fd; text-align: right; }
+    .list-name.l2 { color: #fbbf24; }
+    .list-name.res { color: #86efac; }
+    .node-row { display: flex; align-items: center; gap: 0; min-width: max-content; overflow-x: auto; }
+    .node-unit { display: flex; align-items: center; }
+
+    .node {
+      width: 56px; height: 56px; border-radius: 12px;
+      border: 2px solid #2d3a5a; background: #0f172a;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; font-weight: 700; color: #e0e0e0; position: relative;
+      transition: border-color 0.35s, background 0.35s, transform 0.3s, box-shadow 0.35s, opacity 0.35s;
+    }
+    .node.l1 { } .node.l2 { }
+    .node.active { transform: translateY(-4px); box-shadow: 0 0 16px rgba(245,158,11,0.45); border-color: #f59e0b; }
+    .node.consumed { opacity: 0.4; }
+    .node.placeholder { opacity: 0; }
+    .node.res-pending { opacity: 0.12; border-style: dashed; }
+    .node.res-new { border-color: #10b981; background: #0d2a1a; color: #86efac; animation: pop 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+    @keyframes pop { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+    .arrow { width: 26px; height: 2px; background: #3b5280; position: relative; }
+    .arrow::after { content: ''; position: absolute; right: -1px; top: -4px; border-left: 8px solid #3b5280; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+    .arrow.res { background: #10b981; } .arrow.res::after { border-left-color: #10b981; }
+    .arrow.hidden { opacity: 0; }
+    .null-tag { font-size: 0.78rem; color: #5a6a90; font-style: italic; margin-left: 6px; }
+
+    /* arithmetic panel */
+    .math-panel { display: flex; gap: 14px; flex-wrap: wrap; align-items: stretch; }
+    .math-box {
+      background: #0f172a; border: 1px solid #2d3a5a; border-radius: 10px;
+      padding: 12px 18px; min-width: 120px; text-align: center;
+    }
+    .math-box .k { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.08em; color: #7a8ab0; }
+    .math-box .v { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+    .math-box.sum .v { color: #e0e0e0; }
+    .math-box.digit .v { color: #86efac; }
+    .math-box.carry .v { color: #f59e0b; }
+    .math-box.carry.on { border-color: #f59e0b; box-shadow: 0 0 12px rgba(245,158,11,0.35); }
+    .eqn { font-family: 'Consolas', monospace; font-size: 1rem; color: #c0c0d0; align-self: center; padding: 0 6px; }
+    .eqn b.s { color: #93c5fd; } .eqn b.t { color: #fbbf24; } .eqn b.c { color: #f59e0b; } .eqn b.d { color: #86efac; }
+
+    .result-badge { display: none; align-items: center; gap: 12px; padding: 16px 22px; border-radius: 10px; font-size: 1rem; font-weight: 600; }
+    .result-badge.show { display: flex; }
+    .result-badge.ok { background: #0d2a1a; border: 1.5px solid #10b981; color: #86efac; }
+
+    .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .btn { padding: 12px 26px; border-radius: 8px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: #3b82f6; color: #fff; } .btn-primary:hover { background: #2563eb; }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; } .btn-secondary:hover { background: #263248; }
+    .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+    .takeaway {
+      background: #16213e; border: 1px solid #2d3a5a; border-radius: 12px;
+      padding: 20px 28px; max-width: 800px; width: 100%; display: flex; gap: 16px; align-items: flex-start;
+    }
+    .takeaway-icon { font-size: 1.6rem; flex-shrink: 0; }
+    .takeaway-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #10b981; margin-bottom: 4px; }
+    .takeaway-body p { font-size: 0.95rem; line-height: 1.55; color: #c0c0d0; }
+    .takeaway-body strong { color: #e0e0e0; }
+  </style>
+</head>
+<body>
+
+  <h1>Add Two Numbers &mdash; <span>Carry Propagation</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🧮</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        School-style <strong>column addition</strong>: rightmost column se jodo, har column ki <span style="color:#f59e0b">carry</span>
+        agle column me le jaao. Lists reverse me hain — to &ldquo;rightmost column&rdquo; hi <strong>head</strong> hai.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press &ldquo;Next&rdquo;. Add 342 (2→4→3) + 465 (5→6→4). Digits are stored least-significant first.</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <div class="list-block"><div class="list-name l1">l1</div><div class="node-row" id="rowL1"></div></div>
+      <div class="list-block"><div class="list-name l2">l2</div><div class="node-row" id="rowL2"></div></div>
+      <div style="border-top:1px dashed #2d3a5a;margin:2px 0 0 56px;"></div>
+      <div class="list-block"><div class="list-name res">sum</div><div class="node-row" id="rowRes"></div></div>
+    </div>
+
+    <div>
+      <div class="section-label">Column arithmetic</div>
+      <div class="math-panel">
+        <div class="eqn" id="eqn">l1 + l2 + carry</div>
+        <div class="math-box sum"><div class="k">total</div><div class="v" id="totalV">—</div></div>
+        <div class="math-box digit"><div class="k">new digit (total %10)</div><div class="v" id="digitV">—</div></div>
+        <div class="math-box carry" id="carryBox"><div class="k">carry (total //10)</div><div class="v" id="carryV">0</div></div>
+      </div>
+    </div>
+
+    <div class="result-badge ok" id="resultBadge"><span style="font-size:1.4rem">✅</span><span id="resultText"></span></div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="back()">Prev</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <div class="takeaway-body"><p>
+        Loop <code>while l1 or l2 or carry</code> — one condition handles unequal lengths <em>and</em> a leftover
+        final carry (like 99 + 1 = 100). Build with a <strong>dummy node</strong>, return <code>dummy.next</code>.
+      </p></div>
+    </div>
+  </div>
+
+  <script>
+    // Example: 342 (2,4,3) + 465 (5,6,4) = 807 (7,0,8)
+    const l1 = [2, 4, 3];
+    const l2 = [5, 6, 4];
+
+    function buildInput(rowId, arr, cls) {
+      const row = document.getElementById(rowId); row.innerHTML = '';
+      arr.forEach((d, i) => {
+        const unit = document.createElement('div'); unit.className = 'node-unit';
+        const n = document.createElement('div'); n.className = 'node ' + cls; n.id = cls + i;
+        n.textContent = d; unit.appendChild(n);
+        if (i < arr.length - 1) { const a = document.createElement('div'); a.className = 'arrow'; unit.appendChild(a); }
+        else { const nt = document.createElement('span'); nt.className = 'null-tag'; nt.textContent = '→ null'; unit.appendChild(nt); }
+        row.appendChild(unit);
+      });
+    }
+    buildInput('rowL1', l1, 'l1');
+    buildInput('rowL2', l2, 'l2');
+
+    // result row: up to 4 slots (max len + possible carry); here 3 used
+    const RES_SLOTS = 4;
+    function buildResult() {
+      const row = document.getElementById('rowRes'); row.innerHTML = '';
+      // dummy marker
+      const du = document.createElement('div'); du.className = 'node-unit';
+      const dn = document.createElement('div'); dn.className = 'node'; dn.style.borderStyle = 'dashed';
+      dn.style.color = '#5a6a90'; dn.style.fontSize = '0.8rem'; dn.id = 'resDummy'; dn.textContent = 'dum';
+      du.appendChild(dn);
+      const da = document.createElement('div'); da.className = 'arrow res hidden'; da.id = 'resArrowDummy'; du.appendChild(da);
+      row.appendChild(du);
+      for (let i = 0; i < RES_SLOTS; i++) {
+        const unit = document.createElement('div'); unit.className = 'node-unit';
+        const n = document.createElement('div'); n.className = 'node res-pending'; n.id = 'res' + i; n.textContent = '?';
+        unit.appendChild(n);
+        const a = document.createElement('div'); a.className = 'arrow res hidden'; a.id = 'resArrow' + i; unit.appendChild(a);
+        row.appendChild(unit);
+      }
+      const nt = document.createElement('span'); nt.className = 'null-tag'; nt.id = 'resNull'; nt.style.opacity = '0'; nt.textContent = '→ null';
+      row.appendChild(nt);
+    }
+    buildResult();
+
+    // Precompute steps
+    const steps = [{ desc: 'Inputs in reverse order: l1 = 2→4→3 (=342), l2 = 5→6→4 (=465). A <strong>dummy</strong> node anchors the result list. carry starts at <strong>0</strong>.' }];
+    let carry = 0; const resDigits = [];
+    const maxLen = Math.max(l1.length, l2.length);
+    for (let i = 0; i < maxLen; i++) {
+      const v1 = i < l1.length ? l1[i] : 0;
+      const v2 = i < l2.length ? l2[i] : 0;
+      const total = v1 + v2 + carry;
+      const digit = total % 10;
+      const newCarry = Math.floor(total / 10);
+      resDigits.push(digit);
+      steps.push({
+        col: i, v1, v2, cin: carry, total, digit, cout: newCarry,
+        resLen: i + 1,
+        desc: `Column ${i}: <b style="color:#93c5fd">${v1}</b> + <b style="color:#fbbf24">${v2}</b> + carry <b style="color:#f59e0b">${carry}</b> = <b>${total}</b>. New digit = ${total} % 10 = <b style="color:#86efac">${digit}</b>; carry = ${total} // 10 = <b style="color:#f59e0b">${newCarry}</b>.`
+      });
+      carry = newCarry;
+    }
+    if (carry > 0) {
+      resDigits.push(carry);
+      steps.push({ col: maxLen, v1: 0, v2: 0, cin: carry, total: carry, digit: carry, cout: 0, resLen: maxLen + 1, extraCarry: true,
+        desc: `Both lists are exhausted but <strong>carry = ${carry}</strong> remains — the loop runs once more, appending a leading <b style="color:#86efac">${carry}</b>. This is the 99+1=100 case.` });
+    }
+    steps.push({ done: true, resLen: resDigits.length, finalCarry: 0,
+      desc: `✅ Done. Result list (reverse order) = ${resDigits.join('→')} = <strong>${resDigits.slice().reverse().join('')}</strong>. Return <code>dummy.next</code>.` });
+
+    let cur = 0;
+
+    function render() {
+      const s = steps[cur];
+      // reset transient
+      l1.forEach((_, i) => { const n = document.getElementById('l1' + i); n.classList.remove('active', 'consumed'); });
+      l2.forEach((_, i) => { const n = document.getElementById('l2' + i); n.classList.remove('active', 'consumed'); });
+
+      // figure out how many result digits revealed up to current step
+      let revealed = 0, lastCol = -1;
+      for (let k = 0; k <= cur; k++) if (steps[k].resLen !== undefined) { revealed = steps[k].resLen; if (steps[k].col !== undefined) lastCol = steps[k].col; }
+
+      // result nodes
+      for (let i = 0; i < RES_SLOTS; i++) {
+        const rn = document.getElementById('res' + i);
+        if (i < revealed) { rn.classList.remove('res-pending'); rn.classList.add('res-new'); rn.textContent = resDigits[i]; }
+        else { rn.classList.add('res-pending'); rn.classList.remove('res-new'); rn.textContent = '?'; }
+      }
+      // result arrows + dummy link
+      document.getElementById('resArrowDummy').classList.toggle('hidden', revealed < 1);
+      for (let i = 0; i < RES_SLOTS; i++) document.getElementById('resArrow' + i).classList.toggle('hidden', i < revealed - 1 ? false : true);
+      document.getElementById('resNull').style.opacity = (s.done) ? '1' : '0';
+
+      // consumed inputs (columns already processed before this one)
+      if (lastCol >= 0) {
+        for (let i = 0; i < lastCol; i++) { if (i < l1.length) document.getElementById('l1' + i).classList.add('consumed'); if (i < l2.length) document.getElementById('l2' + i).classList.add('consumed'); }
+      }
+      // active inputs at current column
+      if (s.col !== undefined && !s.done) {
+        if (s.col < l1.length) document.getElementById('l1' + s.col).classList.add('active');
+        if (s.col < l2.length) document.getElementById('l2' + s.col).classList.add('active');
+      }
+
+      // math panel
+      if (s.col !== undefined && !s.done) {
+        document.getElementById('eqn').innerHTML = `<b class="s">${s.v1}</b> + <b class="t">${s.v2}</b> + <b class="c">${s.cin}</b> =`;
+        document.getElementById('totalV').textContent = s.total;
+        document.getElementById('digitV').textContent = s.digit;
+        document.getElementById('carryV').textContent = s.cout;
+        document.getElementById('carryBox').classList.toggle('on', s.cout > 0);
+      } else if (cur === 0) {
+        document.getElementById('eqn').innerHTML = 'l1 + l2 + carry =';
+        document.getElementById('totalV').textContent = '—';
+        document.getElementById('digitV').textContent = '—';
+        document.getElementById('carryV').textContent = '0';
+        document.getElementById('carryBox').classList.remove('on');
+      }
+
+      const desc = document.getElementById('stepDesc');
+      desc.innerHTML = s.desc; desc.className = 'step-description' + (s.done ? ' done' : '');
+
+      const rb = document.getElementById('resultBadge');
+      if (s.done) { rb.classList.add('show'); document.getElementById('resultText').textContent = '342 + 465 = 807  →  list 7→0→8'; document.getElementById('carryBox').classList.remove('on'); document.getElementById('carryV').textContent = '0'; }
+      else rb.classList.remove('show');
+
+      document.getElementById('stepCounter').textContent = 'Step ' + cur + ' / ' + (steps.length - 1);
+      document.getElementById('nextBtn').disabled = cur >= steps.length - 1;
+      document.getElementById('prevBtn').disabled = cur <= 0;
+    }
+
+    function advance() { if (cur < steps.length - 1) { cur++; render(); } }
+    function back() { if (cur > 0) { cur--; render(); } }
+    function reset() { cur = 0; render(); }
+
+    render();
+  </script>
+</body>
+</html>

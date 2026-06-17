@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Largest Rectangle in Histogram — Monotonic Stack Walkthrough</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --border: #2d3a5a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6; padding: 36px 20px 70px;
+    display: flex; flex-direction: column; align-items: center; gap: 28px;
+  }
+  h1 { font-size: 1.65rem; text-align: center; }
+  h1 span { color: var(--amber); }
+  .wrap { width: 100%; max-width: 780px; display: flex; flex-direction: column; gap: 26px; }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--amber);
+    border-left: 5px solid var(--amber); border-radius: 12px;
+    padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start;
+  }
+  .analogy .icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px;
+  }
+  .analogy p { color: #c8c8e0; font-size: 0.97rem; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; padding: 26px 28px 30px;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+
+  .step-desc {
+    min-height: 64px; background: var(--panel2); border-radius: 8px;
+    padding: 14px 18px; font-size: 0.95rem; color: #c8c8e0;
+    border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-desc.pop { border-color: var(--green); }
+  .step-desc.push { border-color: var(--amber); }
+  .step-desc code { color: #ffd479; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+  .section-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+
+  /* histogram */
+  .histo {
+    position: relative;
+    display: flex; gap: 6px; align-items: flex-end;
+    height: 230px;
+    padding-bottom: 22px;
+    border-bottom: 2px solid var(--border);
+  }
+  .col { flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .hbar {
+    width: 100%;
+    border-radius: 6px 6px 0 0;
+    background: #243456;
+    border: 2px solid var(--border);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 4px;
+    font-weight: 700; font-size: 0.9rem; color: #cdd7f0;
+    transition: all 0.35s ease;
+    position: relative; z-index: 1;
+  }
+  .col.instack .hbar { border-color: var(--amber); background: #3a2e10; color: #ffd479; }
+  .col.current .hbar { border-color: var(--blue); background: #1e3a6e; box-shadow: 0 0 16px rgba(59,130,246,0.45); }
+  .col.popping .hbar { border-color: var(--green); background: #0d2a1a; color: #86efac; }
+  .col .lbl { position: absolute; bottom: -20px; font-size: 0.66rem; color: #5a6a90; font-family: 'SF Mono', Menlo, monospace; }
+
+  /* rectangle overlay highlighting the area being computed */
+  .rect-overlay {
+    position: absolute; bottom: 22px;
+    border: 2px dashed var(--green);
+    background: rgba(16,185,129,0.18);
+    border-radius: 4px;
+    z-index: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #86efac; font-weight: 700; font-size: 0.85rem;
+    font-family: 'SF Mono', Menlo, monospace;
+    transition: all 0.35s ease;
+    pointer-events: none;
+  }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1.1fr; gap: 20px; }
+  @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .stack-area {
+    background: var(--panel2); border: 1px dashed var(--border);
+    border-radius: 10px; padding: 14px; min-height: 130px;
+    display: flex; flex-direction: column-reverse; gap: 8px; justify-content: flex-start;
+  }
+  .stack-hint { font-size: 0.82rem; color: #3a4a6a; font-style: italic; text-align: center; margin: auto; }
+  .schip {
+    border-radius: 8px; padding: 8px 12px;
+    background: #3a2e10; border: 1.5px solid var(--amber); color: #ffd479;
+    font-size: 0.85rem; font-weight: 700; font-family: 'SF Mono', Menlo, monospace;
+    display: flex; justify-content: space-between; gap: 10px;
+    animation: popin 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes popin { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+  .calc-box { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; min-height: 130px; font-size: 0.88rem; }
+  .calc-box .line { font-family: 'SF Mono', Menlo, monospace; margin-bottom: 6px; color: #c8c8e0; }
+  .calc-box .max { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-weight: 700; }
+  .calc-box .max .val { color: var(--green); font-family: 'SF Mono', Menlo, monospace; font-size: 1.1rem; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.93rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid var(--border); }
+  .btn-secondary:hover { background: #263248; }
+  .counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; font-family: 'SF Mono', Menlo, monospace; }
+
+  .takeaway {
+    background: var(--panel); border: 1px solid var(--border);
+    border-left: 5px solid var(--blue); border-radius: 12px;
+    padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start;
+  }
+  .takeaway .icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.95rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+</style>
+</head>
+<body>
+  <h1>Largest Rectangle in Histogram &mdash; <span>Monotonic Stack</span></h1>
+
+  <div class="wrap">
+    <div class="analogy">
+      <div class="icon">🏙️</div>
+      <div>
+        <div class="label">Real-world analogy</div>
+        <p>City skyline of width-1 buildings. For each building ask: "if <strong>I'm the shortest</strong>
+        in a banner's range, how <strong>wide</strong> can the banner stretch left & right?" A
+        <strong>increasing stack</strong> finds those boundaries in one pass. The widest banner area wins.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div>
+        <div class="section-label">Step description</div>
+        <div class="step-desc" id="stepDesc">Press <strong>Next</strong>. We keep a stack of bar indices with <em>increasing</em> heights. A shorter bar pops taller ones, resolving their max width.</div>
+      </div>
+
+      <div>
+        <div class="section-label">heights &nbsp;<code style="color:#5a6a90;font-size:0.75rem">[2, 1, 5, 6, 2, 3]</code> &nbsp;<span style="color:#5a6a90;font-size:0.72rem">(a sentinel 0 is appended to flush the stack)</span></div>
+        <div class="histo" id="histo"></div>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <div class="section-label">stack &nbsp;<span style="color:#5a6a90;font-size:0.72rem">(indices, heights increasing)</span></div>
+          <div class="stack-area" id="stackArea"><span class="stack-hint">empty</span></div>
+        </div>
+        <div>
+          <div class="section-label">Area computed on pop</div>
+          <div class="calc-box" id="calcBox">
+            <div class="line">no rectangle computed yet</div>
+            <div class="max">max area = <span class="val" id="maxVal">0</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-secondary" id="prevBtn" onclick="prev()">◀ Prev</button>
+        <button class="btn btn-primary" id="nextBtn" onclick="next()">Next ▶</button>
+        <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+        <span class="counter" id="counter">Step 0 / 0</span>
+      </div>
+    </div>
+
+    <div class="takeaway">
+      <div class="icon">💡</div>
+      <div>
+        <div class="label">Key takeaway</div>
+        <p>A bar is popped exactly when the first <strong>shorter</strong> bar to its right appears — that's its
+        right boundary; the new stack top is its left boundary. <code>width = i − stack[-1] − 1</code>.
+        Each index pushed & popped once → <strong>O(n)</strong>. Largest area here is <strong>10</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+const baseHeights = [2, 1, 5, 6, 2, 3];
+const heights = [...baseHeights, 0];   // sentinel flushes the stack
+const n = heights.length;
+const maxH = Math.max(...baseHeights);
+const UNIT = 30; // px per height unit
+
+// ── Precompute steps ──────────────────────────────────────────────────────
+function buildSteps() {
+  const steps = [];
+  const stack = [];
+  let maxArea = 0;
+
+  steps.push({
+    stack: [], current: -1, kind: 'init', maxArea: 0, rect: null, popped: null,
+    desc: 'Start with an empty stack. We append a sentinel <code>0</code> at the end so every real bar gets popped and measured.'
+  });
+
+  for (let i = 0; i < n; i++) {
+    while (stack.length && heights[stack[stack.length - 1]] > heights[i]) {
+      const top = stack.pop();
+      const h = heights[top];
+      const width = stack.length ? i - stack[stack.length - 1] - 1 : i;
+      const area = h * width;
+      const left = stack.length ? stack[stack.length - 1] + 1 : 0;
+      maxArea = Math.max(maxArea, area);
+      steps.push({
+        stack: stack.slice(), current: i, kind: 'pop', maxArea, popped: top,
+        rect: { left, right: i - 1, height: h },
+        desc: `Bar <code>${i}</code> (h=<code>${heights[i]}</code>) is shorter than stack-top bar <code>${top}</code> (h=<code>${h}</code>). ` +
+              `Pop it. Right boundary = <code>${i}</code>, left boundary = <code>${left}</code> → width = <code>${width}</code>, ` +
+              `area = <code>${h} × ${width} = ${area}</code>.`,
+        calc: `bar ${top}: height <code>${h}</code> × width <code>${width}</code> = <code>${area}</code>${area === maxArea ? '  ← new max' : ''}`
+      });
+    }
+    stack.push(i);
+    const isSentinel = i === n - 1;
+    steps.push({
+      stack: stack.slice(), current: i, kind: 'push', maxArea, popped: null, rect: null,
+      desc: isSentinel
+        ? `Push the sentinel bar <code>${i}</code> (h=<code>0</code>). Everything taller has already been popped & measured.`
+        : `Bar <code>${i}</code> (h=<code>${heights[i]}</code>) is ≥ stack-top — heights stay increasing. Push it; its left extent is still open.`
+    });
+  }
+
+  steps.push({
+    stack: [], current: -1, kind: 'done', maxArea, popped: null, rect: null,
+    desc: `Done. The largest rectangle area is <strong>${maxArea}</strong> (bars 2 & 3, height 5 × width 2). ✅`
+  });
+  return steps;
+}
+
+const steps = buildSteps();
+let cur = 0;
+const $ = id => document.getElementById(id);
+
+// build histogram DOM (only the real bars are visible; sentinel shown faint)
+(function buildHisto() {
+  const histo = $('histo');
+  let html = '';
+  for (let i = 0; i < n; i++) {
+    const isSentinel = i === n - 1;
+    const hpx = isSentinel ? 4 : heights[i] * UNIT;
+    html += `<div class="col" id="col${i}" ${isSentinel ? 'style="opacity:0.5"' : ''}>
+      <div class="hbar" id="bar${i}" style="height:${hpx}px">${isSentinel ? '0*' : heights[i]}</div>
+      <div class="lbl">i=${i}</div>
+    </div>`;
+  }
+  // rectangle overlay element
+  html += `<div class="rect-overlay" id="rectOverlay" style="display:none"></div>`;
+  histo.innerHTML = html;
+})();
+
+function render() {
+  const s = steps[cur];
+
+  // bars
+  for (let i = 0; i < n; i++) {
+    const col = $('col' + i);
+    col.className = 'col';
+    if (i === n - 1) col.style.opacity = '0.5'; else col.style.opacity = '';
+    if (s.stack.includes(i)) col.classList.add('instack');
+    if (i === s.current && (s.kind === 'push' || s.kind === 'pop')) col.classList.add('current');
+    if (s.popped === i) col.classList.add('popping');
+  }
+
+  // rectangle overlay
+  const ov = $('rectOverlay');
+  if (s.rect) {
+    const { left, right, height } = s.rect;
+    const cols = $('histo').querySelectorAll('.col');
+    const lEl = cols[left].getBoundingClientRect();
+    const rEl = cols[right].getBoundingClientRect();
+    const hRect = $('histo').getBoundingClientRect();
+    ov.style.display = 'flex';
+    ov.style.left = (lEl.left - hRect.left) + 'px';
+    ov.style.width = (rEl.right - lEl.left) + 'px';
+    ov.style.height = (height * UNIT) + 'px';
+    ov.textContent = (height * (right - left + 1));
+  } else {
+    ov.style.display = 'none';
+  }
+
+  // stack
+  const sa = $('stackArea');
+  sa.innerHTML = '';
+  if (!s.stack.length) sa.innerHTML = '<span class="stack-hint">empty</span>';
+  else s.stack.forEach(idx => {
+    const chip = document.createElement('div');
+    chip.className = 'schip';
+    const hl = idx === n - 1 ? '0' : heights[idx];
+    chip.innerHTML = `<span>idx ${idx}</span><span>h ${hl}</span>`;
+    sa.appendChild(chip);
+  });
+
+  // calc box
+  const cb = $('calcBox');
+  cb.innerHTML = `<div class="line">${s.calc || (s.kind === 'pop' ? '' : 'no pop this step')}</div>` +
+                 `<div class="max">max area = <span class="val">${s.maxArea}</span></div>`;
+
+  // desc
+  const d = $('stepDesc');
+  d.className = 'step-desc' + (s.kind === 'pop' ? ' pop' : s.kind === 'push' ? ' push' : '');
+  d.innerHTML = s.desc;
+
+  $('counter').textContent = `Step ${cur} / ${steps.length - 1}`;
+  $('prevBtn').disabled = cur === 0;
+  $('nextBtn').disabled = cur === steps.length - 1;
+}
+
+function next() { if (cur < steps.length - 1) { cur++; render(); } }
+function prev() { if (cur > 0) { cur--; render(); } }
+function reset() { cur = 0; render(); }
+
+// rAF so overlay measurement is correct on first paint
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

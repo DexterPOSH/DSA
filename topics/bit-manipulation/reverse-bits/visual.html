@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reverse Bits — Extract & Place Walkthrough</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e; color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px 60px; gap: 28px;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: #3b82f6; }
+
+  .analogy {
+    background: #16213e; border: 1px solid #3b82f6; border-radius: 12px;
+    padding: 18px 26px; max-width: 760px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 2rem; line-height: 1; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.97rem; line-height: 1.5; color: #c0c0d0; }
+
+  .card {
+    background: #16213e; border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 860px; width: 100%;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+  .section-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #7a8ab0; margin-bottom: 10px;
+  }
+  .step-description {
+    min-height: 56px; background: #0f172a; border-radius: 8px;
+    padding: 14px 20px; font-size: 0.95rem; line-height: 1.55;
+    color: #c8c8e0; border-left: 3px solid #3b82f6; transition: border-color 0.3s;
+  }
+  .step-description.done { border-color: #10b981; }
+  .step-description strong { color: #fff; }
+
+  .bit-line { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 14px; }
+  .bit-line-label { font-size: 0.8rem; color: #94a3b8; font-family: 'Consolas', monospace; text-align: right; line-height:1.4; }
+  .bit-line-label .nLbl { color: #f59e0b; font-weight: 700; }
+  .bit-line-label .rLbl { color: #3b82f6; font-weight: 700; }
+  .bit-line-label small { color:#5a6a90; font-size:0.7rem; }
+  .bit-cells { display: flex; gap: 7px; }
+  .bit {
+    width: 40px; height: 44px; border-radius: 7px; border: 1.5px solid #2d3a5a;
+    background: #0f172a; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700; font-family: 'Consolas', monospace;
+    transition: all 0.25s; position: relative; color: #44506e;
+  }
+  .bit .pos { position: absolute; bottom: 2px; font-size: 0.5rem; font-weight: 400; color: #3a4a6a; }
+  .bit.one { color: #93c5fd; border-color: #3b82f6; background: #14233f; }
+  .bit.empty { border-style: dashed; color: #2d3a5a; }
+  /* the bit being extracted from n (rightmost remaining) */
+  .bit.n-row.extract { border-color: #f59e0b; box-shadow: 0 0 16px rgba(245,158,11,0.55); color:#fcd34d !important; background:#3a2a10 !important; transform: translateY(-4px); }
+  .bit.n-row.consumed { opacity: 0.25; }
+  /* the freshly placed bit in result (rightmost) */
+  .bit.r-row.placed { animation: place 0.5s cubic-bezier(0.34,1.56,0.64,1); border-color:#10b981; box-shadow:0 0 16px rgba(16,185,129,0.5); }
+  .bit.r-row.shifted { animation: slide 0.35s ease; }
+  @keyframes place { 0%{transform:translateY(-26px) scale(1.3);opacity:0.2} 100%{transform:translateY(0) scale(1);opacity:1} }
+  @keyframes slide { 0%{transform:translateX(8px)} 100%{transform:translateX(0)} }
+
+  .divider { height: 1px; background: #2d3a5a; margin: 4px 0; }
+
+  .flow {
+    display:flex; align-items:center; gap:12px; justify-content:center;
+    font-family:'Consolas',monospace; font-size:0.9rem; color:#94a3b8;
+    background:#0f172a; border:1px solid #2d3a5a; border-radius:10px; padding:12px 16px; min-height:48px;
+  }
+  .flow .pill { padding:4px 10px; border-radius:6px; font-weight:700; }
+  .flow .pill.amber { background:#3a2a10; color:#fcd34d; border:1px solid #f59e0b; }
+  .flow .pill.green { background:#0d2a1a; color:#6ee7b7; border:1px solid #10b981; }
+  .flow .arrow { color:#5a6a90; }
+
+  .result-badge {
+    display: none; align-items: center; gap: 12px; padding: 14px 20px;
+    border-radius: 10px; font-size: 1rem; font-weight: 600;
+    background: #0d2a1a; border: 1.5px solid #10b981; color: #6ee7b7;
+  }
+  .result-badge.show { display: flex; }
+
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none; font-size: 0.92rem;
+    font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+  .takeaway {
+    background: #16213e; border: 1px solid #2d3a5a; border-radius: 12px;
+    padding: 18px 26px; max-width: 760px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #10b981; margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.95rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: #e0e0e0; }
+  .legend { display:flex; gap:18px; flex-wrap:wrap; font-size:0.78rem; color:#7a8ab0; }
+  .legend span::before { content:''; display:inline-block; width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px; }
+  .legend .l-ex::before { background:#f59e0b; }
+  .legend .l-pl::before { background:#10b981; }
+  .legend .l-on::before { background:#3b82f6; }
+</style>
+</head>
+<body>
+
+  <h1>Reverse Bits &mdash; <span>Extract Right, Place Left</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🔁</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Ek line ko <strong>ulta</strong> karna hai. Har baar <strong>n ka rightmost bit uthao</strong>
+        (<code>n &amp; 1</code>) aur use <strong>result ke left</strong> me daalo &mdash; result ko pehle
+        <code>&lt;&lt; 1</code> shift karke jagah banao. 8 baar me poora mirror ban jaata.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press &ldquo;Next&rdquo;. Each step: <code>result = (result &lt;&lt; 1) | (n &amp; 1)</code>, then <code>n &gt;&gt;= 1</code>.</div>
+    </div>
+
+    <div>
+      <div class="bit-line">
+        <div class="bit-line-label"><span class="nLbl">n</span><br><small>consume from right &rarr;</small></div>
+        <div class="bit-cells" id="nBits"></div>
+      </div>
+      <div class="divider"></div>
+      <div class="bit-line">
+        <div class="bit-line-label"><span class="rLbl">result</span><br><small>&larr; build, shift left</small></div>
+        <div class="bit-cells" id="rBits"></div>
+      </div>
+    </div>
+
+    <div class="flow" id="flow">result = (result &lt;&lt; 1) | (n &amp; 1)</div>
+
+    <div class="result-badge" id="resultBadge">
+      <span style="font-size:1.3rem">🟢</span>
+      <span id="resultText"></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">&larr; Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next &rarr;</button>
+      <button class="btn btn-secondary" id="autoBtn" onclick="toggleAuto()">&#9654; Auto-play</button>
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+
+    <div class="legend">
+      <span class="l-ex">extracting (n &amp; 1)</span>
+      <span class="l-pl">just placed</span>
+      <span class="l-on">bit = 1</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Peel the <strong>lowest</strong> bit off <strong>n</strong>, shift <strong>result</strong> left,
+        and OR it in. The first bit out gets the most shifts &rarr; lands at the MSB &mdash; an exact
+        mirror. Fixed 32 (here 8) iterations &rarr; <strong>O(1) time, O(1) space</strong>.
+      </p>
+    </div>
+  </div>
+
+<script>
+  const WIDTH = 8;
+  const START = 0b10110010; // 178
+
+  function bitsOf(v) { return v.toString(2).padStart(WIDTH, '0').split('').map(Number); }
+
+  // Build steps simulating the loop
+  const steps = [];
+  let n = START, result = 0;
+  // initial
+  steps.push({
+    nVal: n, rVal: result, placedCount: 0, extractBit: null, phase: 'start',
+    desc: `Start: <strong>n = ${START}</strong> (<code>${bitsOf(START).join('')}</code>), result = 0. ` +
+          `8 iterations me n ke bits ulte daalenge.`
+  });
+  for (let k = 0; k < WIDTH; k++) {
+    const eb = n & 1;
+    const prevResult = result;
+    result = (result << 1) | eb;
+    const nAfter = n >>> 1;
+    steps.push({
+      nVal: nAfter, nBefore: n, rVal: result, prevResult, placedCount: k + 1, extractBit: eb, phase: 'place',
+      desc: `Iteration ${k + 1}: n ka rightmost bit = <strong style="color:#f59e0b">${eb}</strong>. ` +
+            `result &lt;&lt; 1 (sab left khiske), phir | ${eb}. ` +
+            `result = <code>${bitsOf(result).join('')}</code> (${result}). Phir n &gt;&gt;= 1.`
+    });
+    n = nAfter;
+  }
+  const finalResult = result;
+  steps.push({
+    nVal: 0, rVal: finalResult, placedCount: WIDTH, extractBit: null, phase: 'done', done: true,
+    desc: `Done! result = <strong style="color:#10b981">${finalResult}</strong> ` +
+          `(<code>${bitsOf(finalResult).join('')}</code>) &mdash; exact mirror of <code>${bitsOf(START).join('')}</code>.`
+  });
+
+  const TOTAL = steps.length;
+  let cur = 0, auto = null;
+
+  const nBits = document.getElementById('nBits');
+  const rBits = document.getElementById('rBits');
+  const stepDesc = document.getElementById('stepDesc');
+  const stepCounter = document.getElementById('stepCounter');
+  const flow = document.getElementById('flow');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const autoBtn = document.getElementById('autoBtn');
+  const resultBadge = document.getElementById('resultBadge');
+  const resultText = document.getElementById('resultText');
+
+  function buildRow(container, cls) {
+    container.innerHTML = '';
+    for (let b = 0; b < WIDTH; b++) {
+      const el = document.createElement('div');
+      el.className = 'bit ' + cls;
+      el.innerHTML = '0<span class="pos">' + (WIDTH - 1 - b) + '</span>';
+      container.appendChild(el);
+    }
+  }
+  buildRow(nBits, 'n-row');
+  buildRow(rBits, 'r-row');
+
+  function render() {
+    const s = steps[cur];
+    stepDesc.innerHTML = s.desc;
+    stepDesc.className = 'step-description' + (s.done ? ' done' : '');
+
+    const nb = bitsOf(s.nVal);
+    const consumed = WIDTH - s.placedCount; // this many low bits of n already consumed
+    // n row: low `s.placedCount` positions are consumed/empty; remaining hold current n bits.
+    [...nBits.children].forEach((el, b) => {
+      el.className = 'bit n-row';
+      const posFromRight = WIDTH - 1 - b; // 0 = rightmost
+      if (posFromRight < s.placedCount) {
+        // already consumed -> show faded as gone
+        el.classList.add('consumed', 'empty');
+        el.innerHTML = '·<span class="pos">' + posFromRight + '</span>';
+      } else {
+        const bit = nb[b];
+        el.classList.toggle('one', bit === 1);
+        el.innerHTML = bit + '<span class="pos">' + posFromRight + '</span>';
+        // the rightmost remaining bit is the one to be extracted next (only highlight on place-phase active step)
+        if (s.phase === 'place' && posFromRight === s.placedCount - 1) {
+          // already consumed this step; highlight handled below differently
+        }
+      }
+    });
+    // Highlight the bit that was just extracted (it sits at position = placedCount-1 from right, now consumed)
+    if (s.phase === 'place') {
+      const idxFromLeft = WIDTH - 1 - (s.placedCount - 1);
+      const el = nBits.children[idxFromLeft];
+      if (el) { el.classList.remove('empty'); el.classList.add('extract');
+        el.innerHTML = s.extractBit + '<span class="pos">' + (s.placedCount - 1) + '</span>'; }
+    }
+
+    // result row: lowest `placedCount` bits are filled, rest dashed-empty
+    const rb = bitsOf(s.rVal);
+    [...rBits.children].forEach((el, b) => {
+      el.className = 'bit r-row';
+      const posFromRight = WIDTH - 1 - b;
+      if (posFromRight < s.placedCount || s.done) {
+        const bit = rb[b];
+        el.classList.toggle('one', bit === 1);
+        el.innerHTML = bit + '<span class="pos">' + posFromRight + '</span>';
+        if (!s.done && s.phase === 'place') {
+          if (posFromRight === 0) el.classList.add('placed');     // freshly OR'd bit
+          else el.classList.add('shifted');                       // shifted left
+        }
+      } else {
+        el.classList.add('empty');
+        el.innerHTML = '·<span class="pos">' + posFromRight + '</span>';
+      }
+    });
+
+    if (s.phase === 'place') {
+      flow.innerHTML = `result = (result &lt;&lt; 1) | (n &amp; 1) &nbsp;<span class="arrow">&rarr;</span>&nbsp; ` +
+        `placed <span class="pill amber">${s.extractBit}</span> <span class="arrow">at LSB, total bits placed:</span> ` +
+        `<span class="pill green">${s.placedCount}</span>`;
+    } else if (s.done) {
+      flow.innerHTML = `All ${WIDTH} bits mirrored &nbsp;<span class="arrow">&rarr;</span>&nbsp; <span class="pill green">${finalResult}</span>`;
+    } else {
+      flow.innerHTML = 'result = (result &lt;&lt; 1) | (n &amp; 1), &nbsp; then n &gt;&gt;= 1';
+    }
+
+    if (s.done) {
+      resultBadge.classList.add('show');
+      resultText.textContent = `return ${finalResult} — bits of ${START} fully reversed.`;
+    } else {
+      resultBadge.classList.remove('show');
+    }
+
+    stepCounter.textContent = `Step ${cur} / ${TOTAL - 1}`;
+    prevBtn.disabled = cur === 0;
+    nextBtn.disabled = cur === TOTAL - 1;
+  }
+
+  function next() { if (cur < TOTAL - 1) { cur++; render(); } if (cur === TOTAL - 1) stopAuto(); }
+  function prev() { if (cur > 0) { cur--; render(); } }
+  function reset() { stopAuto(); cur = 0; render(); }
+  function toggleAuto() {
+    if (auto) stopAuto();
+    else {
+      if (cur === TOTAL - 1) cur = 0;
+      auto = setInterval(() => { if (cur < TOTAL - 1) next(); else stopAuto(); }, 1150);
+      autoBtn.innerHTML = '&#10073;&#10073; Pause';
+      render();
+    }
+  }
+  function stopAuto() { if (auto) { clearInterval(auto); auto = null; autoBtn.innerHTML = '&#9654; Auto-play'; } }
+
+  render();
+</script>
+</body>
+</html>

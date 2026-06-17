@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>House Robber II — break the circle into two linear DP passes</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.75rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.08));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 20px; margin-bottom: 28px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .card {
+    background: var(--panel); border-radius: 14px;
+    padding: 22px 24px 26px; margin-bottom: 26px;
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 6px 22px rgba(0,0,0,0.28);
+  }
+  .section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; margin-top: 20px; }
+  .section-label:first-child { margin-top: 0; }
+  code { background: var(--panel2); padding: 1px 7px; border-radius: 5px; color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .step-desc {
+    background: var(--panel2); border-left: 4px solid var(--blue);
+    border-radius: 8px; padding: 14px 16px; min-height: 64px;
+    margin-bottom: 8px; font-size: 1.02rem;
+  }
+
+  /* circle layout */
+  .ring { position: relative; width: 320px; height: 320px; margin: 6px auto 4px; }
+  .ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .ring .house {
+    position: absolute; width: 56px; height: 56px; border-radius: 12px;
+    display: grid; place-items: center; font-weight: 700; font-size: 1.2rem;
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--panel2); border: 2px solid rgba(255,255,255,0.14);
+    color: #ffd479; transform: translate(-50%, -50%); transition: all .3s ease;
+  }
+  .ring .house .hidx { position: absolute; bottom: -18px; font-size: 0.65rem; color: var(--muted); }
+  .house.dim { opacity: 0.28; filter: grayscale(0.6); }
+  .house.in-line { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.3); }
+  .house.robbed { border-color: var(--green); background: rgba(16,185,129,0.2); color: #b6f0d8; }
+  .edge { stroke: rgba(255,255,255,0.18); stroke-width: 2; transition: all .3s ease; }
+  .edge.cut { stroke: var(--red); stroke-dasharray: 5 5; stroke-width: 2.5; }
+
+  /* dp rows */
+  .dp-block { margin-top: 6px; }
+  .dp-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+  .cell { width: 56px; display: flex; flex-direction: column; align-items: center; }
+  .box {
+    width: 56px; height: 48px; border-radius: 10px;
+    display: grid; place-items: center; font-weight: 700; font-size: 1.15rem;
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--panel2); border: 2px solid rgba(255,255,255,0.1);
+    color: #6b7299; transition: all .3s ease;
+  }
+  .box.filled { color: var(--text); border-color: rgba(255,255,255,0.25); background: #2a2a4a; }
+  .box.active { border-color: var(--blue); background: rgba(59,130,246,0.22); color: #bcd4ff; box-shadow: 0 0 0 3px rgba(59,130,246,0.35); transform: translateY(-3px); }
+  .box.src { border-color: var(--amber); background: rgba(245,158,11,0.14); color: #ffe0a3; }
+  .box.done { border-color: var(--green); background: rgba(16,185,129,0.16); color: #b6f0d8; }
+  .box.empty { opacity: 0.25; border-style: dashed; }
+  .idx { margin-top: 6px; font-size: 0.7rem; color: var(--muted); font-family: "SF Mono", monospace; }
+  .cell.is-active .idx { color: var(--blue); font-weight: 700; }
+  .pass-title { font-size: 0.92rem; font-weight: 600; margin-bottom: 8px; }
+  .pass-title.a { color: var(--blue); }
+  .pass-title.b { color: var(--amber); }
+  .pass-result { font-family: "SF Mono", monospace; font-size: 0.95rem; margin-top: 10px; min-height: 22px; }
+
+  .calc-line {
+    margin-top: 16px; font-family: "SF Mono", Menlo, monospace;
+    font-size: 0.98rem; min-height: 24px; color: var(--green);
+  }
+  .calc-line .res { color: var(--blue); font-weight: 700; }
+  .calc-line .amb { color: var(--amber); }
+
+  .result-badge {
+    margin-top: 18px; display: none;
+    background: rgba(16,185,129,0.15); border: 1px solid var(--green);
+    border-radius: 10px; padding: 12px 18px; font-weight: 700;
+    font-family: "SF Mono", Menlo, monospace; color: #b6f0d8;
+  }
+  .result-badge.show { display: inline-block; }
+
+  .controls { display: flex; align-items: center; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 10px 22px; border-radius: 9px; font-size: 0.98rem; font-weight: 600;
+    cursor: pointer; transition: transform .12s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #34345e; }
+  .step-counter { margin-left: auto; color: var(--muted); font-size: 0.9rem; font-family: "SF Mono", monospace; }
+
+  .code-block {
+    background: #11111f; border-radius: 12px; padding: 18px 20px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.86rem;
+    line-height: 1.7; overflow-x: auto; margin-top: 6px;
+    border: 1px solid rgba(255,255,255,0.06); white-space: pre;
+  }
+  .kw { color: #c792ea; } .fn { color: #82aaff; } .cm { color: #5a6a90; } .num { color: #f78c6c; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px; padding: 18px 22px; margin-top: 30px;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>House Robber II — break the <span>circle</span> into two linear passes</h1>
+  <p class="subtitle">Circular street <code>nums = [2, 7, 9, 3, 1]</code> — first &amp; last houses are adjacent.</p>
+
+  <div class="analogy">
+    <h3>🔁 Real-world analogy</h3>
+    <p>Gali ab gol hai — pehla aur aakhri ghar bhi bagal me. Toh ya <b>pehla loota (aakhri chhoda)</b> → houses <code>0..n-2</code>, ya <b>aakhri loota (pehla chhoda)</b> → houses <code>1..n-1</code>. Dono plain House Robber ban jaate hain. Dono ka max lo.</p>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Step description</div>
+    <div class="step-desc" id="stepDesc">Press <b>Next →</b> to see how we break the circle.</div>
+
+    <div class="section-label">The circular street</div>
+    <div class="ring" id="ring"></div>
+
+    <div class="section-label">Two linear DP passes</div>
+    <div class="dp-block">
+      <div class="pass-title a" id="titleA">Pass A — exclude last house (houses 0 … n-2)</div>
+      <div class="dp-row" id="dpRowA"></div>
+      <div class="pass-result" id="resA"></div>
+    </div>
+    <div class="dp-block" style="margin-top:22px;">
+      <div class="pass-title b" id="titleB">Pass B — exclude first house (houses 1 … n-1)</div>
+      <div class="dp-row" id="dpRowB"></div>
+      <div class="pass-result" id="resB"></div>
+    </div>
+
+    <div class="calc-line" id="calcLine"></div>
+    <div class="result-badge" id="resultBadge"></div>
+
+    <div class="controls">
+      <button class="ghost" id="prevBtn" onclick="prev()">← Prev</button>
+      <button id="nextBtn" onclick="next()">Next →</button>
+      <button class="ghost" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="section-label" style="color:var(--muted)">The whole algorithm</div>
+  <div class="code-block"><span class="kw">def</span> <span class="fn">rob</span>(nums):
+    <span class="kw">if</span> <span class="fn">len</span>(nums) == <span class="num">1</span>: <span class="kw">return</span> nums[<span class="num">0</span>]
+    <span class="kw">def</span> <span class="fn">rob_line</span>(houses):
+        rob2, rob1 = <span class="num">0</span>, <span class="num">0</span>
+        <span class="kw">for</span> n <span class="kw">in</span> houses:
+            rob2, rob1 = rob1, <span class="fn">max</span>(rob1, n + rob2)
+        <span class="kw">return</span> rob1
+    <span class="kw">return</span> <span class="fn">max</span>(<span class="fn">rob_line</span>(nums[:-<span class="num">1</span>]),   <span class="cm"># exclude last</span>
+               <span class="fn">rob_line</span>(nums[<span class="num">1</span>:]))    <span class="cm"># exclude first</span></div>
+
+  <div class="takeaway">
+    <h3>💡 Key takeaway</h3>
+    <p>Circular constraint ko do linear House Robber subproblems me todo — ek first ko allow kare, doosra last ko. Pehla aur aakhri kabhi saath nahi aate, aur max le lo. <b>O(n) time, O(1) space.</b></p>
+  </div>
+</div>
+
+<script>
+  const nums = [2, 7, 9, 3, 1];
+  const n = nums.length;
+
+  // linear robber returning full dp array
+  function robLine(arr) {
+    const m = arr.length;
+    const dp = new Array(m).fill(0);
+    if (m === 0) return { dp:[], best:0 };
+    dp[0] = arr[0];
+    if (m > 1) dp[1] = Math.max(arr[0], arr[1]);
+    for (let i = 2; i < m; i++) dp[i] = Math.max(dp[i-1], arr[i] + dp[i-2]);
+    return { dp, best: dp[m-1] };
+  }
+
+  const arrA = nums.slice(0, n-1);   // houses 0..n-2 (global indices 0..n-2)
+  const arrB = nums.slice(1);        // houses 1..n-1 (global indices 1..n-1)
+  const A = robLine(arrA);
+  const B = robLine(arrB);
+  const answer = Math.max(A.best, B.best);
+
+  // Build step list. Each compute step references a pass ('A'/'B') and a local index.
+  const steps = [];
+  steps.push({ kind:'intro' });
+  // Pass A
+  steps.push({ kind:'passStart', pass:'A' });
+  for (let i = 0; i < arrA.length; i++) steps.push({ kind:'compute', pass:'A', i });
+  steps.push({ kind:'passEnd', pass:'A' });
+  // Pass B
+  steps.push({ kind:'passStart', pass:'B' });
+  for (let i = 0; i < arrB.length; i++) steps.push({ kind:'compute', pass:'B', i });
+  steps.push({ kind:'passEnd', pass:'B' });
+  steps.push({ kind:'done' });
+
+  const $ = id => document.getElementById(id);
+  const stepDesc = $('stepDesc'), calcLine = $('calcLine');
+  const resultBadge = $('resultBadge'), counter = $('stepCounter');
+  const prevBtn = $('prevBtn'), nextBtn = $('nextBtn');
+  const resA = $('resA'), resB = $('resB');
+
+  // ---- build the ring ----
+  (function buildRing() {
+    const R = 120, cx = 160, cy = 160;
+    let svg = '<svg viewBox="0 0 320 320">';
+    // edges between consecutive houses (circular)
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const a1 = -Math.PI/2 + (2*Math.PI*i)/n;
+      const a2 = -Math.PI/2 + (2*Math.PI*j)/n;
+      const x1 = cx + R*Math.cos(a1), y1 = cy + R*Math.sin(a1);
+      const x2 = cx + R*Math.cos(a2), y2 = cy + R*Math.sin(a2);
+      svg += `<line class="edge" id="edge-${i}-${j}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    }
+    svg += '</svg>';
+    let html = svg;
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI/2 + (2*Math.PI*i)/n;
+      const x = cx + R*Math.cos(a), y = cy + R*Math.sin(a);
+      html += `<div class="house" id="ringH-${i}" style="left:${x}px; top:${y}px;">${nums[i]}<span class="hidx">[${i}]</span></div>`;
+    }
+    $('ring').innerHTML = html;
+  })();
+
+  // ---- build dp rows (global-index labels) ----
+  function buildDpRow(rowId, globalIndices) {
+    const row = $(rowId); row.innerHTML = '';
+    globalIndices.forEach(gi => {
+      const c = document.createElement('div');
+      c.className = 'cell';
+      c.innerHTML = `<div class="box" id="${rowId}-${gi}">·</div><div class="idx">dp[${gi}]</div>`;
+      row.appendChild(c);
+    });
+  }
+  const idxA = arrA.map((_, i) => i);       // global 0..n-2
+  const idxB = arrB.map((_, i) => i + 1);   // global 1..n-1
+  buildDpRow('dpRowA', idxA);
+  buildDpRow('dpRowB', idxB);
+
+  let cur = 0;
+
+  function resetVisuals() {
+    for (let i = 0; i < n; i++) {
+      $('ringH-'+i).className = 'house';
+    }
+    document.querySelectorAll('.edge').forEach(e => e.classList.remove('cut'));
+    idxA.forEach(gi => { const b = $('dpRowA-'+gi); b.className = 'box'; b.textContent = '·'; b.parentElement.classList.remove('is-active'); });
+    idxB.forEach(gi => { const b = $('dpRowB-'+gi); b.className = 'box'; b.textContent = '·'; b.parentElement.classList.remove('is-active'); });
+    resA.textContent = ''; resB.textContent = '';
+    calcLine.innerHTML = ''; resultBadge.classList.remove('show');
+  }
+
+  function render() {
+    resetVisuals();
+
+    // count how many compute steps of each pass have been applied
+    let aFilled = 0, bFilled = 0;
+    let aStarted = false, bStarted = false, aEnded = false, bEnded = false;
+    for (let s = 0; s < cur; s++) {
+      const st = steps[s];
+      if (st.kind === 'passStart' && st.pass === 'A') aStarted = true;
+      if (st.kind === 'passStart' && st.pass === 'B') bStarted = true;
+      if (st.kind === 'compute' && st.pass === 'A') aFilled = st.i + 1;
+      if (st.kind === 'compute' && st.pass === 'B') bFilled = st.i + 1;
+      if (st.kind === 'passEnd' && st.pass === 'A') aEnded = true;
+      if (st.kind === 'passEnd' && st.pass === 'B') bEnded = true;
+    }
+
+    // fill pass A cells
+    for (let i = 0; i < aFilled; i++) {
+      const gi = idxA[i];
+      $('dpRowA-'+gi).textContent = A.dp[i];
+      $('dpRowA-'+gi).classList.add('filled');
+    }
+    for (let i = 0; i < bFilled; i++) {
+      const gi = idxB[i];
+      $('dpRowB-'+gi).textContent = B.dp[i];
+      $('dpRowB-'+gi).classList.add('filled');
+    }
+    if (aEnded) resA.innerHTML = `Pass A best = <b style="color:var(--blue)">${A.best}</b>`;
+    if (bEnded) resB.innerHTML = `Pass B best = <b style="color:var(--amber)">${B.best}</b>`;
+
+    const active = cur > 0 ? steps[cur-1] : null;
+
+    // helper to mark which houses are in the active pass / cut the circle edge
+    function markPassRing(pass) {
+      // cut the edge between last(n-1) and first(0) always (circle broken)
+      const cutEdge = $(`edge-0-${n-1}`) || $(`edge-${n-1}-0`);
+      if (cutEdge) cutEdge.classList.add('cut');
+      if (pass === 'A') {
+        $('ringH-'+(n-1)).classList.add('dim'); // last excluded
+        for (let i = 0; i <= n-2; i++) $('ringH-'+i).classList.add('in-line');
+      } else if (pass === 'B') {
+        $('ringH-0').classList.add('dim'); // first excluded
+        for (let i = 1; i <= n-1; i++) $('ringH-'+i).classList.add('in-line');
+      }
+    }
+
+    if (!active || active.kind === 'intro') {
+      stepDesc.innerHTML = 'A circular street: house <code>0</code> and house <code>'+(n-1)+'</code> are neighbours too. We cut the circle by trying each as excluded, turning it into two ordinary House Robber lines.';
+    } else if (active.kind === 'passStart') {
+      const p = active.pass;
+      markPassRing(p);
+      stepDesc.innerHTML = p === 'A'
+        ? '<b>Pass A:</b> assume we <i>could</i> rob the first house, so we <b>exclude the last</b>. Run plain House Robber on houses <code>0 … '+(n-2)+'</code>.'
+        : '<b>Pass B:</b> assume we <i>could</i> rob the last house, so we <b>exclude the first</b>. Run plain House Robber on houses <code>1 … '+(n-1)+'</code>.';
+    } else if (active.kind === 'compute') {
+      const p = active.pass;
+      markPassRing(p);
+      const arr = p === 'A' ? arrA : arrB;
+      const dp = p === 'A' ? A.dp : B.dp;
+      const idxMap = p === 'A' ? idxA : idxB;
+      const i = active.i;
+      const gi = idxMap[i];
+      const rowId = p === 'A' ? 'dpRowA' : 'dpRowB';
+      $(rowId+'-'+gi).classList.remove('filled');
+      $(rowId+'-'+gi).classList.add('active');
+      $(rowId+'-'+gi).parentElement.classList.add('is-active');
+      $('ringH-'+gi).classList.add('robbed');
+      if (i === 0) {
+        stepDesc.innerHTML = `<b>${p}: dp[${gi}] = nums[${gi}] = ${arr[0]}</b>. First house of this line.`;
+        calcLine.innerHTML = `dp[${gi}] = <span class="res">${dp[0]}</span>`;
+      } else if (i === 1) {
+        stepDesc.innerHTML = `<b>${p}: dp[${gi}] = max(${arr[0]}, ${arr[1]}) = ${dp[1]}</b>.`;
+        calcLine.innerHTML = `dp[${gi}] = max(${arr[0]}, ${arr[1]}) = <span class="res">${dp[1]}</span>`;
+        $(rowId+'-'+idxMap[0]).classList.add('src');
+      } else {
+        const take = arr[i] + dp[i-2], skip = dp[i-1];
+        stepDesc.innerHTML = `<b>${p}: dp[${gi}]</b> = max(skip dp[${idxMap[i-1]}]=${skip}, take ${arr[i]}+dp[${idxMap[i-2]}]=${take}) = <b>${dp[i]}</b>.`;
+        calcLine.innerHTML = `dp[${gi}] = max(<span class="amb">${skip}</span>, ${arr[i]}+${dp[i-2]}=${take}) = <span class="res">${dp[i]}</span>`;
+        $(rowId+'-'+idxMap[i-1]).classList.add('src');
+        $(rowId+'-'+idxMap[i-2]).classList.add('src');
+      }
+    } else if (active.kind === 'passEnd') {
+      const p = active.pass;
+      markPassRing(p);
+      const best = p === 'A' ? A.best : B.best;
+      stepDesc.innerHTML = `<b>Pass ${p} done.</b> Best for this line = <code>${best}</code>.`;
+    } else if (active.kind === 'done') {
+      const cutEdge = $(`edge-0-${n-1}`) || $(`edge-${n-1}-0`);
+      if (cutEdge) cutEdge.classList.add('cut');
+      // highlight the winning line on the ring
+      const win = A.best >= B.best ? 'A' : 'B';
+      if (win === 'A') { $('ringH-'+(n-1)).classList.add('dim'); for (let i=0;i<=n-2;i++) $('ringH-'+i).classList.add('in-line'); }
+      else { $('ringH-0').classList.add('dim'); for (let i=1;i<=n-1;i++) $('ringH-'+i).classList.add('in-line'); }
+      idxA.forEach((gi,i)=>{ $('dpRowA-'+gi).textContent = A.dp[i]; $('dpRowA-'+gi).classList.add('filled'); });
+      idxB.forEach((gi,i)=>{ $('dpRowB-'+gi).textContent = B.dp[i]; $('dpRowB-'+gi).classList.add('filled'); });
+      $('dpRowA-'+idxA[idxA.length-1]).classList.add('done');
+      $('dpRowB-'+idxB[idxB.length-1]).classList.add('done');
+      resA.innerHTML = `Pass A best = <b style="color:var(--blue)">${A.best}</b>`;
+      resB.innerHTML = `Pass B best = <b style="color:var(--amber)">${B.best}</b>`;
+      stepDesc.innerHTML = `<b>Done!</b> answer = <code>max(${A.best}, ${B.best}) = ${answer}</code>. Pass <b>${win}</b> wins.`;
+      calcLine.innerHTML = `answer = max(<span class="res">${A.best}</span>, <span class="amb">${B.best}</span>) = <span class="res">${answer}</span>`;
+      resultBadge.textContent = `return ${answer}`;
+      resultBadge.classList.add('show');
+    }
+
+    counter.textContent = `Step ${cur} / ${steps.length}`;
+    prevBtn.disabled = cur === 0;
+    nextBtn.disabled = cur === steps.length;
+  }
+
+  function next() { if (cur < steps.length) cur++; render(); }
+  function prev() { if (cur > 0) cur--; render(); }
+  function reset() { cur = 0; render(); }
+  render();
+</script>
+</body>
+</html>

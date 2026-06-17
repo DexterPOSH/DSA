@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search a 2D Matrix — binary search on a flattened grid</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 20px; margin-bottom: 28px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel);
+    border-radius: 12px; padding: 16px 20px; margin-bottom: 26px;
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+  .problem code {
+    background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family:"SF Mono",Menlo,Consolas,monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .panel {
+    background: var(--panel); border-radius: 14px;
+    padding: 24px 22px 28px; border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25); margin-bottom: 26px;
+  }
+  .sectlabel { font-size:.8rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:0 0 10px; }
+
+  /* matrix grid */
+  .grid { display:grid; gap:8px; justify-content:center; margin: 6px 0 4px; }
+  .gcell {
+    width: 60px; height: 52px; border-radius:9px;
+    display:grid; place-items:center;
+    font-weight:700; font-family:"SF Mono",Menlo,monospace; font-size:1.05rem;
+    background: var(--panel2); border:2px solid rgba(255,255,255,0.10);
+    transition: all .35s ease; position:relative;
+  }
+  .gcell .flat { position:absolute; top:2px; right:5px; font-size:.6rem; color:var(--muted); font-weight:400; }
+  .gcell.out { opacity:.26; filter:grayscale(.7); }
+  .gcell.inrange { border-color: rgba(59,130,246,0.45); background: rgba(59,130,246,0.10); }
+  .gcell.mid { border-color: var(--amber); background: rgba(245,158,11,0.22); color:#ffe2a8; box-shadow:0 0 0 3px rgba(245,158,11,0.25); }
+  .gcell.found { border-color: var(--green); background: rgba(16,185,129,0.25); color:#b6f0d8; box-shadow:0 0 0 3px rgba(16,185,129,0.35); }
+
+  /* flat index bar */
+  .flatbar { display:flex; justify-content:center; gap:4px; flex-wrap:wrap; margin: 22px 0 6px; }
+  .fcell {
+    width: 38px; height: 30px; border-radius:6px;
+    display:grid; place-items:center; position:relative;
+    font-size:.78rem; font-family:"SF Mono",Menlo,monospace;
+    background: var(--panel2); border:1px solid rgba(255,255,255,0.10);
+    transition: all .3s ease;
+  }
+  .fcell.out { opacity:.25; }
+  .fcell.inrange { border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.12); }
+  .fcell.mid { border-color: var(--amber); background: rgba(245,158,11,0.28); }
+  .fcell.found { border-color: var(--green); background: rgba(16,185,129,0.28); }
+  .fmarker { position:absolute; left:50%; transform:translateX(-50%); top:-22px; font-size:.66rem; font-weight:700; padding:1px 6px; border-radius:5px; white-space:nowrap; }
+  .fmarker.lo  { background:var(--blue); color:#fff; }
+  .fmarker.hi  { background:var(--purple); color:#fff; }
+  .fmarker.lohi{ background:linear-gradient(90deg,var(--blue),var(--purple)); color:#fff; }
+  .fmarker.mid { top:auto; bottom:-22px; background:var(--amber); color:#1a1a2e; }
+
+  .target-tag {
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--panel2); border:1px solid rgba(255,255,255,0.1);
+    border-radius:8px; padding:6px 12px; font-family:"SF Mono",Menlo,monospace; margin-bottom:6px;
+  }
+  .target-tag b { color: var(--green); }
+
+  .vars { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; justify-content:center; }
+  .var { font-family:"SF Mono",Menlo,monospace; font-size:.88rem; padding:6px 12px; border-radius:8px; background:var(--panel2); border:1px solid rgba(255,255,255,0.1); }
+  .var .lbl{ color:var(--muted); }
+  .var.lo{ border-color:var(--blue);}  .var.lo b{ color:#bcd4ff;}
+  .var.hi{ border-color:var(--purple);}.var.hi b{ color:#e3c9ff;}
+  .var.mid{border-color:var(--amber);} .var.mid b{ color:#ffe2a8;}
+  .var.dec{ border-color:var(--green);} .var.dec b{ color:#b6f0d8;}
+
+  .caption {
+    margin-top:22px; background:var(--panel2); border-radius:10px;
+    padding:14px 16px; border-left:4px solid var(--blue);
+    min-height:58px; font-size:.97rem; transition:border-color .3s;
+  }
+  .caption code{ color:#ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .caption.win{ border-left-color:var(--green); }
+  .caption.fail{ border-left-color:var(--red); }
+
+  .controls { text-align:center; margin: 6px 0 26px; }
+  button {
+    background:var(--blue); color:#fff; border:none;
+    padding:11px 22px; border-radius:10px; font-size:.98rem; font-weight:600; cursor:pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled){ background:#2f6fd6; transform:translateY(-1px); }
+  button:disabled{ opacity:.4; cursor:not-allowed; }
+  button.ghost{ background:var(--panel2); color:var(--text); }
+  button.ghost:hover:not(:disabled){ background:#34345e; }
+  .stepcount{ color:var(--muted); font-size:.85rem; margin-top:10px; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border:1px solid rgba(59,130,246,0.4); border-radius:12px;
+    padding:18px 22px; margin-top:30px; text-align:center;
+  }
+  .takeaway h3{ margin:0 0 6px; color:var(--blue); }
+  .takeaway p{ margin:0; font-size:1.05rem; }
+  .takeaway code{ color:#ffd479; font-family:"SF Mono",Menlo,monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Search a 2D Matrix — binary search on a <span>flattened</span> grid</h1>
+  <p class="subtitle">Row-major sorted matrix = ek lambi sorted list. Index ko on-the-fly row/col me decode karo.</p>
+
+  <div class="analogy">
+    <h3>📚 Analogy: serial-numbered library shelf</h3>
+    <p>Saari rows jod do to ek fully-sorted list ban jaati hai. Books strictly serial order me, bas alag racks (rows) me. Ek hi binary search — bas flat index ko <code>row = mid // n</code>, <code>col = mid % n</code> se decode karo.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> Find <code>target = 16</code> in the row-major sorted matrix.
+    <span class="arrow">→</span> Found at row 1, col 2 → <code>True</code>.
+  </div>
+
+  <div class="panel">
+    <div class="target-tag">searching for <b id="tgt">16</b></div>
+    <p class="sectlabel">The matrix (small number = flat index)</p>
+    <div class="grid" id="grid"></div>
+    <p class="sectlabel" style="margin-top:24px;">Same cells as one virtual sorted array — binary search runs here</p>
+    <div class="flatbar" id="flatbar"></div>
+    <div class="vars" id="vars"></div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn">‹ Prev</button>
+    <button id="nextBtn">Next ›</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+    <div class="stepcount" id="stepcount"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Row-major sorted matrix ko flatten samjho: <code>matrix[mid // n][mid % n]</code> se decode karke ek hi binary search — O(log(m·n)), no extra space.</p>
+  </div>
+</div>
+
+<script>
+const matrix = [
+  [1,  3,  5,  7],
+  [10, 11, 16, 20],
+  [23, 30, 34, 60]
+];
+const m = matrix.length, n = matrix[0].length;
+const target = 16;
+const val = flat => matrix[Math.floor(flat / n)][flat % n];
+
+function buildSteps() {
+  const steps = [];
+  let lo = 0, hi = m * n - 1;
+  steps.push({ lo, hi, mid: null, kind: 'init',
+    text: `Treat the ${m}×${n} matrix as one sorted array of ${m*n} cells. <code>lo = 0</code>, <code>hi = ${hi}</code>.` });
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const r = Math.floor(mid / n), c = mid % n, v = val(mid);
+    if (v === target) {
+      steps.push({ lo, hi, mid, kind:'found',
+        text: `<code>mid = ${mid}</code> → row <code>${mid}//${n} = ${r}</code>, col <code>${mid}%${n} = ${c}</code> → <code>${v}</code> === target. <b>Found!</b> ✅` });
+      break;
+    } else if (v < target) {
+      steps.push({ lo, hi, mid, kind:'right',
+        text: `<code>mid = ${mid}</code> → <code>matrix[${r}][${c}] = ${v} &lt; ${target}</code>. Go right → <code>lo = ${mid+1}</code>.` });
+      lo = mid + 1;
+    } else {
+      steps.push({ lo, hi, mid, kind:'left',
+        text: `<code>mid = ${mid}</code> → <code>matrix[${r}][${c}] = ${v} &gt; ${target}</code>. Go left → <code>hi = ${mid-1}</code>.` });
+      hi = mid - 1;
+    }
+  }
+  return steps;
+}
+
+const steps = buildSteps();
+let i = 0;
+const $ = id => document.getElementById(id);
+$('tgt').textContent = target;
+$('grid').style.gridTemplateColumns = `repeat(${n}, auto)`;
+
+function classFor(flat, s) {
+  if (s.kind === 'found' && flat === s.mid) return 'found';
+  if (flat === s.mid && s.kind !== 'init') return 'mid';
+  if (flat >= s.lo && flat <= s.hi) return 'inrange';
+  return 'out';
+}
+
+function render() {
+  const s = steps[i];
+  // grid
+  let g = '';
+  for (let flat = 0; flat < m * n; flat++) {
+    g += `<div class="gcell ${classFor(flat, s)}"><span class="flat">${flat}</span>${val(flat)}</div>`;
+  }
+  $('grid').innerHTML = g;
+
+  // flat bar with markers
+  let f = '';
+  for (let flat = 0; flat < m * n; flat++) {
+    let mk = '';
+    if (s.lo === s.hi && flat === s.lo) mk += `<span class="fmarker lohi">lo·hi</span>`;
+    else {
+      if (flat === s.lo) mk += `<span class="fmarker lo">lo</span>`;
+      if (flat === s.hi) mk += `<span class="fmarker hi">hi</span>`;
+    }
+    if (s.mid !== null && s.kind !== 'init' && flat === s.mid) mk += `<span class="fmarker mid">mid</span>`;
+    f += `<div class="fcell ${classFor(flat, s)}">${mk}${val(flat)}</div>`;
+  }
+  $('flatbar').innerHTML = f;
+
+  // vars
+  let v = `<div class="var lo"><span class="lbl">lo</span> = <b>${s.lo}</b></div>` +
+          `<div class="var hi"><span class="lbl">hi</span> = <b>${s.hi}</b></div>`;
+  if (s.mid !== null && s.kind !== 'init') {
+    const r = Math.floor(s.mid / n), c = s.mid % n;
+    v += `<div class="var mid"><span class="lbl">mid</span> = <b>${s.mid}</b></div>`;
+    v += `<div class="var dec"><span class="lbl">[r][c]</span> = <b>[${r}][${c}]</b></div>`;
+  }
+  $('vars').innerHTML = v;
+
+  const cap = $('caption');
+  cap.className = 'caption' + (s.kind === 'found' ? ' win' : '');
+  cap.innerHTML = s.text;
+
+  $('stepcount').textContent = `Step ${i + 1} / ${steps.length}`;
+  $('prevBtn').disabled = i === 0;
+  $('nextBtn').disabled = i === steps.length - 1;
+}
+
+$('nextBtn').onclick = () => { if (i < steps.length - 1) { i++; render(); } };
+$('prevBtn').onclick = () => { if (i > 0) { i--; render(); } };
+$('resetBtn').onclick = () => { i = 0; render(); };
+render();
+</script>
+</body>
+</html>

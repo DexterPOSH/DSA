@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redundant Connection — Union-Find finds the cycle edge</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.85rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 22px;
+    margin-bottom: 28px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.05rem; }
+  .analogy p { margin: 0; }
+
+  .panel {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 20px 24px 26px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  code {
+    background: var(--panel2); padding: 2px 7px; border-radius: 5px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .stage-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; }
+  @media (max-width: 720px) { .stage-grid { grid-template-columns: 1fr; } }
+
+  svg { width: 100%; height: 340px; background: var(--panel2); border-radius: 12px; }
+  .gnode circle { transition: all .4s ease; }
+  .edge-line { transition: all .4s ease; }
+
+  .side h4 { margin: 0 0 10px; font-size: 1rem; color: var(--muted); }
+  .dsu-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .dsu-cell {
+    display: flex; flex-direction: column; align-items: center;
+    background: var(--panel2); border-radius: 8px; padding: 6px 4px 4px;
+    border: 1px solid rgba(255,255,255,0.08); min-width: 46px;
+    transition: all .35s ease;
+  }
+  .dsu-cell .node-id { font-size: .72rem; color: var(--muted); }
+  .dsu-cell .par {
+    font-family: "SF Mono", Menlo, monospace; font-weight: 700;
+    font-size: 1.1rem; color: var(--green);
+  }
+  .dsu-cell.touch { border-color: var(--amber); background: rgba(245,158,11,0.15); }
+
+  .comps { display: flex; flex-wrap: wrap; gap: 8px; }
+  .comp {
+    background: rgba(59,130,246,0.14); border: 1px solid var(--blue);
+    border-radius: 20px; padding: 4px 12px; font-family: "SF Mono", Menlo, monospace;
+    font-size: .92rem; transition: all .35s ease;
+  }
+
+  .caption {
+    margin-top: 18px;
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 14px 18px;
+    border-left: 4px solid var(--blue);
+    font-size: .98rem;
+    min-height: 58px;
+  }
+  .caption.cycle { border-left-color: var(--red); background: rgba(239,68,68,0.10); }
+  .caption.ok { border-left-color: var(--green); }
+  .caption b.u { color: var(--amber); }
+  .caption b.r { color: var(--red); }
+  .caption b.g { color: var(--green); }
+
+  .controls { text-align: center; margin: 4px 0 28px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 10px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); margin: 0 6px; }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .stepcount { color: var(--muted); font-size: .9rem; margin-top: 10px; }
+
+  .edgelist { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 16px; }
+  .ept {
+    background: var(--panel2); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 6px 12px; font-family: "SF Mono", Menlo, monospace;
+    font-size: .95rem; transition: all .3s ease;
+  }
+  .ept.done { border-color: var(--green); color: var(--green); opacity: .65; }
+  .ept.active { border-color: var(--amber); background: rgba(245,158,11,0.16); color: #ffd479; transform: scale(1.08); }
+  .ept.bad { border-color: var(--red); background: rgba(239,68,68,0.18); color: #ffb4b4; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px; padding: 18px 24px; margin-top: 30px; text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Redundant Connection — <span>Union-Find</span> spots the cycle edge</h1>
+  <p class="subtitle">Process edges one by one. The first edge whose two endpoints are <i>already connected</i> is the redundant one.</p>
+
+  <div class="analogy">
+    <h3>🔧 Real-world analogy: the plumbing network</h3>
+    <p>Naya pipe sirf tab daalo jab dono junctions <b>alag clusters</b> me ho. Agar dono ka <b>mukhiya (root)</b> already same hai, to ye pipe ek loop bana dega — wahi redundant edge hai.</p>
+  </div>
+
+  <div class="panel">
+    <b>Input.</b> <code>edges = [[1,2], [1,3], [2,3], [3,4], [1,4]]</code>
+    <span class="arrow">→</span> redundant edge: <code>[1,4]</code>
+    <div class="edgelist" id="edgelist"></div>
+
+    <div class="stage-grid">
+      <div>
+        <svg id="graph" viewBox="0 0 420 340" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="side">
+        <h4>parent[] — each node's leader</h4>
+        <div class="dsu-row" id="dsuRow"></div>
+        <h4>Connected components</h4>
+        <div class="comps" id="comps"></div>
+      </div>
+    </div>
+
+    <div class="caption" id="caption">Press <b>Next</b> to add edges one at a time.</div>
+
+    <div class="controls">
+      <button class="ghost" id="prevBtn">‹ Prev</button>
+      <button id="nextBtn">Next ›</button>
+      <button class="ghost" id="resetBtn">↺ Reset</button>
+      <div class="stepcount" id="stepcount"></div>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Add edges incrementally with Union-Find; the first edge connecting two nodes that already share a root closes the cycle — that's the redundant connection, in <b>O(n·α(n)) ≈ O(n)</b>.</p>
+  </div>
+</div>
+
+<script>
+// ---- graph data (nodes 1..4 plus we visualize 5 edges) ----
+const edges = [[1,2],[1,3],[2,3],[3,4],[1,4]];
+const N = 4;
+// node screen positions in the SVG viewBox 420x340
+const pos = {
+  1: {x: 110, y: 80},
+  2: {x: 310, y: 80},
+  3: {x: 110, y: 260},
+  4: {x: 310, y: 260},
+};
+const compColors = [null, '#3b82f6', '#10b981', '#a855f7', '#f59e0b', '#ec4899'];
+
+// ---- precompute the union-find steps ----
+function buildSteps() {
+  const parent = Array.from({length: N+1}, (_, i) => i);
+  const find = x => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const steps = [];
+  // step 0: initial
+  steps.push({
+    idx: -1, parent: [...parent], addedEdges: [], cycle: false,
+    cap: 'Each node is its own leader. <code>parent[i] = i</code>. No edges yet.'
+  });
+  for (let i = 0; i < edges.length; i++) {
+    const [u, v] = edges[i];
+    const ru = find(u), rv = find(v);
+    if (ru === rv) {
+      // cycle found
+      steps.push({
+        idx: i, parent: [...parent], addedEdges: steps[steps.length-1].addedEdges.slice(),
+        touch: [u, v], roots: [ru, rv], cycle: true, redundant: [u, v],
+        cap: `Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=${ru}</code>, <code>find(${v})=${rv}</code> — <b class="r">same root!</b> These were already connected, so this edge closes a cycle. <b class="r">Return [${u},${v}]</b>.`
+      });
+      break;
+    } else {
+      parent[ru] = rv; // union
+      const added = steps[steps.length-1].addedEdges.slice();
+      added.push(i);
+      steps.push({
+        idx: i, parent: [...parent], addedEdges: added,
+        touch: [u, v], roots: [ru, rv], cycle: false,
+        cap: `Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=${ru}</code> ≠ <code>find(${v})=${rv}</code> — different clusters. <b class="g">union</b> them: <code>parent[${ru}] = ${rv}</code>.`
+      });
+    }
+  }
+  return steps;
+}
+const steps = buildSteps();
+let cur = 0;
+
+const $ = id => document.getElementById(id);
+
+// component lookup for current parent (for coloring)
+function rootOf(parent, x) { while (parent[x] !== x) x = parent[x]; return x; }
+
+function renderEdgeList() {
+  $('edgelist').innerHTML = edges.map((e,i) =>
+    `<div class="ept" id="ept${i}">[${e[0]},${e[1]}]</div>`).join('');
+}
+
+function render() {
+  const s = steps[cur];
+  const parent = s.parent;
+
+  // --- SVG graph ---
+  let svg = '';
+  // edges (only those added, plus the cycle edge if this step is the cycle)
+  const drawEdges = s.addedEdges.slice();
+  let cycleEdge = null;
+  if (s.cycle) cycleEdge = s.idx;
+  drawEdges.forEach(ei => {
+    const [u,v] = edges[ei];
+    svg += `<line class="edge-line" x1="${pos[u].x}" y1="${pos[u].y}" x2="${pos[v].x}" y2="${pos[v].y}" stroke="#5b6b9e" stroke-width="3"/>`;
+  });
+  if (cycleEdge !== null) {
+    const [u,v] = edges[cycleEdge];
+    svg += `<line class="edge-line" x1="${pos[u].x}" y1="${pos[u].y}" x2="${pos[v].x}" y2="${pos[v].y}" stroke="#ef4444" stroke-width="4" stroke-dasharray="7 5"/>`;
+  }
+  // nodes, colored by component root
+  for (let node = 1; node <= N; node++) {
+    const r = rootOf(parent, node);
+    let fill = compColors[r] || '#3b82f6';
+    let stroke = fill, sw = 2;
+    if (s.touch && s.touch.includes(node)) { stroke = '#f59e0b'; sw = 4; }
+    if (s.cycle && s.redundant && s.redundant.includes(node)) { stroke = '#ef4444'; sw = 4; }
+    const p = pos[node];
+    svg += `<g class="gnode">
+      <circle cx="${p.x}" cy="${p.y}" r="26" fill="${fill}" fill-opacity="0.22" stroke="${stroke}" stroke-width="${sw}"/>
+      <text x="${p.x}" y="${p.y+6}" text-anchor="middle" font-size="20" font-weight="700" fill="#e0e0e0" font-family="SF Mono, monospace">${node}</text>
+    </g>`;
+  }
+  $('graph').innerHTML = svg;
+
+  // --- DSU parent[] cells ---
+  let dsu = '';
+  for (let node = 1; node <= N; node++) {
+    const touch = s.touch && s.touch.includes(node) ? ' touch' : '';
+    dsu += `<div class="dsu-cell${touch}">
+      <span class="node-id">node ${node}</span>
+      <span class="par">${parent[node]}</span>
+    </div>`;
+  }
+  $('dsuRow').innerHTML = dsu;
+
+  // --- components ---
+  const groups = {};
+  for (let node = 1; node <= N; node++) {
+    const r = rootOf(parent, node);
+    (groups[r] = groups[r] || []).push(node);
+  }
+  $('comps').innerHTML = Object.values(groups)
+    .map(g => `<div class="comp">{ ${g.join(', ')} }</div>`).join('');
+
+  // --- edge list highlighting ---
+  edges.forEach((e,i) => {
+    const el = $('ept'+i);
+    el.className = 'ept';
+    if (s.addedEdges.includes(i)) el.classList.add('done');
+    if (i === s.idx && !s.cycle) el.classList.add('active');
+    if (i === s.idx && s.cycle) el.classList.add('bad');
+  });
+
+  // --- caption ---
+  const cap = $('caption');
+  cap.className = 'caption' + (s.cycle ? ' cycle' : (s.idx >= 0 ? ' ok' : ''));
+  cap.innerHTML = s.cap;
+
+  // --- controls ---
+  $('prevBtn').disabled = cur === 0;
+  $('nextBtn').disabled = cur === steps.length - 1;
+  $('stepcount').textContent = `Step ${cur} / ${steps.length - 1}`;
+}
+
+$('nextBtn').onclick = () => { if (cur < steps.length-1) { cur++; render(); } };
+$('prevBtn').onclick = () => { if (cur > 0) { cur--; render(); } };
+$('resetBtn').onclick = () => { cur = 0; render(); };
+
+renderEdgeList();
+render();
+</script>
+</body>
+</html>

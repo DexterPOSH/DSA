@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design Twitter — k-way merge of feeds with a max-heap</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; color: var(--text); }
+
+  .problem {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 26px;
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+  .problem code {
+    background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .panel {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 22px;
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    margin-bottom: 22px;
+  }
+  .sec-title { font-size: .82rem; letter-spacing:.05em; text-transform:uppercase; color: var(--muted); margin: 0 0 12px; }
+
+  /* diaries (sorted lists) */
+  .diaries { display:flex; gap:20px; flex-wrap:wrap; }
+  .diary { flex:1; min-width:150px; }
+  .diary .who {
+    font-family:"SF Mono",Menlo,monospace; font-weight:700; margin-bottom:8px;
+    padding:4px 10px; border-radius:8px; display:inline-block; font-size:.85rem;
+  }
+  .diary.u1 .who { background: rgba(59,130,246,0.18); color:#bcd4ff; border:1px solid var(--blue); }
+  .diary.u2 .who { background: rgba(168,85,247,0.18); color:#e3c9ff; border:1px solid var(--purple); }
+  .diary.u3 .who { background: rgba(16,185,129,0.18); color:#b6f0d8; border:1px solid var(--green); }
+  .tw {
+    border-radius:9px; padding:8px 12px; margin-bottom:7px;
+    font-family:"SF Mono",Menlo,monospace; font-size:.9rem;
+    background:var(--panel2); border:2px solid rgba(255,255,255,0.08);
+    display:flex; justify-content:space-between; gap:10px; transition: all .3s ease;
+  }
+  .tw .ts { color: var(--muted); font-size:.78rem; }
+  .tw.head { box-shadow: 0 0 0 2px var(--amber); }
+  .tw.taken { opacity:.32; filter:grayscale(.6); }
+  .tw.picked { border-color: var(--green); background: rgba(16,185,129,0.15); }
+  .newest-tag { font-size:.6rem; color:var(--amber); }
+
+  .cols { display:grid; grid-template-columns: 1fr 1fr; gap:22px; margin-top:8px; }
+
+  /* heap */
+  .heap { display:flex; flex-direction:column; gap:8px; min-height:60px; }
+  .hentry {
+    border-radius:10px; padding:9px 13px; font-family:"SF Mono",Menlo,monospace;
+    background:var(--panel2); border:2px solid rgba(255,255,255,0.10);
+    display:flex; justify-content:space-between; gap:12px; transition: all .3s ease;
+  }
+  .hentry.top { border-color: var(--amber); background: rgba(245,158,11,0.14); box-shadow:0 0 0 3px rgba(245,158,11,0.18); }
+  .hentry .src { color: var(--muted); font-size:.78rem; }
+  .hentry .big { color:#ffd479; font-weight:700; }
+  .empty-note { color: var(--muted); font-style: italic; font-family:"SF Mono",Menlo,monospace; }
+
+  /* feed */
+  .feed { display:flex; flex-direction:column; gap:7px; min-height:60px; }
+  .fitem {
+    border-radius:9px; padding:8px 12px; font-family:"SF Mono",Menlo,monospace;
+    background: rgba(16,185,129,0.14); border:1px solid var(--green); color:#b6f0d8;
+    font-weight:700; animation: pop .35s ease;
+  }
+  @keyframes pop { 0%{transform:scale(.5);opacity:0;} 60%{transform:scale(1.08);} 100%{transform:scale(1);opacity:1;} }
+
+  .caption {
+    margin-top: 16px;
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border-left: 4px solid var(--blue);
+    min-height: 56px; font-size: .98rem;
+    transition: border-color .3s;
+  }
+  .caption code { color:#ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .caption b.tag { color: var(--amber); }
+  .caption.win { border-left-color: var(--green); }
+
+  .controls { text-align: center; margin: 8px 0 26px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 22px; border-radius: 10px;
+    font-size: .98rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled){ background:#2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled){ background:#34345e; }
+  .stepcount { color: var(--muted); font-size:.85rem; margin-top:10px; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 18px 22px; margin-top: 30px; text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.05rem; }
+  @media (max-width: 640px){ .cols{ grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Design Twitter — <span>k-way merge</span> of feeds with a max-heap</h1>
+  <p class="subtitle">Har followee ki diary already newest-first sorted — heap se merge karke top-k nikaalo.</p>
+
+  <div class="analogy">
+    <h3>📔 Analogy: merge sorted diaries</h3>
+    <p>Har user ki <b>diary chronological</b> hai (latest upar). Feed = apni + followees ki diaries ka merge. Har diary ka <b>top tweet</b> mez pe rakho, <b>sabse naya</b> uthao, aur <b>usi diary ka agla</b> le aao. Repeat. Yahi heap-based <b>k-way merge</b> hai.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> User <code>1</code> follows <code>2</code> and <code>3</code>. Return <code>getNewsFeed(1)</code> — the most recent tweets, newest first.
+    <span class="arrow">→</span> merge of three sorted diaries.
+  </div>
+
+  <div class="panel">
+    <p class="sec-title">Per-user diaries (each already newest → oldest). <span style="color:var(--amber)">▸</span> = current head pointer</p>
+    <div class="diaries" id="diaries"></div>
+  </div>
+
+  <div class="panel">
+    <div class="cols">
+      <div>
+        <p class="sec-title">Max-heap of source heads (by timestamp)</p>
+        <div class="heap" id="heap"></div>
+      </div>
+      <div>
+        <p class="sec-title">News feed (newest → oldest)</p>
+        <div class="feed" id="feed"></div>
+      </div>
+    </div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn">‹ Prev</button>
+    <button id="nextBtn">Next ›</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+    <div class="stepcount" id="stepcount"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Because each user's tweets are already time-sorted, a max-heap holding just one head per source merges them into a global newest-first feed — touching only as many tweets as you actually emit.</p>
+  </div>
+</div>
+
+<script>
+// Each diary: list of {ts, id} stored newest-first (index 0 = newest).
+const users = {
+  1: { name:'You (u1)', cls:'u1', tweets:[ {ts:7,id:111}, {ts:2,id:110} ] },
+  2: { name:'u2',       cls:'u2', tweets:[ {ts:9,id:222}, {ts:5,id:221}, {ts:1,id:220} ] },
+  3: { name:'u3',       cls:'u3', tweets:[ {ts:8,id:333}, {ts:6,id:332} ] },
+};
+const sources = [1,2,3];     // self + followees
+const K = 5;                  // top-k to collect (small for the demo)
+
+// Build discrete steps of the heap merge.
+function buildSteps(){
+  const steps = [];
+  // pointer[uid] = index of current head in that user's (newest-first) list
+  const ptr = {1:0, 2:0, 3:0};
+  let heap = [];   // {uid, idx, ts, id}
+  const feed = []; // {uid, id, ts}
+  const taken = {1:new Set(), 2:new Set(), 3:new Set()}; // indices consumed into feed
+
+  const snap = (caption, kind, topUid) => {
+    steps.push({
+      heap: heap.map(h=>({...h})),
+      feed: feed.map(f=>({...f})),
+      ptr: {...ptr},
+      taken: {1:new Set(taken[1]),2:new Set(taken[2]),3:new Set(taken[3])},
+      caption, kind, topUid: topUid ?? null
+    });
+  };
+
+  // seed: push each source's newest tweet
+  sources.forEach(uid=>{
+    const t = users[uid].tweets[0];
+    heap.push({uid, idx:0, ts:t.ts, id:t.id});
+  });
+  heap.sort((a,b)=> b.ts - a.ts);
+  snap(`Seed the heap with each source's <b class="tag">newest</b> tweet: ` +
+       `u1→${users[1].tweets[0].id} (t7), u2→${users[2].tweets[0].id} (t9), u3→${users[3].tweets[0].id} (t8). Heap top = the globally newest.`,
+       'seed');
+
+  while (heap.length && feed.length < K){
+    heap.sort((a,b)=> b.ts - a.ts);
+    const top = heap.shift();
+    taken[top.uid].add(top.idx);
+    feed.push({uid:top.uid, id:top.id, ts:top.ts});
+    // advance that source's pointer
+    const nextIdx = top.idx + 1;
+    let pushNote = '';
+    if (nextIdx < users[top.uid].tweets.length){
+      const nt = users[top.uid].tweets[nextIdx];
+      heap.push({uid:top.uid, idx:nextIdx, ts:nt.ts, id:nt.id});
+      ptr[top.uid] = nextIdx;
+      pushNote = ` Then pull u${top.uid}'s next-older tweet <code>${nt.id}</code> (t${nt.ts}) into the heap.`;
+    } else {
+      ptr[top.uid] = nextIdx; // points past end
+      pushNote = ` u${top.uid}'s diary is now exhausted — nothing more to push.`;
+    }
+    snap(`Pop heap top: <b class="tag">${top.id}</b> from u${top.uid} (t${top.ts}) — the newest remaining anywhere. Append to feed.${pushNote}`,
+         'pop', top.uid);
+  }
+  snap(`Collected ${feed.length} tweets (top-${K}). Feed newest→oldest: <b class="tag">[${feed.map(f=>f.id).join(', ')}]</b>. ✅`,
+       'win');
+  return steps;
+}
+
+const steps = buildSteps();
+let i = 0;
+const $ = id => document.getElementById(id);
+
+function renderDiaries(s){
+  $('diaries').innerHTML = sources.map(uid=>{
+    const u = users[uid];
+    const rows = u.tweets.map((tw,idx)=>{
+      const isHead = idx === s.ptr[uid];
+      const isTaken = s.taken[uid].has(idx);
+      let cls = 'tw';
+      if (isTaken) cls += ' taken';
+      else if (isHead) cls += ' head';
+      const headMark = (isHead && !isTaken) ? '▸ ' : '';
+      const newest = idx===0 ? ` <span class="newest-tag">newest</span>`:'';
+      return `<div class="${cls}">${headMark}#${tw.id}${newest}<span class="ts">t${tw.ts}</span></div>`;
+    }).join('');
+    return `<div class="diary ${u.cls}"><span class="who">${u.name}</span>${rows}</div>`;
+  }).join('');
+}
+
+function renderHeap(s){
+  if (s.heap.length===0){ $('heap').innerHTML = `<span class="empty-note">(empty)</span>`; return; }
+  const sorted = [...s.heap].sort((a,b)=> b.ts - a.ts);
+  $('heap').innerHTML = sorted.map((h,idx)=>
+    `<div class="hentry ${idx===0?'top':''}">
+       <span class="big">#${h.id}</span>
+       <span class="src">u${h.uid} · t${h.ts}</span>
+     </div>`).join('');
+}
+
+function renderFeed(s){
+  if (s.feed.length===0){ $('feed').innerHTML = `<span class="empty-note">(empty)</span>`; return; }
+  $('feed').innerHTML = s.feed.map((f,idx)=>
+    `<div class="fitem">${idx+1}. #${f.id} <span style="color:var(--muted);font-weight:400;font-size:.78rem">u${f.uid} · t${f.ts}</span></div>`).join('');
+}
+
+function render(){
+  const s = steps[i];
+  renderDiaries(s);
+  renderHeap(s);
+  renderFeed(s);
+  const cap = $('caption');
+  cap.className = 'caption' + (s.kind==='win'?' win':'');
+  cap.innerHTML = s.caption;
+  $('stepcount').textContent = `Step ${i+1} / ${steps.length}`;
+  $('prevBtn').disabled = i===0;
+  $('nextBtn').disabled = i===steps.length-1;
+}
+
+$('nextBtn').onclick = () => { if (i<steps.length-1){ i++; render(); } };
+$('prevBtn').onclick = () => { if (i>0){ i--; render(); } };
+$('resetBtn').onclick = () => { i=0; render(); };
+render();
+</script>
+</body>
+</html>

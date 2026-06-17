@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Valid Palindrome — Two Pointers Walkthrough</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a;
+    --text: #e0e0e0; --muted: #7a8ab0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px 60px; gap: 28px; line-height: 1.5;
+  }
+  h1 { font-size: 1.75rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue); border-radius: 12px;
+    padding: 18px 24px; max-width: 760px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 2rem; flex-shrink: 0; line-height: 1; }
+  .analogy-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.97rem; color: #c0c0d0; }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 860px; width: 100%;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+  .section-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+  .step-description {
+    min-height: 56px; background: var(--panel2); border-radius: 8px;
+    padding: 14px 18px; font-size: 0.95rem; color: #c8c8e0;
+    border-left: 3px solid var(--blue); transition: border-color .3s;
+  }
+  .step-description.match  { border-color: var(--green); }
+  .step-description.skip   { border-color: var(--amber); }
+  .step-description.fail   { border-color: var(--red); }
+
+  .str-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-end; }
+  .ch {
+    width: 46px; height: 56px; border-radius: 9px; border: 2px solid #2d3a5a;
+    background: var(--panel2); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-size: 1.3rem;
+    font-weight: 700; position: relative;
+    transition: border-color .35s, background .35s, transform .35s, box-shadow .35s, opacity .35s;
+  }
+  .ch .idx { position: absolute; bottom: 3px; font-size: 0.55rem; font-weight: 400; color: #5a6a90; }
+  .ch.nonalnum { opacity: 0.42; color: #5a6a90; }
+  .ch.pl {
+    border-color: var(--blue); background: #1e3a6e; color: #bcd4ff;
+    box-shadow: 0 0 16px rgba(59,130,246,0.45); transform: translateY(-5px);
+  }
+  .ch.pr {
+    border-color: var(--amber); background: #3a2a08; color: #fcd9a0;
+    box-shadow: 0 0 16px rgba(245,158,11,0.45); transform: translateY(-5px);
+  }
+  .ch.skipnow { border-color: var(--amber); opacity: 0.6; }
+  .ch.matched { border-color: var(--green); background: #0d2a1a; color: #86efac; }
+  .ch.bad     { border-color: var(--red); background: #2a0d0d; color: #fca5a5; animation: shake .4s ease; }
+  @keyframes shake {
+    0%,100% { transform: translateY(-5px) translateX(0); }
+    25% { transform: translateY(-5px) translateX(-5px); }
+    75% { transform: translateY(-5px) translateX(5px); }
+  }
+
+  .ptr-tags { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.85rem; }
+  .tag { display: flex; align-items: center; gap: 7px; }
+  .dot { width: 13px; height: 13px; border-radius: 3px; }
+  .dot.l { background: var(--blue); } .dot.r { background: var(--amber); }
+  .tag code { color: #ffd479; font-family: 'Consolas', monospace; }
+
+  .result-badge { display: none; align-items: center; gap: 12px; padding: 15px 20px;
+    border-radius: 10px; font-size: 1rem; font-weight: 600; }
+  .result-badge.show { display: flex; }
+  .result-badge.ok   { background: #0d2a1a; border: 1.5px solid var(--green); color: #86efac; }
+  .result-badge.no   { background: #2a0d0d; border: 1.5px solid var(--red); color: #fca5a5; }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn { padding: 11px 24px; border-radius: 8px; border: none; font-size: 0.92rem;
+    font-weight: 600; cursor: pointer; transition: background .2s, transform .1s, opacity .2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+
+  .takeaway {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 12px;
+    padding: 18px 24px; max-width: 760px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway-icon { font-size: 1.6rem; flex-shrink: 0; }
+  .takeaway-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .takeaway p { font-size: 0.94rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+  <h1>Valid Palindrome &mdash; <span>Two Pointers Walkthrough</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🪞</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Do log ek sentence padhte hain &mdash; ek <strong>shuru se</strong>, ek <strong>aakhir se</strong>,
+        beech me milte hue. Spaces aur punctuation <em>skip</em> karte hain, capital/small ignore.
+        Koi mismatch mila to palindrome nahi.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press &ldquo;Next&rdquo; to start. String: <code style="color:#ffd479">"A man, a plan"</code> (truncated demo).</div>
+    </div>
+
+    <div>
+      <div class="section-label">Input string &mdash; non-alphanumeric chars are dimmed</div>
+      <div class="str-row" id="strRow"></div>
+    </div>
+
+    <div class="ptr-tags">
+      <div class="tag"><span class="dot l"></span> <code>l</code> = left pointer</div>
+      <div class="tag"><span class="dot r"></span> <code>r</code> = right pointer</div>
+    </div>
+
+    <div class="result-badge" id="resultBadge">
+      <span id="resultIcon"></span><span id="resultText"></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Two converging pointers compare ends inward, <strong>skipping non-alphanumeric chars</strong>
+        and comparing case-insensitively &mdash; <strong>O(n) time, O(1) space</strong>, no extra buffer.
+      </p>
+    </div>
+  </div>
+
+<script>
+  // Demo string: a real palindrome wrapped in junk (commas, spaces, mixed case)
+  // so the walkthrough exercises both the skip path and case-insensitive match,
+  // and ends in success. Cleaned form -> "racecar".
+  const STR = "Ra,Ce caR";
+  const isAlnum = c => /[a-z0-9]/i.test(c);
+  const norm = c => c.toLowerCase();
+
+  // ── Build steps ──────────────────────────────────────────────────────────
+  // Each step: {l, r, type, desc}  type: 'skipL','skipR','match','fail','done'
+  function buildSteps(str) {
+    const steps = [];
+    let l = 0, r = str.length - 1;
+    let result = true;
+    while (l < r) {
+      if (!isAlnum(str[l])) {
+        steps.push({ l, r, type: 'skipL',
+          desc: `<strong>l=${l}</strong> pe '<code>${esc(str[l])}</code>' alphanumeric nahi hai &mdash; skip karo, <code>l += 1</code>.` });
+        l++; continue;
+      }
+      if (!isAlnum(str[r])) {
+        steps.push({ l, r, type: 'skipR',
+          desc: `<strong>r=${r}</strong> pe '<code>${esc(str[r])}</code>' alphanumeric nahi hai &mdash; skip karo, <code>r -= 1</code>.` });
+        r--; continue;
+      }
+      if (norm(str[l]) !== norm(str[r])) {
+        steps.push({ l, r, type: 'fail',
+          desc: `Compare '<code>${str[l]}</code>' (l=${l}) vs '<code>${str[r]}</code>' (r=${r}) &mdash; <strong style="color:#ef4444">mismatch!</strong> Not a palindrome.` });
+        result = false; break;
+      }
+      steps.push({ l, r, type: 'match',
+        desc: `Compare '<code>${str[l]}</code>' (l=${l}) vs '<code>${str[r]}</code>' (r=${r}) &mdash; <strong style="color:#10b981">match</strong> (case-insensitive). Move both inward.` });
+      l++; r--;
+    }
+    steps.push({ l, r, type: 'done', result,
+      desc: result
+        ? `Pointers crossed without any mismatch &mdash; <strong style="color:#10b981">it IS a palindrome</strong>. Return <code>True</code>.`
+        : `A mismatch was found &mdash; return <code>False</code>.` });
+    return steps;
+  }
+  function esc(c){ return c === '<' ? '&lt;' : c === '>' ? '&gt;' : c; }
+
+  const steps = buildSteps(STR);
+  const TOTAL = steps.length;
+  let cur = -1;
+
+  // ── Render the string row once ───────────────────────────────────────────
+  const strRow = document.getElementById('strRow');
+  for (let i = 0; i < STR.length; i++) {
+    const div = document.createElement('div');
+    const alnum = isAlnum(STR[i]);
+    div.className = 'ch' + (alnum ? '' : ' nonalnum');
+    div.id = 'ch-' + i;
+    const disp = STR[i] === ' ' ? '␣' : STR[i];
+    div.innerHTML = `${disp}<span class="idx">${i}</span>`;
+    strRow.appendChild(div);
+  }
+
+  const stepDesc = document.getElementById('stepDesc');
+  const stepCtr  = document.getElementById('stepCounter');
+  const nextBtn  = document.getElementById('nextBtn');
+  const prevBtn  = document.getElementById('prevBtn');
+  const badge    = document.getElementById('resultBadge');
+  const rIcon    = document.getElementById('resultIcon');
+  const rText    = document.getElementById('resultText');
+
+  function clearClasses() {
+    for (let i = 0; i < STR.length; i++) {
+      const el = document.getElementById('ch-' + i);
+      el.className = 'ch' + (isAlnum(STR[i]) ? '' : ' nonalnum');
+    }
+  }
+
+  // Re-render full state up to step index `k` so Prev works deterministically.
+  function renderTo(k) {
+    clearClasses();
+    badge.className = 'result-badge';
+    if (k < 0) {
+      stepDesc.innerHTML = 'Press &ldquo;Next&rdquo; to start. Cleaned string is <code style="color:#ffd479">"racecar"</code> &mdash; a palindrome.';
+      stepDesc.className = 'step-description';
+      stepCtr.textContent = `Step 0 / ${TOTAL}`;
+      prevBtn.disabled = true; nextBtn.disabled = false;
+      return;
+    }
+    const s = steps[k];
+    // mark all comparisons that already matched (steps before k of type match)
+    for (let j = 0; j < k; j++) {
+      if (steps[j].type === 'match') {
+        document.getElementById('ch-' + steps[j].l).className = 'ch matched';
+        document.getElementById('ch-' + steps[j].r).className = 'ch matched';
+      }
+    }
+    if (s.type === 'done') {
+      // keep matched highlights; show result
+      badge.className = 'result-badge show ' + (s.result ? 'ok' : 'no');
+      rIcon.textContent = s.result ? '🟢' : '🔴';
+      rText.textContent = s.result ? 'return True — valid palindrome.' : 'return False — not a palindrome.';
+      stepDesc.className = 'step-description ' + (s.result ? 'match' : 'fail');
+    } else {
+      const lEl = document.getElementById('ch-' + s.l);
+      const rEl = document.getElementById('ch-' + s.r);
+      if (s.type === 'skipL') { lEl.className = 'ch skipnow'; rEl.className = 'ch pr'; stepDesc.className = 'step-description skip'; }
+      else if (s.type === 'skipR') { rEl.className = 'ch skipnow'; lEl.className = 'ch pl'; stepDesc.className = 'step-description skip'; }
+      else if (s.type === 'match') { lEl.className = 'ch pl'; rEl.className = 'ch pr'; stepDesc.className = 'step-description match'; }
+      else if (s.type === 'fail')  { lEl.className = 'ch bad'; rEl.className = 'ch bad'; stepDesc.className = 'step-description fail';
+        badge.className = 'result-badge show no'; rIcon.textContent = '🔴'; rText.textContent = 'return False — not a palindrome.'; }
+    }
+    stepDesc.innerHTML = s.desc;
+    stepCtr.textContent = `Step ${k + 1} / ${TOTAL}`;
+    prevBtn.disabled = false;
+    nextBtn.disabled = (k >= TOTAL - 1);
+  }
+
+  function next() { if (cur < TOTAL - 1) { cur++; renderTo(cur); } }
+  function prev() { if (cur >= 0) { cur--; renderTo(cur); } }
+  function reset() { cur = -1; renderTo(cur); }
+
+  reset();
+</script>
+</body>
+</html>

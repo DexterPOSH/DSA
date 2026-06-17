@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Edit Distance — Levenshtein DP Table</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #1e293b;
+    --text: #e0e0e0;
+    --muted: #94a3b8;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6;
+    padding: 40px 20px 80px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  h1 { font-size: 1.8rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel);
+    border: 1px solid var(--amber);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 18px 24px;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy .icon { font-size: 1.8rem; line-height: 1; }
+  .analogy .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px;
+  }
+  .analogy p { color: #cdd3e0; font-size: 0.96rem; }
+
+  .problem {
+    background: var(--panel2);
+    border: 1px solid #2d3a5a;
+    border-radius: 12px;
+    padding: 16px 22px;
+    font-size: 0.95rem;
+  }
+  .problem code {
+    background: #0f172a; padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: 'JetBrains Mono', Consolas, monospace;
+  }
+  .problem .arrow { color: var(--green); font-weight: bold; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid #2d3a5a;
+    border-radius: 14px;
+    padding: 24px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .section-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+  .step-desc {
+    background: var(--panel2);
+    border-left: 4px solid var(--blue);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 0.96rem;
+    min-height: 64px;
+    color: #d4dae6;
+  }
+  .step-desc strong { color: #fff; }
+  .step-desc .op { font-weight: 700; }
+  .op-rep { color: var(--purple); }
+  .op-del { color: var(--amber); }
+  .op-ins { color: var(--green); }
+  .op-match { color: var(--green); }
+
+  /* DP grid */
+  .grid-scroll { overflow-x: auto; }
+  table.dp {
+    border-collapse: collapse;
+    margin: 0 auto;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+  }
+  table.dp th, table.dp td {
+    width: 50px; height: 50px;
+    text-align: center; vertical-align: middle;
+    border: 1px solid #2d3a5a;
+    font-size: 1.05rem;
+    position: relative;
+    transition: background 0.3s, color 0.3s, box-shadow 0.3s, transform 0.2s;
+  }
+  table.dp th {
+    color: var(--blue); font-weight: 700; background: #131c33;
+    border: none;
+  }
+  table.dp th.charhead { color: #ffd479; }
+  td.cell { background: #0f172a; color: #5a6a90; }
+  td.cell.filled { color: var(--text); background: #15223f; }
+  td.cell.base { color: var(--muted); background: #14233f; }
+  td.cell.current {
+    background: var(--blue); color: #fff; font-weight: 700;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.5);
+    transform: scale(1.08); z-index: 3;
+  }
+  td.cell.dep-diag { background: rgba(168,85,247,0.35); box-shadow: inset 0 0 0 2px var(--purple); color:#e3c9ff; }
+  td.cell.dep-up   { background: rgba(245,158,11,0.30); box-shadow: inset 0 0 0 2px var(--amber); color:#ffe2ad; }
+  td.cell.dep-left { background: rgba(16,185,129,0.30); box-shadow: inset 0 0 0 2px var(--green); color:#b6f0d8; }
+  td.cell.chosen { box-shadow: 0 0 0 3px var(--green); }
+  td.cell.answer {
+    background: var(--green); color: #06281b; font-weight: 800;
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.6);
+  }
+  table.dp td.match-flag::after {
+    content: '✓'; position: absolute; top: 2px; right: 4px;
+    font-size: 0.6rem; color: var(--green);
+  }
+
+  /* options chips */
+  .options { display: flex; gap: 10px; flex-wrap: wrap; }
+  .opt {
+    flex: 1; min-width: 140px;
+    background: var(--panel2);
+    border: 1px solid #2d3a5a;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 0.85rem;
+    opacity: 0.4;
+    transition: opacity 0.3s, border-color 0.3s, background 0.3s;
+  }
+  .opt.live { opacity: 1; }
+  .opt.win { border-color: var(--green); background: rgba(16,185,129,0.1); }
+  .opt .t { font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .opt.diag .t { color: var(--purple); }
+  .opt.up   .t { color: var(--amber); }
+  .opt.left .t { color: var(--green); }
+  .opt .v { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: var(--muted); border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+  .sw-diag { background: var(--purple); }
+  .sw-up { background: var(--amber); }
+  .sw-left { background: var(--green); }
+  .sw-cur { background: var(--blue); }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.14), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 20px 26px;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway .icon { font-size: 1.6rem; }
+  .takeaway .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.97rem; color: #cdd3e0; }
+  .takeaway strong { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Edit Distance &mdash; <span>Levenshtein DP Table</span></h1>
+
+  <div class="analogy">
+    <div class="icon">⌨️</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>Tum ek <strong>autocorrect engine</strong> ho: <code style="background:#0f172a;padding:1px 6px;border-radius:5px;color:#ffd479">"horse"</code> ko <code style="background:#0f172a;padding:1px 6px;border-radius:5px;color:#ffd479">"ros"</code> me badalna hai. Har <em>insert / delete / replace</em> ka cost 1 — sabse sasta raasta dhoondho. Table har prefix-pair ka cheapest answer cache kar leti hai.</p>
+    </div>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> Convert <code>word1 = "horse"</code> into <code>word2 = "ros"</code>.
+    <span class="arrow">→</span> Minimum edits = <code>3</code>
+    &nbsp;(<span class="op op-rep">replace h→r</span>, <span class="op op-del">delete r</span>, <span class="op op-del">delete e</span>).
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">What's happening</div>
+      <div class="step-desc" id="stepDesc">Press <b>Next</b> to fill the table cell by cell. Rows = <span style="color:#ffd479">horse</span>, columns = <span style="color:#3b82f6">ros</span>.</div>
+    </div>
+
+    <div>
+      <div class="section-label">dp[i][j] = min edits to convert word1[:i] → word2[:j]</div>
+      <div class="grid-scroll">
+        <table class="dp" id="dpTable"></table>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Where does this cell's value come from?</div>
+      <div class="options">
+        <div class="opt diag" id="optDiag"><div class="t">↖ Diagonal · replace</div><div class="v" id="vDiag">—</div></div>
+        <div class="opt up" id="optUp"><div class="t">↑ Up · delete</div><div class="v" id="vUp">—</div></div>
+        <div class="opt left" id="optLeft"><div class="t">← Left · insert</div><div class="v" id="vLeft">—</div></div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><i class="swatch sw-cur"></i> current cell</span>
+      <span><i class="swatch sw-diag"></i> ↖ replace / match</span>
+      <span><i class="swatch sw-up"></i> ↑ delete</span>
+      <span><i class="swatch sw-left"></i> ← insert</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">‹ Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next ›</button>
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key Takeaway</div>
+      <p>Each cell asks the same question on smaller prefixes: <strong>match → free diagonal</strong>, else <strong>1 + cheapest of {replace ↖, delete ↑, insert ←}</strong>. Fill the whole <strong>(m+1)×(n+1)</strong> grid in <strong>O(m·n)</strong>; the bottom-right cell is the answer.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const word1 = "horse";   // rows
+const word2 = "ros";     // cols
+const m = word1.length, n = word2.length;
+
+// Build dp table fully (we reveal it step by step).
+const dp = Array.from({length: m + 1}, () => Array(n + 1).fill(0));
+for (let i = 0; i <= m; i++) dp[i][0] = i;
+for (let j = 0; j <= n; j++) dp[0][j] = j;
+for (let i = 1; i <= m; i++) {
+  for (let j = 1; j <= n; j++) {
+    if (word1[i-1] === word2[j-1]) dp[i][j] = dp[i-1][j-1];
+    else dp[i][j] = 1 + Math.min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1]);
+  }
+}
+
+// Build the ordered list of steps: first base cells (row0 + col0), then row-major interior.
+const steps = [];
+// Step type 'base' just reveals a precomputed boundary cell.
+for (let j = 0; j <= n; j++) steps.push({ i: 0, j, type: 'base' });
+for (let i = 1; i <= m; i++) steps.push({ i, j: 0, type: 'base' });
+for (let i = 1; i <= m; i++)
+  for (let j = 1; j <= n; j++)
+    steps.push({ i, j, type: 'compute' });
+
+const TOTAL = steps.length;
+let cur = 0; // number of steps applied (0..TOTAL)
+
+const table = document.getElementById('dpTable');
+const stepDesc = document.getElementById('stepDesc');
+const stepCounter = document.getElementById('stepCounter');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
+function buildTable() {
+  let html = '<tr><th></th><th class="charhead">∅</th>';
+  for (let j = 0; j < n; j++) html += `<th class="charhead">${word2[j]}</th>`;
+  html += '</tr>';
+  for (let i = 0; i <= m; i++) {
+    const rowChar = i === 0 ? '∅' : word1[i-1];
+    html += `<tr><th class="charhead">${rowChar}</th>`;
+    for (let j = 0; j <= n; j++) {
+      html += `<td class="cell" id="c-${i}-${j}"></td>`;
+    }
+    html += '</tr>';
+  }
+  table.innerHTML = html;
+}
+
+function cellEl(i, j) { return document.getElementById(`c-${i}-${j}`); }
+
+function clearDecorations() {
+  document.querySelectorAll('td.cell').forEach(c => {
+    c.classList.remove('current','dep-diag','dep-up','dep-left','chosen','answer','match-flag');
+  });
+}
+
+function setOpt(id, valId, value, live, win) {
+  const o = document.getElementById(id);
+  o.classList.toggle('live', !!live);
+  o.classList.toggle('win', !!win);
+  document.getElementById(valId).textContent = value;
+}
+
+function resetOptions() {
+  setOpt('optDiag','vDiag','—', false, false);
+  setOpt('optUp','vUp','—', false, false);
+  setOpt('optLeft','vLeft','—', false, false);
+}
+
+// Render the state after `cur` steps applied.
+function render() {
+  clearDecorations();
+  resetOptions();
+
+  // Fill all revealed cells with their values.
+  for (let s = 0; s < cur; s++) {
+    const { i, j, type } = steps[s];
+    const el = cellEl(i, j);
+    el.textContent = dp[i][j];
+    el.classList.add('filled');
+    if (type === 'base') el.classList.add('base');
+  }
+
+  if (cur === 0) {
+    stepDesc.innerHTML = 'Press <b>Next</b> to fill the table cell by cell. Rows = <span style="color:#ffd479">horse</span>, columns = <span style="color:#3b82f6">ros</span>.';
+  } else {
+    const { i, j, type } = steps[cur - 1];
+    const el = cellEl(i, j);
+    el.classList.add('current');
+
+    if (type === 'base') {
+      if (i === 0 && j === 0)
+        stepDesc.innerHTML = '<strong>dp[0][0] = 0</strong> — both prefixes empty, zero edits needed. The grid origin.';
+      else if (i === 0)
+        stepDesc.innerHTML = `<strong>dp[0][${j}] = ${j}</strong> — turning the empty string into <code style="color:#ffd479">"${word2.slice(0,j)}"</code> needs <span class="op op-ins">${j} insert${j>1?'s':''}</span>.`;
+      else
+        stepDesc.innerHTML = `<strong>dp[${i}][0] = ${i}</strong> — turning <code style="color:#ffd479">"${word1.slice(0,i)}"</code> into the empty string needs <span class="op op-del">${i} delete${i>1?'s':''}</span>.`;
+    } else {
+      const a = word1[i-1], b = word2[j-1];
+      const diag = dp[i-1][j-1], up = dp[i-1][j], left = dp[i][j-1];
+      // decorate dependency cells
+      cellEl(i-1, j-1).classList.add('dep-diag');
+      cellEl(i-1, j).classList.add('dep-up');
+      cellEl(i, j-1).classList.add('dep-left');
+
+      if (a === b) {
+        el.classList.add('match-flag');
+        cellEl(i-1, j-1).classList.add('chosen');
+        setOpt('optDiag','vDiag', `match '${a}' → ${diag}`, true, true);
+        setOpt('optUp','vUp', String(up), false, false);
+        setOpt('optLeft','vLeft', String(left), false, false);
+        stepDesc.innerHTML = `<strong>word1[${i-1}]='${a}' = word2[${j-1}]='${b}'</strong> — chars <span class="op op-match">match</span>! Free pass: copy the diagonal. <strong>dp[${i}][${j}] = dp[${i-1}][${j-1}] = ${diag}</strong>.`;
+      } else {
+        const best = Math.min(diag, up, left);
+        const winDiag = diag === best, winUp = up === best, winLeft = left === best;
+        // mark first winner among diag/up/left for the green ring
+        if (winDiag) cellEl(i-1,j-1).classList.add('chosen');
+        else if (winUp) cellEl(i-1,j).classList.add('chosen');
+        else cellEl(i,j-1).classList.add('chosen');
+        setOpt('optDiag','vDiag', `${diag} + 1 = ${diag+1}`, true, winDiag);
+        setOpt('optUp','vUp', `${up} + 1 = ${up+1}`, true, winUp);
+        setOpt('optLeft','vLeft', `${left} + 1 = ${left+1}`, true, winLeft);
+        const which = winDiag ? '<span class="op op-rep">replace</span>' : winUp ? '<span class="op op-del">delete</span>' : '<span class="op op-ins">insert</span>';
+        stepDesc.innerHTML = `<strong>'${a}' ≠ '${b}'</strong> — pay 1 edit. Cheapest neighbour is ${which} → <strong>dp[${i}][${j}] = 1 + ${best} = ${best+1}</strong>.`;
+      }
+    }
+
+    // Final answer highlight when grid is complete and we're on the last cell.
+    if (cur === TOTAL && i === m && j === n) {
+      el.classList.remove('current');
+      el.classList.add('answer');
+      stepDesc.innerHTML = `🎉 Table complete. <strong>dp[${m}][${n}] = ${dp[m][n]}</strong> — minimum edits to turn <code style="color:#ffd479">"horse"</code> into <code style="color:#3b82f6">"ros"</code>.`;
+    }
+  }
+
+  stepCounter.textContent = `Step ${cur} / ${TOTAL}`;
+  prevBtn.disabled = cur === 0;
+  nextBtn.disabled = cur === TOTAL;
+}
+
+function next() { if (cur < TOTAL) { cur++; render(); } }
+function prev() { if (cur > 0) { cur--; render(); } }
+function reset() { cur = 0; render(); }
+
+buildTable();
+render();
+</script>
+</body>
+</html>

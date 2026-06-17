@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Burst Balloons — Interval DP</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #1e293b;
+    --text: #e0e0e0;
+    --muted: #94a3b8;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6; padding: 40px 20px 80px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  h1 { font-size: 1.8rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--amber);
+    border-left: 5px solid var(--amber); border-radius: 12px;
+    padding: 18px 24px; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy .icon { font-size: 1.8rem; }
+  .analogy .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px;
+  }
+  .analogy p { color: #cdd3e0; font-size: 0.96rem; }
+
+  .problem {
+    background: var(--panel2); border: 1px solid #2d3a5a;
+    border-radius: 12px; padding: 16px 22px; font-size: 0.95rem;
+  }
+  .problem code {
+    background: #0f172a; padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: 'JetBrains Mono', Consolas, monospace;
+  }
+  .problem .arrow { color: var(--green); font-weight: bold; }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a;
+    border-radius: 14px; padding: 24px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .section-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+  .step-desc {
+    background: var(--panel2); border-left: 4px solid var(--blue);
+    border-radius: 8px; padding: 14px 18px; font-size: 0.95rem;
+    min-height: 64px; color: #d4dae6;
+  }
+  .step-desc strong { color: #fff; }
+  .step-desc code { background:#0f172a;padding:1px 6px;border-radius:5px;color:#ffd479;font-family:'JetBrains Mono',monospace; }
+
+  /* balloon row */
+  .balloons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .balloon {
+    width: 48px; height: 56px;
+    border-radius: 50% 50% 50% 50% / 42% 42% 58% 58%;
+    display: grid; place-items: center;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.05rem;
+    background: #243048; border: 1px solid #2d3a5a; color: var(--muted);
+    position: relative; transition: all 0.3s;
+  }
+  .balloon .idx { position: absolute; bottom: -18px; font-size: 0.68rem; color: #5a6a90; font-weight: 600; }
+  .balloon.wall { background: #131c33; color: #5a6a90; border-style: dashed; }
+  .balloon.inrange { background: rgba(59,130,246,0.18); border-color: var(--blue); color: #bcd4ff; }
+  .balloon.bound { background: rgba(245,158,11,0.22); border-color: var(--amber); color: #ffe2ad; }
+  .balloon.last {
+    background: var(--red); color: #fff; border-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.45); transform: translateY(-4px) scale(1.08);
+  }
+
+  /* dp table */
+  .grid-scroll { overflow-x: auto; }
+  table.dp { border-collapse: collapse; margin: 0 auto; font-family: 'JetBrains Mono', monospace; }
+  table.dp th, table.dp td {
+    width: 52px; height: 46px; text-align: center;
+    border: 1px solid #2d3a5a; font-size: 0.95rem; transition: all 0.3s;
+  }
+  table.dp th { color: var(--blue); font-weight: 700; background: #131c33; border: none; }
+  td.cell { background: #0f172a; color: #5a6a90; }
+  td.cell.dead { background: #131c33; color: #3a4663; }
+  td.cell.filled { background: #15223f; color: var(--text); }
+  td.cell.sub {
+    background: rgba(168,85,247,0.28); color: #e3c9ff;
+    box-shadow: inset 0 0 0 2px var(--purple);
+  }
+  td.cell.current {
+    background: var(--blue); color: #fff; font-weight: 700;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.5); transform: scale(1.06);
+  }
+  td.cell.answer {
+    background: var(--green); color: #06281b; font-weight: 800;
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.6);
+  }
+
+  /* split candidate eval */
+  .eval {
+    background: var(--panel2); border: 1px solid #2d3a5a; border-radius: 10px;
+    padding: 14px 16px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+    color: #cdd3e0; min-height: 72px;
+  }
+  .eval .line { padding: 2px 0; }
+  .eval .line.best { color: #b6f0d8; font-weight: 700; }
+  .eval .k { color: var(--amber); }
+  .eval .prod { color: #ffd479; }
+  .eval .subv { color: #e3c9ff; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: var(--muted); border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+  .sw-bound { background: var(--amber); } .sw-last { background: var(--red); }
+  .sw-sub { background: var(--purple); } .sw-cur { background: var(--blue); }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.14), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px;
+    padding: 20px 26px; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway .icon { font-size: 1.6rem; }
+  .takeaway .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.97rem; color: #cdd3e0; }
+  .takeaway strong { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Burst Balloons &mdash; <span>Interval DP</span></h1>
+
+  <div class="analogy">
+    <div class="icon">🎈</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>"Pehle kaunsa phodun?" puchhne pe fas jaaoge — padosi badalte rehte hain. Ulta socho: kisi interval <code style="background:#0f172a;padding:1px 6px;border-radius:5px;color:#ffd479">(l, r)</code> me poocho <strong>"is range ka <em>last</em> balloon kaunsa phoota?"</strong>. Tab uske padosi exactly walls <code style="background:#0f172a;padding:1px 6px;border-radius:5px;color:#ffd479">l</code> aur <code style="background:#0f172a;padding:1px 6px;border-radius:5px;color:#ffd479">r</code> hote hain — problem do clean halves me toot jaati hai.</p>
+    </div>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> <code>nums = [3, 1, 5, 8]</code>, padded to <code>arr = [1, 3, 1, 5, 8, 1]</code>.
+    Burst all balloons for max coins. <span class="arrow">→</span> Answer = <code>167</code>.
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">What's happening</div>
+      <div class="step-desc" id="stepDesc">Press <b>Next</b> to fill <code>dp[l][r]</code> by interval length — shortest spans first.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Balloons (padded with walls = 1)</div>
+      <div class="balloons" id="balloonRow"></div>
+    </div>
+
+    <div>
+      <div class="section-label">dp[l][r] = max coins from bursting all balloons strictly between l and r</div>
+      <div class="grid-scroll"><table class="dp" id="dpTable"></table></div>
+    </div>
+
+    <div>
+      <div class="section-label">Trying each k as the LAST balloon burst in (l, r)</div>
+      <div class="eval" id="evalBox">—</div>
+    </div>
+
+    <div class="legend">
+      <span><i class="swatch sw-cur"></i> current dp[l][r]</span>
+      <span><i class="swatch sw-bound"></i> walls l, r</span>
+      <span><i class="swatch sw-last"></i> last burst k</span>
+      <span><i class="swatch sw-sub"></i> sub-intervals dp[l][k], dp[k][r]</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">‹ Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next ›</button>
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key Takeaway</div>
+      <p>By fixing the <strong>last</strong> balloon <code style="color:#ffd479">k</code> in each interval, its neighbours are pinned to the walls <strong>l</strong> and <strong>r</strong>, splitting the work into independent halves <strong>dp[l][k] + dp[k][r]</strong>. Fill length-by-length in <strong>O(n³)</strong>; <strong>dp[0][n-1]</strong> is the answer.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const nums = [3, 1, 5, 8];
+const arr = [1, ...nums, 1];     // [1,3,1,5,8,1]
+const N = arr.length;            // 6
+
+// Precompute dp + remember which k won each interval.
+const dp = Array.from({length: N}, () => Array(N).fill(0));
+const bestK = Array.from({length: N}, () => Array(N).fill(-1));
+for (let len = 2; len < N; len++) {
+  for (let l = 0; l + len < N; l++) {
+    const r = l + len;
+    let best = -1, bk = -1;
+    for (let k = l + 1; k < r; k++) {
+      const coins = arr[l]*arr[k]*arr[r] + dp[l][k] + dp[k][r];
+      if (coins > best) { best = coins; bk = k; }
+    }
+    dp[l][r] = best; bestK[l][r] = bk;
+  }
+}
+
+// Steps: one per interval (l, r) with len>=2, in fill order.
+const steps = [];
+for (let len = 2; len < N; len++)
+  for (let l = 0; l + len < N; l++)
+    steps.push({ l, r: l + len });
+const TOTAL = steps.length;
+let cur = 0; // intervals revealed
+
+const balloonRow = document.getElementById('balloonRow');
+const table = document.getElementById('dpTable');
+const stepDesc = document.getElementById('stepDesc');
+const evalBox = document.getElementById('evalBox');
+const stepCounter = document.getElementById('stepCounter');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
+function buildBalloons() {
+  balloonRow.innerHTML = arr.map((v, i) => {
+    const wall = (i === 0 || i === N - 1) ? ' wall' : '';
+    return `<div class="balloon${wall}" id="b-${i}">${v}<span class="idx">${i}</span></div>`;
+  }).join('');
+}
+
+function buildTable() {
+  let html = '<tr><th>l\\r</th>';
+  for (let j = 0; j < N; j++) html += `<th>${j}</th>`;
+  html += '</tr>';
+  for (let i = 0; i < N; i++) {
+    html += `<tr><th>${i}</th>`;
+    for (let j = 0; j < N; j++) {
+      // valid interval cells are j >= i+2 (len>=2); j<=i+1 are structurally 0/dead.
+      const dead = j < i + 2 ? ' dead' : '';
+      html += `<td class="cell${dead}" id="c-${i}-${j}">${j < i + 2 ? '·' : ''}</td>`;
+    }
+    html += '</tr>';
+  }
+  table.innerHTML = html;
+}
+
+function clearBalloons() {
+  for (let i = 0; i < N; i++) {
+    const b = document.getElementById('b-' + i);
+    b.classList.remove('inrange','bound','last');
+  }
+}
+function clearCellDecor() {
+  document.querySelectorAll('td.cell').forEach(c => c.classList.remove('current','sub','answer'));
+}
+
+function render() {
+  clearBalloons();
+  clearCellDecor();
+
+  // reveal all completed intervals
+  for (let s = 0; s < cur; s++) {
+    const { l, r } = steps[s];
+    const el = document.getElementById(`c-${l}-${r}`);
+    el.textContent = dp[l][r];
+    el.classList.add('filled');
+  }
+
+  if (cur === 0) {
+    stepDesc.innerHTML = 'Press <b>Next</b> to fill <code>dp[l][r]</code> by interval length — shortest spans first.';
+    evalBox.innerHTML = '—';
+  } else {
+    const { l, r } = steps[cur - 1];
+    const len = r - l;
+    const cell = document.getElementById(`c-${l}-${r}`);
+    cell.classList.add('current');
+
+    // mark walls + in-range balloons
+    document.getElementById('b-' + l).classList.add('bound');
+    document.getElementById('b-' + r).classList.add('bound');
+    for (let i = l + 1; i < r; i++) document.getElementById('b-' + i).classList.add('inrange');
+
+    const bk = bestK[l][r];
+    document.getElementById('b-' + bk).classList.remove('inrange');
+    document.getElementById('b-' + bk).classList.add('last');
+
+    // highlight sub-interval cells for the winning k
+    if (bk > l + 1 || bk < r - 1) { /* sub cells may be 0/dead but still show */ }
+    if (bk - l >= 2) document.getElementById(`c-${l}-${bk}`).classList.add('sub');
+    if (r - bk >= 2) document.getElementById(`c-${bk}-${r}`).classList.add('sub');
+
+    // build the eval lines for every candidate k
+    let lines = '';
+    let best = -1;
+    for (let k = l + 1; k < r; k++) {
+      const prod = arr[l]*arr[k]*arr[r];
+      const left = dp[l][k], right = dp[k][r];
+      const total = prod + left + right;
+      best = Math.max(best, total);
+    }
+    for (let k = l + 1; k < r; k++) {
+      const prod = arr[l]*arr[k]*arr[r];
+      const left = dp[l][k], right = dp[k][r];
+      const total = prod + left + right;
+      const win = (k === bk);
+      lines += `<div class="line${win ? ' best' : ''}">`
+        + `k=<span class="k">${k}</span> (val ${arr[k]}): `
+        + `<span class="prod">${arr[l]}·${arr[k]}·${arr[r]}=${prod}</span> + `
+        + `dp[${l}][${k}]=<span class="subv">${left}</span> + dp[${k}][${r}]=<span class="subv">${right}</span> `
+        + `= <b>${total}</b>${win ? ' ◄ max' : ''}</div>`;
+    }
+    evalBox.innerHTML = lines;
+
+    stepDesc.innerHTML = `Interval <code>(l=${l}, r=${r})</code>, length ${len}. Try every balloon between them as the <strong style="color:#ef4444">last</strong> burst. Best is k=${bk}: <strong>dp[${l}][${r}] = ${dp[l][r]}</strong>.`;
+
+    if (cur === TOTAL && l === 0 && r === N - 1) {
+      cell.classList.remove('current');
+      cell.classList.add('answer');
+      stepDesc.innerHTML = `🎉 Full interval <code>(0, ${N-1})</code> done. <strong>dp[0][${N-1}] = ${dp[0][N-1]}</strong> — maximum coins.`;
+    }
+  }
+
+  stepCounter.textContent = `Interval ${cur} / ${TOTAL}`;
+  prevBtn.disabled = cur === 0;
+  nextBtn.disabled = cur === TOTAL;
+}
+
+function next() { if (cur < TOTAL) { cur++; render(); } }
+function prev() { if (cur > 0) { cur--; render(); } }
+function reset() { cur = 0; render(); }
+
+buildBalloons();
+buildTable();
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Remove Nth Node From End — Two-Pointer Gap Walkthrough</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 60px;
+      gap: 32px;
+    }
+
+    h1 { font-size: 1.75rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+    h1 span { color: #3b82f6; }
+
+    .analogy {
+      background: #16213e; border: 1px solid #3b82f6; border-radius: 12px;
+      padding: 20px 28px; max-width: 760px; width: 100%;
+      display: flex; gap: 16px; align-items: flex-start;
+    }
+    .analogy-icon { font-size: 2rem; line-height: 1; flex-shrink: 0; }
+    .analogy-body { display: flex; flex-direction: column; gap: 4px; }
+    .analogy-label {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: #3b82f6;
+    }
+    .analogy-text { font-size: 1rem; line-height: 1.5; color: #c0c0d0; }
+
+    .card {
+      background: #16213e; border: 1px solid #2d3a5a; border-radius: 16px;
+      padding: 32px; max-width: 860px; width: 100%;
+      display: flex; flex-direction: column; gap: 28px;
+    }
+
+    .step-description {
+      min-height: 56px; background: #0f172a; border-radius: 8px;
+      padding: 14px 20px; font-size: 0.95rem; line-height: 1.55;
+      color: #c8c8e0; border-left: 3px solid #3b82f6; transition: border-color 0.3s;
+    }
+    .step-description.done { border-color: #10b981; }
+
+    .section-label {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: #7a8ab0; margin-bottom: 14px;
+    }
+
+    /* Linked list */
+    .list-wrap { overflow-x: auto; padding: 30px 6px 46px; }
+    .list-row { display: flex; align-items: center; gap: 0; min-width: max-content; }
+
+    .node-unit { display: flex; align-items: center; }
+
+    .node {
+      width: 60px; height: 60px; border-radius: 12px;
+      border: 2px solid #2d3a5a; background: #0f172a;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; font-weight: 700; color: #e0e0e0;
+      position: relative;
+      transition: border-color 0.35s, background 0.35s, transform 0.35s, box-shadow 0.35s, opacity 0.4s;
+    }
+    .node.dummy { border-style: dashed; color: #5a6a90; font-size: 0.9rem; }
+
+    .node .ptr-tag {
+      position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
+      font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+      padding: 2px 8px; border-radius: 6px; opacity: 0; transition: opacity 0.3s;
+    }
+    .node .ptr-fast { color: #f59e0b; background: rgba(245,158,11,0.12); }
+    .node .ptr-slow { color: #3b82f6; background: rgba(59,130,246,0.14); top: -28px; }
+    .node.show-fast .ptr-fast { opacity: 1; }
+    .node.show-slow .ptr-slow { opacity: 1; }
+    /* if both on same node, stack them */
+    .node.show-fast.show-slow .ptr-fast { top: -52px; }
+
+    .node.fast-here { border-color: #f59e0b; box-shadow: 0 0 16px rgba(245,158,11,0.4); }
+    .node.slow-here { border-color: #3b82f6; box-shadow: 0 0 16px rgba(59,130,246,0.45); }
+    .node.fast-here.slow-here { border-color: #a78bfa; box-shadow: 0 0 18px rgba(167,139,250,0.5); }
+
+    .node.target { animation: shake 0.45s ease; }
+    .node.removed { opacity: 0.25; border-color: #ef4444; background: #2a0d0d; color: #fca5a5; text-decoration: line-through; }
+
+    .node .idx {
+      position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
+      font-size: 0.62rem; color: #5a6a90; white-space: nowrap;
+    }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); } 75% { transform: translateX(5px); }
+    }
+
+    .arrow { width: 34px; height: 2px; background: #3b5280; position: relative; }
+    .arrow::after {
+      content: ''; position: absolute; right: -1px; top: -4px;
+      border-left: 8px solid #3b5280; border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+    }
+    .arrow.relinked { background: #10b981; }
+    .arrow.relinked::after { border-left-color: #10b981; }
+    .arrow.skip { opacity: 0.2; }
+
+    .null-tag { font-size: 0.85rem; color: #5a6a90; font-style: italic; margin-left: 6px; }
+
+    /* gap / state panel */
+    .state-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+    .state-box {
+      background: #0f172a; border: 1px solid #2d3a5a; border-radius: 10px;
+      padding: 12px 18px; min-width: 130px;
+    }
+    .state-box .k { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: #7a8ab0; }
+    .state-box .v { font-size: 1.2rem; font-weight: 700; margin-top: 4px; }
+    .state-box.fast .v { color: #f59e0b; }
+    .state-box.slow .v { color: #3b82f6; }
+    .state-box.gap .v { color: #a78bfa; }
+
+    .result-badge { display: none; align-items: center; gap: 12px; padding: 16px 22px; border-radius: 10px; font-size: 1rem; font-weight: 600; }
+    .result-badge.show { display: flex; }
+    .result-badge.ok { background: #0d2a1a; border: 1.5px solid #10b981; color: #86efac; }
+    .result-icon { font-size: 1.4rem; }
+
+    .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .btn {
+      padding: 12px 26px; border-radius: 8px; border: none;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      transition: background 0.2s, transform 0.1s, opacity 0.2s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+    .btn-secondary:hover { background: #263248; }
+    .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+    .takeaway {
+      background: #16213e; border: 1px solid #2d3a5a; border-radius: 12px;
+      padding: 20px 28px; max-width: 760px; width: 100%;
+      display: flex; gap: 16px; align-items: flex-start;
+    }
+    .takeaway-icon { font-size: 1.6rem; flex-shrink: 0; }
+    .takeaway-body .takeaway-label {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: #10b981; margin-bottom: 4px;
+    }
+    .takeaway-body p { font-size: 0.95rem; line-height: 1.55; color: #c0c0d0; }
+    .takeaway-body strong { color: #e0e0e0; }
+  </style>
+</head>
+<body>
+
+  <h1>Remove Nth Node From End &mdash; <span>Two-Pointer Gap</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🚂</div>
+    <div class="analogy-body">
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Do scouts bhejo. Pehla scout <strong>n+1 dabbe aage</strong> chalta hai, phir dono same speed se.
+        Jab aage waala scout <strong>end (null)</strong> par pahunche, peeche waala theek
+        <em>delete hone waale node ke just pehle</em> khada hota hai.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press &ldquo;Next&rdquo; to begin. We remove the <strong>2nd node from the end</strong> (n = 2) of 1&rarr;2&rarr;3&rarr;4&rarr;5.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Linked list &nbsp;<code style="color:#5a6a90;font-size:0.75rem">dummy &rarr; 1 &rarr; 2 &rarr; 3 &rarr; 4 &rarr; 5,&nbsp; n = 2</code></div>
+      <div class="list-wrap">
+        <div class="list-row" id="listRow"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Pointers</div>
+      <div class="state-grid">
+        <div class="state-box fast"><div class="k">fast at</div><div class="v" id="fastVal">dummy</div></div>
+        <div class="state-box slow"><div class="k">slow at</div><div class="v" id="slowVal">dummy</div></div>
+        <div class="state-box gap"><div class="k">gap (fast&minus;slow)</div><div class="v" id="gapVal">0</div></div>
+      </div>
+    </div>
+
+    <div class="result-badge ok" id="resultBadge">
+      <span class="result-icon">✅</span>
+      <span id="resultText"></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="back()">Prev</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div class="takeaway-body">
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        A <strong>dummy node + a fixed gap of n</strong> lets you find the node *before* the target
+        in a <strong>single O(1)-space pass</strong>. When fast hits null, slow is perfectly positioned
+        to do <code>slow.next = slow.next.next</code>.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // nodes: index 0 = dummy, then 1..5 hold the values
+    const labels = ['dummy', '1', '2', '3', '4', '5'];
+    const N = 2;                       // remove 2nd from end -> node "4" (list index 4)
+    const TARGET = 4;                  // node array index that gets removed
+
+    // Build the list DOM
+    const listRow = document.getElementById('listRow');
+    function buildList() {
+      listRow.innerHTML = '';
+      labels.forEach((lab, i) => {
+        const unit = document.createElement('div');
+        unit.className = 'node-unit';
+
+        const node = document.createElement('div');
+        node.className = 'node' + (i === 0 ? ' dummy' : '');
+        node.id = 'node-' + i;
+        node.innerHTML =
+          lab +
+          '<span class="ptr-tag ptr-fast">fast</span>' +
+          '<span class="ptr-tag ptr-slow">slow</span>' +
+          '<span class="idx">' + (i === 0 ? '' : 'i=' + (i - 1)) + '</span>';
+        unit.appendChild(node);
+
+        if (i < labels.length - 1) {
+          const arr = document.createElement('div');
+          arr.className = 'arrow';
+          arr.id = 'arrow-' + i;        // arrow FROM node i to node i+1
+          unit.appendChild(arr);
+        } else {
+          const nt = document.createElement('span');
+          nt.className = 'null-tag';
+          nt.id = 'nulltag';
+          nt.textContent = '→ null';
+          unit.appendChild(nt);
+        }
+        listRow.appendChild(unit);
+      });
+    }
+    buildList();
+
+    // ── Steps ────────────────────────────────────────────────
+    // state: { fast: idx|null, slow: idx, desc, phase, removed }
+    // fast index null means "past the end" (at null)
+    const steps = [];
+    // Phase A: advance fast n+1 = 3 steps from dummy
+    steps.push({ fast: 0, slow: 0, desc: 'Both <span style="color:#f59e0b">fast</span> and <span style="color:#3b82f6">slow</span> start at the <strong>dummy</strong> node (before head). The dummy frees us from the "delete the head" edge case.' });
+    steps.push({ fast: 1, slow: 0, desc: 'Move <strong>fast</strong> forward 1. We will advance fast a total of <strong>n+1 = 3</strong> steps to open a gap of exactly n+1 from slow.' });
+    steps.push({ fast: 2, slow: 0, desc: '<strong>fast</strong> forward (step 2 of 3).' });
+    steps.push({ fast: 3, slow: 0, desc: '<strong>fast</strong> forward (step 3 of 3). Gap is now <strong>3</strong>. Phase 1 done — fast sits on node "2".' });
+    // Phase B: move both until fast hits null
+    steps.push({ fast: 4, slow: 1, desc: 'Now move <strong>both</strong> together. fast→node "3", slow→node "1". The fixed gap is preserved.' });
+    steps.push({ fast: 5, slow: 2, desc: 'Both forward. fast→node "4", slow→node "2".' });
+    steps.push({ fast: null, slow: 3, desc: 'Both forward. fast steps off the end to <strong>null</strong>, slow lands on node "3" — the node <em>just before</em> the target. Loop stops.' });
+    // Phase C: unlink
+    steps.push({ fast: null, slow: 3, desc: 'slow is right before the target. Set <code>slow.next = slow.next.next</code> — splice node <strong style="color:#ef4444">"4"</strong> out.', unlink: true });
+    steps.push({ fast: null, slow: 3, desc: '✅ Done. Node "4" (the 2nd from the end) is removed. Return <code>dummy.next</code> = the head 1→2→3→5.', removed: true, done: true });
+
+    let cur = 0;
+    const nodeEl = i => document.getElementById('node-' + i);
+
+    function render() {
+      const s = steps[cur];
+      // clear all node states
+      labels.forEach((_, i) => {
+        const n = nodeEl(i);
+        n.classList.remove('fast-here', 'slow-here', 'show-fast', 'show-slow', 'target', 'removed');
+      });
+      document.getElementById('arrow-3').classList.remove('relinked'); // dummy->1 is arrow-0; arrow from node3 is arrow-3
+      // arrows: arrow-3 = node"3"->node"4"; arrow-4 = node"4"->node"5"
+      const a3 = document.getElementById('arrow-3');
+      const a4 = document.getElementById('arrow-4');
+      a3.classList.remove('relinked', 'skip');
+      a4.classList.remove('relinked', 'skip');
+
+      // place fast
+      if (s.fast !== null) {
+        const f = nodeEl(s.fast);
+        f.classList.add('fast-here', 'show-fast');
+        document.getElementById('fastVal').textContent = labels[s.fast] === 'dummy' ? 'dummy' : labels[s.fast];
+      } else {
+        document.getElementById('fastVal').textContent = 'null';
+      }
+      // place slow
+      const sl = nodeEl(s.slow);
+      sl.classList.add('slow-here', 'show-slow');
+      document.getElementById('slowVal').textContent = labels[s.slow] === 'dummy' ? 'dummy' : labels[s.slow];
+
+      // gap
+      const gap = s.fast === null ? (labels.length - s.slow) : (s.fast - s.slow);
+      document.getElementById('gapVal').textContent = gap;
+
+      // unlink visuals
+      if (s.unlink || s.removed) {
+        nodeEl(TARGET).classList.add('target');
+        a3.classList.add('relinked');   // node3 now points past node4
+        a4.classList.add('skip');
+      }
+      if (s.removed) {
+        nodeEl(TARGET).classList.remove('target');
+        nodeEl(TARGET).classList.add('removed');
+      }
+
+      // desc
+      const desc = document.getElementById('stepDesc');
+      desc.innerHTML = s.desc;
+      desc.className = 'step-description' + (s.done ? ' done' : '');
+
+      // result
+      const rb = document.getElementById('resultBadge');
+      if (s.done) {
+        rb.classList.add('show');
+        document.getElementById('resultText').textContent = 'Result: 1 → 2 → 3 → 5  (node "4" removed in one pass)';
+      } else {
+        rb.classList.remove('show');
+      }
+
+      document.getElementById('stepCounter').textContent = 'Step ' + cur + ' / ' + (steps.length - 1);
+      document.getElementById('nextBtn').disabled = cur >= steps.length - 1;
+      document.getElementById('prevBtn').disabled = cur <= 0;
+    }
+
+    function advance() { if (cur < steps.length - 1) { cur++; render(); } }
+    function back()    { if (cur > 0) { cur--; render(); } }
+    function reset()   { cur = 0; render(); }
+
+    render();
+  </script>
+</body>
+</html>

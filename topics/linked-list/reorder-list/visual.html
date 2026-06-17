@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reorder List — Middle · Reverse · Zip</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a;
+    --text: #e0e0e0; --muted: #7a8ab0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444; --purple:#a855f7;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px 70px; gap: 28px;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing:-0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy, .takeaway {
+    background: var(--panel); border-radius:12px; padding:18px 24px;
+    max-width:820px; width:100%; display:flex; gap:16px; align-items:flex-start;
+  }
+  .analogy { border:1px solid var(--blue); } .takeaway { border:1px solid #2d3a5a; }
+  .ic { font-size:1.8rem; line-height:1; flex-shrink:0; }
+  .label { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--blue); margin-bottom:5px; }
+  .analogy-text, .takeaway p { font-size:.97rem; line-height:1.55; color:#c0c0d0; }
+  .takeaway strong, .analogy-text strong { color:var(--text); }
+  .takeaway code, .analogy-text code { background:#1e293b; padding:1px 6px; border-radius:5px; color:#ffd479; font-family:monospace; }
+
+  .card {
+    background: var(--panel); border:1px solid #2d3a5a; border-radius:16px;
+    padding:30px; max-width:880px; width:100%;
+    display:flex; flex-direction:column; gap:24px;
+  }
+
+  .phases { display:flex; gap:10px; flex-wrap:wrap; }
+  .phase-pill {
+    flex:1; min-width:150px; text-align:center;
+    padding:10px 12px; border-radius:10px; border:1px solid #2d3a5a;
+    background:var(--panel2); font-size:.85rem; font-weight:600; color:#7a8ab0;
+    transition: all .3s;
+  }
+  .phase-pill .pnum { display:inline-block; width:20px; height:20px; line-height:20px; border-radius:50%; background:#2d3a5a; color:#c0c0d0; font-size:.72rem; margin-right:6px; }
+  .phase-pill.active { border-color:var(--blue); background:rgba(59,130,246,.12); color:#dbeafe; }
+  .phase-pill.active .pnum { background:var(--blue); color:#fff; }
+  .phase-pill.done { border-color:var(--green); color:#86efac; }
+  .phase-pill.done .pnum { background:var(--green); color:#04140c; }
+
+  .step-desc {
+    min-height:56px; background:var(--panel2); border-radius:8px; padding:14px 20px;
+    font-size:.96rem; line-height:1.55; color:#c8c8e0; border-left:3px solid var(--blue);
+  }
+  .step-desc.p2 { border-color: var(--amber); }
+  .step-desc.p3 { border-color: var(--purple); }
+  .step-desc.done { border-color: var(--green); }
+  .step-desc code { background:#1e293b; padding:1px 6px; border-radius:5px; color:#ffd479; font-family:monospace; }
+
+  .section-label { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:12px; }
+
+  .list-stage { width:100%; overflow-x:auto; padding-top:26px; }
+  .list-row { display:flex; align-items:center; min-width:max-content; }
+  .node-wrap { position:relative; display:flex; align-items:center; }
+  .node {
+    width:52px; height:52px; border-radius:10px; border:2px solid #2d3a5a;
+    background:var(--panel2); display:grid; place-items:center;
+    font-size:1.3rem; font-weight:700; color:var(--text); flex-shrink:0;
+    transition: border-color .35s, background .35s, transform .35s, box-shadow .35s, opacity .35s;
+  }
+  .node.firstHalf { border-color:#2d4a7a; }
+  .node.secondHalf { border-color:#4a3a6a; }
+  .node.slow { border-color:var(--green); background:#0d2a1a; box-shadow:0 0 16px rgba(16,185,129,.45); }
+  .node.fast { border-color:var(--amber); box-shadow:0 0 14px rgba(245,158,11,.4); }
+  .node.curr { border-color:var(--amber); background:#3a2a08; box-shadow:0 0 16px rgba(245,158,11,.5); transform:translateY(-3px); }
+  .node.prev { border-color:var(--green); background:#0d2a1a; }
+  .node.zip { border-color:var(--purple); background:#2a1a3e; box-shadow:0 0 16px rgba(168,85,247,.5); transform:translateY(-3px); }
+  .node.placed { border-color:var(--green); background:#0d2a1a; color:#86efac; }
+  .node.dim { opacity:.32; }
+
+  .arrow { width:30px; height:20px; flex-shrink:0; display:grid; place-items:center; }
+  .arrow svg { width:30px; height:20px; }
+  .arrow .line { stroke:#4a5a7a; stroke-width:2.4; } .arrow .head { fill:#4a5a7a; }
+  .arrow.green .line { stroke:var(--green); } .arrow.green .head { fill:var(--green); }
+  .arrow.purple .line { stroke:var(--purple); } .arrow.purple .head { fill:var(--purple); }
+  .arrow.cut { opacity:.2; }
+  .null-box { min-width:44px; height:34px; border-radius:8px; border:1.5px dashed #3a4a6a; display:grid; place-items:center; font-size:.78rem; color:#5a6a90; font-family:monospace; flex-shrink:0; }
+
+  .ptr-flag { position:absolute; top:-24px; left:50%; transform:translateX(-50%); font-size:.68rem; font-weight:700; font-family:monospace; padding:2px 7px; border-radius:6px; white-space:nowrap; }
+  .ptr-flag.slow { background:var(--green); color:#04140c; }
+  .ptr-flag.fast { background:var(--amber); color:#1a1200; top:-44px; }
+  .ptr-flag.curr { background:var(--amber); color:#1a1200; }
+  .ptr-flag.prev { background:var(--green); color:#04140c; top:-44px; }
+  .ptr-flag.first { background:var(--blue); color:#fff; }
+  .ptr-flag.second { background:var(--purple); color:#fff; top:-44px; }
+
+  .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .btn { padding:11px 24px; border-radius:8px; border:none; font-size:.92rem; font-weight:600; cursor:pointer; transition: background .2s, transform .1s, opacity .2s; }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background:var(--blue); color:#fff; } .btn-primary:hover { background:#2563eb; }
+  .btn:disabled { opacity:.35; cursor:not-allowed; }
+  .btn-secondary { background:#1e293b; color:#94a3b8; border:1px solid #2d3a5a; } .btn-secondary:hover { background:#263248; }
+  .step-counter { font-size:.85rem; color:var(--muted); margin-left:auto; }
+
+  .code-block {
+    background:var(--panel2); border:1px solid #2d3a5a; border-radius:10px; padding:18px 22px;
+    max-width:820px; width:100%; font-family:monospace; font-size:.78rem; line-height:1.65;
+    color:#94a3b8; overflow-x:auto; white-space:pre;
+  }
+  .code-block .kw { color:#818cf8; } .code-block .fn { color:#38bdf8; } .code-block .cm { color:#475569; font-style:italic; }
+  .code-block .hl { background: rgba(245,158,11,.15); display:inline-block; width:100%; }
+</style>
+</head>
+<body>
+
+<h1>Reorder List &mdash; <span>Middle · Reverse · Zip</span></h1>
+
+<div class="analogy">
+  <div class="ic">🤐</div>
+  <div>
+    <div class="label">Real-world analogy</div>
+    <div class="analogy-text">
+      List ko <strong>"zip"</strong> karna hai: pehla, phir last, phir doosra, phir second-last…
+      Aasaan tareeka — list ko <strong>beech se kaato</strong>, <strong>second half ulta ghumao</strong>,
+      phir dono halves ko <strong>alternate karke interleave</strong> kar do. Teen familiar moves:
+      find-middle + reverse + merge.
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="phases">
+    <div class="phase-pill active" id="pill1"><span class="pnum">1</span>Find middle</div>
+    <div class="phase-pill" id="pill2"><span class="pnum">2</span>Reverse 2nd half</div>
+    <div class="phase-pill" id="pill3"><span class="pnum">3</span>Zip halves</div>
+  </div>
+
+  <div>
+    <div class="section-label">Step description</div>
+    <div class="step-desc" id="stepDesc">Press "Next" to reorder <code>1 → 2 → 3 → 4 → 5</code>.</div>
+  </div>
+
+  <div>
+    <div class="section-label" id="rowLabel">Linked list</div>
+    <div class="list-stage"><div class="list-row" id="listRow"></div></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-secondary" id="resetBtn">Reset</button>
+    <button class="btn btn-secondary" id="prevBtn">◀ Prev</button>
+    <button class="btn btn-primary" id="nextBtn">Next ▶</button>
+    <span class="step-counter" id="counter">Step 0</span>
+  </div>
+</div>
+
+<div class="code-block" id="codeBlock"></div>
+
+<div class="takeaway">
+  <div class="ic">💡</div>
+  <div>
+    <div class="label">Key takeaway</div>
+    <p>
+      Reorder = compose three primitives: <strong>fast/slow to find the middle</strong>,
+      <strong>reverse the second half</strong>, then <strong>merge the two halves alternately</strong>.
+      Each is O(n); together still <strong>O(n) time, O(1) space</strong>, all in-place — no value
+      copies, just pointer rewiring.
+    </p>
+  </div>
+</div>
+
+<script>
+const VALS = [1, 2, 3, 4, 5];
+const N = VALS.length;
+
+// We render nodes by their VALUE positions in a fixed left-to-right layout,
+// but the *links* (arrows between rendered slots) and pointer flags change per step.
+// Each step provides: render = ordered array of {val, cls[], flags[]} plus arrows between them,
+// and a phase + desc + code line.
+
+const steps = [];
+
+function S(o){ steps.push(o); }
+
+// Helper to make a node spec
+function node(val, classes, flags){ return { val, classes: classes||[], flags: flags||[] }; }
+// arrow spec between consecutive rendered nodes: {color:'gray'|'green'|'purple', cut:bool}
+function arr(color, cut){ return { color: color||'gray', cut: !!cut }; }
+
+// ── PHASE 1: find middle (slow/fast on 1→2→3→4→5) ──
+// slow ends at index 2 (value 3) for odd length 5.
+(function phase1(){
+  // sequence of (slow,fast) positions: start both 0; then advance.
+  const moves = [
+    { slow:0, fast:0, d:`Both <code>slow</code> &amp; <code>fast</code> at head (node 1).` },
+    { slow:1, fast:2, d:`<code>slow</code>→node 2 (1 step), <code>fast</code>→node 3 (2 steps).` },
+    { slow:2, fast:4, d:`<code>slow</code>→node 3, <code>fast</code>→node 5. <code>fast.next</code> is None → stop. <strong>slow = node 3 is the middle.</strong>` },
+  ];
+  moves.forEach((m, k) => {
+    const nodes = VALS.map((v, i) => {
+      const cls = ['firstHalf'];
+      const flags = [];
+      if (i === m.slow) { cls.push('slow'); flags.push({c:'slow', t:'slow'}); }
+      if (i === m.fast) { cls.push('fast'); flags.push({c:'fast', t:'fast'}); }
+      return node(v, cls, flags);
+    });
+    const arrows = VALS.slice(0, N-1).map(() => arr('gray'));
+    S({ phase:1, nodes, arrows, tailNone:true, desc:m.d, line: k===0?1:2, rowLabel:'Phase 1 — fast/slow find the middle' });
+  });
+})();
+
+// ── PHASE 2: reverse second half (nodes 4,5 -> after cut at node3) ──
+// First half: [1,2,3], second half starts at node 4 (index 3).
+// We cut slow.next (3 -> None) and reverse [4,5] into [5,4].
+(function phase2(){
+  // step a: cut
+  {
+    const nodes = VALS.map((v,i) => node(v, i<=2?['firstHalf']:['secondHalf'], []));
+    const arrows = [arr('gray'),arr('gray'),arr('gray',true),arr('gray')]; // cut between idx2(node3) and idx3(node4)
+    S({ phase:2, nodes, arrows, tailNone:true, cutNoneAfter:2,
+        desc:`<strong>Split:</strong> <code>slow.next = None</code> cuts after node 3. First half = <strong>1→2→3</strong>, second half = <strong>4→5</strong>.`,
+        line:4, rowLabel:'Phase 2 — reverse the second half (4 → 5)' });
+  }
+  // reverse [4,5]: prev=None, curr=4 ; then flip
+  // step b: curr=4
+  {
+    const nodes = VALS.map((v,i) => {
+      const cls = i<=2?['firstHalf']:['secondHalf'];
+      const flags=[];
+      if(i===3){ cls.push('curr'); flags.push({c:'curr',t:'curr'}); }
+      return node(v,cls,flags);
+    });
+    const arrows=[arr('gray'),arr('gray'),arr('gray',true),arr('gray')];
+    S({ phase:2, nodes, arrows, tailNone:true, cutNoneAfter:2, secondTailNone:true,
+        desc:`Reverse the second half. <code>curr = node 4</code>, <code>prev = None</code>. Flip node 4 to point to None.`,
+        line:5, rowLabel:'Phase 2 — reverse the second half' });
+  }
+  // step c: after flipping 4->None, curr=5, prev=4 ; render order still 1 2 3 4 5 but link 4 reversed
+  {
+    const nodes = VALS.map((v,i) => {
+      const cls = i<=2?['firstHalf']:['secondHalf'];
+      const flags=[];
+      if(i===4){ cls.push('curr'); flags.push({c:'curr',t:'curr'}); }
+      if(i===3){ cls.push('prev'); flags.push({c:'prev',t:'prev'}); }
+      return node(v,cls,flags);
+    });
+    // arrow between 4 and 5 now reversed (5->4 green). We draw it green & note it's backward.
+    const arrows=[arr('gray'),arr('gray'),arr('gray',true),arr('green')];
+    S({ phase:2, nodes, arrows, tailNone:true, cutNoneAfter:2, fourPointsNone:true,
+        desc:`Node 4 now points to None (it's the new tail). Move on: <code>curr = node 5</code>, <code>prev = node 4</code>.`,
+        line:6, rowLabel:'Phase 2 — reverse the second half' });
+  }
+  // step d: flip 5->4 done. Reversed half is 5->4->None. We re-render second half in reversed order: 5,4
+  {
+    // render order: 1 2 3 | 5 4
+    const order = [0,1,2,4,3];
+    const nodes = order.map((i,pos) => {
+      const cls = pos<=2?['firstHalf']:['secondHalf'];
+      const flags=[];
+      if(i===4){ cls.push('prev'); flags.push({c:'prev',t:'2nd head'}); }
+      return node(VALS[i],cls,flags);
+    });
+    const arrows=[arr('gray'),arr('gray'),arr('gray',true),arr('green')];
+    S({ phase:2, nodes, arrows, tailNone:true, cutNoneAfter:2, secondReversed:true,
+        desc:`Reversed! Second half is now <strong>5 → 4 → None</strong> (green). Head of reversed half = <code>node 5</code>. First half still <strong>1 → 2 → 3</strong>.`,
+        line:7, rowLabel:'Phase 2 — second half reversed: 5 → 4' });
+  }
+})();
+
+// ── PHASE 3: zip first(1,2,3) with second(5,4) alternately ──
+// Result: 1 -> 5 -> 2 -> 4 -> 3
+(function phase3(){
+  // We'll show the building result row. first=[1,2,3], second=[5,4]
+  const first = [1,2,3], second = [5,4];
+  // intro
+  S({ phase:3, custom:'zip', placed:[], firstPtr:0, secondPtr:0,
+      desc:`Now <strong>zip</strong> the two halves. <code>first → 1→2→3</code>, <code>second → 5→4</code>. Take from <code>first</code>, then <code>second</code>, alternating.`,
+      line:9, rowLabel:'Phase 3 — interleave the two halves' });
+  // zip iterations
+  const placed = [];
+  let fp=0, sp=0;
+  const order = [];
+  // 1 (first), 5(second), 2(first), 4(second), 3(first)
+  // simulate merge: while second: place first[fp], place second[sp]
+  const seq = [];
+  let i=0,j=0;
+  while (j < second.length) {
+    seq.push({from:'first', val:first[i]}); i++;
+    seq.push({from:'second', val:second[j]}); j++;
+  }
+  while (i < first.length) { seq.push({from:'first', val:first[i]}); i++; }
+
+  seq.forEach((st, k) => {
+    placed.push(st);
+    S({ phase:3, custom:'zip', placed: placed.slice(),
+        firstPtr: placed.filter(p=>p.from==='first').length,
+        secondPtr: placed.filter(p=>p.from==='second').length,
+        desc:`Splice <code>${st.from}</code> node <strong>${st.val}</strong> onto the result. Built so far: <strong>${placed.map(p=>p.val).join(' → ')}</strong>.`,
+        line: 10, rowLabel:'Phase 3 — zipping…' });
+  });
+
+  // final
+  S({ phase:3, custom:'zip', placed: placed.slice(), done:true,
+      firstPtr: 3, secondPtr: 2,
+      desc:`Done! Final list: <strong>1 → 5 → 2 → 4 → 3 → None</strong> 🎉  All in place, O(1) extra space.`,
+      line: 11, rowLabel:'Phase 3 — reordered!' });
+})();
+
+const TOTAL = steps.length;
+
+// ── Rendering ────────────────────────────────────────────────────────────
+const listRow = document.getElementById('listRow');
+const stepDesc = document.getElementById('stepDesc');
+const counter = document.getElementById('counter');
+const rowLabel = document.getElementById('rowLabel');
+const nextBtn = document.getElementById('nextBtn');
+const prevBtn = document.getElementById('prevBtn');
+const resetBtn = document.getElementById('resetBtn');
+const pill1 = document.getElementById('pill1');
+const pill2 = document.getElementById('pill2');
+const pill3 = document.getElementById('pill3');
+
+let idx = 0;
+
+function arrowSVG(cls){
+  return `<div class="arrow ${cls}"><svg viewBox="0 0 30 20"><line class="line" x1="2" y1="10" x2="22" y2="10"/><polygon class="head" points="22,4 30,10 22,16"/></svg></div>`;
+}
+
+function flagHTML(f){ return `<span class="ptr-flag ${f.c}">${f.t}</span>`; }
+
+function render() {
+  const s = steps[idx];
+
+  // phase pills
+  [pill1,pill2,pill3].forEach((p,i) => {
+    p.classList.remove('active','done');
+    if (i+1 < s.phase) p.classList.add('done');
+    else if (i+1 === s.phase) p.classList.add('active');
+  });
+  if (s.done) pill3.classList.add('done');
+
+  let html = '';
+
+  if (s.custom === 'zip') {
+    // Build result row from placed[], plus remaining unplaced nodes faded
+    const placedVals = s.placed.map(p=>p.val);
+    // result nodes
+    s.placed.forEach((p, k) => {
+      const cls = ['node','placed'];
+      if (k === s.placed.length - 1 && !s.done) cls.push('zip');
+      html += `<div class="node-wrap"><div class="${cls.join(' ')}">${p.val}</div></div>`;
+      if (k < s.placed.length - 1) html += arrowSVG('purple');
+    });
+    if (s.done) {
+      if (s.placed.length) html += arrowSVG('purple');
+      html += `<div class="null-box">None</div>`;
+    } else {
+      // show what's left to merge in a faded pool
+      html += `<div style="display:flex;align-items:center;gap:10px;margin-left:18px;padding-left:18px;border-left:1px dashed #2d3a5a;">`;
+      const remFirst = [1,2,3].slice(s.firstPtr);
+      const remSecond = [5,4].slice(s.secondPtr);
+      html += `<span style="font-family:monospace;font-size:.74rem;color:#5a6a90;">remaining →</span>`;
+      remFirst.forEach(v => { html += `<div class="node firstHalf dim" style="width:42px;height:42px;font-size:1.05rem;">${v}</div>`; });
+      remSecond.forEach(v => { html += `<div class="node secondHalf dim" style="width:42px;height:42px;font-size:1.05rem;">${v}</div>`; });
+      if (!remFirst.length && !remSecond.length) html += `<span style="color:#5a6a90;font-style:italic;font-size:.8rem;">empty</span>`;
+      html += `</div>`;
+    }
+  } else {
+    // normal list row from s.nodes + s.arrows
+    s.nodes.forEach((nd, i) => {
+      const flags = (nd.flags||[]).map(flagHTML).join('');
+      html += `<div class="node-wrap">${flags}<div class="node ${nd.classes.join(' ')}">${nd.val}</div></div>`;
+      if (i < s.nodes.length - 1) {
+        const a = s.arrows[i] || arr('gray');
+        const cls = (a.color || 'gray') + (a.cut ? ' cut' : '');
+        html += arrowSVG(cls);
+      }
+    });
+    // trailing None for first-half tail when cut, or whole-list tail
+    if (s.cutNoneAfter !== undefined) {
+      // first half ends with None already shown via cut; append a small None after node3 region is implied.
+      // Append trailing None for the reversed-second-half tail (node 4 -> None)
+      html += arrowSVG('green') + `<div class="null-box">None</div>`;
+    } else if (s.tailNone) {
+      html += arrowSVG('gray') + `<div class="null-box">None</div>`;
+    }
+  }
+
+  listRow.innerHTML = html;
+  stepDesc.innerHTML = s.desc;
+  stepDesc.className = 'step-desc ' + (s.done ? 'done' : (s.phase===2?'p2':(s.phase===3?'p3':'')));
+  rowLabel.textContent = s.rowLabel || 'Linked list';
+  counter.textContent = `Step ${idx} / ${TOTAL - 1}`;
+  prevBtn.disabled = idx === 0;
+  nextBtn.disabled = idx === TOTAL - 1;
+  renderCode(s.line);
+}
+
+const CODE_LINES = [
+  `<span class="kw">def</span> <span class="fn">reorderList</span>(head):`,
+  `    slow = fast = head                  <span class="cm"># 1) find middle</span>`,
+  `    <span class="kw">while</span> fast <span class="kw">and</span> fast.next:`,
+  `        slow, fast = slow.next, fast.next.next`,
+  `    prev, curr = <span class="kw">None</span>, slow.next     <span class="cm"># 2) reverse 2nd half</span>`,
+  `    slow.next = <span class="kw">None</span>`,
+  `    <span class="kw">while</span> curr:`,
+  `        curr.next, prev, curr = prev, curr, curr.next`,
+  `    second = prev`,
+  `    first = head                        <span class="cm"># 3) zip halves</span>`,
+  `    <span class="kw">while</span> second:`,
+  `        n1, n2 = first.next, second.next`,
+  `        first.next, second.next = second, n1`,
+  `        first, second = n1, n2`,
+];
+const LINE_MAP = { 1:1, 2:3, 4:5, 5:6, 6:7, 7:8, 9:9, 10:12, 11:13 };
+function renderCode(stepLine) {
+  const target = LINE_MAP[stepLine];
+  document.getElementById('codeBlock').innerHTML =
+    CODE_LINES.map((l, i) => (i === target ? `<span class="hl">${l}</span>` : l)).join('\n');
+}
+
+nextBtn.addEventListener('click', () => { if (idx < TOTAL - 1) { idx++; render(); } });
+prevBtn.addEventListener('click', () => { if (idx > 0) { idx--; render(); } });
+resetBtn.addEventListener('click', () => { idx = 0; render(); });
+
+render();
+</script>
+</body>
+</html>

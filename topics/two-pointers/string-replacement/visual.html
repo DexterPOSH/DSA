@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>String Replacement — Scan &amp; Swap Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  h1 {
+    margin: 0 0 6px;
+    color: #ffffff;
+    font-size: 28px;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    color: #a0a0b8;
+    margin-bottom: 28px;
+    font-size: 15px;
+  }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px;
+    border-radius: 8px;
+    margin-bottom: 28px;
+  }
+  .analogy h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #3b82f6;
+  }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+
+  .problem {
+    background: #24243e;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .section-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #8888aa;
+    margin: 0 0 14px;
+  }
+  .section-title .sub {
+    color: #666680; font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 6px;
+  }
+
+  /* Character strip */
+  .strip {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 26px;
+    flex-wrap: wrap;
+  }
+  .ch {
+    position: relative;
+    min-width: 38px;
+    padding: 16px 4px 8px;
+    background: #2d2d50;
+    border: 2px solid #3a3a5c;
+    border-radius: 8px;
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+  .ch .idx {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a2e;
+    font-size: 10px;
+    color: #777796;
+    padding: 0 4px;
+  }
+  .ch .val {
+    font-size: 19px;
+    font-weight: 600;
+    color: #e0e0e0;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  /* the scan window orig[i:i+m] */
+  .ch.window {
+    background: #3f2e0d;
+    border-color: #fbbf24;
+  }
+  .ch.window .val { color: #fbbf24; }
+  /* the single char being compared right now */
+  .ch.probe {
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4);
+    transform: translateY(-3px);
+  }
+  .ch.probe-bad {
+    background: #4a1d1d;
+    border-color: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35);
+  }
+  .ch.probe-bad .val { color: #fca5a5; }
+  /* a fully matched window about to be replaced */
+  .ch.matched {
+    background: #14532d;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+  }
+  .ch.matched .val { color: #ffffff; }
+  /* chars already consumed into result */
+  .ch.consumed { opacity: 0.45; }
+  /* the scan pointer arrow */
+  .ch .ptr {
+    position: absolute;
+    bottom: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: #3b82f6;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* find pattern row aligned under the window */
+  .findline {
+    display: flex;
+    gap: 6px;
+    margin: 6px 0 26px;
+    min-height: 30px;
+    align-items: center;
+  }
+  .findline .lead {
+    font-size: 12px; color: #8888aa; margin-right: 6px; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .findbox {
+    display: flex; gap: 6px;
+    transition: margin-left 0.3s ease;
+  }
+  .fch {
+    min-width: 38px; padding: 7px 4px; text-align: center;
+    background: #20203a; border: 1px dashed #4a4a6c; border-radius: 6px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #c0c0d8;
+    transition: all 0.2s ease;
+  }
+  .fch.ok { background: #14321f; border-color: #10b981; border-style: solid; color: #6ee7b7; }
+  .fch.bad { background: #3a1414; border-color: #ef4444; border-style: solid; color: #fca5a5; }
+  .fch.active { box-shadow: 0 0 0 2px rgba(251,191,36,0.5); }
+
+  /* Result builder */
+  .result {
+    display: flex; gap: 4px; flex-wrap: wrap;
+    min-height: 52px;
+    padding: 12px 14px;
+    background: #1f1f3a;
+    border: 1px dashed #3a3a5c;
+    border-radius: 8px;
+  }
+  .result:empty::after {
+    content: '""  (empty — nothing emitted yet)';
+    color: #666680; font-style: italic; font-size: 13px;
+  }
+  .rch {
+    min-width: 30px; padding: 8px 5px; text-align: center;
+    border-radius: 5px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; font-weight: 600;
+    animation: popin 0.25s ease;
+  }
+  .rch.copied { background: #2d2d50; border: 1px solid #3a3a5c; color: #d0d0e0; }
+  .rch.repl   { background: #14532d; border: 1px solid #10b981; color: #6ee7b7; }
+
+  @keyframes popin { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* state row */
+  .vars {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px;
+  }
+  .var {
+    background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px;
+  }
+  .var .label { font-size: 11px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 17px; color: #3b82f6; font-weight: 600; }
+
+  /* Narration */
+  .narration {
+    background: #1f1f3a;
+    border-left: 3px solid #3b82f6;
+    padding: 14px 18px;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #d0d0e0;
+    min-height: 52px;
+    transition: border-color 0.3s ease;
+  }
+  .narration.match { border-left-color: #10b981; background: #14321f; }
+  .narration.miss  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+
+  /* Controls */
+  .controls {
+    display: flex; gap: 10px; justify-content: center; align-items: center;
+    margin: 24px 0 8px; flex-wrap: wrap;
+  }
+  button {
+    background: #3b82f6; color: #ffffff; border: none;
+    padding: 10px 20px; font-size: 14px; font-weight: 500; border-radius: 6px;
+    cursor: pointer; transition: background 0.15s ease, transform 0.1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; font-size: 12px; color: #8888aa; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  /* Edge cases */
+  .edge {
+    margin-top: 32px;
+    background: #24243e;
+    border-radius: 12px;
+    padding: 22px 24px;
+  }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 8px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #ffffff; }
+
+  /* Complexity */
+  .complexity {
+    margin-top: 20px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .cx {
+    background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 10px; padding: 16px 18px;
+  }
+  .cx .big { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .cx.naive .big { color: #fbbf24; }
+  .cx.kmp .big   { color: #10b981; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #a0a0b8; }
+
+  /* Takeaway */
+  .takeaway {
+    margin-top: 20px;
+    background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981;
+    padding: 18px 22px;
+    border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+
+  @media (max-width: 620px) {
+    .vars { grid-template-columns: 1fr; }
+    .complexity { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>String Replacement — Scan &amp; Swap</h1>
+  <div class="subtitle">Implement <code style="color:#fbbf24">replace(orig, find, repl)</code> by hand — no <code style="color:#fbbf24">str.replace</code>, no regex. Walk a single pointer across the string, try to match <code style="color:#fbbf24">find</code> at each spot, and build a fresh result.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy</h3>
+    <p>You're a <b>proofreader</b> sweeping a finger across a manuscript looking for the phrase "Fox" to swap with "Cat". At each letter you peek ahead: do the next few letters spell "Fox"? If <b>yes</b>, you write "Cat" onto a clean sheet and skip your finger <i>past</i> the whole phrase. If <b>no</b>, you copy the single letter under your finger and nudge forward by one. The clean sheet you build up is the answer.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">orig:</span><code>"AFoxRunsInTheField"</code></div>
+    <div class="row"><span class="label">find:</span><code>"Fox"</code> &nbsp;&nbsp; <span class="label">repl:</span><code>"Cat"</code></div>
+    <div class="row"><span class="label">goal:</span><code>"ACatRunsInTheField"</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="section-title">Original string <span class="sub">scan pointer i walks left → right</span></div>
+    <div class="strip" id="strip"></div>
+
+    <div class="section-title">Matching <span class="sub">slide find under the window orig[i : i+m] and compare char by char</span></div>
+    <div class="findline">
+      <span class="lead">find&nbsp;=</span>
+      <div class="findbox" id="findbox"></div>
+    </div>
+
+    <div class="vars">
+      <div class="var"><div class="label">scan pointer i</div><div class="value" id="v-i">0</div></div>
+      <div class="var"><div class="label">match cursor j</div><div class="value" id="v-j">—</div></div>
+      <div class="var"><div class="label">result length</div><div class="value" id="v-len">0</div></div>
+    </div>
+
+    <div class="section-title">Result being built <span class="sub">copied chars vs. emitted repl</span></div>
+    <div class="result" id="result"></div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>scan pointer i</div>
+      <div class="legend-item"><span class="swatch" style="background:#fbbf24"></span>window / active compare</div>
+      <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>mismatch</div>
+      <div class="legend-item"><span class="swatch" style="background:#10b981"></span>full match → emit repl</div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to begin. The result sheet starts blank; <code>i = 0</code>.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="edge">
+    <h3>Edge cases to defend in the interview</h3>
+    <ul>
+      <li><b>Empty <code>find</code></b> — there is no substring to locate; an empty needle "matches everywhere." Treat as an <b>error / throw</b> (or define it as a no-op) rather than looping forever.</li>
+      <li><b>find == repl</b> — swapping a phrase for itself changes nothing. <b>Return <code>orig</code> unchanged</b> (and skip the work).</li>
+      <li><b>find not present</b> — every position mismatches, so you just copy <code>orig</code> char for char. Result equals the input.</li>
+      <li><b>Overlapping matches</b> — only <i>non-overlapping</i> occurrences count. With <code>find="aa"</code> on <code>"aaaa"</code> you jump by <code>len(find)</code> after each hit, giving <b>2</b> matches, not 3. (Replacing left-to-right and skipping the consumed window enforces this.)</li>
+      <li><b>null / empty inputs</b> — <code>orig=""</code> returns <code>""</code>; null <code>orig</code> → return null or throw per contract; null <code>repl</code> often means delete (treat as <code>""</code>). Decide and state the contract.</li>
+      <li><b>Case sensitivity</b> — <code>"fox" ≠ "Fox"</code>. Matching is case-sensitive by default; mention a <code>caseInsensitive</code> flag (compare lower-cased) only if asked.</li>
+    </ul>
+  </div>
+
+  <div class="complexity">
+    <div class="cx naive">
+      <div class="big">O(n · m)</div>
+      <p><b>Naive scan</b> (this walkthrough). For each of the <code>n</code> start positions you may compare up to <code>m = len(find)</code> chars before a mismatch. Simple, and usually plenty for interview inputs.</p>
+    </div>
+    <div class="cx kmp">
+      <div class="big">O(n + m)</div>
+      <p><b>KMP</b>. Precompute a failure (LPS) table over <code>find</code> in O(m), then scan <code>orig</code> once without ever re-examining a char — no backtracking on the text. Mention it as the optimal follow-up.</p>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>One pointer, two moves: on a <b>full match</b> emit <code style="color:#6ee7b7">repl</code> and jump <code>i += len(find)</code>; on a <b>mismatch</b> copy <code>orig[i]</code> and do <code>i += 1</code>. Building a fresh result string — instead of mutating in place — keeps replacements clean and naturally non-overlapping.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const orig = "AFoxRunsInTheField";
+  const find = "Fox";
+  const repl = "Cat";
+  const n = orig.length;
+  const m = find.length;
+
+  // ---- Build atomic visual steps ----
+  // State fields:
+  //   i          scan pointer
+  //   j          match cursor within find (or null)
+  //   result     array of {ch, type:'copied'|'repl'}
+  //   probeBad   boolean: current compare is a mismatch
+  //   matched    boolean: window fully matched
+  //   narration / narrClass
+  const steps = [];
+
+  function snapResult(arr) { return arr.map(o => ({ ...o })); }
+
+  steps.push({
+    i: 0, j: null, window: 0, result: [],
+    probeBad: false, matched: false,
+    narration: `Start with an empty result and <code>i = 0</code>. We never use <code>str.replace</code> — we drive a pointer by hand.`,
+    narrClass: ""
+  });
+
+  const result = [];
+  let i = 0;
+  while (i < n) {
+    // Can a window even fit?
+    const fits = i + m <= n;
+
+    if (fits) {
+      // Phase: announce we try to match starting at i
+      steps.push({
+        i, j: 0, window: i, result: snapResult(result),
+        probeBad: false, matched: false,
+        narration: `Try to match <code>find="${find}"</code> against the window <code>orig[${i}:${i+m}] = "${orig.substr(i, m)}"</code>.`,
+        narrClass: ""
+      });
+
+      // Compare char by char
+      let j = 0;
+      let mismatchAt = -1;
+      for (; j < m; j++) {
+        const oc = orig[i + j];
+        const fc = find[j];
+        if (oc === fc) {
+          steps.push({
+            i, j, window: i, result: snapResult(result),
+            probeBad: false, matched: false, okUpTo: j,
+            narration: `Compare <code>orig[${i + j}]='${oc}'</code> vs <code>find[${j}]='${fc}'</code> → match. Keep going.`,
+            narrClass: ""
+          });
+        } else {
+          mismatchAt = j;
+          steps.push({
+            i, j, window: i, result: snapResult(result),
+            probeBad: true, matched: false, okUpTo: j - 1,
+            narration: `Compare <code>orig[${i + j}]='${oc}'</code> vs <code>find[${j}]='${fc}'</code> → <b>mismatch</b>. This window is not "${find}".`,
+            narrClass: "miss"
+          });
+          break;
+        }
+      }
+
+      if (mismatchAt === -1) {
+        // FULL MATCH
+        steps.push({
+          i, j: m, window: i, result: snapResult(result),
+          probeBad: false, matched: true, okUpTo: m - 1,
+          narration: `All ${m} chars matched — full hit at <code>i = ${i}</code>! Emit <code>repl="${repl}"</code> and jump <code>i += ${m}</code>.`,
+          narrClass: "match"
+        });
+        for (const c of repl) result.push({ ch: c, type: "repl" });
+        i += m;
+        steps.push({
+          i, j: null, window: i, result: snapResult(result),
+          probeBad: false, matched: false,
+          narration: `Wrote <code>"${repl}"</code> to the result and skipped the whole matched window. Now <code>i = ${i}</code> — note we never re-scan the consumed chars (this is what makes matches non-overlapping).`,
+          narrClass: ""
+        });
+      } else {
+        // MISMATCH -> copy single char
+        const c = orig[i];
+        result.push({ ch: c, type: "copied" });
+        i += 1;
+        steps.push({
+          i, j: null, window: i, result: snapResult(result),
+          probeBad: false, matched: false,
+          narration: `No match here, so copy just the single char <code>orig[${i - 1}]='${c}'</code> into the result and advance <code>i += 1</code> → <code>i = ${i}</code>.`,
+          narrClass: ""
+        });
+      }
+    } else {
+      // Not enough chars left for find to fit: copy remaining one at a time
+      const c = orig[i];
+      result.push({ ch: c, type: "copied" });
+      i += 1;
+      steps.push({
+        i, j: null, window: i - 1, result: snapResult(result),
+        probeBad: false, matched: false,
+        narration: `Only ${n - (i - 1)} char(s) left — too few for <code>find</code> (len ${m}) to fit. Copy <code>orig[${i - 1}]='${c}'</code> and advance.`,
+        narrClass: ""
+      });
+    }
+  }
+
+  steps.push({
+    i: n, j: null, window: n, result: snapResult(result),
+    probeBad: false, matched: false, done: true,
+    narration: `<code>i</code> reached the end. The result <code>"${result.map(o=>o.ch).join("")}"</code> is the answer — <b>done.</b>`,
+    narrClass: "match"
+  });
+
+  // ---- DOM ----
+  const stripEl = document.getElementById("strip");
+  const findboxEl = document.getElementById("findbox");
+  const resultEl = document.getElementById("result");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vI = document.getElementById("v-i");
+  const vJ = document.getElementById("v-j");
+  const vLen = document.getElementById("v-len");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  // build static char strip
+  for (let k = 0; k < n; k++) {
+    const d = document.createElement("div");
+    d.className = "ch";
+    d.dataset.idx = k;
+    d.innerHTML = `<span class="idx">${k}</span><span class="val">${orig[k]}</span>`;
+    stripEl.appendChild(d);
+  }
+  // build static find boxes
+  for (let k = 0; k < m; k++) {
+    const f = document.createElement("div");
+    f.className = "fch";
+    f.dataset.idx = k;
+    f.textContent = find[k];
+    findboxEl.appendChild(f);
+  }
+
+  let cursor = 0;
+  const CELL = 44; // min-width(38) + gap(6) — used to align find under the window
+
+  function render() {
+    const s = steps[cursor];
+
+    // strip cells
+    [...stripEl.children].forEach((cell, k) => {
+      cell.className = "ch";
+      cell.querySelector(".ptr")?.remove();
+
+      const inWindow = s.window !== null && k >= s.window && k < s.window + m && s.j !== null;
+      const consumed = k < s.i && !(s.matched && inWindow);
+
+      if (s.matched && k >= s.window && k < s.window + m) {
+        cell.classList.add("matched");
+      } else if (inWindow) {
+        cell.classList.add("window");
+        const rel = k - s.window;
+        if (s.probeBad && rel === s.j) cell.classList.add("probe-bad");
+        else if (rel === s.j) cell.classList.add("probe");
+      } else if (consumed) {
+        cell.classList.add("consumed");
+      }
+
+      // scan pointer arrow under index i (when i in range)
+      if (k === s.i && s.i < n) {
+        const p = document.createElement("span");
+        p.className = "ptr";
+        p.textContent = "▲ i";
+        cell.appendChild(p);
+      }
+    });
+
+    // find boxes: slide under window, color compared chars
+    if (s.window !== null && s.j !== null) {
+      findboxEl.style.marginLeft = (s.window * CELL) + "px";
+      findboxEl.style.visibility = "visible";
+    } else {
+      findboxEl.style.visibility = "hidden";
+    }
+    [...findboxEl.children].forEach((fb, k) => {
+      fb.className = "fch";
+      if (s.j === null) return;
+      if (s.matched) { fb.classList.add("ok"); return; }
+      if (typeof s.okUpTo === "number" && k <= s.okUpTo) fb.classList.add("ok");
+      if (s.probeBad && k === s.j) fb.classList.add("bad");
+      else if (k === s.j) fb.classList.add("active");
+    });
+
+    // result
+    resultEl.innerHTML = "";
+    s.result.forEach(o => {
+      const r = document.createElement("div");
+      r.className = "rch " + (o.type === "repl" ? "repl" : "copied");
+      r.textContent = o.ch;
+      resultEl.appendChild(r);
+    });
+
+    // vars
+    vI.textContent = s.i;
+    vJ.textContent = s.j === null ? "—" : s.j;
+    vLen.textContent = s.result.length;
+
+    // narration
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find Median from Data Stream — two heaps balancing a seesaw</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1 { font-size: 1.75rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; color: var(--text); }
+
+  .problem {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 26px;
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+  .problem code {
+    background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .panel {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 22px;
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    margin-bottom: 22px;
+  }
+
+  /* stream row */
+  .stream { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+  .snum {
+    min-width:38px; height:38px; border-radius:8px; display:grid; place-items:center;
+    font-family:"SF Mono",Menlo,monospace; font-weight:700;
+    background:var(--panel2); border:2px solid rgba(255,255,255,0.10); transition: all .3s ease;
+  }
+  .snum.done { opacity:.34; }
+  .snum.cur { border-color: var(--amber); box-shadow:0 0 0 3px rgba(245,158,11,0.25); color:#ffe2a8; }
+  .snum.future { opacity:.5; border-style:dashed; }
+
+  .heaps { display:grid; grid-template-columns: 1fr auto 1fr; gap:14px; align-items:start; }
+  .heapcol { }
+  .heapcol h3 { margin:0 0 4px; font-size:1rem; }
+  .heapcol .sub { color:var(--muted); font-size:.8rem; margin:0 0 12px; font-family:"SF Mono",Menlo,monospace;}
+  .small h3 { color: var(--blue); }
+  .large h3 { color: var(--purple); }
+
+  svg { width: 100%; height: 180px; display:block; }
+  .edge { stroke: rgba(255,255,255,0.18); stroke-width: 2; }
+  .ncircle { stroke-width: 2; transition: all .3s ease; }
+  .small .ncircle { fill: rgba(59,130,246,0.16); stroke: rgba(59,130,246,0.5); }
+  .small .ncircle.top { fill: rgba(59,130,246,0.32); stroke: var(--blue); }
+  .large .ncircle { fill: rgba(168,85,247,0.16); stroke: rgba(168,85,247,0.5); }
+  .large .ncircle.top { fill: rgba(168,85,247,0.32); stroke: var(--purple); }
+  .nlabel { fill:#fff; font-family:"SF Mono",Menlo,monospace; font-weight:700; font-size:15px; text-anchor:middle; }
+  .toptag { font-size:9px; text-anchor:middle; }
+  .small .toptag { fill: var(--blue); } .large .toptag { fill: var(--purple); }
+
+  .harr { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; justify-content:center; min-height:34px; }
+  .hb {
+    min-width:34px; height:34px; border-radius:7px; display:grid; place-items:center;
+    font-family:"SF Mono",Menlo,monospace; font-weight:700; font-size:.85rem;
+    background:var(--panel2); border:1px solid rgba(255,255,255,0.12);
+  }
+  .small .hb.top { border-color: var(--blue); color:#bcd4ff; }
+  .large .hb.top { border-color: var(--purple); color:#e3c9ff; }
+  .empty-note { color: var(--muted); font-style: italic; font-family:"SF Mono",Menlo,monospace; }
+
+  /* pivot / median in the middle */
+  .pivot { text-align:center; padding-top:30px; min-width:110px; }
+  .pivot .fulcrum { font-size:1.6rem; }
+  .median-box {
+    margin-top:8px; background: rgba(16,185,129,0.14); border:1px solid var(--green);
+    border-radius:10px; padding:10px 8px; font-family:"SF Mono",Menlo,monospace;
+  }
+  .median-box .lbl { color:var(--muted); font-size:.72rem; display:block; }
+  .median-box .val { color:#b6f0d8; font-weight:700; font-size:1.3rem; }
+  .sizes { margin-top:10px; font-family:"SF Mono",Menlo,monospace; font-size:.78rem; color:var(--muted); }
+  .sizes b.s { color:#bcd4ff; } .sizes b.l { color:#e3c9ff; }
+
+  .caption {
+    margin-top: 18px;
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border-left: 4px solid var(--blue);
+    min-height: 56px; font-size: .98rem;
+    transition: border-color .3s;
+  }
+  .caption code { color:#ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .caption b.tag { color: var(--amber); }
+  .caption.move { border-left-color: var(--purple); }
+  .caption.win { border-left-color: var(--green); }
+
+  .controls { text-align: center; margin: 8px 0 26px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 22px; border-radius: 10px;
+    font-size: .98rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled){ background:#2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled){ background:#34345e; }
+  .stepcount { color: var(--muted); font-size:.85rem; margin-top:10px; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 18px 22px; margin-top: 30px; text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.05rem; }
+  @media (max-width: 680px){ .heaps{ grid-template-columns: 1fr; } .pivot{ padding-top:8px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Find Median from Data Stream — <span>two heaps</span> balancing a seesaw</h1>
+  <p class="subtitle">Left = smaller half (max-heap), right = larger half (min-heap). Median bilkul beech me.</p>
+
+  <div class="analogy">
+    <h3>⚖️ Analogy: a balanced seesaw</h3>
+    <p>Left side pe <b>chhoti aadhi</b> numbers (uska <b>max</b> chahiye → max-heap), right side pe <b>badi aadhi</b> (uska <b>min</b> chahiye → min-heap). Har naya number sahi side daalo, phir balance karo. Median = bhaari side ka top (odd) ya dono tops ka average (even).</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> Stream <code>5, 3, 8, 7, 1</code>. After each <code>addNum</code>, <code>findMedian()</code> in O(1).
+    <span class="arrow">→</span> medians: 5, 4, 5, 6, 5.
+  </div>
+
+  <div class="panel">
+    <div style="font-size:.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Incoming stream</div>
+    <div class="stream" id="stream"></div>
+  </div>
+
+  <div class="panel">
+    <div class="heaps">
+      <div class="heapcol small">
+        <h3>small — max-heap</h3>
+        <p class="sub">smaller half · top = its MAX</p>
+        <svg id="smallSvg" viewBox="0 0 300 180" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="harr small" id="smallArr"></div>
+      </div>
+      <div class="pivot">
+        <div class="fulcrum">▲</div>
+        <div class="median-box">
+          <span class="lbl">findMedian()</span>
+          <span class="val" id="medVal">—</span>
+        </div>
+        <div class="sizes" id="sizes"></div>
+      </div>
+      <div class="heapcol large">
+        <h3>large — min-heap</h3>
+        <p class="sub">larger half · top = its MIN</p>
+        <svg id="largeSvg" viewBox="0 0 300 180" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="harr large" id="largeArr"></div>
+      </div>
+    </div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn">‹ Prev</button>
+    <button id="nextBtn">Next ›</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+    <div class="stepcount" id="stepcount"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Keep the smaller half in a max-heap and the larger half in a min-heap, balanced to within one element — the median is always sitting on top, giving O(log n) adds and O(1) median.</p>
+  </div>
+</div>
+
+<script>
+const stream = [5, 3, 8, 7, 1];
+
+// Simulate the two-heap algorithm, snapshotting after each sub-action.
+function buildSteps(){
+  const steps = [];
+  let small = []; // max-heap as plain array; we treat conceptually, sort for top
+  let large = []; // min-heap
+  // helpers maintaining true heap semantics via sort (small arrays — fine for viz)
+  const smallMax = () => small.length ? Math.max(...small) : null;
+  const largeMin = () => large.length ? Math.min(...large) : null;
+  const popMax = () => { const m = smallMax(); small.splice(small.indexOf(m),1); return m; };
+  const popMin = () => { const m = largeMin(); large.splice(large.indexOf(m),1); return m; };
+
+  const median = () => {
+    if (small.length > large.length) return smallMax();
+    if (small.length === 0) return null;
+    return (smallMax() + largeMin()) / 2;
+  };
+
+  const snap = (caption, kind, processedCount) => {
+    steps.push({
+      small:[...small], large:[...large],
+      smallMax: smallMax(), largeMin: largeMin(),
+      median: median(),
+      caption, kind, processed: processedCount
+    });
+  };
+
+  snap(`Empty start. <code>small</code> (max-heap) and <code>large</code> (min-heap) are both empty. Press Next to stream numbers in.`, 'init', 0);
+
+  for (let k=0;k<stream.length;k++){
+    const num = stream[k];
+    // 1) push to small
+    small.push(num);
+    snap(`Add <b class="tag">${num}</b>. Step 1 — push it into <code>small</code> (the max-heap). small.max is now ${smallMax()}.`, 'push', k+1);
+
+    // 2) ordering fix: if small.max > large.min, move it over
+    if (small.length && large.length && smallMax() > largeMin()){
+      const moved = popMax();
+      large.push(moved);
+      snap(`Step 2 — order fix: small's max (${moved}) was bigger than large's min (${largeMin()===moved?'—':largeMin()}). That breaks "every small ≤ every large", so move <b class="tag">${moved}</b> across to <code>large</code>.`, 'move', k+1);
+    }
+    // 3a) balance: small too big
+    if (small.length > large.length + 1){
+      const moved = popMax();
+      large.push(moved);
+      snap(`Step 3 — rebalance: <code>small</code> got 2 ahead. Move its max <b class="tag">${moved}</b> to <code>large</code> so sizes differ by at most 1.`, 'move', k+1);
+    }
+    // 3b) balance: large too big
+    else if (large.length > small.length){
+      const moved = popMin();
+      small.push(moved);
+      snap(`Step 3 — rebalance: <code>large</code> outgrew <code>small</code>. Move its min <b class="tag">${moved}</b> back to <code>small</code> (small holds the extra on odd counts).`, 'move', k+1);
+    }
+    // report median
+    const tot = small.length + large.length;
+    const m = median();
+    const how = (small.length > large.length)
+      ? `odd count → median = small's top = <b class="tag">${m}</b>.`
+      : `even count → median = (small.max ${smallMax()} + large.min ${largeMin()}) / 2 = <b class="tag">${m}</b>.`;
+    snap(`After balancing: small=${small.length}, large=${large.length}. findMedian() → ${how}`, 'median', k+1);
+  }
+  steps[steps.length-1].kind = 'win';
+  steps[steps.length-1].caption += ` All ${stream.length} numbers streamed — median stayed O(1) throughout. ✅`;
+  return steps;
+}
+
+const steps = buildSteps();
+let i = 0;
+const $ = id => document.getElementById(id);
+
+// Render a heap as a small binary tree.
+// `order`: 'max' -> parent >= children (small heap); 'min' -> parent <= children (large heap)
+function heapArray(values, order){
+  // build a valid heap array layout for display (level order)
+  const arr = [...values];
+  const cmp = order==='max' ? (a,b)=>b-a : (a,b)=>a-b;
+  // siftable: we just sort then re-heapify-ish for a *display* that respects root=top.
+  // Simple approach: repeatedly extract root (max or min) to get level-order-ish.
+  // For small n, produce a binary-heap array via insertion.
+  const heap = [];
+  const less = order==='max' ? (a,b)=>a>b : (a,b)=>a<b; // "has priority over"
+  for (const v of arr){
+    heap.push(v);
+    let c = heap.length-1;
+    while (c>0){
+      const p = (c-1>>1);
+      if (less(heap[c], heap[p])){ [heap[c],heap[p]]=[heap[p],heap[c]]; c=p; }
+      else break;
+    }
+  }
+  return heap;
+}
+
+function renderTree(svgId, values, order, side){
+  const svg = $(svgId);
+  if (values.length===0){ svg.innerHTML = `<text x="150" y="60" text-anchor="middle" fill="#9a9ac0" font-style="italic" font-family="monospace">empty</text>`; return; }
+  const heap = heapArray(values, order);
+  const pos = [ {x:150,y:30}, {x:80,y:105}, {x:220,y:105}, {x:45,y:165}, {x:115,y:165}, {x:185,y:165}, {x:255,y:165} ];
+  let edges='', nodes='';
+  for (let k=1;k<heap.length && k<7;k++){
+    const p = pos[(k-1>>1)];
+    edges += `<line class="edge" x1="${pos[k].x}" y1="${pos[k].y}" x2="${p.x}" y2="${p.y}"/>`;
+  }
+  for (let k=0;k<heap.length && k<7;k++){
+    const isTop = k===0;
+    nodes += `<g>
+      <circle class="ncircle ${isTop?'top':''}" cx="${pos[k].x}" cy="${pos[k].y}" r="22"/>
+      <text class="nlabel" x="${pos[k].x}" y="${pos[k].y+1}">${heap[k]}</text>
+      ${isTop?`<text class="toptag" x="${pos[k].x}" y="${pos[k].y-28}">${order==='max'?'MAX':'MIN'}</text>`:''}
+    </g>`;
+  }
+  svg.innerHTML = edges + nodes;
+}
+
+function renderArr(elId, values, order){
+  const el = $(elId);
+  if (values.length===0){ el.innerHTML = `<span class="empty-note">[]</span>`; return; }
+  const heap = heapArray(values, order);
+  el.innerHTML = heap.map((v,idx)=>`<div class="hb ${idx===0?'top':''}">${v}</div>`).join('');
+}
+
+function renderStream(s){
+  $('stream').innerHTML = stream.map((v,idx)=>{
+    let cls='snum';
+    if (idx < s.processed-1) cls+=' done';
+    else if (idx === s.processed-1 && s.processed>0) cls+=' cur';
+    else cls+=' future';
+    return `<div class="${cls}">${v}</div>`;
+  }).join('');
+}
+
+function fmtMedian(m){
+  if (m===null) return '—';
+  return Number.isInteger(m) ? m.toFixed(1) : m.toString();
+}
+
+function render(){
+  const s = steps[i];
+  renderStream(s);
+  renderTree('smallSvg', s.small, 'max', 'small');
+  renderTree('largeSvg', s.large, 'min', 'large');
+  renderArr('smallArr', s.small, 'max');
+  renderArr('largeArr', s.large, 'min');
+  $('medVal').textContent = fmtMedian(s.median);
+  $('sizes').innerHTML = `len(<b class="s">small</b>)=${s.small.length} · len(<b class="l">large</b>)=${s.large.length}`;
+  const cap = $('caption');
+  cap.className = 'caption' + (s.kind==='move'?' move':'') + (s.kind==='win'?' win':'');
+  cap.innerHTML = s.caption;
+  $('stepcount').textContent = `Step ${i+1} / ${steps.length}`;
+  $('prevBtn').disabled = i===0;
+  $('nextBtn').disabled = i===steps.length-1;
+}
+
+$('nextBtn').onclick = () => { if (i<steps.length-1){ i++; render(); } };
+$('prevBtn').onclick = () => { if (i>0){ i--; render(); } };
+$('resetBtn').onclick = () => { i=0; render(); };
+render();
+</script>
+</body>
+</html>

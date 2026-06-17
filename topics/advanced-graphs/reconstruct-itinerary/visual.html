@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reconstruct Itinerary — Hierholzer's Eulerian Path</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444; --purple:#a855f7;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:30px 18px 70px;}
+  .wrap{max-width:940px;margin:0 auto;}
+  h1{font-size:1.6rem;margin:0 0 6px;}
+  h1 span{color:var(--purple);}
+  .subtitle{color:var(--muted);margin:0 0 24px;}
+  .analogy{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(168,85,247,.10));
+    border:1px solid rgba(245,158,11,.4);border-left:5px solid var(--amber);border-radius:12px;padding:16px 20px;margin-bottom:24px;}
+  .analogy h3{margin:0 0 6px;color:var(--amber);font-size:1.02rem;}
+  .analogy p{margin:0;}
+  .stage{display:grid;grid-template-columns:1fr 300px;gap:18px;background:var(--panel);
+    border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:18px 20px;margin-bottom:18px;}
+  @media(max-width:740px){.stage{grid-template-columns:1fr;}}
+  svg{width:100%;height:auto;background:#12182e;border-radius:10px;}
+  .side{display:flex;flex-direction:column;gap:14px;}
+  .panel-box{background:var(--panel2);border-radius:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);}
+  .panel-box h4{margin:0 0 8px;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);}
+  .heaprow{font-family:"SF Mono",monospace;font-size:.9rem;padding:4px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .heaprow .ap{color:var(--amber);font-weight:700;min-width:42px;}
+  .dchip{background:#1b2748;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:2px 8px;}
+  .dchip.next{border-color:var(--amber);background:rgba(245,158,11,.16);color:#ffe3a8;}
+  .dchip.used{opacity:.35;text-decoration:line-through;}
+  .stack{display:flex;flex-direction:column-reverse;gap:5px;min-height:30px;}
+  .sframe{font-family:"SF Mono",monospace;font-weight:700;background:rgba(59,130,246,.18);border:1px solid var(--blue);
+    border-radius:7px;padding:4px 11px;color:#bcd4ff;}
+  .sframe.top{border-color:var(--amber);background:rgba(245,158,11,.18);color:#ffe3a8;}
+  .route{display:flex;flex-wrap:wrap;gap:7px;min-height:34px;align-items:center;}
+  .rchip{font-family:"SF Mono",monospace;font-weight:700;background:rgba(16,185,129,.18);border:1px solid var(--green);
+    border-radius:7px;padding:4px 11px;color:#b6f0d8;}
+  .empty{color:var(--muted);font-style:italic;font-size:.85rem;}
+  .caption{background:var(--panel2);border-left:4px solid var(--purple);border-radius:8px;
+    padding:12px 16px;margin:0 0 16px;font-size:.98rem;min-height:54px;}
+  .caption b{color:#e3c9ff;}
+  .controls{display:flex;align-items:center;gap:10px;margin:6px 0 22px;}
+  button{background:var(--purple);color:#fff;border:none;padding:10px 22px;border-radius:9px;font-size:.98rem;font-weight:700;cursor:pointer;transition:transform .12s,background .2s;}
+  button:hover{background:#9333ea;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  button.ghost{background:var(--panel2);font-weight:600;}
+  button.ghost:hover{background:#33457a;}
+  .stepind{color:var(--muted);font-size:.9rem;margin-left:auto;}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:4px 0 18px;font-size:.84rem;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:13px;height:13px;border-radius:50%;display:inline-block;}
+  .takeaway{background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(16,185,129,.12));
+    border:1px solid rgba(168,85,247,.4);border-radius:12px;padding:18px 22px;margin-top:26px;text-align:center;}
+  .takeaway h3{margin:0 0 6px;color:var(--purple);}
+  .takeaway p{margin:0;font-size:1.05rem;}
+  .nlabel{font:700 13px 'Segoe UI';fill:#fff;}
+  .edge{stroke:#4a5a88;stroke-width:2.5;transition:all .3s;}
+  .edge.used{stroke:#2c3a63;stroke-width:1.5;opacity:.45;stroke-dasharray:4 4;}
+  .edge.active{stroke:var(--amber);stroke-width:4;}
+  .elabel{font:600 11px "SF Mono",monospace;fill:#9fb0e0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Reconstruct Itinerary — <span>Hierholzer's</span> Eulerian path</h1>
+  <p class="subtitle">Use every ticket (edge) exactly once. DFS down the smallest unused edge, append airports post-order at dead-ends, then reverse.</p>
+
+  <div class="analogy">
+    <h3>📮 The courier analogy</h3>
+    <p>Har gali (ticket) se exactly ek baar guzarna hai. Chalte raho — sabse chhota available raasta lo. Jab <b>dead-end</b> pe phaso (aage koi unused ticket nahi), wo airport route ke <b>end</b> me jaata hai (stack pe push). Peechhe laut ke bachi galiyaan khaate jao. Aakhir me stack <b>ulta</b> padho = sahi itinerary.</p>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#3a4a78"></i>airport</span>
+    <span><i class="dot" style="background:var(--amber)"></i>current / flying</span>
+    <span><i class="dot" style="background:var(--green)"></i>appended to route</span>
+    <span><i class="dot" style="width:18px;height:4px;border-radius:2px;background:#4a5a88"></i>unused ticket</span>
+    <span><i class="dot" style="width:18px;height:4px;border-radius:2px;background:#2c3a63;opacity:.5"></i>used</span>
+  </div>
+
+  <div class="stage">
+    <svg id="graph" viewBox="0 0 440 280"></svg>
+    <div class="side">
+      <div class="panel-box">
+        <h4>Adjacency (min-heaps)</h4>
+        <div id="heaps"></div>
+      </div>
+      <div class="panel-box">
+        <h4>Recursion / DFS stack</h4>
+        <div class="stack" id="stack"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-box" style="margin-bottom:16px;">
+    <h4>route[] (post-order appends — will be reversed)</h4>
+    <div class="route" id="route"><span class="empty">empty</span></div>
+  </div>
+
+  <div class="caption" id="caption">Press <b>Next</b>. DFS starts at JFK, always taking the lexically smallest unused ticket.</div>
+  <div class="controls">
+    <button id="prev" class="ghost">‹ Prev</button>
+    <button id="next">Next ›</button>
+    <button id="auto" class="ghost">▶ Auto</button>
+    <span class="stepind" id="ind"></span>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>A node is appended to <code>route</code> only after all its edges are exhausted (post-order). Dead-ends land at the end; reversing the route lifts them back into the correct continuous Eulerian path.</p>
+  </div>
+</div>
+
+<script>
+// tickets -> answer ["JFK","ATL","JFK","SFO","ATL","SFO"]
+const tickets=[["JFK","SFO"],["JFK","ATL"],["SFO","ATL"],["ATL","JFK"],["ATL","SFO"]];
+const pos={JFK:[80,140], ATL:[230,60], SFO:[230,220], EXT:[0,0]};
+// fix layout: 3 airports
+const apos={JFK:[80,150], ATL:[240,60], SFO:[260,230]};
+const airports=['JFK','ATL','SFO'];
+
+// build min-heaps
+function freshGraph(){
+  const g={}; airports.forEach(a=>g[a]=[]);
+  tickets.forEach(([u,v])=>g[u].push(v));
+  for(const a in g) g[a].sort();
+  return g;
+}
+
+function buildSteps(){
+  const steps=[];
+  const graph=freshGraph();
+  const route=[]; const stack=[]; const usedEdges=new Set(); // "u->v" with index
+  let edgeId=0;
+  const usedKey=(u,v,n)=>`${u}->${v}#${n}`;
+  const snap=(o)=>({
+    caption:o.caption,
+    graph:Object.fromEntries(Object.entries(graph).map(([k,v])=>[k,[...v]])),
+    used:new Set(usedEdges),
+    route:[...route],
+    stack:[...stack],
+    flying:o.flying?[...o.flying]:null,
+    cur:o.cur??(stack.length?stack[stack.length-1]:null)
+  });
+  // iterative Hierholzer mirroring recursion
+  stack.push('JFK');
+  steps.push(snap({caption:`Push <b>JFK</b> onto the stack (start). Its tickets: [${graph['JFK'].join(', ')}].`}));
+  while(stack.length){
+    const node=stack[stack.length-1];
+    if(graph[node].length>0){
+      const nxt=graph[node][0];
+      // record used edge for visualization (count which occurrence)
+      const occ=usedEdges.size; // not exact per pair but fine for display
+      graph[node].shift();
+      usedEdges.add(usedKey(node,nxt,edgeId++));
+      stack.push(nxt);
+      steps.push(snap({caption:`At <b>${node}</b>: take smallest unused ticket <b>${node}→${nxt}</b>. Push ${nxt}. (${node} now: [${graph[node].join(', ')||'none'}])`,flying:[node,nxt]}));
+    } else {
+      // dead end
+      route.push(node);
+      steps.push(snap({caption:`<b>${node}</b> has no tickets left → dead-end. Pop it and <b>append to route</b> → [${route.join(', ')}].`}));
+      stack.pop();
+    }
+  }
+  const finalRoute=[...route].reverse();
+  steps.push(snap({caption:`Stack empty. route (post-order) = [${route.join(', ')}]. <b>Reverse it</b> → itinerary = <b>[${finalRoute.join(', ')}]</b>. ✅`}));
+  return steps;
+}
+const steps=buildSteps();
+let cur=0,timer=null;
+const $=id=>document.getElementById(id);
+
+function drawGraph(s){
+  let h=`<defs><marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6a7aae"/></marker><marker id="arrA" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#f59e0b"/></marker></defs>`;
+  // group tickets by pair to count multiplicity and curve
+  const pairs={};
+  tickets.forEach(([u,v])=>{const k=u+'|'+v;pairs[k]=(pairs[k]||0)+1;});
+  // count how many of each pair remain in graph (unused)
+  const remain={};
+  for(const a in s.graph){s.graph[a].forEach(v=>{const k=a+'|'+v;remain[k]=(remain[k]||0)+1;});}
+  const drawn={};
+  Object.keys(pairs).forEach(k=>{
+    const [u,v]=k.split('|');
+    const total=pairs[k]; const left=remain[k]||0; const usedN=total-left;
+    const [x1,y1]=apos[u],[x2,y2]=apos[v];
+    const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),r=24;
+    // curve offset for bidirectional separation
+    const nx=-dy/len, ny=dx/len; const off=18;
+    const reverse=apos[v][1]<apos[u][1]; // arbitrary side
+    const ox=nx*off*(u<v?1:-1), oy=ny*off*(u<v?1:-1);
+    const mx=(x1+x2)/2+ox, my=(y1+y2)/2+oy;
+    const sx=x1+dx/len*r, sy=y1+dy/len*r, ex=x2-dx/len*r, ey=y2-dy/len*r;
+    const active=s.flying&&s.flying[0]===u&&s.flying[1]===v;
+    let cls='edge';
+    if(active) cls='edge active';
+    else if(usedN>=total) cls='edge used';
+    h+=`<path class="${cls}" d="M${sx},${sy} Q${mx},${my} ${ex},${ey}" fill="none" marker-end="url(#${active?'arrA':'arr'})"/>`;
+    h+=`<text class="elabel" x="${mx}" y="${my}" text-anchor="middle">${u}→${v}${total>1?` ×${left}/${total}`:''}</text>`;
+  });
+  airports.forEach(a=>{
+    const [x,y]=apos[a];
+    let fill='#3a4a78',stroke='#5a6aa0';
+    if(s.route.includes(a)){fill='#10b981';stroke='#0c8f63';}
+    if(s.cur===a){fill='#f59e0b';stroke='#d98a08';}
+    h+=`<circle cx="${x}" cy="${y}" r="24" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>`;
+    h+=`<text class="nlabel" x="${x}" y="${y+1}" text-anchor="middle">${a}</text>`;
+  });
+  $('graph').innerHTML=h;
+}
+function drawHeaps(s){
+  $('heaps').innerHTML=airports.map(a=>{
+    const dests=s.graph[a];
+    const chips=dests.length?dests.map((d,i)=>`<span class="dchip ${i===0?'next':''}">${d}</span>`).join(''):'<span class="empty">—</span>';
+    return `<div class="heaprow"><span class="ap">${a}:</span>${chips}</div>`;
+  }).join('');
+}
+function drawStack(s){
+  $('stack').innerHTML=s.stack.length?s.stack.map((a,i)=>`<span class="sframe ${i===s.stack.length-1?'top':''}">${a}</span>`).join(''):'<span class="empty">empty</span>';
+}
+function drawRoute(s){
+  $('route').innerHTML=s.route.length?s.route.map(a=>`<span class="rchip">${a}</span>`).join(''):'<span class="empty">empty</span>';
+}
+function render(){
+  const s=steps[cur];
+  drawGraph(s);drawHeaps(s);drawStack(s);drawRoute(s);
+  $('caption').innerHTML=s.caption;
+  $('ind').textContent=`Step ${cur+1} / ${steps.length}`;
+  $('prev').disabled=cur===0; $('next').disabled=cur===steps.length-1;
+}
+$('next').onclick=()=>{if(cur<steps.length-1){cur++;render();}};
+$('prev').onclick=()=>{if(cur>0){cur--;render();}};
+$('auto').onclick=function(){
+  if(timer){clearInterval(timer);timer=null;this.textContent='▶ Auto';return;}
+  this.textContent='⏸ Pause';
+  timer=setInterval(()=>{if(cur<steps.length-1){cur++;render();}else{clearInterval(timer);timer=null;$('auto').textContent='▶ Auto';}},1000);
+};
+render();
+</script>
+</body>
+</html>

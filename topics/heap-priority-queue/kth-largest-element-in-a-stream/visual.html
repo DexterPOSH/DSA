@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kth Largest in a Stream — Min-Heap of Size k</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #1e2a4a;
+    --text: #e0e0e0; --muted: #93a0c0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444; --purple: #a855f7;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6; padding: 36px 20px 80px;
+    display: flex; flex-direction: column; align-items: center; gap: 26px;
+  }
+  .wrap { max-width: 780px; width: 100%; display: flex; flex-direction: column; gap: 24px; }
+  h1 { font-size: 1.7rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+  .analogy {
+    background: var(--panel); border: 1px solid var(--amber); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px;
+  }
+  .analogy .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--amber); margin-bottom: 6px; }
+  .analogy p { font-size: 0.96rem; }
+  .analogy b { color: var(--text); }
+
+  .problem { background: var(--panel); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 14px 22px; font-size: 0.95rem; }
+  .problem code { background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+  .card { background: var(--panel); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 20px;
+    box-shadow: 0 8px 26px rgba(0,0,0,0.3); }
+  .section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+
+  .step-desc { background: var(--panel2); border-left: 4px solid var(--blue);
+    border-radius: 8px; padding: 14px 16px; font-size: 0.95rem; min-height: 60px; }
+  .step-desc b { color: #fff; }
+  .step-desc .hl-green { color: var(--green); font-weight: 700; }
+  .step-desc .hl-amber { color: var(--amber); font-weight: 700; }
+  .step-desc .hl-red { color: var(--red); font-weight: 700; }
+
+  /* stream row */
+  .stream { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stream-cell { min-width: 38px; height: 38px; border-radius: 8px;
+    display: grid; place-items: center; font-weight: 700;
+    font-family: 'SF Mono', Menlo, monospace;
+    background: var(--panel2); border: 1px solid rgba(255,255,255,0.1); color: var(--muted);
+    transition: all 0.3s; }
+  .stream-cell.done { color: var(--text); opacity: 0.55; }
+  .stream-cell.active { background: rgba(245,158,11,0.18); border-color: var(--amber);
+    color: #ffe2ad; transform: translateY(-3px); box-shadow: 0 4px 12px rgba(245,158,11,0.3); }
+
+  /* heap tree svg */
+  .tree-wrap { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 460px; height: 220px; }
+  .edge { stroke: #3a4a6e; stroke-width: 2; }
+  .node-circle { fill: var(--panel2); stroke: var(--blue); stroke-width: 2; transition: all 0.3s; }
+  .node-circle.root { fill: rgba(16,185,129,0.18); stroke: var(--green); stroke-width: 3; }
+  .node-circle.moving { fill: rgba(245,158,11,0.2); stroke: var(--amber); stroke-width: 3; }
+  .node-circle.evict { fill: rgba(239,68,68,0.2); stroke: var(--red); stroke-width: 3; }
+  .node-circle.incoming { fill: rgba(168,85,247,0.2); stroke: var(--purple); stroke-width: 3; }
+  .node-text { fill: var(--text); font-family: 'SF Mono', Menlo, monospace;
+    font-weight: 700; font-size: 15px; text-anchor: middle; dominant-baseline: central; }
+
+  /* array view */
+  .arr-view { display: flex; gap: 6px; align-items: center; }
+  .arr-cell { min-width: 40px; height: 40px; border-radius: 8px; position: relative;
+    display: grid; place-items: center; font-weight: 700;
+    font-family: 'SF Mono', Menlo, monospace;
+    background: var(--panel2); border: 1px solid var(--blue); color: #bcd4ff; transition: all 0.3s; }
+  .arr-cell.root { border-color: var(--green); background: rgba(16,185,129,0.15); color: #b6f0d8; }
+  .arr-cell.moving { border-color: var(--amber); background: rgba(245,158,11,0.18); color: #ffe2ad; }
+  .arr-cell.incoming { border-color: var(--purple); background: rgba(168,85,247,0.18); color: #e3c9ff; }
+  .arr-idx { position: absolute; bottom: -18px; left: 0; right: 0; text-align: center;
+    font-size: 0.65rem; color: #5a6a90; }
+  .arr-empty { color: #5a6a90; font-style: italic; font-size: 0.9rem; }
+
+  .answer { display: inline-flex; align-items: center; gap: 10px;
+    background: rgba(16,185,129,0.14); border: 1px solid var(--green);
+    color: #b6f0d8; padding: 10px 18px; border-radius: 10px;
+    font-family: 'SF Mono', Menlo, monospace; font-weight: 700; font-size: 1.05rem;
+    align-self: flex-start; opacity: 0; transition: opacity 0.3s; }
+  .answer.show { opacity: 1; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .counter { font-size: 0.82rem; color: #5a6a90; margin-left: auto;
+    font-family: 'SF Mono', Menlo, monospace; }
+
+  .takeaway { background: linear-gradient(135deg, rgba(59,130,246,0.14), rgba(16,185,129,0.1));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px; padding: 18px 24px; }
+  .takeaway .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 6px; }
+  .takeaway p { font-size: 1rem; }
+  .takeaway b { color: var(--text); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kth Largest in a Stream &mdash; <span>Min-Heap of Size k</span></h1>
+
+  <div class="analogy">
+    <div class="label">Real-world analogy</div>
+    <p>Ek <b>VIP lounge me sirf top-3 spenders ki seats</b> hain. Naya customer aata hai — agar uska bill lounge ke <b>sabse chhote member</b> se bada hai, andar aa jaata hai aur sabse chhota nikal diya jaata hai. Kth largest ka jawab? Lounge ka sabse chhota member — wahi <b>min-heap ka root</b> hai.</p>
+  </div>
+
+  <div class="problem">
+    <b>k = 3</b>, initial <code>nums = [4, 5, 8, 2]</code>, then stream <code>add(3), add(5), add(10), add(9), add(4)</code>. Har add ke baad 3rd largest return karo.
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">What happens</div>
+      <div class="step-desc" id="stepDesc">Press <b>Next</b> to start. We build the min-heap from the initial nums, then process the stream.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Incoming stream</div>
+      <div class="stream" id="streamRow"></div>
+    </div>
+
+    <div>
+      <div class="section-label">Min-heap (size k = 3) &mdash; tree view, root = kth largest</div>
+      <div class="tree-wrap">
+        <svg id="treeSvg" viewBox="0 0 460 220"></svg>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Underlying array (heap[0] = root = answer)</div>
+      <div class="arr-view" id="arrView"></div>
+    </div>
+
+    <div class="answer" id="answer"></div>
+
+    <div class="legend">
+      <span><i class="dot" style="background:var(--green)"></i> root = kth largest</span>
+      <span><i class="dot" style="background:var(--purple)"></i> incoming</span>
+      <span><i class="dot" style="background:var(--amber)"></i> sifting</span>
+      <span><i class="dot" style="background:var(--red)"></i> evicted</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">‹ Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next ›</button>
+      <span class="counter" id="counter">0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="label">Key takeaway</div>
+    <p>Keep <b>only the top-k</b> elements in a min-heap. Its root is always the <b>kth largest</b>. Each <code style="font-family:monospace">add</code> is just push + maybe pop — <b>O(log k)</b>, no full sort, no growing memory.</p>
+  </div>
+</div>
+
+<script>
+const k = 3;
+const initial = [4, 5, 8, 2];
+const stream = [3, 5, 10, 9, 4];
+
+// ---- min-heap helpers operating on a plain array; we record snapshots ----
+function heapPush(h, v) {
+  h.push(v);
+  let i = h.length - 1;
+  while (i > 0) { const p = (i-1)>>1; if (h[p] <= h[i]) break; [h[p],h[i]]=[h[i],h[p]]; i = p; }
+}
+function heapPop(h) {
+  const top = h[0]; const last = h.pop();
+  if (h.length) { h[0] = last; let i = 0;
+    while (true) { let s=i, l=2*i+1, r=2*i+2;
+      if (l<h.length && h[l]<h[s]) s=l; if (r<h.length && h[r]<h[s]) s=r;
+      if (s===i) break; [h[s],h[i]]=[h[i],h[s]]; i=s; } }
+  return top;
+}
+
+// ---- build step list with snapshots ----
+const steps = [];
+let heap = [];
+function snap(desc, opts={}) {
+  steps.push({
+    heap: heap.slice(),
+    desc,
+    streamIdx: opts.streamIdx ?? -1,        // which stream cell active
+    streamDone: opts.streamDone ?? -1,      // process up to (exclusive) marked done
+    answer: opts.answer ?? null,
+    rootHi: opts.rootHi ?? false,
+    incoming: opts.incoming ?? null,        // value being inserted
+    evict: opts.evict ?? null               // value being evicted
+  });
+}
+
+// initial heapify (push one by one, trimming to k)
+snap(`Start with initial nums = [4, 5, 8, 2] and k = 3. We'll build a min-heap holding only the 3 largest.`);
+initial.forEach(v => {
+  heapPush(heap, v);
+  if (heap.length > k) {
+    const ev = heap[0];
+    heapPop(heap);
+    snap(`Insert <b>${v}</b>, heap now has ${k+1} > k. Evict the smallest (<span class="hl-red">${ev}</span>) so only the top ${k} remain.`, {incoming:v, evict:ev});
+  } else {
+    snap(`Insert <b>${v}</b> into the heap (size ${heap.length}). It sifts up to keep the smallest at the root.`, {incoming:v});
+  }
+});
+snap(`Heap built: root <span class="hl-green">${heap[0]}</span> is the current 3rd largest. Now process the stream.`, {rootHi:true});
+
+// process stream
+stream.forEach((v, si) => {
+  heapPush(heap, v);
+  snap(`<b>add(${v})</b> → push <span class="hl-amber">${v}</span>. Heap temporarily has ${heap.length} elements.`, {streamIdx:si, streamDone:si, incoming:v});
+  if (heap.length > k) {
+    const ev = heap[0];
+    heapPop(heap);
+    snap(`Size ${k+1} > k → pop the smallest (<span class="hl-red">${ev}</span>). Heap back to k = ${k}.`, {streamIdx:si, streamDone:si, evict:ev});
+  }
+  snap(`Root = <span class="hl-green">${heap[0]}</span> → <b>return ${heap[0]}</b> as the 3rd largest so far.`, {streamIdx:si, streamDone:si+1, rootHi:true, answer:heap[0]});
+});
+
+// ---- rendering ----
+const TREE_POS = [ {x:230,y:34}, {x:130,y:108}, {x:330,y:108}, {x:80,y:182}, {x:180,y:182}, {x:280,y:182}, {x:380,y:182} ];
+const TREE_EDGES = [[0,1],[0,2],[1,3],[1,4],[2,5],[2,6]];
+
+const svg = document.getElementById('treeSvg');
+const arrView = document.getElementById('arrView');
+const streamRow = document.getElementById('streamRow');
+const stepDesc = document.getElementById('stepDesc');
+const counter = document.getElementById('counter');
+const answerEl = document.getElementById('answer');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
+function buildStream() {
+  streamRow.innerHTML = stream.map((v,i)=>`<div class="stream-cell" id="sc${i}">${v}</div>`).join('');
+}
+buildStream();
+
+function classFor(value, st, idxInHeap) {
+  if (idxInHeap === 0 && st.rootHi) return 'root';
+  if (st.incoming !== null && value === st.incoming) return 'incoming';
+  if (st.evict !== null && value === st.evict) return 'evict';
+  return '';
+}
+
+function render(i) {
+  const st = steps[i];
+  stepDesc.innerHTML = st.desc;
+  counter.textContent = `${i} / ${steps.length - 1}`;
+
+  // stream cells
+  stream.forEach((v, si) => {
+    const c = document.getElementById('sc'+si);
+    c.className = 'stream-cell';
+    if (si < st.streamDone) c.classList.add('done');
+    if (si === st.streamIdx) c.classList.add('active');
+  });
+
+  // tree
+  let edges = '';
+  TREE_EDGES.forEach(([a,b]) => {
+    if (a < st.heap.length && b < st.heap.length) {
+      const pa = TREE_POS[a], pb = TREE_POS[b];
+      edges += `<line class="edge" x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" />`;
+    }
+  });
+  let nodes = '';
+  st.heap.forEach((v, idx) => {
+    const p = TREE_POS[idx];
+    const cls = classFor(v, st, idx);
+    nodes += `<circle class="node-circle ${cls}" cx="${p.x}" cy="${p.y}" r="22" />
+              <text class="node-text" x="${p.x}" y="${p.y}">${v}</text>`;
+  });
+  svg.innerHTML = edges + nodes;
+
+  // array
+  if (st.heap.length === 0) {
+    arrView.innerHTML = '<span class="arr-empty">heap empty</span>';
+  } else {
+    arrView.innerHTML = st.heap.map((v, idx) => {
+      const cls = classFor(v, st, idx);
+      return `<div class="arr-cell ${cls}">${v}<span class="arr-idx">[${idx}]</span></div>`;
+    }).join('');
+  }
+
+  // answer
+  if (st.answer !== null) { answerEl.textContent = `return ${st.answer}`; answerEl.classList.add('show'); }
+  else answerEl.classList.remove('show');
+
+  prevBtn.disabled = (i === 0);
+  nextBtn.disabled = (i === steps.length - 1);
+}
+
+let cur = 0;
+function next() { if (cur < steps.length - 1) { cur++; render(cur); } }
+function prev() { if (cur > 0) { cur--; render(cur); } }
+render(0);
+</script>
+</body>
+</html>

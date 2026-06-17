@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Course Schedule II — Building a Topological Order</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a; --text: #e0e0e0;
+    --muted: #7a8ab0; --blue: #3b82f6; --amber: #f59e0b; --green: #10b981;
+    --red: #ef4444; --edge: #2d3a5a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 36px 18px 64px; gap: 26px;
+  }
+  h1 { font-size: 1.6rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue); border-radius: 12px;
+    padding: 16px 22px; max-width: 820px; width: 100%;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.96rem; line-height: 1.55; color: #c0c0d0; }
+  .analogy-text strong { color: var(--text); }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--edge);
+    border-radius: 16px; padding: 26px; max-width: 880px; width: 100%;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .section-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+  .step-description {
+    min-height: 56px; background: var(--panel2); border-radius: 8px;
+    padding: 14px 18px; font-size: 0.95rem; line-height: 1.55;
+    color: #c8c8e0; border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-description.done { border-color: var(--green); }
+  .step-description code { color: #93c5fd; }
+
+  .layout { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+  .graph-box {
+    background: var(--panel2); border: 1px solid var(--edge);
+    border-radius: 12px; padding: 8px; flex: 1 1 400px;
+  }
+  .node circle { fill: #1c2540; stroke: var(--edge); stroke-width: 2.5; transition: fill 0.35s, stroke 0.35s; }
+  .node text.lbl { fill: var(--text); font-size: 16px; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+  .node text.deg { fill: var(--amber); font-size: 10.5px; font-weight: 700; text-anchor: middle; }
+  .node.ready circle { fill: #1e3a6e; stroke: var(--blue); }
+  .node.taking circle { fill: #3a2e0d; stroke: var(--amber); filter: drop-shadow(0 0 8px rgba(245,158,11,0.6)); }
+  .node.done circle  { fill: #0d2a1a; stroke: var(--green); }
+  .node.done text.lbl { fill: #86efac; }
+  .node.done text.deg { fill: #4a8c6a; }
+  .edge { stroke: var(--edge); stroke-width: 2.5; transition: stroke 0.35s, opacity 0.35s; }
+  .edge.relaxed { stroke: var(--green); opacity: 0.4; }
+
+  .side { flex: 1 1 220px; display: flex; flex-direction: column; gap: 16px; }
+  .stat-box { background: var(--panel2); border: 1px solid var(--edge); border-radius: 10px; padding: 14px 16px; }
+  .stat-row { display: flex; justify-content: space-between; align-items: baseline; margin: 5px 0; }
+  .stat-row .k { color: var(--muted); font-size: 0.85rem; }
+  .stat-row .v { font-size: 1.3rem; font-weight: 800; font-family: 'SF Mono', Menlo, monospace; color: var(--green); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; min-height: 38px; align-items: center; }
+  .qchip {
+    height: 32px; min-width: 32px; padding: 0 9px; border-radius: 8px; background: #1e3a6e;
+    border: 1.5px solid var(--blue); color: #93c5fd; font-size: 0.9rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; font-family: 'SF Mono', Menlo, monospace;
+    animation: pop 0.25s ease;
+  }
+  @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .order-box { background: var(--panel2); border: 1px solid var(--green); border-radius: 10px; padding: 14px 16px; }
+  .order-row { display: flex; gap: 6px; flex-wrap: wrap; min-height: 40px; align-items: center; }
+  .ochip {
+    height: 36px; min-width: 36px; padding: 0 10px; border-radius: 8px; background: #0d2a1a;
+    border: 1.5px solid var(--green); color: #86efac; font-size: 1rem; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; font-family: 'SF Mono', Menlo, monospace;
+    animation: pop 0.25s ease; position: relative;
+  }
+  .ochip .idx { position: absolute; top: -8px; left: -5px; font-size: 0.55rem; color: var(--muted); }
+  .arrow { color: var(--muted); font-size: 0.9rem; }
+  .empty-hint { font-size: 0.85rem; color: #3a4a6a; font-style: italic; }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn { padding: 11px 24px; border-radius: 8px; border: none; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid var(--edge); }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+
+  .takeaway {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 12px;
+    padding: 18px 24px; max-width: 820px; width: 100%;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .takeaway p { font-size: 0.94rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+  code { color: #93c5fd; }
+</style>
+</head>
+<body>
+
+  <h1>Course Schedule II &mdash; <span>Building a Topological Order</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🍳</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Recipe steps: har step se pehle uske prerequisites done hone chahiye. Tumhe ek aisi
+        <strong>line</strong> chahiye jisme jab bhi koi course aaye, uske saare prereqs already aage aa chuke ho.
+        Repeatedly grab whatever has <strong>0 pending prereqs</strong>, append it, unlock its dependents.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press "Next". Compute indegrees, seed the queue with indegree-0 courses, then take them one by one — each goes into the output order.</div>
+    </div>
+
+    <div class="layout">
+      <div class="graph-box">
+        <svg id="svg" viewBox="0 0 440 300" width="100%" height="280"></svg>
+      </div>
+      <div class="side">
+        <div class="stat-box">
+          <div class="stat-row"><span class="k">in output</span><span class="v" id="takenVal">0 / 6</span></div>
+        </div>
+        <div class="stat-box">
+          <div class="section-label">queue (indegree 0)</div>
+          <div class="chips" id="queueRow"><span class="empty-hint">empty</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="order-box">
+      <div class="section-label" style="color:var(--green)">topological order (output)</div>
+      <div class="order-row" id="orderRow"><span class="empty-hint">[ ]</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Kahn's BFS <strong>builds the order as it goes</strong>: each course you pop (indegree 0) is appended,
+        then its dependents lose a prereq. If all <code>numCourses</code> land in the output → return it;
+        if fewer (a cycle blocks some), return <strong>[]</strong>. <strong>O(V + E)</strong>.
+      </p>
+    </div>
+  </div>
+
+<script>
+  const ns = 'http://www.w3.org/2000/svg';
+  const N = 6;
+  // numCourses=6, prerequisites [a,b] = b before a. Edges pre->course:
+  // 0->1, 0->2, 1->3, 2->3, 3->4, 2->5
+  const EDGES = [[0,1],[0,2],[1,3],[2,3],[3,4],[2,5]];
+  const POS = {
+    0: { x: 55,  y: 150 },
+    1: { x: 165, y: 70  },
+    2: { x: 165, y: 230 },
+    3: { x: 285, y: 150 },
+    4: { x: 395, y: 90  },
+    5: { x: 295, y: 255 },
+  };
+
+  function buildSteps() {
+    const adj = {}; for (let i=0;i<N;i++) adj[i]=[];
+    const indeg = new Array(N).fill(0);
+    EDGES.forEach(([f,t]) => { adj[f].push(t); indeg[t]++; });
+
+    const out = [];
+    let deg = indeg.slice();
+    // deterministic queue (sorted) for a stable, readable demo
+    let q = [];
+    for (let i=0;i<N;i++) if (deg[i]===0) q.push(i);
+
+    out.push({
+      desc: 'Compute every course\'s <strong>indegree</strong>. Courses with indegree <code>0</code> have no ' +
+            'prerequisites left — seed them into the queue. Here that\'s course <strong>0</strong>.',
+      deg: deg.slice(), queue: q.slice(), order: [], taking: null, relaxed: []
+    });
+
+    let order = [];
+    while (q.length) {
+      const node = q.shift();
+      order.push(node);
+      const relaxed = [];
+      const freed = [];
+      for (const t of adj[node]) {
+        deg[t]--;
+        relaxed.push(node + '-' + t);
+        if (deg[t] === 0) freed.push(t);
+      }
+      const combinedQ = q.concat(freed);
+      out.push({
+        desc: '<strong>Take course ' + node + '</strong> → append to output. Decrement indegree of its ' +
+              'dependents' + (adj[node].length ? ' (' + adj[node].join(', ') + ')' : ' (none)') +
+              (freed.length ? '. Newly unlocked: <strong>' + freed.join(', ') + '</strong> → into queue.'
+                            : '.'),
+        deg: deg.slice(), queue: combinedQ.slice(), order: order.slice(), taking: node, relaxed
+      });
+      q = combinedQ;
+    }
+
+    out.push({
+      desc: 'Queue empty and all <code>' + N + '</code> courses are in the output → valid topological order: ' +
+            '<strong>[' + order.join(', ') + ']</strong>. ✅ (Other valid orders exist too.)',
+      deg: deg.slice(), queue: [], order: order.slice(), taking: null, relaxed: [], finished: true
+    });
+    return out;
+  }
+
+  const steps = buildSteps();
+  let cur = 0;
+
+  const svg = document.getElementById('svg');
+  (function draw() {
+    EDGES.forEach(([f,t]) => {
+      const p = POS[f], c = POS[t];
+      const dx=c.x-p.x, dy=c.y-p.y, len=Math.hypot(dx,dy), ux=dx/len, uy=dy/len, r=22;
+      const l = document.createElementNS(ns,'line');
+      l.setAttribute('x1', p.x+ux*r); l.setAttribute('y1', p.y+uy*r);
+      l.setAttribute('x2', c.x-ux*(r+8)); l.setAttribute('y2', c.y-uy*(r+8));
+      l.setAttribute('class','edge'); l.id='e-'+f+'-'+t;
+      l.setAttribute('marker-end','url(#arrow)');
+      svg.appendChild(l);
+    });
+    const defs = document.createElementNS(ns,'defs');
+    defs.innerHTML = '<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5a6b8a"/></marker>';
+    svg.appendChild(defs);
+    for (let i=0;i<N;i++) {
+      const n = POS[i];
+      const g = document.createElementNS(ns,'g'); g.setAttribute('class','node'); g.id='n'+i;
+      const c = document.createElementNS(ns,'circle');
+      c.setAttribute('cx',n.x); c.setAttribute('cy',n.y); c.setAttribute('r',22);
+      const t = document.createElementNS(ns,'text'); t.setAttribute('class','lbl');
+      t.setAttribute('x',n.x); t.setAttribute('y',n.y); t.textContent=i;
+      const d = document.createElementNS(ns,'text'); d.setAttribute('class','deg'); d.id='deg'+i;
+      d.setAttribute('x',n.x); d.setAttribute('y',n.y-30); d.textContent='in:0';
+      g.appendChild(c); g.appendChild(t); g.appendChild(d); svg.appendChild(g);
+    }
+  })();
+
+  const stepDesc = document.getElementById('stepDesc');
+  const stepCtr = document.getElementById('stepCounter');
+  const takenVal = document.getElementById('takenVal');
+  const queueRow = document.getElementById('queueRow');
+  const orderRow = document.getElementById('orderRow');
+  const nextBtn = document.getElementById('nextBtn');
+  const prevBtn = document.getElementById('prevBtn');
+
+  function render() {
+    const s = steps[cur];
+    stepDesc.innerHTML = s.desc;
+    stepDesc.className = 'step-description ' + (s.finished ? 'done' : '');
+
+    for (let i=0;i<N;i++) {
+      const g = document.getElementById('n'+i);
+      let cls = 'node';
+      if (s.order.includes(i)) cls = 'node done';
+      else if (s.deg[i] === 0) cls = 'node ready';
+      if (s.taking === i) cls = 'node taking';
+      g.setAttribute('class', cls);
+      document.getElementById('deg'+i).textContent = 'in:' + s.deg[i];
+    }
+    EDGES.forEach(([f,t]) => {
+      const e = document.getElementById('e-'+f+'-'+t);
+      e.setAttribute('class', s.relaxed.includes(f+'-'+t) ? 'edge relaxed' : 'edge');
+    });
+
+    takenVal.textContent = s.order.length + ' / ' + N;
+
+    queueRow.innerHTML = '';
+    if (!s.queue.length) queueRow.innerHTML = '<span class="empty-hint">empty</span>';
+    else s.queue.forEach(v => {
+      const ch = document.createElement('div'); ch.className='qchip'; ch.textContent=v; queueRow.appendChild(ch);
+    });
+
+    orderRow.innerHTML = '';
+    if (!s.order.length) orderRow.innerHTML = '<span class="empty-hint">[ ]</span>';
+    else s.order.forEach((v,i) => {
+      if (i>0) { const a=document.createElement('span'); a.className='arrow'; a.textContent='→'; orderRow.appendChild(a); }
+      const ch = document.createElement('div'); ch.className='ochip';
+      ch.innerHTML = '<span class="idx">' + i + '</span>' + v;
+      orderRow.appendChild(ch);
+    });
+
+    stepCtr.textContent = 'Step ' + cur + ' / ' + (steps.length - 1);
+    prevBtn.disabled = (cur === 0);
+    nextBtn.disabled = (cur >= steps.length - 1);
+  }
+
+  function next() { if (cur < steps.length - 1) { cur++; render(); } }
+  function prev() { if (cur > 0) { cur--; render(); } }
+  function reset() { cur = 0; render(); }
+  reset();
+</script>
+</body>
+</html>

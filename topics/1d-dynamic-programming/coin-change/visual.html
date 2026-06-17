@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Coin Change — Bottom-Up DP Table Fill</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px 70px; gap: 28px; line-height: 1.55;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy, .takeaway {
+    background: var(--panel); border-radius: 12px; padding: 18px 26px;
+    max-width: 760px; width: 100%; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy { border: 1px solid var(--blue); border-left: 5px solid var(--blue); }
+  .takeaway { border: 1px solid #2d3a5a; }
+  .ic { font-size: 1.8rem; flex-shrink: 0; line-height: 1; }
+  .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .analogy-text, .takeaway p { font-size: 0.98rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 880px; width: 100%; display: flex; flex-direction: column; gap: 24px;
+  }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+  .step-desc {
+    min-height: 64px; background: var(--panel2); border-radius: 8px; padding: 14px 20px;
+    font-size: 0.96rem; color: #c8c8e0; border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-desc.ok  { border-color: var(--green); }
+  .step-desc.bad { border-color: var(--red); }
+  .step-desc.try { border-color: var(--amber); }
+
+  .coins-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .coin {
+    width: 50px; height: 50px; border-radius: 50%;
+    border: 2px solid var(--amber); background: #2a1f08; color: #fcd34d;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700; transition: all 0.3s;
+  }
+  .coin.active { box-shadow: 0 0 16px rgba(245,158,11,0.6); transform: scale(1.12); background: #3a2c0a; }
+
+  /* dp table */
+  .dp-wrap { overflow-x: auto; padding-bottom: 6px; }
+  .dp-table { display: flex; gap: 6px; min-width: max-content; }
+  .dp-col { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .dp-head { font-size: 0.66rem; color: var(--muted); font-family: 'JetBrains Mono', Consolas, monospace; }
+  .dp-cell {
+    width: 50px; height: 50px; border-radius: 9px; border: 2px solid #2d3a5a;
+    background: var(--panel2); display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; font-weight: 700; color: #5a6a90; font-family: 'JetBrains Mono', Consolas, monospace;
+    transition: all 0.3s;
+  }
+  .dp-cell.filled { color: var(--text); border-color: #3a4a6a; }
+  .dp-cell.base   { color: #86efac; border-color: var(--green); background: #0d2a1a; }
+  .dp-cell.active { border-color: var(--blue); background: #1e3a6e; color: #fff; box-shadow: 0 0 16px rgba(59,130,246,0.55); transform: translateY(-4px); }
+  .dp-cell.source { border-color: var(--amber); background: #2a1f08; color: #fcd34d; box-shadow: 0 0 12px rgba(245,158,11,0.4); }
+  .dp-cell.inf    { color: var(--red); font-size: 0.95rem; }
+
+  .recur {
+    background: var(--panel2); border: 1px dashed #2d3a5a; border-radius: 10px;
+    padding: 14px 20px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 0.9rem;
+    color: #c8c8e0; min-height: 50px; line-height: 1.7;
+  }
+  .recur .a { color: #fcd34d; }
+  .recur .r { color: #86efac; }
+  .recur .x { color: #fca5a5; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn { padding: 11px 26px; border-radius: 8px; border: none; font-size: 0.93rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+  code.inline { background: var(--panel2); padding: 2px 7px; border-radius: 5px; font-size: 0.85rem; color: #93c5fd; }
+</style>
+</head>
+<body>
+
+  <h1>Coin Change &mdash; <span>Bottom-Up DP Table Fill</span></h1>
+
+  <div class="analogy">
+    <div class="ic">🪙</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <div class="analogy-text">
+        A <strong>cashier making change with the fewest coins</strong>, with an unlimited supply of
+        each denomination. Solve small amounts first and write them down — then
+        <code class="inline">dp[a] = 1 + min(dp[a − coin])</code> over every coin reuses those answers.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">What's happening</div>
+      <div class="step-desc" id="stepDesc">Press "Next". We solve <code class="inline">coins = [1, 2, 5], amount = 6</code> by filling dp[0..6].</div>
+    </div>
+
+    <div>
+      <div class="section-label">Coins (unlimited supply each)</div>
+      <div class="coins-row" id="coinsRow"></div>
+    </div>
+
+    <div>
+      <div class="section-label">dp[a] = fewest coins to make amount a &nbsp;<span style="color:#5a6a90">(∞ = not yet reachable)</span></div>
+      <div class="dp-wrap"><div class="dp-table" id="dpTable"></div></div>
+    </div>
+
+    <div class="recur" id="recurBox">dp[0] = 0 &nbsp;(zero coins make amount 0 — the base case)</div>
+
+    <div class="legend">
+      <span><span class="swatch" style="background:#10b981"></span> base case dp[0]</span>
+      <span><span class="swatch" style="background:#3b82f6"></span> amount being solved</span>
+      <span><span class="swatch" style="background:#f59e0b"></span> dp[a−coin] source</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next</button>
+      <button class="btn btn-secondary" id="autoBtn" onclick="toggleAuto()">Auto-play</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="ic">💡</div>
+    <div>
+      <div class="label">Key Takeaway</div>
+      <p>
+        <strong>Unbounded knapsack:</strong> each coin can be reused because <code class="inline">dp[a]</code>
+        pulls from <code class="inline">dp[a−coin]</code>, which may itself use the same coin. Greedy fails;
+        DP guarantees the minimum. <strong>O(amount × coins) time, O(amount) space.</strong>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const coins = [1, 2, 5];
+    const amount = 6;
+    const INF = Infinity;
+
+    // Build steps simulating the bottom-up fill.
+    const steps = [];
+
+    // base
+    let dp = new Array(amount + 1).fill(INF);
+    dp[0] = 0;
+    steps.push({
+      type: 'base', dp: dp.slice(), active: 0, source: null, coin: null,
+      desc: `<b>Base case.</b> <code class="inline">dp[0] = 0</code> — making amount 0 needs zero coins. All other dp[a] start at ∞ (unknown).`,
+      descClass: 'ok',
+      recur: `dp[0] = <span class="r">0</span>  (base case)`
+    });
+
+    for (let a = 1; a <= amount; a++) {
+      // announce starting this amount
+      steps.push({
+        type: 'start', dp: dp.slice(), active: a, source: null, coin: null,
+        desc: `<b>Solve dp[${a}].</b> Try every coin c ≤ ${a}; the best is <code class="inline">1 + min(dp[${a}−c])</code>.`,
+        descClass: 'try',
+        recur: `dp[${a}] = 1 + min( dp[${a}−c] for c in coins, c ≤ ${a} )`
+      });
+
+      let best = INF;
+      let bestCoin = null;
+      for (const c of coins) {
+        if (c > a) {
+          steps.push({
+            type: 'skip', dp: dp.slice(), active: a, source: null, coin: c,
+            desc: `Coin <b>${c}</b> &gt; ${a} → too big, skip.`,
+            descClass: 'try',
+            recur: `coin ${c} &gt; ${a} → skip`
+          });
+          continue;
+        }
+        const sub = dp[a - c];
+        const cand = sub === INF ? INF : sub + 1;
+        let improved = cand < best;
+        if (improved) { best = cand; bestCoin = c; }
+        steps.push({
+          type: 'try', dp: dp.slice(), active: a, source: a - c, coin: c,
+          curBest: best,
+          desc: `Try coin <b>${c}</b>: <code class="inline">dp[${a-c}]</code> = ${sub === INF ? '∞' : sub}, ` +
+                (sub === INF
+                  ? `so this path is unreachable.`
+                  : `so candidate = 1 + ${sub} = <b>${cand}</b>.`) +
+                (improved ? ` ✔ New best for dp[${a}] → ${best}.` : ` Not better than current best (${best === INF ? '∞' : best}).`),
+          descClass: improved ? 'ok' : 'try',
+          recur: `coin ${c}: 1 + dp[${a-c}](=${sub === INF ? '∞' : sub}) = ${cand === INF ? '∞' : cand}` + (improved ? `  ← best` : '')
+        });
+      }
+      dp[a] = best;
+      steps.push({
+        type: 'commit', dp: dp.slice(), active: a, source: bestCoin != null ? a - bestCoin : null, coin: bestCoin,
+        desc: best === INF
+          ? `<b>dp[${a}] = ∞</b> — amount ${a} can't be made with these coins (for now).`
+          : `<b>dp[${a}] = ${best}</b> — best is to use coin <b>${bestCoin}</b> plus dp[${a-bestCoin}].`,
+        descClass: best === INF ? 'bad' : 'ok',
+        recur: `dp[${a}] = <span class="${best===INF?'x':'r'}">${best === INF ? '∞' : best}</span>`
+      });
+    }
+
+    steps.push({
+      type: 'done', dp: dp.slice(), active: amount, source: null, coin: null,
+      desc: dp[amount] === INF
+        ? `✅ <b>Done.</b> dp[${amount}] = ∞ → return <b>−1</b> (amount ${amount} is impossible).`
+        : `✅ <b>Done.</b> dp[${amount}] = <b>${dp[amount]}</b> → fewest coins to make ${amount} is <b>${dp[amount]}</b>.`,
+      descClass: dp[amount] === INF ? 'bad' : 'ok',
+      recur: `Answer = dp[${amount}] = <span class="${dp[amount]===INF?'x':'r'}">${dp[amount]===INF?'−1':dp[amount]}</span>`,
+      done: true
+    });
+
+    // ── Render ─────────────────────────────────────────────
+    const coinsRow = document.getElementById('coinsRow');
+    const dpTable = document.getElementById('dpTable');
+    const stepDesc = document.getElementById('stepDesc');
+    const recurBox = document.getElementById('recurBox');
+    const counter = document.getElementById('stepCounter');
+    const nextBtn = document.getElementById('nextBtn');
+    const prevBtn = document.getElementById('prevBtn');
+
+    coins.forEach((c, idx) => {
+      const d = document.createElement('div');
+      d.className = 'coin'; d.id = 'coin-' + c;
+      d.textContent = c;
+      coinsRow.appendChild(d);
+    });
+
+    for (let a = 0; a <= amount; a++) {
+      const col = document.createElement('div');
+      col.className = 'dp-col';
+      const head = document.createElement('div');
+      head.className = 'dp-head'; head.textContent = `dp[${a}]`;
+      const cell = document.createElement('div');
+      cell.className = 'dp-cell'; cell.id = 'dp-' + a;
+      cell.textContent = '·';
+      col.appendChild(head); col.appendChild(cell);
+      dpTable.appendChild(col);
+    }
+
+    let cur = -1;
+    let autoTimer = null;
+
+    function clearAll() {
+      coins.forEach(c => document.getElementById('coin-' + c).classList.remove('active'));
+      for (let a = 0; a <= amount; a++) {
+        const c = document.getElementById('dp-' + a);
+        c.className = 'dp-cell'; c.textContent = '·';
+      }
+    }
+
+    function render() {
+      clearAll();
+      counter.textContent = `Step ${cur + 1} / ${steps.length}`;
+
+      if (cur < 0) {
+        stepDesc.innerHTML = 'Press "Next". We solve <code class="inline">coins = [1, 2, 5], amount = 6</code> by filling dp[0..6].';
+        stepDesc.className = 'step-desc';
+        recurBox.innerHTML = 'dp[0] = 0 &nbsp;(zero coins make amount 0 — the base case)';
+        prevBtn.disabled = true; nextBtn.disabled = false;
+        return;
+      }
+
+      const st = steps[cur];
+      stepDesc.innerHTML = st.desc;
+      stepDesc.className = 'step-desc ' + (st.descClass || '');
+      recurBox.innerHTML = st.recur;
+
+      // fill known dp cells
+      for (let a = 0; a <= amount; a++) {
+        const cell = document.getElementById('dp-' + a);
+        const v = st.dp[a];
+        if (v === INF) {
+          cell.textContent = '∞';
+          cell.classList.add('inf');
+        } else {
+          cell.textContent = v;
+          cell.classList.add('filled');
+          if (a === 0) cell.classList.add('base');
+        }
+      }
+      // source highlight
+      if (st.source != null) document.getElementById('dp-' + st.source).classList.add('source');
+      // active cell
+      if (st.active != null && !st.done) {
+        const a = document.getElementById('dp-' + st.active);
+        a.classList.remove('source');
+        a.classList.add('active');
+      }
+      if (st.done && st.active != null) {
+        document.getElementById('dp-' + st.active).classList.add('active');
+      }
+      // coin highlight
+      if (st.coin != null) {
+        const cn = document.getElementById('coin-' + st.coin);
+        if (cn) cn.classList.add('active');
+      }
+
+      prevBtn.disabled = (cur <= -1);
+      nextBtn.disabled = (cur >= steps.length - 1);
+    }
+
+    function next() { if (cur < steps.length - 1) { cur++; render(); } }
+    function prev() { if (cur > -1) { cur--; render(); } }
+    function reset() { stopAuto(); cur = -1; render(); }
+    function toggleAuto() {
+      if (autoTimer) stopAuto();
+      else {
+        document.getElementById('autoBtn').textContent = 'Pause';
+        autoTimer = setInterval(() => { if (cur >= steps.length - 1) { stopAuto(); return; } next(); }, 750);
+      }
+    }
+    function stopAuto() {
+      if (autoTimer) clearInterval(autoTimer);
+      autoTimer = null;
+      document.getElementById('autoBtn').textContent = 'Auto-play';
+    }
+
+    render();
+  </script>
+</body>
+</html>

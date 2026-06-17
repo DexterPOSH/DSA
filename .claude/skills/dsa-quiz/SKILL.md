@@ -27,8 +27,14 @@ If unclear, ask: "Conceptual quiz (I ask questions) or coding challenge (you imp
 ## Pytest Mode
 
 1. Get the current topic from `dsa-buddy plan next` (or use the topic the user specified).
-2. Run `dsa-buddy quiz scaffold <problem>` to create the test file if needed.
-3. Tell the user the file path and what to implement.
-4. When the user says they're ready, run `dsa-buddy quiz check <problem>`.
-5. If tests pass: "All tests pass!" → `dsa-buddy progress update <problem> --pytest pass`
-6. If tests fail: show the failures, offer hints, let them try again.
+2. Run `dsa-buddy quiz scaffold <problem>` to create the test file.
+3. **Always overwrite the scaffolded file** with a complete, production-quality test suite before telling the user it's ready. The scaffold is too thin — replace it entirely with:
+   - A clean function stub (correct signature, `pass` body, type hints)
+   - `@pytest.mark.parametrize` covering: basic happy-path cases, negative numbers, zeroes, edge indices (pair at start/end), duplicates, two-element arrays, and any problem-specific traps
+   - A soft-check test that nudges the user toward the intended approach (e.g. no nested loops, no `sorted()`)
+   - A `# ---------- Tests (don't modify) ----------` separator so the user knows their edit boundary
+   - User writes ONLY the target function — nothing else
+4. Tell the user the file path and what to implement.
+5. When the user says they're ready, run `dsa-buddy quiz check <problem>`.
+6. If tests pass: "All tests pass!" → `dsa-buddy progress update <problem> --pytest pass`
+7. If tests fail: show the failures, offer hints, let them try again.
