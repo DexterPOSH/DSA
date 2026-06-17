@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Leader Election — Heartbeats, Terms &amp; Quorum Voting</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  /* cluster SVG */
+  .cluster-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 480px; height: auto; }
+
+  .node circle { transition: all .4s ease; }
+  .node .ring2 { transition: all .4s ease; }
+  .node text { font-family: -apple-system, sans-serif; font-weight: 700; fill: #fff; }
+  .node .nid { font-size: 15px; }
+  .node .role { font-size: 9px; font-weight: 600; }
+  .node .term { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10px; fill: #fbbf24; font-weight: 700; }
+  .node .vote { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; }
+
+  .pulse circle { transition: none; }
+  .center-lbl { fill: #555577; font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 50%; display: inline-block; flex: none; border: 2px solid transparent; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.warn { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.good  { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.good h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 22px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.good .big { color: #10b981; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Leader Election — Heartbeats, Terms &amp; Quorum</h1>
+  <div class="subtitle">How a cluster of nodes agrees on <b>exactly one leader</b> to order all writes, detects when that leader dies, and elects a fresh one — without ever ending up with <b>two leaders</b> (the dreaded <code>split-brain</code>).</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the cricket captain</h3>
+    <p>A team of <b>5 players</b> needs one <b>captain</b> to call the toss and set the field — one decider means no confusion. While the captain keeps shouting instructions (a <b>heartbeat</b> every few seconds), everyone just plays. If the captain walks off injured and goes quiet for too long (the <b>election timeout</b>), the players hold a fresh vote and the next agreed player takes over — play never stops, only leadership hands off. The danger: if two players <i>both</i> yell "I'm captain!" at once, you get <b>conflicting calls</b> — that's split-brain, and the voting rule (a <b>majority</b> must agree) is exactly what stops it.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">cluster:</span><code>5 nodes — A B C D E</code> &nbsp;(odd → clean majority)</div>
+    <div class="row"><span class="label">quorum:</span><code>majority = 3 of 5</code> &nbsp;votes needed to win</div>
+    <div class="row"><span class="label">term:</span><code>monotonic election number</code> &nbsp;(higher term wins, stale rejected)</div>
+    <div class="row"><span class="label">timing:</span><code>heartbeat 50–150 ms</code> &nbsp;&lt;&lt;&nbsp; <code>election timeout 150–300 ms</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="cluster-holder">
+      <svg viewBox="0 0 400 400" id="cluster">
+        <text class="center-lbl" id="center-lbl" x="200" y="196" text-anchor="middle">cluster</text>
+        <text class="center-lbl" id="center-sub" x="200" y="214" text-anchor="middle"></text>
+        <g id="g-pulse"></g>
+        <g id="g-nodes"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Term</div><div class="value amber" id="v-term">1</div></div>
+        <div class="var"><div class="label">Leader</div><div class="value green" id="v-leader">A</div></div>
+        <div class="var"><div class="label">Votes for candidate</div><div class="value" id="v-votes">—</div></div>
+        <div class="var"><div class="label">Quorum needed</div><div class="value" id="v-quorum">3 / 5</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#10b981;border-color:#6ee7b7"></span>Leader (orders all writes)</div>
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6;border-color:#1a1a2e"></span>Follower (replicates leader)</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b;border-color:#fbbf24"></span>Candidate (requesting votes)</div>
+        <div class="legend-item"><span class="swatch" style="background:#3a3a5c;border-color:#1a1a2e"></span>Dead / partitioned node</div>
+        <div class="legend-item"><span class="swatch" style="background:#1f1f3a;border-color:#10b981"></span>Granted a vote this term</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to start: a healthy cluster with leader A sending heartbeats.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>No quorum / no term</h3>
+      <div class="formula">leader = "whoever declares first"</div>
+      <p>A network partition splits the cluster into <code>3 | 2</code>. With no majority rule, <b>each side elects its own leader</b> and both accept writes. Result: <span class="big">2 leaders</span> — conflicting writes, corrupted data.</p>
+      <p>This is <b>split-brain</b>: the single most-asked leader-election failure in interviews.</p>
+    </div>
+    <div class="cx good">
+      <h3>Quorum + term + fencing</h3>
+      <div class="formula">leader = wins majority in a new, higher term</div>
+      <p>On the same <code>3 | 2</code> split, only the <b>3-side can reach quorum</b> (3 ≥ 3); the 2-side can never win (2 &lt; 3). At most <span class="big">1 leader</span> per term — <code>3 + 3 &gt; 5</code> makes two majorities impossible.</p>
+      <p>If the old leader returns, its <b>lower term + stale fencing token</b> get rejected and it demotes to follower.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Why odd node counts?</b> <code>3 → tolerates 1</code> failure, <code>5 → tolerates 2</code>. A 4-node cluster <i>also</i> needs quorum 3 but still only tolerates 1 — extra cost, no extra safety. Always <b>3 / 5 / 7</b>.</li>
+      <li><b>Heartbeat &lt;&lt; election timeout.</b> Heartbeat every <code>50–150 ms</code>, timeout <code>150–300 ms</code>. The gap absorbs normal network jitter so a blip doesn't trigger a needless election.</li>
+      <li><b>Randomized timeouts</b> stop an <b>election storm</b>: if every follower times out together, votes split and nobody wins. Random per-node timeouts let one node ask first and win.</li>
+      <li><b>Missed heartbeat ≠ death.</b> A GC pause or slow disk can delay a heartbeat. <b>Fencing tokens</b> (monotonic numbers) make a "dead" leader's late writes get rejected if it comes back.</li>
+      <li><b>Election restriction.</b> Only a node with an <b>up-to-date log</b> can win — so a new leader never overwrites already-committed data.</li>
+      <li><b>Used by</b> — <b>Raft</b> (etcd, CockroachDB, TiKV), <b>ZooKeeper</b> (epochs), <b>Kafka</b> (per-partition leader + controller / KRaft), and <b>Kubernetes</b> (controller-manager lease objects).</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Elect <b>one</b> leader to serialize writes; keep it alive with <b>heartbeats</b>; on silence past a <b>randomized election timeout</b>, bump the <b>term</b> and run a vote where a <b>majority quorum</b> is required to win. Because two majorities can't exist in one term, you get <b>at most one leader at a time</b> — and <b>fencing tokens</b> neutralize a zombie old leader.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const CX = 200, CY = 200, R = 130;
+  // 5 nodes evenly around the circle, A at top, clockwise
+  const IDS = ["A","B","C","D","E"];
+  function nodePos(i) {
+    const a = (-90 + i * (360/5)) * Math.PI/180;
+    return { x: CX + R*Math.cos(a), y: CY + R*Math.sin(a) };
+  }
+  const POS = IDS.map((id,i)=>({id, ...nodePos(i)}));
+  const byId = id => POS.find(p=>p.id===id);
+
+  // roles: 'leader' | 'follower' | 'candidate' | 'dead'
+  // each step describes the full cluster state + animation flavor
+  const steps = [
+    {
+      term:1, leader:"A",
+      roles:{A:"leader",B:"follower",C:"follower",D:"follower",E:"follower"},
+      votes:null, quorum:"3 / 5", center:["term 1","leader A"],
+      pulse:{from:"A", to:["B","C","D","E"], color:"#10b981"},
+      narr:`<b>1. Healthy cluster.</b> <b>A</b> is leader in <code>term 1</code>. It serializes every write and replicates to the 4 followers. To prove it's alive it sends a <b>heartbeat</b> every <code>50–150 ms</code> to all followers.`,
+      cls:"good"
+    },
+    {
+      term:1, leader:"A",
+      roles:{A:"leader",B:"follower",C:"follower",D:"follower",E:"follower"},
+      votes:null, quorum:"3 / 5", center:["heartbeat","resets timers"],
+      pulse:{from:"A", to:["B","C","D","E"], color:"#10b981"},
+      narr:`<b>2. Heartbeats reset the clock.</b> Each follower runs a randomized <b>election timeout</b> (<code>150–300 ms</code>). Every heartbeat received resets that timer — so as long as A keeps pinging, nobody starts an election.`,
+      cls:"good"
+    },
+    {
+      term:1, leader:null,
+      roles:{A:"dead",B:"follower",C:"follower",D:"follower",E:"follower"},
+      votes:null, quorum:"3 / 5", center:["leader A","SILENT"],
+      pulse:null,
+      narr:`<b>3. The leader dies.</b> A crashes (or gets partitioned away). Heartbeats stop. Note: one <i>missed</i> heartbeat isn't proof of death — a GC pause looks the same — so followers wait out the full timeout buffer first.`,
+      cls:"warn"
+    },
+    {
+      term:1, leader:null,
+      roles:{A:"dead",B:"follower",C:"candidate",D:"follower",E:"follower"},
+      votes:{cand:"C", set:["C"]}, quorum:"3 / 5", center:["C times out","term 1 → 2"],
+      pulse:{from:"C", to:["B","D","E"], color:"#f59e0b", req:true},
+      narr:`<b>4. A follower times out first.</b> Thanks to <b>randomized</b> timeouts, <b>C</b> hits its deadline before the others. It increments the <b>term</b> (<code>1 → 2</code>), votes for itself, becomes a <b>candidate</b>, and sends <code>RequestVote</code> to everyone.`,
+      cls:"warn"
+    },
+    {
+      term:2, leader:null,
+      roles:{A:"dead",B:"follower",C:"candidate",D:"follower",E:"follower"},
+      votes:{cand:"C", set:["C","B","D"]}, quorum:"3 / 5", center:["votes for C","B  C  D"],
+      pulse:{from:["B","D"], to:"C", color:"#10b981", grant:true},
+      voted:["B","D"],
+      narr:`<b>5. Votes come back.</b> Each node votes <b>at most once per term</b> and only for an up-to-date candidate. B and D grant their votes → C now has <b>3 votes (C + B + D)</b>, exactly the <b>quorum of 3 / 5</b>.`,
+      cls:"good"
+    },
+    {
+      term:2, leader:"C",
+      roles:{A:"dead",B:"follower",C:"leader",D:"follower",E:"follower"},
+      votes:{cand:"C", set:["C","B","D"]}, quorum:"3 / 5", center:["term 2","leader C"],
+      pulse:{from:"C", to:["B","D","E"], color:"#10b981"},
+      narr:`<b>6. C wins → new leader.</b> Majority reached, so <b>C</b> becomes leader for <code>term 2</code> and immediately starts heartbeating to assert authority. Convergence from failure to a fresh leader is typically <b>sub-second</b>. Play never stopped.`,
+      cls:"good"
+    },
+    {
+      term:2, leader:"C",
+      roles:{A:"follower",B:"follower",C:"leader",D:"follower",E:"follower"},
+      votes:{cand:"C", set:["C","B","D"]}, quorum:"3 / 5", center:["A returns","term 1 < 2"],
+      pulse:{from:"A", to:["C"], color:"#ef4444", stale:true},
+      staleNode:"A",
+      narr:`<b>7. Zombie old leader returns.</b> A wasn't dead — just slow. It comes back still thinking it's leader and sends a command stamped <code>term 1</code>. Peers see <code>1 &lt; 2</code> (and a stale <b>fencing token</b>) and <b>reject</b> it — A demotes to <b>follower</b>. No split-brain, no double write.`,
+      cls:"bad"
+    }
+  ];
+
+  const gNodes = document.getElementById("g-nodes");
+  const gPulse = document.getElementById("g-pulse");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vTerm = document.getElementById("v-term");
+  const vLeader = document.getElementById("v-leader");
+  const vVotes = document.getElementById("v-votes");
+  const vQuorum = document.getElementById("v-quorum");
+  const centerLbl = document.getElementById("center-lbl");
+  const centerSub = document.getElementById("center-sub");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  const ROLE_FILL = { leader:"#10b981", follower:"#3b82f6", candidate:"#f59e0b", dead:"#3a3a5c" };
+  const ROLE_STROKE = { leader:"#6ee7b7", follower:"#1a1a2e", candidate:"#fbbf24", dead:"#1a1a2e" };
+  const ROLE_LABEL = { leader:"LEADER", follower:"follower", candidate:"CANDIDATE", dead:"dead" };
+
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function asArr(x){ return Array.isArray(x) ? x : [x]; }
+
+  let cursor = 0;
+  let timers = [];
+  function clearTimers(){ timers.forEach(t=>clearTimeout(t)); timers=[]; gPulse.innerHTML=""; }
+
+  function drawNodes(s) {
+    gNodes.innerHTML = "";
+    for (const p of POS) {
+      const role = s.roles[p.id];
+      const granted = s.voted && s.voted.includes(p.id);
+      const g = svgEl("g", { class:"node" });
+      // outer ring for "granted vote" highlight
+      const ring2 = svgEl("circle", {
+        class:"ring2", cx:p.x, cy:p.y, r:34, fill:"none",
+        stroke: granted ? "#10b981" : "transparent",
+        "stroke-width": granted ? 3 : 0, "stroke-dasharray":"4 4"
+      });
+      const isLeader = role === "leader";
+      const c = svgEl("circle", {
+        cx:p.x, cy:p.y, r: isLeader ? 28 : 25,
+        fill: ROLE_FILL[role],
+        stroke: ROLE_STROKE[role],
+        "stroke-width": isLeader ? 4 : 3,
+        opacity: role === "dead" ? 0.5 : 1
+      });
+      const nid = svgEl("text", { class:"nid", x:p.x, y:p.y-3, "text-anchor":"middle" });
+      nid.textContent = p.id;
+      const role_t = svgEl("text", { class:"role", x:p.x, y:p.y+10, "text-anchor":"middle",
+        fill: role==="dead" ? "#888" : "#eafff2" });
+      role_t.textContent = ROLE_LABEL[role];
+      // term tag below node
+      const tterm = svgEl("text", { class:"term", x:p.x, y:p.y+44, "text-anchor":"middle" });
+      const shownTerm = (s.staleNode === p.id) ? "t1 (stale)" : ("t"+s.term);
+      tterm.textContent = role==="dead" ? "" : shownTerm;
+      g.appendChild(ring2); g.appendChild(c); g.appendChild(nid); g.appendChild(role_t); g.appendChild(tterm);
+      gNodes.appendChild(g);
+    }
+  }
+
+  function animatePulse(s) {
+    clearTimers();
+    if (!s.pulse) return;
+    const p = s.pulse;
+    const froms = asArr(p.from);
+    const tos = asArr(p.to);
+    // build directed packets from each 'from' to each 'to'
+    const packets = [];
+    froms.forEach(f => tos.forEach(t => packets.push([f,t])));
+    function fire() {
+      packets.forEach(([fid,tid], idx) => {
+        const a = byId(fid), b = byId(tid);
+        if (!a || !b) return;
+        const dot = svgEl("circle", { class:"pkt", r:6, fill:p.color, cx:a.x, cy:a.y, opacity:0.95 });
+        gPulse.appendChild(dot);
+        const anim = svgEl("animate", {
+          attributeName:"cx", from:a.x, to:b.x, dur:"0.9s", begin:(idx*0.05)+"s", fill:"freeze"
+        });
+        const anim2 = svgEl("animate", {
+          attributeName:"cy", from:a.y, to:b.y, dur:"0.9s", begin:(idx*0.05)+"s", fill:"freeze"
+        });
+        const fade = svgEl("animate", {
+          attributeName:"opacity", from:0.95, to:0, dur:"0.9s", begin:(idx*0.05)+"s", fill:"freeze"
+        });
+        dot.appendChild(anim); dot.appendChild(anim2); dot.appendChild(fade);
+        if (anim.beginElement) { anim.beginElement(); anim2.beginElement(); fade.beginElement(); }
+        timers.push(setTimeout(()=>{ if(dot.parentNode) dot.parentNode.removeChild(dot); }, 1000 + idx*50));
+      });
+    }
+    fire();
+    // loop the pulse a few times for the steady-state heartbeat steps
+    if (!p.req && !p.grant && !p.stale) {
+      timers.push(setTimeout(fire, 1300));
+      timers.push(setTimeout(fire, 2600));
+    }
+  }
+
+  function render() {
+    const s = steps[cursor];
+    drawNodes(s);
+    animatePulse(s);
+
+    vTerm.textContent = s.term;
+    vLeader.textContent = s.leader || "— none —";
+    vLeader.className = "value " + (s.leader ? "green" : "red");
+    if (s.votes) {
+      vVotes.textContent = s.votes.set.length + " (" + s.votes.set.join(" ") + ")";
+      vVotes.className = "value " + (s.votes.set.length >= 3 ? "green" : "amber");
+    } else {
+      vVotes.textContent = "—";
+      vVotes.className = "value";
+    }
+    vQuorum.textContent = s.quorum;
+    centerLbl.textContent = s.center[0] || "";
+    centerSub.textContent = s.center[1] || "";
+
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next(){ if (cursor < steps.length-1){ cursor++; render(); } }
+  function prev(){ if (cursor > 0){ cursor--; render(); } }
+  function reset(){ cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

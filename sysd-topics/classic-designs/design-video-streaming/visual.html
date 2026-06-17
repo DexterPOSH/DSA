@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Design YouTube / Video Streaming — End-to-End Flow</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 860px) { .stage { grid-template-columns: 1fr; } }
+
+  /* Architecture SVG */
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 620px; height: auto; }
+
+  .edge-line { fill: none; stroke: #3a3a5c; stroke-width: 2.5; transition: stroke .3s ease, opacity .3s ease; }
+  .edge-line.active { stroke: #f59e0b; stroke-width: 4; }
+  .edge-line.dim { opacity: .25; }
+  .edge-line.dash { stroke-dasharray: 6 5; }
+
+  .box rect { transition: all .35s ease; }
+  .box text { font-family: -apple-system, sans-serif; fill: #e8e8f4; }
+  .box .title { font-weight: 700; font-size: 12px; }
+  .box .sub { font-size: 9px; fill: #aab; }
+  .box.dim { opacity: .3; }
+  .box.active rect { stroke-width: 3.5; filter: drop-shadow(0 0 6px rgba(245,158,11,.55)); }
+
+  .zone-label { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10px; fill: #5a5a78; letter-spacing: 1px; }
+  .zone-box { fill: none; stroke: #2d2d50; stroke-width: 1.5; stroke-dasharray: 4 4; rx: 8; }
+
+  .packet { transition: none; }
+  .packet circle { stroke: #fff; stroke-width: 2; }
+  .packet text { font-size: 8px; fill: #1a1a2e; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.small { font-size: 13px; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+  .swatch.lineamber { width: 16px; height: 0; border-top: 3px solid #f59e0b; border-radius: 0; }
+
+  .phasebar { display: flex; gap: 6px; }
+  .phasebar .ph { flex: 1; text-align: center; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+                  padding: 6px 4px; border-radius: 6px; background: #2d2d50; color: #777799; border: 1px solid #3a3a5c; }
+  .phasebar .ph.on-up { background: #2a2147; color: #c4b5fd; border-color: #8b5cf6; }
+  .phasebar .ph.on-watch { background: #14321f; color: #6ee7b7; border-color: #10b981; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.upload { border-left-color: #8b5cf6; background: #1e1838; }
+  .narration.watch { border-left-color: #10b981; background: #14321f; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.consistent { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.consistent h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 22px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.consistent .big { color: #10b981; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Design YouTube / Video Streaming — End-to-End Flow</h1>
+  <div class="subtitle">How a video travels from a creator's <b>upload</b>, through an <b>async transcoding pipeline</b>, into durable <b>object storage</b>, and back out to billions of viewers via a <b>CDN</b> with <b>adaptive bitrate</b> — a <code>~1000:1</code> read-heavy system serving <code>~3.5 Tbps</code> of egress.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — a film studio + global cinema chain</h3>
+    <p>A creator hands over one master reel (the <b>raw upload</b>). The studio's lab doesn't make the audience wait — it sends the reel down a back-room <b>processing line</b> (the <b>transcoding pipeline</b>) that prints copies in many sizes: a tiny one for phones (240p), a big one for TVs (4K), all cut into short clips. Those prints are filed in a giant fireproof <b>vault</b> (the <b>object store</b>, 11-nines durable). When viewers worldwide want to watch, they don't queue at the vault — each city has a local <b>cinema</b> (the <b>CDN edge</b>) that keeps popular reels on hand. Your player even picks the print size that matches your seat — sorry, your network speed (<b>adaptive bitrate</b>).</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">scale:</span><code>DAU 100M · 500M watches/day · ~15K watch-start QPS peak · ~6 uploads/sec</code></div>
+    <div class="row"><span class="label">storage:</span><code>~250 MB stored per source (all renditions) → ~125 TB/day → ~45 PB/year</code></div>
+    <div class="row"><span class="label">egress:</span><code>~3.5 Tbps avg → CDN mandatory</code> &nbsp; <span class="label">NFR:</span><code>availability &gt; strong consistency</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 620 470" id="arch">
+        <!-- zones -->
+        <rect class="zone-box" x="14" y="40" width="592" height="172" rx="8" />
+        <text class="zone-label" x="24" y="58">UPLOAD / CONTROL PLANE</text>
+        <rect class="zone-box" x="14" y="224" width="592" height="120" rx="8" />
+        <text class="zone-label" x="24" y="242">ASYNC PROCESSING</text>
+        <rect class="zone-box" x="14" y="356" width="592" height="100" rx="8" />
+        <text class="zone-label" x="24" y="374">READ / WATCH PLANE</text>
+
+        <!-- edges (drawn first, behind boxes) -->
+        <g id="edges">
+          <!-- up1: creator -> api  (POST /videos) -->
+          <path id="e-up1" class="edge-line" d="M118 110 L196 110" data-marker="end" />
+          <!-- up2: creator -> object store (direct bytes via pre-signed URL) -->
+          <path id="e-up2" class="edge-line dash" d="M70 138 L70 282 L196 282" />
+          <!-- up3: api -> metadata db (status row) -->
+          <path id="e-up3" class="edge-line" d="M310 138 L310 168 L470 168 L470 138" />
+          <!-- up4: api -> queue (complete event) -->
+          <path id="e-up4" class="edge-line" d="M278 138 L278 282 L196 282" />
+          <!-- tr1: queue -> workers -->
+          <path id="e-tr1" class="edge-line" d="M340 282 L416 282" />
+          <!-- tr2: workers -> object store (write renditions) -->
+          <path id="e-tr2" class="edge-line" d="M470 258 L470 230 L160 230 L160 258" />
+          <!-- tr3: workers -> metadata db (status=READY) -->
+          <path id="e-tr3" class="edge-line" d="M520 270 L560 200 L500 130" />
+          <!-- w1: viewer -> api (GET /videos/{id}) -->
+          <path id="e-w1" class="edge-line" d="M118 404 L196 404" />
+          <!-- w1b: api/cache served -->
+          <path id="e-w1b" class="edge-line dash" d="M253 138 L253 392 L196 392" />
+          <!-- w2: viewer -> CDN (manifest + chunk GET) -->
+          <path id="e-w2" class="edge-line" d="M82 420 L370 420" />
+          <!-- w3: CDN miss -> object store (origin pull) -->
+          <path id="e-w3" class="edge-line dash" d="M470 396 L470 308" />
+          <!-- w4: view event -> queue (fire-and-forget) -->
+          <path id="e-w4" class="edge-line" d="M196 404 L160 404 L160 320" />
+        </g>
+
+        <!-- boxes -->
+        <g id="boxes">
+          <!-- Creator -->
+          <g class="box" id="b-creator">
+            <rect x="40" y="86" width="78" height="48" rx="8" fill="#1e1838" stroke="#8b5cf6" stroke-width="2" />
+            <text class="title" x="79" y="106" text-anchor="middle">Creator</text>
+            <text class="sub" x="79" y="120" text-anchor="middle">uploads video</text>
+          </g>
+          <!-- API / Metadata service -->
+          <g class="box" id="b-api">
+            <rect x="196" y="86" width="114" height="48" rx="8" fill="#1c2a44" stroke="#3b82f6" stroke-width="2" />
+            <text class="title" x="253" y="105" text-anchor="middle">API / Metadata</text>
+            <text class="sub" x="253" y="120" text-anchor="middle">pre-signed URLs, orchestration</text>
+          </g>
+          <!-- Metadata DB + cache -->
+          <g class="box" id="b-db">
+            <rect x="400" y="86" width="100" height="48" rx="8" fill="#1c2a44" stroke="#3b82f6" stroke-width="2" />
+            <text class="title" x="450" y="103" text-anchor="middle">Metadata DB</text>
+            <text class="sub" x="450" y="116" text-anchor="middle">NoSQL + Redis</text>
+            <text class="sub" x="450" y="127" text-anchor="middle">status, views</text>
+          </g>
+
+          <!-- Queue -->
+          <g class="box" id="b-queue">
+            <rect x="196" y="258" width="144" height="48" rx="8" fill="#332611" stroke="#f59e0b" stroke-width="2" />
+            <text class="title" x="268" y="278" text-anchor="middle">Message Queue</text>
+            <text class="sub" x="268" y="292" text-anchor="middle">Kafka — decouple + backpressure</text>
+          </g>
+          <!-- Transcoding workers -->
+          <g class="box" id="b-workers">
+            <rect x="416" y="258" width="108" height="48" rx="8" fill="#2a1f3d" stroke="#8b5cf6" stroke-width="2" />
+            <text class="title" x="470" y="278" text-anchor="middle">Transcoders</text>
+            <text class="sub" x="470" y="292" text-anchor="middle">ffmpeg fleet, per-segment</text>
+          </g>
+          <!-- Object store (center, spans) -->
+          <g class="box" id="b-store">
+            <rect x="100" y="258" width="120" height="48" rx="8" fill="#13322a" stroke="#10b981" stroke-width="2" />
+            <text class="title" x="160" y="278" text-anchor="middle">Object Store</text>
+            <text class="sub" x="160" y="292" text-anchor="middle">S3/GCS · 11 nines · chunks</text>
+          </g>
+
+          <!-- Viewer -->
+          <g class="box" id="b-viewer">
+            <rect x="40" y="380" width="78" height="48" rx="8" fill="#13322a" stroke="#10b981" stroke-width="2" />
+            <text class="title" x="79" y="400" text-anchor="middle">Viewer</text>
+            <text class="sub" x="79" y="414" text-anchor="middle">ABR player</text>
+          </g>
+          <!-- CDN -->
+          <g class="box" id="b-cdn">
+            <rect x="370" y="380" width="100" height="48" rx="8" fill="#13322a" stroke="#10b981" stroke-width="2" />
+            <text class="title" x="420" y="400" text-anchor="middle">CDN edge</text>
+            <text class="sub" x="420" y="414" text-anchor="middle">serves chunks globally</text>
+          </g>
+        </g>
+
+        <!-- moving packet -->
+        <g class="packet" id="packet" style="display:none">
+          <circle cx="0" cy="0" r="11" fill="#f59e0b" />
+          <text x="0" y="3" text-anchor="middle" id="packet-label">►</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="phasebar">
+        <div class="ph" id="ph-up">Upload</div>
+        <div class="ph" id="ph-watch">Watch</div>
+      </div>
+      <div class="vars">
+        <div class="var"><div class="label">Phase</div><div class="value small" id="v-phase">—</div></div>
+        <div class="var"><div class="label">Video status</div><div class="value amber small" id="v-status">—</div></div>
+        <div class="var"><div class="label">Bytes path</div><div class="value green small" id="v-bytes">—</div></div>
+        <div class="var"><div class="label">Served by</div><div class="value small" id="v-served">—</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#8b5cf6"></span>Upload / transcode path</div>
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Control plane (metadata)</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Queue (async decoupling)</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Storage + read/watch path</div>
+        <div class="legend-item"><span class="swatch lineamber"></span>Bytes flow direct (bypass app servers)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to follow a video from upload all the way to a global viewer's screen.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>Naive&nbsp;&nbsp;synchronous + origin-served</h3>
+      <div class="formula">upload → transcode inline → serve bytes from origin</div>
+      <p>App server takes the upload, transcodes in the request, and streams every byte itself. Transcoding takes <b>minutes</b>, so the upload call blocks; and serving <span class="big">~3.5 Tbps</span> from origin is physically impossible.</p>
+      <p>Result: uploads time out, the worker fleet melts, and the origin's bandwidth bill is a brick wall. The system cannot exist.</p>
+    </div>
+    <div class="cx consistent">
+      <h3>This design&nbsp;&nbsp;async + CDN</h3>
+      <div class="formula">direct-to-store upload · queue · CDN-served reads</div>
+      <p>Bytes bypass app servers (pre-signed URLs). Transcoding runs <b>async behind a queue</b>, scaling on lag. Reads are served from <b>CDN edges</b>, so origin only sees <span class="big">cache misses</span>.</p>
+      <p>Result: uploads return instantly, processing autoscales, and <code>~99%+</code> of watch bytes never touch the origin.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Bytes never flow through app servers</b> — both upload (pre-signed multipart <code>PUT</code>) and download (CDN) go straight to/from object storage. App servers handle only the <b>control plane</b>: metadata, status, orchestration.</li>
+      <li><b>Transcoding is async + DAG-parallel</b> — split the video into segments, fan-out transcode each segment × each resolution in parallel, then merge into HLS/DASH manifests. Needs <b>idempotency + retries</b> so a crashed worker reprocesses without duplicate output.</li>
+      <li><b>CDN is non-negotiable</b> — <code>~3.5 Tbps</code> egress can't come from origin. Store <b>2-10s chunks</b>; popular content stays hot at the edge, cold/tail videos pull from origin on first miss (<b>origin shielding</b> mitigates the miss storm on a new viral video).</li>
+      <li><b>Adaptive bitrate (ABR)</b> — player fetches a <b>master manifest</b>, then picks a rendition per network conditions (480p on slow, 1080p on fast), switching mid-stream to minimize buffering.</li>
+      <li><b>View counts are eventually consistent</b> — writing the DB on every view kills throughput. Fire view events to a queue, <b>batch/stream-aggregate</b>, materialize periodically. Acceptable because <b>availability &gt; strong consistency</b> here.</li>
+      <li><b>Data model</b> — <code>videos</code> in NoSQL (partition by <code>video_id</code>, point lookups), accounts/billing in SQL, and <b>actual bytes only in the object store</b> — the DB stores paths/URLs, never the blob.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Separate the <b>write path</b> from the <b>read path</b>: uploads land <b>directly in durable object storage</b> and trigger an <b>async, queue-driven transcoding pipeline</b> that produces multi-resolution chunks; reads are served from a <b>CDN with adaptive bitrate</b> so the origin only handles cache misses. App servers stay on the lean control plane, and <b>availability beats strong consistency</b> — so a stream never stalls just because a view count is a few seconds behind.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- geometry helpers ----------
+  const svg = document.getElementById("arch");
+  const packet = document.getElementById("packet");
+  const packetLabel = document.getElementById("packet-label");
+
+  // sample points along an SVG path so the packet can travel it
+  function pathPoints(pathEl, n) {
+    const len = pathEl.getTotalLength();
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const p = pathEl.getPointAtLength((i / n) * len);
+      pts.push({ x: p.x, y: p.y });
+    }
+    return pts;
+  }
+
+  let animTimer = null;
+  function stopAnim() { if (animTimer) { clearInterval(animTimer); animTimer = null; } }
+
+  // animate the packet along one or more edge ids in sequence
+  function runPacket(edgeIds, color, label) {
+    stopAnim();
+    if (!edgeIds || !edgeIds.length) { packet.style.display = "none"; return; }
+    packet.querySelector("circle").setAttribute("fill", color);
+    packetLabel.textContent = label || "►";
+    packet.style.display = "";
+    let segIdx = 0, i = 0, pts = pathPoints(document.getElementById(edgeIds[0]), 36);
+    function place() {
+      const pt = pts[i];
+      packet.setAttribute("transform", `translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)})`);
+    }
+    place();
+    animTimer = setInterval(() => {
+      i++;
+      if (i >= pts.length) {
+        segIdx++;
+        if (segIdx >= edgeIds.length) { segIdx = 0; }
+        pts = pathPoints(document.getElementById(edgeIds[segIdx]), 36);
+        i = 0;
+      }
+      place();
+    }, 26);
+  }
+
+  // ---------- step model ----------
+  // each step: { phase, boxesOn:[], edgesOn:[], packetEdges:[], packetColor, packetLabel,
+  //   status, bytes, served, narration, narrClass }
+  const PURPLE = "#8b5cf6", BLUE = "#3b82f6", AMBER = "#f59e0b", GREEN = "#10b981";
+
+  const steps = [
+    {
+      phase: "—", boxesOn: [], edgesOn: [], packetEdges: [],
+      status: "—", bytes: "—", served: "—",
+      narration: `<b>The two journeys.</b> A video has a <b>write path</b> (upload → transcode → store) and a <b>read path</b> (store → CDN → viewer). The whole trick is keeping them separate so heavy processing never blocks a watch. Press <b>Next</b> to begin the upload.`,
+      narrClass: ""
+    },
+
+    // ---- UPLOAD PHASE ----
+    {
+      phase: "upload", boxesOn: ["b-creator", "b-api"], edgesOn: ["e-up1"],
+      packetEdges: ["e-up1"], packetColor: PURPLE, packetLabel: "1",
+      status: "UPLOADING", bytes: "—", served: "—",
+      narration: `<b>1. Init upload.</b> Creator calls <code>POST /api/v1/videos</code>. The API service writes a <code>videos</code> row with <code>status=UPLOADING</code> and returns a <b>pre-signed multipart URL</b> — a one-time pass to write straight to the object store.`,
+      narrClass: "upload"
+    },
+    {
+      phase: "upload", boxesOn: ["b-creator", "b-store"], edgesOn: ["e-up2"],
+      packetEdges: ["e-up2"], packetColor: AMBER, packetLabel: "GB",
+      status: "UPLOADING", bytes: "client → object store", served: "—",
+      narration: `<b>2. Bytes go direct.</b> The client <code>PUT</code>s the raw GBs <b>straight into object storage</b> via that pre-signed URL — <b>bypassing the app servers entirely</b> (resumable). Backend never touches the heavy bytes, so it can't be a bottleneck.`,
+      narrClass: "upload"
+    },
+    {
+      phase: "upload", boxesOn: ["b-creator", "b-api", "b-queue"], edgesOn: ["e-up4"],
+      packetEdges: ["e-up1", "e-up4"], packetColor: BLUE, packetLabel: "✓",
+      status: "PROCESSING", bytes: "stored (raw)", served: "—",
+      narration: `<b>3. Complete → enqueue.</b> Client calls <code>POST /{id}/complete</code>. The API flips status to <code>PROCESSING</code> and publishes an <code>upload.complete</code> event to <b>Kafka</b>. The slow work is now <b>decoupled</b> from the request — the creator's call returns immediately.`,
+      narrClass: "upload"
+    },
+
+    // ---- TRANSCODE PHASE ----
+    {
+      phase: "upload", boxesOn: ["b-queue", "b-workers"], edgesOn: ["e-tr1"],
+      packetEdges: ["e-tr1"], packetColor: AMBER, packetLabel: "►",
+      status: "PROCESSING", bytes: "stored (raw)", served: "—",
+      narration: `<b>4. Workers consume.</b> The transcoding fleet pulls events off the queue and <b>autoscales on queue lag</b>. Each video is split into segments, then transcoded <b>fan-out: every segment × every resolution in parallel</b> (a DAG) so even long videos finish fast.`,
+      narrClass: "upload"
+    },
+    {
+      phase: "upload", boxesOn: ["b-workers", "b-store"], edgesOn: ["e-tr2"],
+      packetEdges: ["e-tr2"], packetColor: GREEN, packetLabel: "HLS",
+      status: "PROCESSING", bytes: "renditions written", served: "—",
+      narration: `<b>5. Write renditions.</b> Workers produce <b>240p → 4K</b> renditions, slice them into <b>2-10s HLS/DASH chunks</b>, generate thumbnails, and write it all back to the object store (~5× the raw size, all resolutions). Idempotent + retried, so a crash never leaves duplicates.`,
+      narrClass: "upload"
+    },
+    {
+      phase: "upload", boxesOn: ["b-workers", "b-db"], edgesOn: ["e-tr3"],
+      packetEdges: ["e-tr3"], packetColor: BLUE, packetLabel: "✓",
+      status: "READY", bytes: "stored (all)", served: "—",
+      narration: `<b>6. Mark READY.</b> The worker updates the metadata DB to <code>status=READY</code> and records the manifest/CDN paths. The video is now publishable. <b>Write path done</b> — notice the viewer never waited for any of this.`,
+      narrClass: "upload"
+    },
+
+    // ---- WATCH PHASE ----
+    {
+      phase: "watch", boxesOn: ["b-viewer", "b-api", "b-db"], edgesOn: ["e-w1", "e-w1b"],
+      packetEdges: ["e-w1", "e-w1b"], packetColor: BLUE, packetLabel: "?",
+      status: "READY", bytes: "stored (all)", served: "Redis cache",
+      narration: `<b>7. Viewer requests metadata.</b> <code>GET /api/v1/videos/{id}</code> returns title, status, and the <b>CDN manifest URL</b>. Hot metadata is served from <b>Redis (cache-aside)</b> — this read path is huge (<code>~15K QPS</code> peak), so it must not hit the DB on every call.`,
+      narrClass: "watch"
+    },
+    {
+      phase: "watch", boxesOn: ["b-viewer", "b-cdn"], edgesOn: ["e-w2"],
+      packetEdges: ["e-w2"], packetColor: GREEN, packetLabel: "▶",
+      status: "READY", bytes: "edge → viewer", served: "CDN edge (hit)",
+      narration: `<b>8. Stream from the edge.</b> The player fetches the <b>master manifest</b> from the <b>CDN</b>, then pulls chunks (<code>720p/seg_003.ts</code>) sequentially. <b>Adaptive bitrate</b> picks the rendition that fits the viewer's network. Popular videos are cached at the edge → most bytes never reach origin.`,
+      narrClass: "watch"
+    },
+    {
+      phase: "watch", boxesOn: ["b-cdn", "b-store"], edgesOn: ["e-w3"],
+      packetEdges: ["e-w3"], packetColor: GREEN, packetLabel: "↑",
+      status: "READY", bytes: "origin → edge (once)", served: "origin pull (miss)",
+      narration: `<b>9. Cache miss → origin pull.</b> On a cold/tail video the edge misses, pulls the chunk from the object store <b>once</b>, caches it, then serves all later viewers locally. <b>Origin shielding</b> (a mid-tier cache) absorbs the miss storm when a brand-new video goes viral everywhere at once.`,
+      narrClass: "watch"
+    },
+    {
+      phase: "watch", boxesOn: ["b-viewer", "b-queue", "b-db"], edgesOn: ["e-w4", "e-tr1"],
+      packetEdges: ["e-w4"], packetColor: AMBER, packetLabel: "+1",
+      status: "READY", bytes: "edge → viewer", served: "CDN edge",
+      narration: `<b>10. View count, async.</b> A <code>POST /{id}/view</code> is <b>fire-and-forget</b> into the queue, then <b>batch/stream-aggregated</b> and materialized periodically. The count is <b>eventually consistent</b> — fine, because the NFR is <b>availability &gt; strong consistency</b>: the stream must never stall over a counter.`,
+      narrClass: "watch"
+    }
+  ];
+
+  // ---------- DOM refs ----------
+  const allBoxes = Array.from(document.querySelectorAll(".box"));
+  const allEdges = Array.from(document.querySelectorAll(".edge-line"));
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vPhase = document.getElementById("v-phase");
+  const vStatus = document.getElementById("v-status");
+  const vBytes = document.getElementById("v-bytes");
+  const vServed = document.getElementById("v-served");
+  const phUp = document.getElementById("ph-up");
+  const phWatch = document.getElementById("ph-watch");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  let cursor = 0;
+
+  function render() {
+    const s = steps[cursor];
+
+    // boxes
+    allBoxes.forEach(b => {
+      b.classList.remove("active", "dim");
+      if (s.boxesOn.length) {
+        if (s.boxesOn.includes(b.id)) b.classList.add("active");
+        else b.classList.add("dim");
+      }
+    });
+
+    // edges
+    allEdges.forEach(e => {
+      e.classList.remove("active", "dim");
+      if (s.boxesOn.length) {
+        if (s.edgesOn.includes(e.id)) e.classList.add("active");
+        else e.classList.add("dim");
+      }
+    });
+
+    // packet
+    runPacket(s.packetEdges, s.packetColor, s.packetLabel);
+
+    // phase bar
+    phUp.className = "ph" + (s.phase === "upload" ? " on-up" : "");
+    phWatch.className = "ph" + (s.phase === "watch" ? " on-watch" : "");
+
+    // side stats
+    vPhase.textContent = s.phase === "upload" ? "Write path" : (s.phase === "watch" ? "Read path" : "—");
+    vPhase.className = "value small" + (s.phase === "watch" ? " green" : "");
+    vStatus.textContent = s.status;
+    vBytes.textContent = s.bytes;
+    vServed.textContent = s.served;
+
+    // narration
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

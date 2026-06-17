@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Search in Rotated Sorted Array — Binary Search Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { margin: 0 0 6px; color: #fff; font-size: 28px; letter-spacing: -0.5px; }
+  h1 span { color: #3b82f6; }
+  .subtitle { color: #a0a0b8; margin-bottom: 26px; font-size: 15px; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #f59e0b;
+    padding: 18px 22px; border-radius: 10px; margin-bottom: 26px;
+  }
+  .analogy h3 {
+    margin: 0 0 8px; font-size: 13px; text-transform: uppercase;
+    letter-spacing: 1px; color: #f59e0b;
+  }
+  .analogy p { margin: 0; color: #d6d6e6; font-size: 15px; }
+
+  .problem {
+    background: #16213e; border-radius: 10px; padding: 16px 20px;
+    margin-bottom: 24px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .arrow { color: #10b981; font-weight: bold; }
+
+  .stage {
+    background: #16213e; border-radius: 12px; padding: 26px 24px;
+    margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.06);
+  }
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: #8888aa; margin: 0 0 26px;
+  }
+
+  /* Array of cells */
+  .array { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .cell {
+    position: relative;
+    min-width: 60px; padding: 22px 8px 10px;
+    background: #2d2d50; border: 2px solid #3a3a5c; border-radius: 10px;
+    text-align: center; transition: all 0.35s ease;
+  }
+  .cell .idx {
+    position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+    background: #1a1a2e; font-size: 11px; color: #8888aa; padding: 0 6px;
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .cell .val { font-size: 20px; font-weight: 600; color: #e0e0e0;
+    font-family: "SF Mono", Menlo, monospace; }
+
+  /* out of search window */
+  .cell.excluded { opacity: 0.28; filter: grayscale(0.6); }
+  /* sorted half shading */
+  .cell.sorted-half {
+    background: #20304f; border-color: #2f4a73;
+  }
+  /* pointer states */
+  .cell.lo  { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.22); }
+  .cell.hi  { border-color: #a855f7; box-shadow: 0 0 0 3px rgba(168,85,247,0.22); }
+  .cell.mid {
+    background: #3f2e0d; border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.3); transform: translateY(-4px);
+  }
+  .cell.mid .val { color: #fff; }
+  .cell.found {
+    background: #14532d; border-color: #10b981;
+    box-shadow: 0 0 0 4px rgba(16,185,129,0.35); transform: translateY(-4px);
+  }
+  .cell.found .val { color: #fff; }
+
+  /* pointer tags under cells */
+  .ptrs { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+  .ptr-slot { min-width: 60px; text-align: center; font-size: 11px;
+    font-family: "SF Mono", Menlo, monospace; height: 18px; }
+  .ptr-slot .lo { color: #10b981; font-weight: 700; }
+  .ptr-slot .mid { color: #f59e0b; font-weight: 700; }
+  .ptr-slot .hi { color: #a855f7; font-weight: 700; }
+
+  .state {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 26px 0 4px;
+  }
+  .scard {
+    background: #1f2947; border: 1px solid #2f3a5c; border-radius: 8px; padding: 12px 14px;
+  }
+  .scard .l { font-size: 11px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .scard .v { font-family: "SF Mono", Menlo, monospace; font-size: 16px; }
+  .scard .v .g { color: #10b981; } .scard .v .a { color: #f59e0b; } .scard .v .p { color: #a855f7; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px;
+    border-radius: 6px; font-size: 14.5px; color: #d6d6e6; min-height: 56px;
+    transition: border-color 0.3s ease; margin-top: 8px;
+  }
+  .narration.found-n { border-left-color: #10b981; background: #14321f; }
+  .narration.miss-n { border-left-color: #ef4444; }
+  .narration code {
+    background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 4px; font-size: 13px;
+  }
+  .narration b.sorted { color: #69b3ff; }
+
+  .controls {
+    display: flex; gap: 10px; justify-content: center; align-items: center;
+    margin: 24px 0 8px; flex-wrap: wrap;
+  }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 22px;
+    font-size: 14px; font-weight: 600; border-radius: 8px; cursor: pointer;
+    transition: background 0.15s, transform 0.1s; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #2c2c46; color: #5a5a76; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, monospace; margin: 0 8px; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 22px; font-size: 12px; color: #8888aa; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 13px; height: 13px; border-radius: 4px; display: inline-block; }
+
+  .takeaway {
+    margin-top: 30px;
+    background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 10px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d6d6e6; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Search in Rotated Sorted Array — <span>lo / mid / hi</span> in action</h1>
+  <div class="subtitle">Watch binary search work even on a rotated array by always trusting the half that's still sorted.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy</h3>
+    <p>Ek <b>circular ghadi</b> ke sorted numbers ko kisi ne ghuma diya. Phir bhi kisi bhi <code>lo…hi</code> window me <b>ek aadha hamesha properly sorted</b> hota hai. Wo sorted half dekho — target uski range me hai to udhar jao, warna doosre half me. Har step pe aadha kaat do.</p>
+  </div>
+
+  <div class="problem">
+    <span class="label">nums:</span><code>[4, 5, 6, 7, 0, 1, 2]</code>
+    &nbsp;&nbsp;<span class="label">target:</span><code>0</code>
+    &nbsp;&nbsp;<span class="arrow">→</span> expected index <code>4</code>
+  </div>
+
+  <div class="stage">
+    <div class="section-title">Search window (lo … hi), mid highlighted</div>
+    <div class="array" id="array"></div>
+    <div class="ptrs" id="ptrs"></div>
+
+    <div class="state">
+      <div class="scard"><div class="l">lo</div><div class="v"><span class="g" id="s-lo">0</span></div></div>
+      <div class="scard"><div class="l">mid = (lo+hi)//2</div><div class="v"><span class="a" id="s-mid">3</span></div></div>
+      <div class="scard"><div class="l">hi</div><div class="v"><span class="p" id="s-hi">6</span></div></div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="swatch" style="background:#10b981"></span>lo</div>
+      <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>mid</div>
+      <div class="legend-item"><span class="swatch" style="background:#a855f7"></span>hi</div>
+      <div class="legend-item"><span class="swatch" style="background:#20304f;border:1px solid #2f4a73"></span>sorted half</div>
+      <div class="legend-item"><span class="swatch" style="background:#2d2d50;opacity:.4"></span>excluded</div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to begin. <code>lo=0</code>, <code>hi=6</code>.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>At every <code>mid</code>, exactly one side <code>[lo..mid]</code> or <code>[mid..hi]</code> is fully sorted. Check whether <code>target</code> falls inside that sorted side's range — that single test tells you which half to keep. O(log n), O(1) space, even when rotated.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const nums = [4, 5, 6, 7, 0, 1, 2];
+  const target = 0;
+
+  // Build discrete steps of the modified binary search.
+  const steps = [];
+  steps.push({
+    lo: 0, hi: nums.length - 1, mid: null, leftSorted: null,
+    rangeFrom: null, rangeTo: null, found: null,
+    narr: `Initialize <code>lo = 0</code>, <code>hi = ${nums.length - 1}</code>. The whole array is the search window. Press Next.`,
+    cls: ""
+  });
+
+  let lo = 0, hi = nums.length - 1, foundIdx = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const leftSorted = nums[lo] <= nums[mid];
+
+    // Step A: compute mid, identify which half is sorted
+    steps.push({
+      lo, hi, mid, leftSorted, rangeFrom: null, rangeTo: null, found: null,
+      narr: `<code>mid = (${lo}+${hi})//2 = ${mid}</code>, <code>nums[${mid}] = ${nums[mid]}</code>. ` +
+            `Since <code>nums[${lo}]=${nums[lo]} ${leftSorted ? "≤" : ">"} nums[${mid}]=${nums[mid]}</code>, the ` +
+            `<b class="sorted">${leftSorted ? "LEFT" : "RIGHT"} half is sorted</b>.`,
+      cls: ""
+    });
+
+    if (nums[mid] === target) {
+      steps.push({
+        lo, hi, mid, leftSorted, rangeFrom: null, rangeTo: null, found: mid,
+        narr: `<code>nums[${mid}] = ${nums[mid]} = target</code> ✅ — found it at index <code>${mid}</code>. Return <code>${mid}</code>.`,
+        cls: "found-n"
+      });
+      foundIdx = mid;
+      break;
+    }
+
+    // Step B: decide which half using the sorted side's range
+    let goLeft;
+    if (leftSorted) {
+      const inLeft = nums[lo] <= target && target < nums[mid];
+      goLeft = inLeft;
+      steps.push({
+        lo, hi, mid, leftSorted, rangeFrom: lo, rangeTo: mid, found: null,
+        narr: `Left half <code>[${nums[lo]} … ${nums[mid]})</code> is sorted. Is <code>target=${target}</code> inside it? ` +
+              `<code>${nums[lo]} ≤ ${target} &lt; ${nums[mid]}</code> → <b>${inLeft ? "YES" : "NO"}</b>. ` +
+              `So move to the <b>${inLeft ? "LEFT" : "RIGHT"}</b> half: <code>${inLeft ? "hi = mid-1" : "lo = mid+1"}</code>.`,
+        cls: ""
+      });
+    } else {
+      const inRight = nums[mid] < target && target <= nums[hi];
+      goLeft = !inRight;
+      steps.push({
+        lo, hi, mid, leftSorted, rangeFrom: mid, rangeTo: hi, found: null,
+        narr: `Right half <code>(${nums[mid]} … ${nums[hi]}]</code> is sorted. Is <code>target=${target}</code> inside it? ` +
+              `<code>${nums[mid]} &lt; ${target} ≤ ${nums[hi]}</code> → <b>${inRight ? "YES" : "NO"}</b>. ` +
+              `So move to the <b>${inRight ? "RIGHT" : "LEFT"}</b> half: <code>${inRight ? "lo = mid+1" : "hi = mid-1"}</code>.`,
+        cls: ""
+      });
+    }
+
+    if (goLeft) hi = mid - 1; else lo = mid + 1;
+  }
+
+  if (foundIdx === null) {
+    steps.push({
+      lo, hi, mid: null, leftSorted: null, rangeFrom: null, rangeTo: null, found: null,
+      narr: `<code>lo &gt; hi</code> — window is empty, target not present. Return <code>-1</code>.`,
+      cls: "miss-n"
+    });
+  }
+
+  // DOM
+  const arrayEl = document.getElementById("array");
+  const ptrsEl = document.getElementById("ptrs");
+  const narrEl = document.getElementById("narration");
+  const indEl = document.getElementById("step-indicator");
+  const sLo = document.getElementById("s-lo"), sMid = document.getElementById("s-mid"), sHi = document.getElementById("s-hi");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  function build() {
+    arrayEl.innerHTML = "";
+    ptrsEl.innerHTML = "";
+    nums.forEach((v, i) => {
+      const c = document.createElement("div");
+      c.className = "cell"; c.dataset.idx = i;
+      c.innerHTML = `<span class="idx">${i}</span><span class="val">${v}</span>`;
+      arrayEl.appendChild(c);
+      const p = document.createElement("div");
+      p.className = "ptr-slot"; p.dataset.idx = i;
+      ptrsEl.appendChild(p);
+    });
+  }
+
+  let cursor = 0;
+  function render() {
+    const s = steps[cursor];
+    [...arrayEl.children].forEach((cell, idx) => {
+      cell.className = "cell";
+      if (s.lo != null && (idx < s.lo || idx > s.hi)) cell.classList.add("excluded");
+      // sorted-half shading (only when mid known & no found highlight)
+      if (s.mid != null && s.found == null) {
+        const inLeftHalf = idx >= s.lo && idx <= s.mid;
+        const inRightHalf = idx >= s.mid && idx <= s.hi;
+        if (s.leftSorted && inLeftHalf) cell.classList.add("sorted-half");
+        if (!s.leftSorted && inRightHalf) cell.classList.add("sorted-half");
+      }
+      if (s.found === idx) { cell.classList.add("found"); return; }
+      if (s.lo === idx) cell.classList.add("lo");
+      if (s.hi === idx) cell.classList.add("hi");
+      if (s.mid === idx) cell.classList.add("mid");
+    });
+
+    [...ptrsEl.children].forEach((slot, idx) => {
+      const tags = [];
+      if (s.lo === idx) tags.push('<span class="lo">▲lo</span>');
+      if (s.mid === idx) tags.push('<span class="mid">▲mid</span>');
+      if (s.hi === idx) tags.push('<span class="hi">▲hi</span>');
+      slot.innerHTML = tags.join(" ");
+    });
+
+    sLo.textContent = s.lo != null ? s.lo : "—";
+    sMid.textContent = s.mid != null ? s.mid : "—";
+    sHi.textContent = s.hi != null ? s.hi : "—";
+
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+    indEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  build();
+  render();
+})();
+</script>
+</body>
+</html>

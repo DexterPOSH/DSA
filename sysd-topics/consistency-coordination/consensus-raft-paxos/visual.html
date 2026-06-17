@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Consensus (Raft / Paxos) — Leader Election & Log Replication</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  /* cluster SVG */
+  .cluster-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 480px; height: auto; }
+  .wire { stroke: #3a3a5c; stroke-width: 2; }
+
+  .node circle { transition: all .4s ease; }
+  .node .role { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #cdd; }
+  .node .nid { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 14px; fill: #fff; }
+  .node .term { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #fbbf24; }
+  .node.dead circle { opacity: .25; }
+  .node.dead text { opacity: .35; }
+
+  /* travelling message packet */
+  .packet { transition: all .55s cubic-bezier(.4,.1,.3,1); }
+  .packet text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8px; fill: #1a1a2e; font-weight: 700; }
+
+  /* log strip under each node */
+  .logcell { transition: all .4s ease; }
+  .logcell text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8px; font-weight: 700; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.dot { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.consistent { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.consistent h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 22px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.consistent .big { color: #10b981; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Consensus — Raft / Paxos</h1>
+  <div class="subtitle">How a cluster of <b>unreliable nodes</b> agrees on one ordered sequence of operations — surviving crashes and message loss — using <b>leader election</b> + <b>majority quorum</b> + <b>monotonic terms</b>. We walk a 5-node Raft cluster through electing a leader, replicating a write to a majority, and recovering from a leader crash.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the WhatsApp group plan</h3>
+    <p>5 dosto ka group Sunday ka plan decide kar raha hai — movie ya trekking — par network flaky hai (kisi ka message late, koi offline). Rule banta hai: ek <b>leader</b> hoga aur har plan-change usi ke through propose hoga. Plan tab confirm hota hai jab <b>majority (5 me se 3)</b> "haan" bol de — kyunki koi bhi 2 majorities kam-se-kam 1 banda share karti hain (overlap), isliye do alag plans kabhi confirm nahi ho paate. Agar leader ka phone band ho gaya, baaki log timeout ke baad <b>naya leader</b> chun lete hain aur plan chalta rehta hai. Yahi consensus hai.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">cluster:</span><code>N = 5 nodes (odd)</code> &nbsp;→&nbsp; <code>quorum = floor(N/2)+1 = 3</code> &nbsp;→&nbsp; tolerates <code>f = 2</code> failures</div>
+    <div class="row"><span class="label">rule:</span><code>2f + 1 nodes survive f failures</code> &nbsp;·&nbsp; election timeout <code>150–300 ms</code> (randomized)</div>
+    <div class="row"><span class="label">commit:</span><code>entry committed once durably on a MAJORITY</code> &nbsp;·&nbsp; same-region round-trip <code>~1–5 ms</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="cluster-holder">
+      <svg viewBox="0 0 400 400" id="cluster">
+        <g id="g-wires"></g>
+        <g id="g-packets"></g>
+        <g id="g-nodes"></g>
+        <g id="g-logs"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Term</div><div class="value amber" id="v-term">0</div></div>
+        <div class="var"><div class="label">Leader</div><div class="value green" id="v-leader">—</div></div>
+        <div class="var"><div class="label">Acks / Quorum</div><div class="value" id="v-acks">0 / 3</div></div>
+        <div class="var"><div class="label">Committed</div><div class="value green" id="v-commit">0</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch dot" style="background:#10b981"></span>Leader</div>
+        <div class="legend-item"><span class="swatch dot" style="background:#3b82f6"></span>Follower</div>
+        <div class="legend-item"><span class="swatch dot" style="background:#8b5cf6"></span>Candidate (asking for votes)</div>
+        <div class="legend-item"><span class="swatch dot" style="background:#475569"></span>Crashed / unreachable</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>RPC in flight (RequestVote / AppendEntries)</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Committed log entry (on majority)</div>
+        <div class="legend-item"><span class="swatch" style="background:#64748b"></span>Uncommitted log entry</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to start: 5 followers sit idle, waiting for a heartbeat that never comes.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>2-Phase Commit (2PC) — blocking</h3>
+      <div class="formula">coordinator → all participants must vote YES</div>
+      <p>Needs <b>every</b> participant to agree. If the coordinator crashes mid-commit, participants are stuck <i>uncertain</i> — holding locks, unable to proceed or abort. A single failure can <span class="big">block</span> the whole system. 2PC is for atomic commit across resources, not availability under failure.</p>
+    </div>
+    <div class="cx consistent">
+      <h3>Consensus (Raft / Paxos) — non-blocking</h3>
+      <div class="formula">leader → MAJORITY acks = committed</div>
+      <p>Only needs a <b>majority</b>, not everyone. If the leader crashes, survivors time out and elect a new one — the cluster keeps going. Tolerates <span class="big">f = 2</span> of 5 down. Higher <code>term</code> always wins, so split-brain self-heals. This is replicated agreement that stays <b>available</b>.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Quorum overlap is the whole trick</b> — any two majorities of <code>floor(N/2)+1</code> share at least one node, so two conflicting values can never both be committed. Say this and the interviewer smiles.</li>
+      <li><b>Odd numbers only</b> — <code>4</code> nodes tolerate the same <code>1</code> failure as <code>3</code> (quorum 3 vs 2), just at extra cost. Pick <b>3, 5, or 7</b>. <code>2f+1</code> nodes → <code>f</code> failures.</li>
+      <li><b>Term = logical clock</b> — a monotonically increasing integer; at most one leader per term. See a higher term → step down to follower immediately. This kills stale leaders and split-brain.</li>
+      <li><b>Committed ≠ visible instantly</b> — an entry is committed once durable on a majority, but the client sees it only after the state machine <i>applies</i> it, strictly in log order.</li>
+      <li><b>Raft vs Paxos</b> — same safety, same <code>2f+1</code> math. Raft = strong leader + explicit terms, easier to grasp. Multi-Paxos amortizes phase 1 with a stable leader, ending up Raft-like in steady state. Default to <b>Raft</b> in interviews.</li>
+      <li><b>CP, not AP</b> — partition a leader onto the minority side and it stops accepting writes (no quorum). Consensus trades availability for consistency.</li>
+      <li><b>Cross-region hurts</b> — a commit needs one round-trip leader→majority→leader: <code>~1–5 ms</code> same-region but <code>50–100+ ms</code> across datacenters. So big systems <b>shard</b> and run one Raft group per shard (Spanner, CockroachDB, TiKV).</li>
+      <li><b>Used by</b> — etcd, Consul (Raft); ZooKeeper (ZAB); Kubernetes control plane (etcd); Spanner (Paxos per shard).</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Consensus = <b>elect one leader</b>, funnel every write through it, and treat a write as committed only once a <b>majority</b> has durably stored it. Because any two majorities overlap, the cluster can never commit two conflicting values; and because a <b>higher term</b> always wins, a crashed leader is cleanly replaced — giving you a single, consistent, <b>fault-tolerant source of truth</b> at the cost of one round-trip per write.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- geometry: 5 nodes on a circle ----------
+  const CX = 200, CY = 188, R = 120;
+  const NODE_IDS = ["S1","S2","S3","S4","S5"];
+  // angle per node, starting top, clockwise
+  const nodePos = {};
+  NODE_IDS.forEach((id, i) => {
+    const a = (-90 + i * (360 / 5)) * Math.PI / 180;
+    nodePos[id] = { x: CX + R * Math.cos(a), y: CY + R * Math.sin(a) };
+  });
+
+  const COLOR = {
+    leader: "#10b981", follower: "#3b82f6", candidate: "#8b5cf6", dead: "#475569"
+  };
+
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // ---------- step model ----------
+  // Each step describes full cluster state:
+  //  roles: {S1:'follower',...}
+  //  term, leader, acksFrom:Set (nodes that acked current op), quorum=3
+  //  logs: {S1:[{t,v,committed}], ...}  (entries)
+  //  packets: [{from,to,label,kind}]  kind: vote|votegrant|append|ack
+  //  narration, narrClass, vars override
+  const Q = 3;
+  const steps = [];
+
+  // helper to build uniform roles
+  function roles(over) {
+    const base = { S1:"follower",S2:"follower",S3:"follower",S4:"follower",S5:"follower" };
+    return Object.assign(base, over || {});
+  }
+  function emptyLogs(over) {
+    const base = { S1:[],S2:[],S3:[],S4:[],S5:[] };
+    return Object.assign(base, over || {});
+  }
+
+  // log entry helpers
+  const E = (t, v, committed) => ({ t, v, committed: !!committed });
+
+  // STEP 0 — idle followers, term 0
+  steps.push({
+    roles: roles(), term: 0, leader: "—", acks: 0, committed: 0,
+    logs: emptyLogs(), packets: [],
+    narration: `<b>1. Everyone is a follower.</b> The 5 servers (<code>S1…S5</code>) start at <code>term 0</code> with no leader. Each holds a randomized <b>election timeout</b> (<code>150–300 ms</code>). Heartbeats keep them quiet — but right now none are arriving.`,
+    narrClass: "", vars: { acks: "0 / 3", leader: "—" }
+  });
+
+  // STEP 1 — S2 times out, becomes candidate, term 1, sends RequestVote
+  steps.push({
+    roles: roles({ S2: "candidate" }), term: 1, leader: "—", acks: 1, committed: 0,
+    logs: emptyLogs(), packets: [
+      { from:"S2", to:"S1", label:"vote?", kind:"vote" },
+      { from:"S2", to:"S3", label:"vote?", kind:"vote" },
+      { from:"S2", to:"S4", label:"vote?", kind:"vote" },
+      { from:"S2", to:"S5", label:"vote?", kind:"vote" },
+    ],
+    narration: `<b>2. A timeout fires → election.</b> <code>S2</code> hits its timeout first, becomes a <b>candidate</b>, bumps to <code>term 1</code>, votes for itself, and broadcasts <code>RequestVote</code> RPCs. The randomized timeouts make simultaneous candidates rare — this avoids split votes.`,
+    narrClass: "move", vars: { acks: "1 / 3", leader: "—" }
+  });
+
+  // STEP 2 — votes granted, S2 has majority, becomes leader
+  steps.push({
+    roles: roles({ S2: "leader" }), term: 1, leader: "S2", acks: 3, committed: 0,
+    logs: emptyLogs(), packets: [
+      { from:"S1", to:"S2", label:"yes", kind:"votegrant" },
+      { from:"S3", to:"S2", label:"yes", kind:"votegrant" },
+    ],
+    narration: `<b>3. Majority votes → leader elected.</b> <code>S1</code> and <code>S3</code> grant their votes. With its own vote that's <b>3 of 5 = quorum</b>, so <code>S2</code> becomes <b>leader</b> for <code>term 1</code>. It immediately starts sending <b>heartbeats</b> (empty <code>AppendEntries</code>, every ~50 ms) to suppress new elections.`,
+    narrClass: "good", vars: { acks: "3 / 3", leader: "S2" }
+  });
+
+  // STEP 3 — client write arrives, leader appends uncommitted entry, replicates
+  steps.push({
+    roles: roles({ S2: "leader" }), term: 1, leader: "S2", acks: 1, committed: 0,
+    logs: emptyLogs({ S2: [E(1, "x=5", false)] }),
+    packets: [
+      { from:"S2", to:"S1", label:"x=5", kind:"append" },
+      { from:"S2", to:"S3", label:"x=5", kind:"append" },
+      { from:"S2", to:"S4", label:"x=5", kind:"append" },
+      { from:"S2", to:"S5", label:"x=5", kind:"append" },
+    ],
+    narration: `<b>4. A client write arrives.</b> Request <code>SET x=5</code> goes to the leader. <code>S2</code> appends it to its log at <code>(index 1, term 1)</code> as an <b>uncommitted</b> entry (grey), then replicates it to all followers via <code>AppendEntries</code>. Not committed yet — it must reach a majority first.`,
+    narrClass: "move", vars: { acks: "1 / 3", leader: "S2" }
+  });
+
+  // STEP 4 — two followers ack -> majority reached -> committed
+  steps.push({
+    roles: roles({ S2: "leader" }), term: 1, leader: "S2", acks: 3, committed: 1,
+    logs: emptyLogs({
+      S2: [E(1, "x=5", true)],
+      S1: [E(1, "x=5", true)],
+      S3: [E(1, "x=5", true)],
+    }),
+    packets: [
+      { from:"S1", to:"S2", label:"ack", kind:"ack" },
+      { from:"S3", to:"S2", label:"ack", kind:"ack" },
+    ],
+    narration: `<b>5. Majority acks → committed.</b> <code>S1</code> and <code>S3</code> durably write the entry and ack. Now <b>3 of 5</b> have it — quorum reached, so the leader marks <code>x=5</code> <b>committed</b> (green), applies it to its state machine, and acks the client. One round-trip (<code>~1–5 ms</code> same-region).`,
+    narrClass: "good", vars: { acks: "3 / 3", leader: "S2" }
+  });
+
+  // STEP 5 — leader S2 crashes
+  steps.push({
+    roles: roles({ S2: "dead" }), term: 1, leader: "— (S2 down)", acks: 0, committed: 1,
+    logs: emptyLogs({
+      S2: [E(1, "x=5", true)],
+      S1: [E(1, "x=5", true)],
+      S3: [E(1, "x=5", true)],
+    }),
+    packets: [],
+    narration: `<b>6. The leader crashes.</b> <code>S2</code> dies — no more heartbeats. The committed entry <code>x=5</code> is <b>safe</b>: it already lives on a majority (<code>S1</code>, <code>S3</code>) and any future leader must contain it. Followers start counting down their election timeouts again.`,
+    narrClass: "bad", vars: { acks: "0 / 3", leader: "— (S2 down)" }
+  });
+
+  // STEP 6 — S4 becomes candidate, term 2, requests votes from survivors
+  steps.push({
+    roles: roles({ S2: "dead", S4: "candidate" }), term: 2, leader: "—", acks: 1, committed: 1,
+    logs: emptyLogs({
+      S2: [E(1, "x=5", true)],
+      S1: [E(1, "x=5", true)],
+      S3: [E(1, "x=5", true)],
+    }),
+    packets: [
+      { from:"S4", to:"S1", label:"vote? t2", kind:"vote" },
+      { from:"S4", to:"S3", label:"vote? t2", kind:"vote" },
+      { from:"S4", to:"S5", label:"vote? t2", kind:"vote" },
+    ],
+    narration: `<b>7. New election, higher term.</b> <code>S4</code> times out first, becomes candidate, and bumps to <code>term 2</code> — a higher term <b>always wins</b>, so any stale leader would step down. It asks the survivors for votes (a candidate only wins if its log is at least as up-to-date as the voter's).`,
+    narrClass: "move", vars: { acks: "1 / 3", leader: "—" }
+  });
+
+  // STEP 7 — S4 elected leader term 2, with 4 alive still quorum=3
+  steps.push({
+    roles: roles({ S2: "dead", S4: "leader" }), term: 2, leader: "S4", acks: 3, committed: 1,
+    logs: emptyLogs({
+      S2: [E(1, "x=5", true)],
+      S1: [E(1, "x=5", true)],
+      S3: [E(1, "x=5", true)],
+      S4: [E(1, "x=5", true)],
+    }),
+    packets: [
+      { from:"S3", to:"S4", label:"yes", kind:"votegrant" },
+      { from:"S5", to:"S4", label:"yes", kind:"votegrant" },
+    ],
+    narration: `<b>8. Recovered — cluster keeps going.</b> <code>S3</code> and <code>S5</code> vote yes; with its own vote that's <b>3 of 4 alive</b> = quorum. <code>S4</code> leads <code>term 2</code> and already holds the committed <code>x=5</code>. With <code>f = 2</code> tolerance we lost 1 node and never lost availability — the system stayed correct and live.`,
+    narrClass: "good", vars: { acks: "3 / 3", leader: "S4" }
+  });
+
+  // ---------- DOM refs ----------
+  const gWires = document.getElementById("g-wires");
+  const gPackets = document.getElementById("g-packets");
+  const gNodes = document.getElementById("g-nodes");
+  const gLogs = document.getElementById("g-logs");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vTerm = document.getElementById("v-term");
+  const vLeader = document.getElementById("v-leader");
+  const vAcks = document.getElementById("v-acks");
+  const vCommit = document.getElementById("v-commit");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  // static wires between every pair (drawn once)
+  function drawWires() {
+    gWires.innerHTML = "";
+    for (let i = 0; i < NODE_IDS.length; i++) {
+      for (let j = i + 1; j < NODE_IDS.length; j++) {
+        const a = nodePos[NODE_IDS[i]], b = nodePos[NODE_IDS[j]];
+        gWires.appendChild(svgEl("line", {
+          class: "wire", x1: a.x, y1: a.y, x2: b.x, y2: b.y
+        }));
+      }
+    }
+  }
+
+  let cursor = 0;
+  let animTimers = [];
+
+  function clearTimers() { animTimers.forEach(clearTimeout); animTimers = []; }
+
+  function render() {
+    clearTimers();
+    const s = steps[cursor];
+    gNodes.innerHTML = ""; gLogs.innerHTML = ""; gPackets.innerHTML = "";
+
+    // ---- nodes ----
+    NODE_IDS.forEach(id => {
+      const p = nodePos[id];
+      const role = s.roles[id];
+      const isDead = role === "dead";
+      const col = COLOR[role] || COLOR.follower;
+      const g = svgEl("g", { class: "node" + (isDead ? " dead" : "") });
+      const isLeader = role === "leader";
+      const c = svgEl("circle", {
+        cx: p.x, cy: p.y, r: isLeader ? 26 : 22,
+        fill: col,
+        stroke: isLeader ? "#6ee7b7" : "#1a1a2e",
+        "stroke-width": isLeader ? 4 : 3
+      });
+      g.appendChild(c);
+      const nid = svgEl("text", { class: "nid", x: p.x, y: p.y - 2, "text-anchor": "middle" });
+      nid.textContent = id;
+      g.appendChild(nid);
+      const roleLbl = svgEl("text", { class: "role", x: p.x, y: p.y + 9, "text-anchor": "middle" });
+      roleLbl.textContent = isDead ? "down" : role;
+      g.appendChild(roleLbl);
+      // term tag below node
+      if (!isDead) {
+        const tt = svgEl("text", { class: "term", x: p.x, y: p.y + 38, "text-anchor": "middle" });
+        tt.textContent = "term " + s.term;
+        g.appendChild(tt);
+      }
+      gNodes.appendChild(g);
+    });
+
+    // ---- log strips (small cells near node, toward center) ----
+    NODE_IDS.forEach(id => {
+      const entries = s.logs[id] || [];
+      if (!entries.length) return;
+      const p = nodePos[id];
+      // place log strip between node and center
+      const dx = (CX - p.x), dy = (CY - p.y);
+      const len = Math.hypot(dx, dy);
+      const ux = dx / len, uy = dy / len;
+      const startX = p.x + ux * 34, startY = p.y + uy * 34;
+      entries.forEach((e, i) => {
+        const cw = 30, ch = 16;
+        const bx = startX + ux * (i * (cw + 2)) - cw / 2;
+        const by = startY + uy * (i * (ch + 2)) - ch / 2;
+        const g = svgEl("g", { class: "logcell" });
+        const rect = svgEl("rect", {
+          x: bx, y: by, width: cw, height: ch, rx: 3,
+          fill: e.committed ? "#10b981" : "#64748b",
+          stroke: e.committed ? "#6ee7b7" : "#94a3b8", "stroke-width": 1.5,
+          opacity: 0.95
+        });
+        g.appendChild(rect);
+        const t = svgEl("text", {
+          x: bx + cw / 2, y: by + ch / 2 + 3, "text-anchor": "middle",
+          fill: e.committed ? "#06281a" : "#e8edf2"
+        });
+        t.textContent = e.v;
+        g.appendChild(t);
+        gLogs.appendChild(g);
+      });
+    });
+
+    // ---- packets: render at source, animate toward dest ----
+    const PKT_COLOR = { vote:"#f59e0b", votegrant:"#10b981", append:"#f59e0b", ack:"#10b981" };
+    (s.packets || []).forEach((pk, idx) => {
+      const a = nodePos[pk.from], b = nodePos[pk.to];
+      const col = PKT_COLOR[pk.kind] || "#f59e0b";
+      const g = svgEl("g", { class: "packet" });
+      // start near source
+      const sx = a.x + (b.x - a.x) * 0.18;
+      const sy = a.y + (b.y - a.y) * 0.18;
+      const c = svgEl("circle", { cx: sx, cy: sy, r: 11, fill: col, stroke: "#1a1a2e", "stroke-width": 2 });
+      const t = svgEl("text", { x: sx, y: sy + 3, "text-anchor": "middle" });
+      t.textContent = pk.label;
+      g.appendChild(c); g.appendChild(t);
+      gPackets.appendChild(g);
+      // animate to near dest, staggered
+      const ex = a.x + (b.x - a.x) * 0.78;
+      const ey = a.y + (b.y - a.y) * 0.78;
+      const tm = setTimeout(() => {
+        g.setAttribute("transform", `translate(${(ex - sx).toFixed(1)},${(ey - sy).toFixed(1)})`);
+      }, 60 + idx * 90);
+      animTimers.push(tm);
+    });
+
+    // ---- side stats ----
+    vTerm.textContent = s.term;
+    vLeader.textContent = (s.vars && s.vars.leader) || s.leader;
+    vAcks.textContent = (s.vars && s.vars.acks) || (s.acks + " / " + Q);
+    vCommit.textContent = s.committed;
+    // color the acks value green if quorum met
+    const acksMet = s.acks >= Q;
+    vAcks.className = "value " + (acksMet ? "green" : "amber");
+    vLeader.className = "value " + (s.roles.S2 === "dead" || (s.vars && /down/.test(s.vars.leader||"")) ? "red" : "green");
+
+    // ---- narration ----
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  drawWires();
+  render();
+})();
+</script>
+</body>
+</html>

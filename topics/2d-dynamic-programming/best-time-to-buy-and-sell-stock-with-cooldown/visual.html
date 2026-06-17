@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock with Cooldown — State-Machine DP Table</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 24px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.05rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel); border-radius: 12px; padding: 16px 22px;
+    margin-bottom: 22px; border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  /* state machine diagram */
+  .machine { display:flex; gap:14px; justify-content:center; align-items:center; flex-wrap:wrap; margin: 6px 0 22px; }
+  .node {
+    border-radius: 12px; padding: 12px 18px; text-align:center; min-width:120px;
+    border: 2px solid; background: var(--panel2); transition: all .3s ease;
+  }
+  .node .nm { font-weight:700; font-size:1rem; letter-spacing:.5px; }
+  .node .sub { font-size:.72rem; color: var(--muted); margin-top:3px; }
+  .node.hold { border-color: var(--blue); }
+  .node.sold { border-color: var(--red); }
+  .node.rest { border-color: var(--green); }
+  .node.lit { box-shadow: 0 0 0 3px rgba(245,158,11,0.4); transform: translateY(-2px); }
+  .machine .sep { color: var(--muted); font-size:1.4rem; }
+
+  .controls { text-align: center; margin: 6px 0 22px; }
+  button {
+    background: var(--blue); color:#fff; border:none; padding:11px 24px; border-radius:10px;
+    font-size:1rem; font-weight:600; cursor:pointer; transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled){ background:#2f6fd6; transform:translateY(-1px); }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); margin: 0 6px; }
+  button.ghost:hover:not(:disabled){ background:#3a3a66; }
+
+  .stage {
+    background: var(--panel); border-radius:14px; padding:22px 22px 26px;
+    border:1px solid rgba(255,255,255,0.06); box-shadow:0 6px 20px rgba(0,0,0,0.25);
+  }
+  .tablewrap { display:flex; justify-content:center; overflow-x:auto; padding-bottom:6px; }
+  table.dp { border-collapse: separate; border-spacing: 6px; }
+  .dp th {
+    color: var(--muted); font-family:"SF Mono",Menlo,monospace; font-weight:700;
+    padding: 4px 8px; font-size:.92rem;
+  }
+  .dp th.hh { color: var(--blue); }
+  .dp th.sh { color: var(--red); }
+  .dp th.rh { color: var(--green); }
+  .dp th.day { color: var(--amber); text-align:right; }
+  .dp th.price { color:#ffd479; }
+  .dp td {
+    width: 72px; height: 44px; border-radius:9px; text-align:center; vertical-align:middle;
+    font-family:"SF Mono",Menlo,monospace; font-weight:700; font-size:1.05rem;
+    background: var(--panel2); border:1px solid rgba(255,255,255,0.08); color:#555;
+    transition: all .3s ease;
+  }
+  .dp td.fill-h { background: rgba(59,130,246,0.13); border-color: rgba(59,130,246,0.35); color:#9bbcf5; }
+  .dp td.fill-s { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.35); color:#f5a3a3; }
+  .dp td.fill-r { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.35); color:#b6f0d8; }
+  .dp td.active { box-shadow: 0 0 0 3px var(--amber); transform: scale(1.07); color:#ffe6b0; background: rgba(245,158,11,0.2); border-color: var(--amber); }
+  .dp td.dep { box-shadow: 0 0 0 3px var(--green); }
+  .dp tr.activeRow th.day { color:#fff; }
+
+  .caption {
+    margin-top: 18px; background: var(--panel2); border-radius:10px;
+    padding:14px 16px; border-left:4px solid var(--amber); font-size:.97rem; min-height:70px;
+  }
+  .caption .eq { color:#ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .caption .h { color:#9bbcf5; font-weight:700; }
+  .caption .s { color:#f5a3a3; font-weight:700; }
+  .caption .r { color:#b6f0d8; font-weight:700; }
+  .stepcount { text-align:center; color:var(--muted); font-size:.85rem; margin-top:12px; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border:1px solid rgba(59,130,246,0.4); border-radius:12px;
+    padding:18px 24px; margin-top:28px; text-align:center;
+  }
+  .takeaway h3 { margin:0 0 6px; color: var(--blue); }
+  .takeaway p { margin:0; font-size:1.05rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Stock with Cooldown — <span>state-machine DP</span></h1>
+  <p class="subtitle">Max profit from unlimited buy/sell, but one forced <b>cooldown day</b> after every sell.</p>
+
+  <div class="analogy">
+    <h3>📈 Analogy: three trader moods each day</h3>
+    <p>Har din tum ek mood me ho: <b style="color:#9bbcf5">HOLD</b> (share pakde ho), <b style="color:#f5a3a3">SOLD</b> (aaj becha → kal cooldown), ya <b style="color:#b6f0d8">REST</b> (free, khareed sakte ho). Aaj ka mood kal ke mood pe depend karta hai — yahi state machine hai.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> <code>prices = [1, 2, 3, 0, 2]</code>. Max profit with cooldown?
+    <span class="arrow">→</span> Answer: <code>3</code>
+  </div>
+
+  <div class="machine">
+    <div class="node rest" id="nRest"><div class="nm">REST</div><div class="sub">free, no share</div></div>
+    <span class="sep">— buy →</span>
+    <div class="node hold" id="nHold"><div class="nm">HOLD</div><div class="sub">holding a share</div></div>
+    <span class="sep">— sell →</span>
+    <div class="node sold" id="nSold"><div class="nm">SOLD</div><div class="sub">just sold</div></div>
+    <span class="sep">cooldown ↺</span>
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn">‹ Prev</button>
+    <button id="nextBtn">Next ›</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+  </div>
+
+  <div class="stage">
+    <div class="tablewrap"><table class="dp" id="dp"></table></div>
+    <div class="caption" id="caption">Press <b>Next</b>. Day −1 (before trading): <span class="h">hold = −∞</span> (can't hold for free), <span class="s">sold = 0</span>, <span class="r">rest = 0</span>.</div>
+    <div class="stepcount" id="stepcount"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Track the best profit for each <b>state</b> per day. The extra <b>REST</b> state is what enforces the cooldown — you can only buy from REST, never straight after a SOLD.</p>
+  </div>
+</div>
+
+<script>
+const prices = [1,2,3,0,2];
+const NEG = -Infinity;
+// compute table: rows = day index, cols = hold/sold/rest
+const rows = [];
+let hold = NEG, sold = 0, rest = 0;
+rows.push({day:-1, price:null, hold, sold, rest});   // initial
+for (let i=0;i<prices.length;i++){
+  const p = prices[i];
+  const ph = hold, ps = sold, pr = rest;
+  const nsold = ph + p;
+  const nhold = Math.max(ph, pr - p);
+  const nrest = Math.max(pr, ps);
+  hold = nhold; sold = nsold; rest = nrest;
+  rows.push({day:i, price:p, hold, sold, rest,
+    prev:{hold:ph, sold:ps, rest:pr},
+    // dependency info for captions
+  });
+}
+
+const fmt = v => v === NEG ? '−∞' : v;
+
+// Build steps. Each step reveals one day's row computed, and lights the relevant state.
+// We'll have: step0 = initial row only. Then for each trading day, 3 sub-steps (hold, sold, rest)?
+// To keep it readable: one step per day, but caption explains all three transitions.
+const steps = [];
+steps.push({ upto:0, activeCell:null, deps:[], lit:[],
+  caption:`Initialize day −1: <span class="h">hold = −∞</span> (holding a share for free is impossible), <span class="s">sold = 0</span>, <span class="r">rest = 0</span>. These seed the recurrence.` });
+
+for (let i=1;i<rows.length;i++){
+  const r = rows[i];
+  const day = r.day, p = r.price, pv = r.prev;
+  // sub-step a: sold
+  steps.push({ upto:i, activeCell:[i,'sold'], deps:[[i-1,'hold']], lit:['sold'],
+    caption:`Day ${day} (price <span class="eq">${p}</span>): <span class="s">SOLD</span> = sell what you held = <span class="h">hold_prev</span> + price = <span class="eq">${fmt(pv.hold)}</span> + <span class="eq">${p}</span> = <b class="s">${fmt(r.sold)}</b>.` });
+  // sub-step b: hold
+  steps.push({ upto:i, activeCell:[i,'hold'], deps:[[i-1,'hold'],[i-1,'rest']], lit:['hold'],
+    caption:`Day ${day}: <span class="h">HOLD</span> = keep holding (<span class="eq">${fmt(pv.hold)}</span>) or buy from REST (<span class="r">rest_prev</span> − price = <span class="eq">${fmt(pv.rest)}</span>−<span class="eq">${p}</span>=<span class="eq">${fmt(pv.rest-p)}</span>) → max = <b class="h">${fmt(r.hold)}</b>. Buying only from REST is the cooldown rule.` });
+  // sub-step c: rest
+  steps.push({ upto:i, activeCell:[i,'rest'], deps:[[i-1,'rest'],[i-1,'sold']], lit:['rest'],
+    caption:`Day ${day}: <span class="r">REST</span> = stay resting (<span class="eq">${fmt(pv.rest)}</span>) or finish yesterday's cooldown (<span class="s">sold_prev</span> = <span class="eq">${fmt(pv.sold)}</span>) → max = <b class="r">${fmt(r.rest)}</b>.` +
+      (i===rows.length-1 ? ` 🎯 Final answer = max(<span class="s">sold</span>, <span class="r">rest</span>) = <b>${Math.max(r.sold, r.rest)}</b>.` : '') });
+}
+
+const $ = id => document.getElementById(id);
+let cur = 0;
+
+function buildTable(){
+  let html = '';
+  html += '<tr><th class="day">day</th><th class="price">price</th><th class="hh">HOLD</th><th class="sh">SOLD</th><th class="rh">REST</th></tr>';
+  for (let i=0;i<rows.length;i++){
+    const r = rows[i];
+    html += `<tr id="row${i}">`;
+    html += `<th class="day">${r.day<0?'−1':r.day}</th>`;
+    html += `<th class="price">${r.price===null?'·':r.price}</th>`;
+    html += `<td id="c${i}-hold"></td><td id="c${i}-sold"></td><td id="c${i}-rest"></td>`;
+    html += '</tr>';
+  }
+  $('dp').innerHTML = html;
+}
+
+function render(){
+  const st = steps[cur];
+  // reset rows
+  for (let i=0;i<rows.length;i++){
+    ['hold','sold','rest'].forEach(s=>{
+      const cell = $('c'+i+'-'+s);
+      cell.className = '';
+      cell.textContent = '';
+    });
+    $('row'+i).classList.remove('activeRow');
+  }
+  // fill all rows fully up to (upto-1); for the active row fill only cells already decided
+  const activeRow = st.activeCell ? st.activeCell[0] : st.upto;
+  const order = ['sold','hold','rest']; // computation order within a day
+  for (let i=0;i<=st.upto;i++){
+    const r = rows[i];
+    ['hold','sold','rest'].forEach(s=>{
+      const cell = $('c'+i+'-'+s);
+      let show = true;
+      if (st.activeCell && i===activeRow){
+        // within active row, only show cells computed so far this step (including active)
+        const activeState = st.activeCell[1];
+        show = order.indexOf(s) <= order.indexOf(activeState);
+      }
+      if (i===0) show = true; // init row always full
+      if (!show){ cell.textContent=''; cell.className=''; return; }
+      cell.textContent = fmt(r[s]);
+      cell.classList.add(s==='hold'?'fill-h':s==='sold'?'fill-s':'fill-r');
+    });
+  }
+  // active cell + deps
+  if (st.activeCell){
+    const [ai,as] = st.activeCell;
+    $('c'+ai+'-'+as).classList.add('active');
+    $('row'+ai).classList.add('activeRow');
+    st.deps.forEach(([di,ds]) => $('c'+di+'-'+ds).classList.add('dep'));
+  }
+  // light state-machine nodes
+  $('nHold').classList.toggle('lit', st.lit.includes('hold'));
+  $('nSold').classList.toggle('lit', st.lit.includes('sold'));
+  $('nRest').classList.toggle('lit', st.lit.includes('rest'));
+
+  $('caption').innerHTML = st.caption;
+  $('stepcount').textContent = `Step ${cur} / ${steps.length-1}`;
+  $('prevBtn').disabled = cur===0;
+  $('nextBtn').disabled = cur===steps.length-1;
+}
+
+$('nextBtn').addEventListener('click', ()=>{ if(cur<steps.length-1){cur++;render();}});
+$('prevBtn').addEventListener('click', ()=>{ if(cur>0){cur--;render();}});
+$('resetBtn').addEventListener('click', ()=>{ cur=0; render(); });
+
+buildTable();
+render();
+</script>
+</body>
+</html>

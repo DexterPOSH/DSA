@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rotate Image — Transpose then Reverse</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 70px;
+    gap: 28px;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.75rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel);
+    border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue);
+    border-radius: 12px;
+    padding: 18px 24px;
+    max-width: 720px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy .icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy .label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .analogy p { color: #c0c0d0; font-size: 0.98rem; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid #2d3a5a;
+    border-radius: 16px;
+    padding: 30px;
+    max-width: 720px; width: 100%;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+
+  .phase-tabs { display: flex; gap: 10px; flex-wrap: wrap; }
+  .phase-tab {
+    font-size: 0.78rem; font-weight: 600; padding: 7px 14px;
+    border-radius: 20px; background: var(--panel2);
+    border: 1px solid #2d3a5a; color: var(--muted);
+  }
+  .phase-tab.active { background: #1e3a6e; border-color: var(--blue); color: #bcd4ff; }
+  .phase-tab.done { border-color: var(--green); color: #86efac; }
+
+  .step-desc {
+    min-height: 56px;
+    background: var(--panel2);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 0.95rem; color: #c8c8e0;
+    border-left: 3px solid var(--blue);
+    transition: border-color 0.3s;
+  }
+  .step-desc.transpose { border-color: var(--amber); }
+  .step-desc.reverse { border-color: var(--green); }
+  .step-desc code { color: #ffd479; font-family: 'Consolas', monospace; }
+
+  .grid-wrap { display: flex; justify-content: center; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 72px);
+    grid-template-rows: repeat(3, 72px);
+    gap: 10px;
+  }
+  .cell {
+    border-radius: 10px;
+    border: 2px solid #2d3a5a;
+    background: var(--panel2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.7rem; font-weight: 700; color: var(--text);
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  .cell .coord {
+    position: absolute; bottom: 4px; right: 6px;
+    font-size: 0.55rem; font-weight: 400; color: #5a6a90;
+  }
+  .cell.diagonal { border-color: #4b5a82; background: #1a2540; }
+  .cell.swap-a {
+    border-color: var(--amber); background: #3a2a0a; color: #fcd34d;
+    box-shadow: 0 0 18px rgba(245,158,11,0.45); transform: scale(1.08);
+  }
+  .cell.swap-b {
+    border-color: var(--blue); background: #1e3a6e; color: #93c5fd;
+    box-shadow: 0 0 18px rgba(59,130,246,0.45); transform: scale(1.08);
+  }
+  .cell.row-active {
+    border-color: var(--green); background: #0d2a1a; color: #86efac;
+    box-shadow: 0 0 16px rgba(16,185,129,0.4);
+  }
+  .cell.settled { border-color: #2f6f4f; }
+
+  .result-badge {
+    display: none; align-items: center; gap: 12px;
+    padding: 14px 20px; border-radius: 10px;
+    background: #0d2a1a; border: 1.5px solid var(--green); color: #86efac;
+    font-weight: 600;
+  }
+  .result-badge.show { display: flex; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.82rem; color: var(--muted); margin-left: auto; }
+
+  .takeaway {
+    background: var(--panel);
+    border: 1px solid #2d3a5a;
+    border-radius: 12px;
+    padding: 18px 24px;
+    max-width: 720px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway .icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway .label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.93rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+
+  .code-block {
+    background: var(--panel2);
+    border: 1px solid #2d3a5a;
+    border-radius: 10px;
+    padding: 18px 22px;
+    max-width: 720px; width: 100%;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.8rem; line-height: 1.7; color: #94a3b8;
+    overflow-x: auto; white-space: pre;
+  }
+  .code-block .kw { color: #818cf8; }
+  .code-block .fn { color: #38bdf8; }
+  .code-block .cm { color: #475569; font-style: italic; }
+</style>
+</head>
+<body>
+
+  <h1>Rotate Image &mdash; <span>Transpose then Reverse</span></h1>
+
+  <div class="analogy">
+    <div class="icon">🖼️</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>Photo studio wala 90° rotation ko do simple foldings me todta hai:
+      pehle <strong>diagonal pe fold</strong> (transpose — rows aur columns swap),
+      phir har row ko <strong>horizontally flip</strong> (reverse). Koi naya frame nahi chahiye.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="phase-tabs">
+      <span class="phase-tab active" id="tab-transpose">1 · Transpose (diagonal swap)</span>
+      <span class="phase-tab" id="tab-reverse">2 · Reverse each row</span>
+    </div>
+
+    <div class="step-desc" id="stepDesc">Press &quot;Next Step&quot; to rotate <code>[[1,2,3],[4,5,6],[7,8,9]]</code> 90° clockwise, in place.</div>
+
+    <div class="grid-wrap">
+      <div class="grid" id="grid"></div>
+    </div>
+
+    <div class="result-badge" id="resultBadge">
+      <span style="font-size:1.3rem">✅</span>
+      <span>Rotated 90° clockwise &mdash; <code>[[7,4,1],[8,5,2],[9,6,3]]</code> &mdash; all in place, O(1) space.</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn">Reset</button>
+      <button class="btn btn-primary" id="nextBtn">Next Step</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key Takeaway</div>
+      <p><strong>Clockwise rotation = transpose + reverse each row.</strong> Two clean
+      O(n²)-time passes with O(1) extra space beat memorizing the
+      <code style="color:#ffd479">new[j][n-1-i] = old[i][j]</code> index formula.</p>
+    </div>
+  </div>
+
+  <div class="code-block"><span class="kw">def</span> <span class="fn">rotate</span>(matrix):
+    n = <span class="fn">len</span>(matrix)
+    <span class="cm"># Step 1: transpose (swap across main diagonal, j > i)</span>
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(n):
+        <span class="kw">for</span> j <span class="kw">in</span> <span class="fn">range</span>(i + 1, n):
+            matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]
+    <span class="cm"># Step 2: reverse each row (horizontal flip)</span>
+    <span class="kw">for</span> row <span class="kw">in</span> matrix:
+        row.reverse()</div>
+
+  <script>
+    const N = 3;
+    const initial = [[1,2,3],[4,5,6],[7,8,9]];
+
+    // Build the step list.
+    // Transpose phase: swap pairs (i,j)<->(j,i) for j>i  => (0,1),(0,2),(1,2)
+    // Reverse phase: reverse each row => 3 steps
+    const transposePairs = [];
+    for (let i = 0; i < N; i++)
+      for (let j = i + 1; j < N; j++)
+        transposePairs.push([i, j]);
+
+    const steps = [];
+    transposePairs.forEach(([i, j]) => {
+      steps.push({ phase: 'transpose', i, j });
+    });
+    for (let r = 0; r < N; r++) {
+      steps.push({ phase: 'reverse', row: r });
+    }
+    const TOTAL = steps.length;
+
+    const gridEl   = document.getElementById('grid');
+    const stepDesc = document.getElementById('stepDesc');
+    const counter  = document.getElementById('stepCounter');
+    const nextBtn  = document.getElementById('nextBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const resultBadge = document.getElementById('resultBadge');
+    const tabT = document.getElementById('tab-transpose');
+    const tabR = document.getElementById('tab-reverse');
+
+    let mat, stepIdx;
+
+    function buildGrid() {
+      gridEl.innerHTML = '';
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          const c = document.createElement('div');
+          c.className = 'cell';
+          c.id = `c-${i}-${j}`;
+          c.innerHTML = `${mat[i][j]}<span class="coord">${i},${j}</span>`;
+          gridEl.appendChild(c);
+        }
+      }
+    }
+    function paint() {
+      for (let i = 0; i < N; i++)
+        for (let j = 0; j < N; j++) {
+          const c = document.getElementById(`c-${i}-${j}`);
+          c.innerHTML = `${mat[i][j]}<span class="coord">${i},${j}</span>`;
+        }
+    }
+    function clearClasses(keepSettled) {
+      document.querySelectorAll('.cell').forEach(c => {
+        const settled = c.classList.contains('settled');
+        c.className = 'cell' + (keepSettled && settled ? ' settled' : '');
+      });
+    }
+    function markDiagonal() {
+      for (let i = 0; i < N; i++)
+        document.getElementById(`c-${i}-${i}`).classList.add('diagonal');
+    }
+
+    function reset() {
+      mat = initial.map(r => r.slice());
+      stepIdx = 0;
+      buildGrid();
+      markDiagonal();
+      stepDesc.className = 'step-desc';
+      stepDesc.innerHTML = 'Press &quot;Next Step&quot; to rotate <code>[[1,2,3],[4,5,6],[7,8,9]]</code> 90° clockwise, in place.';
+      resultBadge.classList.remove('show');
+      nextBtn.disabled = false;
+      tabT.className = 'phase-tab active';
+      tabR.className = 'phase-tab';
+      counter.textContent = `Step 0 / ${TOTAL}`;
+    }
+
+    function advance() {
+      if (stepIdx >= TOTAL) return;
+      const s = steps[stepIdx];
+      clearClasses(true);
+      markDiagonal();
+
+      if (s.phase === 'transpose') {
+        tabT.className = 'phase-tab active';
+        tabR.className = 'phase-tab';
+        const a = document.getElementById(`c-${s.i}-${s.j}`);
+        const b = document.getElementById(`c-${s.j}-${s.i}`);
+        a.classList.add('swap-a');
+        b.classList.add('swap-b');
+        stepDesc.className = 'step-desc transpose';
+        stepDesc.innerHTML =
+          `<strong>Transpose:</strong> swap <code>(${s.i},${s.j})=${mat[s.i][s.j]}</code> ` +
+          `with <code>(${s.j},${s.i})=${mat[s.j][s.i]}</code> across the main diagonal.`;
+        setTimeout(() => {
+          const t = mat[s.i][s.j];
+          mat[s.i][s.j] = mat[s.j][s.i];
+          mat[s.j][s.i] = t;
+          paint();
+        }, 350);
+
+      } else { // reverse
+        tabT.className = 'phase-tab done';
+        tabR.className = 'phase-tab active';
+        for (let j = 0; j < N; j++)
+          document.getElementById(`c-${s.row}-${j}`).classList.add('row-active');
+        stepDesc.className = 'step-desc reverse';
+        stepDesc.innerHTML =
+          `<strong>Reverse row ${s.row}:</strong> flip <code>[${mat[s.row].join(',')}]</code> ` +
+          `&rarr; <code>[${mat[s.row].slice().reverse().join(',')}]</code>.`;
+        setTimeout(() => {
+          mat[s.row].reverse();
+          paint();
+          for (let j = 0; j < N; j++)
+            document.getElementById(`c-${s.row}-${j}`).classList.add('settled');
+        }, 350);
+      }
+
+      stepIdx++;
+      counter.textContent = `Step ${stepIdx} / ${TOTAL}`;
+
+      if (stepIdx >= TOTAL) {
+        nextBtn.disabled = true;
+        tabR.className = 'phase-tab done';
+        setTimeout(() => resultBadge.classList.add('show'), 400);
+      }
+    }
+
+    nextBtn.addEventListener('click', advance);
+    resetBtn.addEventListener('click', reset);
+    reset();
+  </script>
+</body>
+</html>

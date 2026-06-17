@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Longest Increasing Subsequence — filling the dp row</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel); border-radius: 12px;
+    padding: 16px 22px; margin-bottom: 28px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: 'SF Mono', Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .stage {
+    background: var(--panel); border-radius: 14px;
+    padding: 22px 24px 26px; border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .secLabel { font-size: .82rem; color: var(--muted); letter-spacing:.04em; text-transform: uppercase; margin: 8px 0 8px; }
+
+  .grid { display: flex; gap: 10px; flex-wrap: wrap; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .ix { font-size: .68rem; color: var(--muted); }
+  .num, .dp {
+    width: 52px; height: 48px; border-radius: 9px;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 1.1rem;
+    font-family: 'SF Mono', Menlo, monospace;
+    background: var(--panel2); border: 2px solid rgba(255,255,255,0.08);
+    transition: all .3s ease;
+  }
+  .num.active { background: rgba(59,130,246,0.25); border-color: var(--blue); color: #bcd4ff; transform: translateY(-2px); }
+  .num.compare { box-shadow: 0 0 0 3px var(--amber); }
+  .num.smaller { background: rgba(16,185,129,0.18); border-color: rgba(16,185,129,0.5); }
+  .num.done { opacity: .85; }
+  .dp.set { background: rgba(16,185,129,0.16); border-color: rgba(16,185,129,0.45); color: #b6f0d8; }
+  .dp.active { box-shadow: 0 0 0 3px var(--blue); }
+  .dp.best { box-shadow: 0 0 0 3px var(--green); }
+  .dplbl { font-size: .62rem; color: var(--muted); }
+
+  .caption {
+    margin-top: 22px; background: var(--panel2); border-radius: 10px;
+    padding: 14px 18px; border-left: 4px solid var(--green);
+    font-size: 1rem; min-height: 24px;
+  }
+  .caption b.up { color: var(--green); }
+
+  .controls { text-align: center; margin: 24px 0 6px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 26px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .stepcount { color: var(--muted); margin: 0 14px; font-size: .92rem; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px;
+    padding: 18px 24px; margin-top: 30px; text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Longest Increasing <span>Subsequence</span> — filling the dp row</h1>
+  <p class="subtitle">dp[i] = length of the longest increasing subsequence that <em>ends</em> at index i.</p>
+
+  <div class="analogy">
+    <h3>🥤 Stacking cups</h3>
+    <p>Har naye number pe poochho: "mere se <b>chhote</b> jitne pehle aaye, unme sabse lambi chain kaunsi thi?" Us chain ke peeche lag jao, <b>+1</b>. Har position pe "yahan khatam hone wali" sabse lambi chain yaad rakho.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> <code>nums = [10, 9, 2, 5, 3, 7]</code> — length of the longest strictly increasing subsequence.
+    <span class="arrow">→</span> Answer: <code>3</code> &nbsp;(e.g. [2, 5, 7] or [2, 3, 7])
+  </div>
+
+  <div class="stage">
+    <div class="secLabel">nums (active = current i, ▢ amber = j being compared)</div>
+    <div class="grid" id="numrow"></div>
+
+    <div class="secLabel">dp[] (longest increasing subsequence ending here)</div>
+    <div class="grid" id="dprow"></div>
+
+    <div class="caption" id="cap">Press <b>Next</b>. Every element starts with dp = 1 (itself).</div>
+
+    <div class="controls">
+      <button class="ghost" id="prev" disabled>‹ Prev</button>
+      <span class="stepcount" id="cnt">step 0 / 0</span>
+      <button id="next">Next ›</button>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>For each <code>i</code>, look back at every smaller <code>nums[j]</code> and take <code>max(dp[j]) + 1</code>. The answer is the largest value in the whole dp row — O(n²), or O(n log n) with patience sorting.</p>
+  </div>
+</div>
+
+<script>
+const nums = [10, 9, 2, 5, 3, 7];
+const n = nums.length;
+
+// Build the trace following the O(n^2) dp.
+const steps = [];
+const dp = new Array(n).fill(1);
+steps.push({
+  dp: dp.slice(), i: null, j: null, smaller: false,
+  cap: 'Initialise dp[] to all 1s — every element is at least a length-1 subsequence on its own.'
+});
+for (let i = 0; i < n; i++) {
+  steps.push({
+    dp: dp.slice(), i, j: null, smaller: false, justStartI: true,
+    cap: `Now process i=${i} (value ${nums[i]}). Scan all earlier j < ${i} looking for smaller values.`
+  });
+  for (let j = 0; j < i; j++) {
+    const smaller = nums[j] < nums[i];
+    let improved = false;
+    if (smaller && dp[j] + 1 > dp[i]) { dp[i] = dp[j] + 1; improved = true; }
+    steps.push({
+      dp: dp.slice(), i, j, smaller, improved,
+      cap: smaller
+        ? (improved
+            ? `nums[${j}]=${nums[j]} < nums[${i}]=${nums[i]} → chain of length dp[${j}]=${dp[j]} extends. <b class="up">dp[${i}] becomes ${dp[i]}</b>.`
+            : `nums[${j}]=${nums[j]} < nums[${i}]=${nums[i]}, but dp[${j}]+1=${dp[j]+1} is not better than dp[${i}]=${dp[i]}. Keep dp[${i}].`)
+        : `nums[${j}]=${nums[j]} is not < nums[${i}]=${nums[i]} → can't extend. Skip.`
+    });
+  }
+}
+const ans = Math.max(...dp);
+steps.push({
+  dp: dp.slice(), i: null, j: null, smaller: false, done: true, best: dp.indexOf(ans),
+  cap: `Answer = max of the whole dp row = <b class="up">${ans}</b>.`
+});
+
+const $ = id => document.getElementById(id);
+let idx = 0;
+
+function render() {
+  const st = steps[idx];
+  $('numrow').innerHTML = nums.map((v, k) => {
+    let cls = 'num';
+    if (st.i !== null && k < st.i) cls += ' done';
+    if (k === st.i) cls += ' active';
+    if (k === st.j) cls += ' compare' + (st.smaller ? ' smaller' : '');
+    return `<div class="col"><span class="ix">i=${k}</span><div class="${cls}">${v}</div></div>`;
+  }).join('');
+
+  $('dprow').innerHTML = st.dp.map((v, k) => {
+    let cls = 'dp';
+    if (v > 1) cls += ' set';
+    if (k === st.i) cls += ' active';
+    if (st.done && k === st.best) cls += ' best';
+    return `<div class="col"><div class="${cls}">${v}</div><span class="dplbl">dp[${k}]</span></div>`;
+  }).join('');
+
+  $('cap').innerHTML = st.cap;
+  $('cnt').textContent = `step ${idx} / ${steps.length - 1}`;
+  $('prev').disabled = idx === 0;
+  $('next').disabled = idx === steps.length - 1;
+}
+
+$('next').addEventListener('click', () => { if (idx < steps.length - 1) { idx++; render(); } });
+$('prev').addEventListener('click', () => { if (idx > 0) { idx--; render(); } });
+render();
+</script>
+</body>
+</html>

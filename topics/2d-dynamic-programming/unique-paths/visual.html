@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unique Paths — Filling the DP Grid Cell by Cell</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 {
+    font-size: 1.9rem; margin: 0 0 6px;
+  }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 22px;
+    margin-bottom: 28px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.05rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px 22px;
+    margin-bottom: 28px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .controls { text-align: center; margin: 6px 0 24px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  button.ghost { background: var(--panel2); color: var(--text); margin: 0 6px; }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+
+  .stage {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 22px 24px 26px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .gridwrap { display: flex; justify-content: center; margin: 10px 0 6px; }
+  table.grid { border-collapse: separate; border-spacing: 8px; }
+  td.cell {
+    width: 64px; height: 56px;
+    border-radius: 10px;
+    text-align: center; vertical-align: middle;
+    font-family: "SF Mono", Menlo, monospace;
+    font-weight: 700; font-size: 1.25rem;
+    background: var(--panel2);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #555;
+    transition: all .35s ease;
+    position: relative;
+  }
+  td.cell.base { background: rgba(59,130,246,0.16); border-color: rgba(59,130,246,0.45); color: #bcd4ff; }
+  td.cell.done { background: rgba(16,185,129,0.13); border-color: rgba(16,185,129,0.4); color: #b6f0d8; }
+  td.cell.active {
+    background: rgba(245,158,11,0.22); border-color: var(--amber); color: #ffe6b0;
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.35);
+    transform: scale(1.06);
+  }
+  td.cell.dep {
+    box-shadow: 0 0 0 3px var(--green);
+    background: rgba(16,185,129,0.28); color: #d6ffe9;
+  }
+  td.cell .start, td.cell .goal {
+    position: absolute; top: 3px; left: 5px;
+    font-size: .55rem; font-weight: 700; letter-spacing: .5px;
+    color: var(--amber);
+  }
+  td.cell.goalcell.active { box-shadow: 0 0 0 3px var(--green); }
+
+  .caption {
+    margin-top: 18px;
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border-left: 4px solid var(--amber);
+    font-size: .98rem;
+    min-height: 58px;
+  }
+  .caption b { color: var(--text); }
+  .caption .eq { color: #ffd479; font-family: "SF Mono", Menlo, monospace; }
+  .stepcount { text-align:center; color: var(--muted); font-size: .85rem; margin-top: 12px; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:16px; justify-content:center; margin-top:18px; font-size:.84rem; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .swatch { width:14px; height:14px; border-radius:4px; display:inline-block; border:1px solid rgba(255,255,255,.15); }
+  .sw-base { background: rgba(59,130,246,0.4); }
+  .sw-active { background: var(--amber); }
+  .sw-dep { background: var(--green); }
+  .sw-done { background: rgba(16,185,129,0.4); }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin-top: 30px; text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+  .recurrence {
+    text-align:center; font-family:"SF Mono",Menlo,monospace; color:#ffd479;
+    background: var(--panel2); border-radius:8px; padding:8px 12px; margin: 4px 0 16px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Unique Paths — <span>filling the DP grid</span> cell by cell</h1>
+  <p class="subtitle">A robot moves only <b>right</b> or <b>down</b>. Count distinct paths from top-left to bottom-right.</p>
+
+  <div class="analogy">
+    <h3>🤖 Analogy: one-way city streets</h3>
+    <p>Har intersection tak pahunchne ke tareeke = (upar wale corner ke tareeke) + (left wale corner ke tareeke). Robot sirf wahin se aa sakta hai. Bas har cell ko apne <b>top + left</b> ka sum bana do.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> Grid <code>m = 3</code> rows × <code>n = 4</code> cols.
+    Count paths from <code>(0,0)</code> to <code>(2,3)</code>. <span class="arrow">→</span> Answer: <code>10</code>
+  </div>
+
+  <div class="recurrence">dp[i][j] = dp[i-1][j] &nbsp;(top)&nbsp; + &nbsp;dp[i][j-1] &nbsp;(left)</div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn">‹ Prev</button>
+    <button id="nextBtn">Next ›</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+  </div>
+
+  <div class="stage">
+    <div class="gridwrap"><table class="grid" id="grid"></table></div>
+    <div class="legend">
+      <span><i class="swatch sw-base"></i>base (=1)</span>
+      <span><i class="swatch sw-active"></i>computing now</span>
+      <span><i class="swatch sw-dep"></i>top + left it reads</span>
+      <span><i class="swatch sw-done"></i>filled</span>
+    </div>
+    <div class="caption" id="caption">Press <b>Next</b> to start. First we seed the top row and left column with <b>1</b> — only one straight-line path reaches those.</div>
+    <div class="stepcount" id="stepcount"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Each cell is just <b>top + left</b>. Filling the grid row-by-row turns an exponential path-count into an <b>O(m·n)</b> sweep — the bottom-right cell holds the answer.</p>
+  </div>
+</div>
+
+<script>
+const M = 3, N = 4;
+// dp values precomputed for display reference
+const dp = Array.from({length:M}, () => Array(N).fill(0));
+for (let i=0;i<M;i++) for(let j=0;j<N;j++){
+  if (i===0||j===0) dp[i][j]=1;
+  else dp[i][j]=dp[i-1][j]+dp[i][j-1];
+}
+
+// Build the step list.
+// Each step: {type:'base'|'compute', cells (to mark filled), active:[i,j], deps:[[i,j]...], caption}
+const steps = [];
+// step 0: intro (no fills yet) handled as initial render
+steps.push({ filled: [], active: null, deps: [], base: false,
+  caption: `Start. The grid is empty. We'll fill it top-left to bottom-right.` });
+
+// base seeding step: fill row0 and col0
+const baseCells = [];
+for (let j=0;j<N;j++) baseCells.push([0,j]);
+for (let i=1;i<M;i++) baseCells.push([i,0]);
+steps.push({ filled: baseCells.slice(), active: null, deps: [], base: true,
+  caption: `<b>Base case:</b> top row and left column all = <span class="eq">1</span>. Reaching any of these has exactly one straight path (only-right, or only-down).` });
+
+// compute interior cells in row-major order
+const filledSoFar = baseCells.slice();
+for (let i=1;i<M;i++){
+  for (let j=1;j<N;j++){
+    filledSoFar.push([i,j]);
+    steps.push({
+      filled: filledSoFar.slice(),
+      active: [i,j],
+      deps: [[i-1,j],[i,j-1]],
+      base: true,
+      caption: `Cell <span class="eq">(${i},${j})</span> = top <span class="eq">${dp[i-1][j]}</span> + left <span class="eq">${dp[i][j-1]}</span> = <b><span class="eq">${dp[i][j]}</span></b>.` +
+        (i===M-1 && j===N-1 ? ` 🎯 This is the goal cell — the answer is <b>${dp[i][j]}</b>.` : '')
+    });
+  }
+}
+
+const baseSet = new Set(baseCells.map(c=>c[0]+','+c[1]));
+const $ = id => document.getElementById(id);
+let cur = 0;
+
+function buildGrid(){
+  let html = '';
+  for (let i=0;i<M;i++){
+    html += '<tr>';
+    for (let j=0;j<N;j++){
+      const tag = (i===0&&j===0) ? '<span class="start">START</span>'
+                : (i===M-1&&j===N-1) ? '<span class="goal">GOAL</span>' : '';
+      const goalcls = (i===M-1&&j===N-1) ? ' goalcell' : '';
+      html += `<td class="cell${goalcls}" id="c${i}-${j}">${tag}<span class="val" id="v${i}-${j}"></span></td>`;
+    }
+    html += '</tr>';
+  }
+  $('grid').innerHTML = html;
+}
+
+function render(){
+  const st = steps[cur];
+  const filledKeys = new Set(st.filled.map(c=>c[0]+','+c[1]));
+  const depKeys = new Set(st.deps.map(c=>c[0]+','+c[1]));
+  const activeKey = st.active ? st.active[0]+','+st.active[1] : null;
+
+  for (let i=0;i<M;i++){
+    for (let j=0;j<N;j++){
+      const key = i+','+j;
+      const cell = $('c'+i+'-'+j);
+      const val = $('v'+i+'-'+j);
+      cell.classList.remove('base','done','active','dep');
+      if (filledKeys.has(key)) {
+        val.textContent = dp[i][j];
+        if (key === activeKey) cell.classList.add('active');
+        else if (depKeys.has(key)) cell.classList.add('dep');
+        else if (baseSet.has(key)) cell.classList.add(activeKey || st.base ? 'done' : 'base');
+        else cell.classList.add('done');
+      } else {
+        val.textContent = '';
+      }
+    }
+  }
+  $('caption').innerHTML = st.caption;
+  $('stepcount').textContent = `Step ${cur} / ${steps.length-1}`;
+  $('prevBtn').disabled = cur === 0;
+  $('nextBtn').disabled = cur === steps.length-1;
+}
+
+$('nextBtn').addEventListener('click', () => { if (cur < steps.length-1) { cur++; render(); }});
+$('prevBtn').addEventListener('click', () => { if (cur > 0) { cur--; render(); }});
+$('resetBtn').addEventListener('click', () => { cur = 0; render(); });
+
+buildGrid();
+render();
+</script>
+</body>
+</html>

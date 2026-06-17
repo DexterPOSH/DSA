@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Letter Combinations — Keypad Decision Tree</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #1e293b;
+    --text: #e0e0e0; --muted: #94a3b8;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; padding: 36px 20px 70px; }
+  .wrap { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+  h1 { font-size: 1.7rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy, .takeaway { background: var(--panel); border-radius: 12px; padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start; }
+  .analogy { border: 1px solid var(--amber); border-left: 5px solid var(--amber); }
+  .takeaway { border: 1px solid var(--blue); border-left: 5px solid var(--blue); }
+  .icon { font-size: 1.7rem; flex-shrink: 0; }
+  .label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+  .analogy .label { color: var(--amber); } .takeaway .label { color: var(--blue); }
+  .analogy p, .takeaway p { font-size: 0.95rem; color: #d8d8e8; }
+  .analogy strong, .takeaway strong { color: #fff; }
+  code { background: #0f172a; padding: 1px 6px; border-radius: 5px; color: #ffd479; font-family: 'Consolas', monospace; }
+
+  .card { background: var(--panel); border: 1px solid #2d3a5a; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 22px; }
+  .section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 10px; }
+
+  .step-desc { background: var(--panel2); border-left: 4px solid var(--blue); border-radius: 8px; padding: 14px 16px; font-size: 0.96rem; min-height: 64px; display: flex; align-items: center; }
+  .step-desc.pick { border-left-color: var(--amber); }
+  .step-desc.found { border-left-color: var(--green); }
+  .step-desc.back { border-left-color: var(--amber); }
+  .step-desc strong { color: #fff; }
+
+  /* SVG tree */
+  .tree-wrap { overflow-x: auto; }
+  svg { display: block; margin: 0 auto; }
+  .edge { stroke: #2d3a5a; stroke-width: 2; transition: stroke 0.25s; }
+  .edge.on { stroke: var(--amber); stroke-width: 3; }
+  .edge.dim { stroke: #232f4a; }
+  .node circle { fill: var(--panel2); stroke: #2d3a5a; stroke-width: 2; transition: all 0.25s; }
+  .node.on circle { fill: rgba(245,158,11,0.22); stroke: var(--amber); }
+  .node.path circle { fill: rgba(59,130,246,0.22); stroke: var(--blue); }
+  .node.leaf circle { fill: rgba(16,185,129,0.20); stroke: var(--green); }
+  .node text { fill: #cbd5e1; font-family: 'Consolas', monospace; font-weight: 700; font-size: 14px; text-anchor: middle; dominant-baseline: central; }
+  .node.on text { fill: #fcd34d; } .node.leaf text { fill: #86efac; }
+  .edgelbl { fill: var(--muted); font-family: 'Consolas', monospace; font-size: 12px; text-anchor: middle; }
+
+  /* digit + path display */
+  .topbar { display: flex; gap: 30px; flex-wrap: wrap; }
+  .digits { display: flex; gap: 8px; }
+  .dg { width: 44px; height: 48px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--panel2); border: 1.5px solid #2d3a5a; transition: all 0.25s; }
+  .dg .num { font-family: 'Consolas', monospace; font-weight: 700; font-size: 1.3rem; color: #cbd5e1; }
+  .dg .ltrs { font-size: 0.55rem; color: var(--muted); letter-spacing: 1px; }
+  .dg.cur { background: rgba(245,158,11,0.2); border-color: var(--amber); }
+  .dg.cur .num { color: #fcd34d; }
+  .dg.done { background: rgba(59,130,246,0.18); border-color: var(--blue); }
+  .pathbox { font-family: 'Consolas', monospace; font-size: 1.5rem; letter-spacing: 4px; color: var(--amber); align-self: center; min-width: 60px; }
+
+  .res-row { display: flex; flex-wrap: wrap; gap: 8px; min-height: 40px; }
+  .res-chip { padding: 7px 13px; border-radius: 8px; font-family: 'Consolas', monospace; font-weight: 700; font-size: 1.05rem; background: rgba(16,185,129,0.14); border: 1.5px solid var(--green); color: #86efac; animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .res-empty { color: #5a6a90; font-size: 0.82rem; align-self: center; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 11px 22px; border-radius: 8px; border: none; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; } .btn-primary:hover { background: #2563eb; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: var(--muted); border: 1px solid #2d3a5a; } .btn-secondary:hover { background: #263248; }
+  .counter { font-size: 0.82rem; color: #5a6a90; margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Letter Combinations &mdash; <span>Keypad Decision Tree</span></h1>
+
+  <div class="analogy">
+    <div class="icon">📱</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>Old T9 keypad: <code>2</code> = a/b/c, <code>3</code> = d/e/f. Each digit
+      is a wheel of letters. Fix one letter on wheel 1, spin through all of wheel
+      2, then <strong>come back and change wheel 1</strong>. Every root-to-leaf
+      path through this tree is one combination.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-desc" id="stepDesc">Build combinations for <code>digits = "23"</code>. Press <strong>Next</strong>.</div>
+    </div>
+
+    <div class="topbar">
+      <div>
+        <div class="section-label" style="margin-bottom:6px;">digits</div>
+        <div class="digits" id="digits"></div>
+      </div>
+      <div>
+        <div class="section-label" style="margin-bottom:6px;">current path</div>
+        <div class="pathbox" id="pathbox">ε</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">decision tree</div>
+      <div class="tree-wrap">
+        <svg id="svg" width="640" height="300" viewBox="0 0 640 300"></svg>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">combinations collected</div>
+      <div class="res-row" id="resRow"><span class="res-empty">none yet</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn">◀ Prev</button>
+      <button class="btn btn-primary" id="nextBtn">Next ▶</button>
+      <span class="counter" id="counter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key takeaway</div>
+      <p>At level <code>idx</code> we loop over the letters of
+      <code>digits[idx]</code>: append → recurse to the next digit → pop. Reaching
+      the last level emits one combination. It's a pure Cartesian product —
+      <code>3 × 3 = 9</code> leaves for <code>"23"</code>.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const digits = "23";
+  const keypad = {"2":"abc","3":"def"};
+
+  // ---- Build tree geometry ----
+  // root -> 3 children (a,b,c) -> each 3 children (d,e,f) = 9 leaves
+  const W = 640;
+  const levelY = [40, 150, 260];
+  const nodes = {};   // id -> {x,y, label, parent, depth, combo}
+  const edges = [];   // {from, to, label}
+  let nid = 0;
+  function makeTree() {
+    const root = { id: "n" + (nid++), x: W/2, y: levelY[0], label: "•", parent: null, depth: 0, combo: "" };
+    nodes[root.id] = root;
+    const l1 = keypad[digits[0]].split("");
+    const l1n = [];
+    l1.forEach((ch, i) => {
+      const x = (W / (l1.length + 1)) * (i + 1);
+      const node = { id: "n" + (nid++), x, y: levelY[1], label: ch, parent: root.id, depth: 1, combo: ch };
+      nodes[node.id] = node; l1n.push(node);
+      edges.push({ from: root.id, to: node.id, label: ch });
+    });
+    const l2 = keypad[digits[1]].split("");
+    l1n.forEach((p, gi) => {
+      const span = W / l1n.length;
+      const base = span * gi;
+      l2.forEach((ch, j) => {
+        const x = base + (span / (l2.length + 1)) * (j + 1);
+        const node = { id: "n" + (nid++), x, y: levelY[2], label: ch, parent: p.id, depth: 2, combo: p.combo + ch };
+        nodes[node.id] = node;
+        edges.push({ from: p.id, to: node.id, label: ch });
+      });
+    });
+  }
+  makeTree();
+
+  // ---- Record a real backtracking run, tracking which nodes/edges are active ----
+  const steps = [];
+  (function build() {
+    const res = [];
+    const path = [];
+    // map combo string -> node id for highlighting
+    const comboToNode = {};
+    Object.values(nodes).forEach(n => { comboToNode[n.combo] = n.id; });
+
+    function activeChain() {
+      // node ids along current path (including root)
+      const ids = [nodes["n0"].id];
+      let acc = "";
+      for (const ch of path) { acc += ch; ids.push(comboToNode[acc]); }
+      return ids;
+    }
+    function snap(kind, note, curNodeId) {
+      steps.push({
+        path: path.join(""),
+        chain: activeChain(),
+        cur: curNodeId,
+        depth: path.length,
+        res: res.slice(),
+        kind, note
+      });
+    }
+
+    function dfs(idx) {
+      if (idx === digits.length) {
+        res.push(path.join(""));
+        const id = comboToNode[path.join("")];
+        snap("found", `Reached the last digit. Emit combination <strong>"${path.join("")}"</strong>. ✅`, id);
+        return;
+      }
+      const letters = keypad[digits[idx]];
+      for (const ch of letters) {
+        path.push(ch);
+        const id = comboToNode[path.join("")];
+        snap("pick", `Digit <code>${digits[idx]}</code> → pick letter <strong>"${ch}"</strong>. Path = <code>"${path.join("")}"</code>. Recurse to next digit.`, id);
+        dfs(idx + 1);
+        path.pop();
+        const backId = path.length ? comboToNode[path.join("")] : "n0";
+        snap("back", `Done with that branch. <strong>Backtrack</strong>: pop <code>"${ch}"</code>, path = <code>"${path.join("") || "ε"}"</code>.`, backId);
+      }
+    }
+    snap("info", `Start at the root (empty path), idx = 0 → digit <code>"${digits[0]}"</code>.`, "n0");
+    dfs(0);
+    const last = steps[steps.length - 1];
+    steps.push({ path: "", chain: ["n0"], cur: "n0", depth: 0, res: res.slice(), kind: "done",
+      note: `All branches explored. <strong style="color:#10b981">${res.length} combinations</strong> = 3 × 3.` });
+  })();
+
+  const $ = id => document.getElementById(id);
+  const TOTAL = steps.length;
+  let cur = -1;
+
+  // static digits bar
+  $("digits").innerHTML = digits.split("").map((d,i) =>
+    `<div class="dg" id="dg${i}"><span class="num">${d}</span><span class="ltrs">${keypad[d]}</span></div>`).join("");
+
+  function drawTree(st) {
+    const chain = st ? st.chain : [];
+    const curNode = st ? st.cur : null;
+    const leaves = st && (st.kind === "found") ? st.cur : null;
+    let h = "";
+    // edges first
+    edges.forEach(e => {
+      const a = nodes[e.from], b = nodes[e.to];
+      const onPath = chain.includes(e.from) && chain.includes(e.to);
+      h += `<line class="edge ${onPath ? 'on' : 'dim'}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+      h += `<text class="edgelbl" x="${(a.x+b.x)/2 + 10}" y="${(a.y+b.y)/2}">${e.label}</text>`;
+    });
+    // nodes
+    Object.values(nodes).forEach(n => {
+      let cls = "node";
+      if (n.id === leaves) cls += " leaf";
+      else if (n.id === curNode) cls += " on";
+      else if (chain.includes(n.id)) cls += " path";
+      h += `<g class="${cls}"><circle cx="${n.x}" cy="${n.y}" r="18"/><text x="${n.x}" y="${n.y}">${n.label}</text></g>`;
+    });
+    $("svg").innerHTML = h;
+  }
+
+  function render() {
+    digits.split("").forEach((_,i) => $("dg"+i).className = "dg");
+    if (cur < 0) {
+      drawTree(null);
+      $("pathbox").textContent = "ε";
+      $("resRow").innerHTML = `<span class="res-empty">none yet</span>`;
+      $("stepDesc").className = "step-desc";
+      $("stepDesc").innerHTML = `Build combinations for <code>digits = "23"</code>. Press <strong>Next</strong>.`;
+      updateControls(); return;
+    }
+    const st = steps[cur];
+    drawTree(st);
+    $("pathbox").textContent = st.path || "ε";
+
+    // digit highlighting: done = filled positions, cur = next to pick
+    digits.split("").forEach((_,i) => {
+      if (i < st.depth) $("dg"+i).className = "dg done";
+      else if (i === st.depth && st.kind !== "done") $("dg"+i).className = "dg cur";
+    });
+
+    $("resRow").innerHTML = st.res.length
+      ? st.res.map(r => `<span class="res-chip">${r}</span>`).join("")
+      : `<span class="res-empty">none yet</span>`;
+
+    $("stepDesc").className = "step-desc " + (
+      st.kind === "found" || st.kind === "done" ? "found" :
+      st.kind === "back" ? "back" :
+      st.kind === "pick" ? "pick" : "");
+    $("stepDesc").innerHTML = st.note;
+    updateControls();
+  }
+  function updateControls() {
+    $("counter").textContent = `Step ${cur + 1} / ${TOTAL}`;
+    $("prevBtn").disabled = cur < 0;
+    $("nextBtn").disabled = cur >= TOTAL - 1;
+  }
+  $("nextBtn").addEventListener("click", () => { if (cur < TOTAL - 1) { cur++; render(); } });
+  $("prevBtn").addEventListener("click", () => { if (cur >= 0) { cur--; render(); } });
+  $("resetBtn").addEventListener("click", () => { cur = -1; render(); });
+  render();
+</script>
+</body>
+</html>

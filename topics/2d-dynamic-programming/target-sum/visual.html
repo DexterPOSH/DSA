@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Target Sum — Counting Sign Assignments with a DP Grid</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1 { font-size: 1.85rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.05rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel); border-radius: 12px; padding: 16px 22px;
+    margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .recurrence {
+    font-family:"SF Mono",Menlo,monospace; color:#ffd479; background: var(--panel2);
+    border-radius:8px; padding:10px 14px; margin: 4px 0 18px; font-size:.92rem; line-height:1.85;
+  }
+  .recurrence .plus { color: var(--green); }
+  .recurrence .minus { color: var(--amber); }
+
+  .controls { text-align: center; margin: 6px 0 22px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); margin: 0 6px; }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+
+  .stage {
+    background: var(--panel); border-radius: 14px; padding: 22px 22px 26px;
+    border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .numsrow { display:flex; gap:8px; justify-content:center; margin-bottom:18px; flex-wrap:wrap; }
+  .numcell {
+    min-width:42px; height:42px; border-radius:8px; display:grid; place-items:center;
+    font-family:"SF Mono",Menlo,monospace; font-weight:700; font-size:1.05rem;
+    background: var(--panel2); border:1px solid rgba(255,255,255,0.08); color:var(--muted);
+    transition: all .3s ease;
+  }
+  .numcell.curnum {
+    background: rgba(59,130,246,0.22); border-color: var(--blue); color:#bcd4ff;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.35); transform: scale(1.06);
+  }
+  .numcell.donenum { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.35); color:#b6f0d8; }
+
+  .tablewrap { display:flex; justify-content:center; overflow-x:auto; padding-bottom:6px; }
+  table.dp { border-collapse: separate; border-spacing: 5px; }
+  .dp th {
+    color: var(--muted); font-family:"SF Mono",Menlo,monospace; font-weight:700;
+    min-width: 46px; height: 34px; font-size: .92rem;
+  }
+  .dp th.sumhdr { color: var(--amber); }
+  .dp th.rowhdr { color: var(--blue); text-align:right; padding-right:6px; white-space:nowrap; }
+  .dp td {
+    min-width: 46px; height: 42px; border-radius: 8px; text-align:center; vertical-align:middle;
+    font-family:"SF Mono",Menlo,monospace; font-weight:700; font-size:1.05rem;
+    background: var(--panel2); border: 1px solid rgba(255,255,255,0.06);
+    color: #4a4a66; transition: all .3s ease;
+  }
+  .dp td.zero { color:#3a3a55; }
+  .dp td.base { background: rgba(59,130,246,0.14); border-color: rgba(59,130,246,0.4); color:#9bbcf5; }
+  .dp td.done { background: rgba(16,185,129,0.10); border-color: rgba(16,185,129,0.30); color:#b6f0d8; }
+  .dp td.active {
+    background: rgba(245,158,11,0.24); border-color: var(--amber); color:#ffe6b0;
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.4); transform: scale(1.10);
+  }
+  .dp td.src {
+    box-shadow: 0 0 0 3px var(--green); background: rgba(16,185,129,0.26); color:#d6ffe9;
+  }
+  .dp td.target { outline: 2px dashed var(--purple); outline-offset: 1px; }
+
+  .caption {
+    margin-top: 18px; background: var(--panel2); border-radius: 10px;
+    padding: 14px 16px; border-left: 4px solid var(--amber); font-size:.98rem; min-height: 70px;
+  }
+  .caption .eq { color: #ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .caption .plus { color: var(--green); font-weight:700; }
+  .caption .minus { color: var(--amber); font-weight:700; }
+  .stepcount { text-align:center; color:var(--muted); font-size:.85rem; margin-top:12px; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-top:16px; font-size:.8rem; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .swatch { width:14px; height:14px; border-radius:4px; display:inline-block; border:1px solid rgba(255,255,255,.15); }
+  .sw-active { background: var(--amber); }
+  .sw-src { background: var(--green); }
+  .sw-done { background: rgba(16,185,129,0.4); }
+  .sw-target { background: transparent; outline: 2px dashed var(--purple); outline-offset:-2px; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px;
+    padding: 18px 24px; margin-top: 28px; text-align:center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.05rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Target Sum — <span>counting sign assignments</span></h1>
+  <p class="subtitle">Assign <b>+</b> or <b>−</b> to every number; count the ways to hit the target.</p>
+
+  <div class="analogy">
+    <h3>🪙 Analogy: two pockets</h3>
+    <p>Har coin ko <b>left pocket (+)</b> ya <b>right pocket (−)</b> me daalo. End me running sum exactly <code>target</code> chahiye. Alag sign-choices jab <b>same running sum</b> pe milein, aage ka kaam identical — to unhe ek count me merge karo. Yahi 2-D DP: rows = "kitne numbers process kiye", columns = "running sum abhi kya hai".</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> <code>nums = [1, 1, 1, 1, 1]</code>, <code>target = 3</code>.
+    Kitne sign-assignments sum ko <code>3</code> banate hain? <span class="arrow">→</span> Answer: <code>5</code>
+  </div>
+
+  <div class="recurrence">
+    dp[i][s] = number of ways to reach running sum <b>s</b> using first <b>i</b> numbers<br>
+    dp[i][s] = <span class="plus">dp[i-1][s − nums[i-1]]</span> (chose +) &nbsp;+&nbsp; <span class="minus">dp[i-1][s + nums[i-1]]</span> (chose −)
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn">‹ Prev</button>
+    <button id="nextBtn">Next ›</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+  </div>
+
+  <div class="stage">
+    <div class="numsrow" id="numsrow"></div>
+    <div class="tablewrap"><table class="dp" id="dp"></table></div>
+    <div class="legend">
+      <span><i class="swatch sw-active"></i>cell computing now</span>
+      <span><i class="swatch sw-src"></i>came from (+ / −)</span>
+      <span><i class="swatch sw-done"></i>filled</span>
+      <span><i class="swatch sw-target"></i>target column (s=3)</span>
+    </div>
+    <div class="caption" id="caption">Press <b>Next</b>. Row 0 = "0 numbers used": exactly <b>1</b> way to be at running sum <b>0</b> (do nothing), all other sums have <b>0</b> ways.</div>
+    <div class="stepcount" id="stepcount"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Each new number <b>shifts</b> every reachable sum up by <code>+num</code> and down by <code>−num</code>, adding the two source counts together. Read <code>dp[n][target]</code> — here <b>5</b> — for the answer in <b>O(n·S)</b>.</p>
+  </div>
+</div>
+
+<script>
+const nums = [1,1,1,1,1];
+const n = nums.length;
+const target = 3;
+const total = nums.reduce((a,b)=>a+b,0);   // 5
+const OFF = total;                          // sum index = s + OFF, s in [-total, total]
+const W = 2*total + 1;                      // number of columns
+const sums = [];                            // displayed sum labels, left->right
+for (let s = total; s >= -total; s--) sums.push(s);   // 5,4,...,-5
+// column index in our table for a given real sum s:
+function col(s){ return total - s; }        // s=5 -> 0, s=-5 -> 2*total
+
+// build dp
+const dp = Array.from({length:n+1}, () => Array(W).fill(0));
+dp[0][col(0)] = 1;
+for (let i=1;i<=n;i++){
+  for (let c=0;c<W;c++){
+    if (dp[i-1][c]===0) continue;
+    const s = total - c;                    // real sum at this prev cell
+    dp[i][col(s + nums[i-1])] += dp[i-1][c];
+    dp[i][col(s - nums[i-1])] += dp[i-1][c];
+  }
+}
+
+// Build steps. Each step computes one cell dp[i][c] from its two sources.
+const steps = [];
+steps.push({ rowFilled:0, active:null, srcs:[], num:-1,
+  caption:`<b>Base row (i=0):</b> using <b>zero</b> numbers, the only reachable running sum is <span class="eq">0</span> with <b>1</b> way. Every other sum = 0 ways.` });
+
+for (let i=1;i<=n;i++){
+  for (let c=0;c<W;c++){
+    if (dp[i][c]===0) continue;             // only animate cells that actually get a value
+    const s = total - c;
+    const fromPlus = col(s - nums[i-1]);    // a prev cell that chose + to land here
+    const fromMinus = col(s + nums[i-1]);   // prev cell that chose - to land here
+    const srcs = [];
+    let parts = [];
+    if (fromPlus>=0 && fromPlus<W && dp[i-1][fromPlus]>0){ srcs.push([i-1,fromPlus]);
+      parts.push(`<span class="plus">+${nums[i-1]}</span> from sum ${total-fromPlus} (${dp[i-1][fromPlus]} ways)`); }
+    if (fromMinus>=0 && fromMinus<W && dp[i-1][fromMinus]>0){ srcs.push([i-1,fromMinus]);
+      parts.push(`<span class="minus">−${nums[i-1]}</span> from sum ${total-fromMinus} (${dp[i-1][fromMinus]} ways)`); }
+    let cap = `<b>i=${i}</b> (placed num <span class="eq">${nums[i-1]}</span>), running sum <span class="eq">${s>=0?'+':''}${s}</span>: combine ${parts.join(' and ')} = <b>${dp[i][c]}</b> ways.`;
+    if (i===n && s===target) cap += ` 🎯 This is <code>dp[n][target]</code> — answer <b>${dp[i][c]}</b>.`;
+    steps.push({ rowFilled:i, active:[i,c], srcs, num:i-1, caption:cap });
+  }
+}
+
+const $ = id => document.getElementById(id);
+let cur = 0;
+
+function buildNums(){
+  $('numsrow').innerHTML = nums.map((v,idx)=>`<div class="numcell" id="num${idx}">${v}</div>`).join('');
+}
+function buildTable(){
+  let html = '<tr><th class="rowhdr">i \\ sum →</th>';
+  for (let s=total; s>=-total; s--) html += `<th class="sumhdr">${s>0?'+':''}${s}</th>`;
+  html += '</tr>';
+  for (let i=0;i<=n;i++){
+    html += `<tr><th class="rowhdr">i=${i}</th>`;
+    for (let c=0;c<W;c++) html += `<td id="t${i}-${c}">·</td>`;
+    html += '</tr>';
+  }
+  $('dp').innerHTML = html;
+}
+
+function render(){
+  const st = steps[cur];
+  const activeKey = st.active ? st.active[0]+','+st.active[1] : null;
+  const srcKeys = new Set(st.srcs.map(c=>c[0]+','+c[1]));
+
+  // numbers row state
+  for (let idx=0; idx<n; idx++){
+    const el = $('num'+idx);
+    el.className = 'numcell';
+    if (idx === st.num) el.classList.add('curnum');
+    else if (idx < st.rowFilled) el.classList.add('donenum');
+  }
+
+  for (let i=0;i<=n;i++){
+    for (let c=0;c<W;c++){
+      const cell = $('t'+i+'-'+c);
+      cell.className = '';
+      const shown = i <= st.rowFilled;
+      const val = dp[i][c];
+      cell.textContent = shown ? (val===0 ? '·' : val) : '·';
+      if (!shown){ cell.classList.add('zero'); continue; }
+      const kk = i+','+c;
+      const s = total - c;
+      if (i===n && s===target) cell.classList.add('target');
+      if (kk === activeKey) cell.classList.add('active');
+      else if (srcKeys.has(kk)) cell.classList.add('src');
+      else if (i===0 && val>0) cell.classList.add('base');
+      else if (val>0) cell.classList.add('done');
+      else cell.classList.add('zero');
+    }
+  }
+  $('caption').innerHTML = st.caption;
+  $('stepcount').textContent = `Step ${cur} / ${steps.length-1}`;
+  $('prevBtn').disabled = cur === 0;
+  $('nextBtn').disabled = cur === steps.length-1;
+}
+
+$('nextBtn').addEventListener('click', ()=>{ if(cur<steps.length-1){cur++;render();}});
+$('prevBtn').addEventListener('click', ()=>{ if(cur>0){cur--;render();}});
+$('resetBtn').addEventListener('click', ()=>{ cur=0; render(); });
+
+buildNums();
+buildTable();
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Design Uber / Nearby — Location Ingest, Geo-Index & Matching</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+
+  /* architecture boxes */
+  .box rect { transition: all .4s ease; }
+  .box text { font-family: -apple-system, sans-serif; fill: #e6e6f0; }
+  .box .title { font-weight: 700; font-size: 12.5px; }
+  .box .sub { font-size: 9.5px; fill: #9a9ab8; }
+  .box.dim { opacity: .28; }
+  .box.active rect { stroke-width: 3; }
+
+  .wire { fill: none; stroke: #3a3a5c; stroke-width: 2; }
+  .wire.hot { stroke: #f59e0b; stroke-width: 3; }
+  .wire-label { fill: #7a7a98; font-size: 9px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .packet { transition: opacity .3s ease; }
+  .packet text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #1a1a2e; font-weight: 700; }
+
+  /* geo cells mini ring */
+  .cell { stroke: #2d2d50; stroke-width: 1; transition: all .4s ease; }
+  .cell-label { fill: #555577; font-size: 8px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .driver-dot { transition: all .4s ease; }
+  .rider-dot { transition: all .4s ease; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.small { font-size: 13px; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.dot { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.warn { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.smart { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.smart h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 22px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.smart .big { color: #10b981; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Design Uber / Nearby</h1>
+  <div class="subtitle">How a ride-hailing system swallows a <b>250K writes/sec</b> location firehose, answers <code>nearby drivers</code> in <b>&lt; 200&ndash;300 ms</b>, and matches a rider to one driver <b>without double-booking</b>. Follow the packet through the pipeline.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the air-traffic control tower</h3>
+    <p>Think of a busy <b>airport control tower</b>. Every plane (a <b>driver</b>) constantly radios its position every few seconds — that's a relentless stream of chatter the tower must absorb without choking. The tower doesn't scan the whole sky for every question; it divides airspace into <b>sectors / grid squares</b> (the <b>geo-index</b>) so "who's near runway 9?" only inspects a few nearby squares, not the planet. And when a gate is assigned to a plane, the controller <b>claims it atomically</b> — two planes can never be told to use the same gate at the same instant. Absorb the firehose, bucket by region, claim exactly once.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">writes:</span><code>1M drivers / 4s = 250K location updates/sec</code> &nbsp;(the firehose)</div>
+    <div class="row"><span class="label">reads :</span><code>~1&ndash;2K nearby/match QPS</code> &nbsp;p99 &lt; 200&ndash;300 ms</div>
+    <div class="row"><span class="label">stores:</span><code>Redis geo-index (100 MB, hot)</code> + <code>SQL rides (ACID)</code> + <code>Kafka → cold trail (~788 TB/yr)</code></div>
+    <div class="row"><span class="label">rule  :</span><code>reads = eventual · claim = strongly consistent (no double-booking)</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 560 440" id="diagram">
+        <!-- wires -->
+        <g id="g-wires"></g>
+        <!-- geo grid (drawn under boxes, right side) -->
+        <g id="g-geo"></g>
+        <!-- architecture boxes -->
+        <g id="g-boxes"></g>
+        <!-- travelling packet on top -->
+        <g id="g-packet"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Stage</div><div class="value small" id="v-stage">—</div></div>
+        <div class="var"><div class="label">Path</div><div class="value small amber" id="v-path">—</div></div>
+        <div class="var"><div class="label">Store hit</div><div class="value small green" id="v-store">—</div></div>
+        <div class="var"><div class="label">Consistency</div><div class="value small" id="v-cons">—</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Service / compute node</div>
+        <div class="legend-item"><span class="swatch" style="background:#ec4899"></span>Redis geo-index (hot, in-memory)</div>
+        <div class="legend-item"><span class="swatch" style="background:#8b5cf6"></span>Kafka stream → cold trail</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>SQL rides (ACID, claim)</div>
+        <div class="legend-item"><span class="swatch dot" style="background:#f59e0b"></span>Travelling request / packet</div>
+        <div class="legend-item"><span class="swatch dot" style="background:#22d3ee"></span>Driver in geo-cell &nbsp;|&nbsp; <span class="swatch dot" style="background:#f43f5e;margin-left:4px"></span>Rider query point</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to send the first packet — a driver's location heartbeat — into the system.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>Naive&nbsp;&nbsp;scan all drivers</h3>
+      <div class="formula">WHERE dist(p, driver) &lt; r  // over 1M rows</div>
+      <p>No spatial index → every nearby query is an <span class="big">O(N)</span> scan of all 1M drivers. And funnelling 250K writes/sec of per-row updates into one relational DB makes <i>that</i> the bottleneck too.</p>
+      <p>Result: nearby queries blow past the latency budget and the write firehose <b>melts a single store</b>.</p>
+    </div>
+    <div class="cx smart">
+      <h3>Geo-index + sharding + Kafka</h3>
+      <div class="formula">GEOSEARCH on per-city Redis · async persist</div>
+      <p>Geohash/H3 buckets turn nearby into an <span class="big">O(log N)</span> lookup over a handful of cells. Per-city shards spread the firehose; Kafka decouples durable history so ingest stays thin.</p>
+      <p>Result: <b>fast reads, horizontal writes</b>, and the claim stays transactional in SQL — no double-booking.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Geo-index choice</b> — start with <b>geohash + Redis <code>GEOSEARCH</code></b> (sorted set keyed by geohash score, <code>O(log N)</code> radius query). Watch the <b>cell-boundary gotcha</b>: query the center cell <b>+ 8 neighbours</b> so a driver just over the edge isn't missed. Upgrade to <b>H3 (Uber's actual choice — hexagons, equidistant neighbours)</b> or a <b>quadtree</b> for dense-area skew.</li>
+      <li><b>Tame the 250K-QPS firehose</b> — keep ingest thin & <b>ack-only</b>; <b>overwrite</b> latest location in Redis (no append), put a <b>10&ndash;15s TTL</b> so dead drivers self-evict; fan durable history to <b>Kafka</b> for downstream consumers.</li>
+      <li><b>Geo-sharding</b> — shard the location store <b>by city/region</b>. Mumbai drivers on the Mumbai shard; nearby queries resolve inside one shard since rider + driver are usually same-city.</li>
+      <li><b>No double-booking</b> — the claim is the <b>strongly consistent</b> step: <code>SETNX driver:lock:{id}</code> or <code>UPDATE ... WHERE status='AVAILABLE'</code>. Only the winner offers; decline/timeout releases the lock → next candidate.</li>
+      <li><b>Async matching</b> — return <code>202 Accepted {rideId, status:MATCHING}</code>; deliver the result via push/poll. Don't block synchronously on search + lock + confirm.</li>
+      <li><b>Two stores, two patterns</b> — ephemeral location → <b>Redis (eventual, AP-leaning)</b>; ride/booking → <b>SQL (ACID)</b>; raw trail (~788 TB/yr) → <b>object/time-series store</b>, never the hot path.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Split the system by <b>access pattern</b>: absorb the <b>write firehose</b> with a thin, ack-only ingest that <b>overwrites</b> into a sharded in-memory <b>geo-index</b> (and streams history to Kafka), serve <b>nearby</b> as an <code>O(log N)</code> spatial lookup over a few cells, and make the <b>match a single atomic claim</b> in a transactional store. Reads can be eventual; the booking must be exactly-once.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- helpers ----------
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  const COL = {
+    svc:   "#3b82f6",
+    redis: "#ec4899",
+    kafka: "#8b5cf6",
+    sql:   "#10b981",
+    client:"#64748b"
+  };
+
+  // ---------- architecture box layout ----------
+  // id, x, y, w, h, color, title, sub
+  const BW = 116, BH = 50;
+  const boxes = {
+    driver: { x: 14,  y: 26,  w: 96, h: 44, c: COL.client, t: "Driver",   s: "heartbeat /4s" },
+    rider:  { x: 14,  y: 250, w: 96, h: 44, c: COL.client, t: "Rider",    s: "app" },
+    gw:     { x: 150, y: 138, w: 96, h: 60, c: COL.svc,    t: "Gateway",  s: "geo-route + LB" },
+    ingest: { x: 286, y: 26,  w: BW, h: BH, c: COL.svc,    t: "Location Ingest", s: "ack-only, thin" },
+    redis:  { x: 286, y: 138, w: BW, h: BH, c: COL.redis,  t: "Redis Geo-Index", s: "GEOSEARCH · TTL 15s" },
+    kafka:  { x: 286, y: 250, w: BW, h: BH, c: COL.kafka,  t: "Kafka stream", s: "location-updates" },
+    nearby: { x: 432, y: 138, w: BW, h: BH, c: COL.svc,    t: "Nearby Svc", s: "top-K + ETA" },
+    match:  { x: 432, y: 250, w: BW, h: BH, c: COL.svc,    t: "Matching Svc", s: "atomic claim" },
+    sql:    { x: 432, y: 360, w: BW, h: BH, c: COL.sql,    t: "SQL Rides", s: "ACID · status" },
+    cold:   { x: 286, y: 360, w: BW, h: BH, c: COL.kafka,  t: "Cold Trail", s: "object store ~788TB/yr" }
+  };
+  function center(id){ const b = boxes[id]; return { x: b.x + b.w/2, y: b.y + b.h/2 }; }
+  function port(id, side){
+    const b = boxes[id];
+    if (side === "r") return { x: b.x + b.w, y: b.y + b.h/2 };
+    if (side === "l") return { x: b.x,       y: b.y + b.h/2 };
+    if (side === "t") return { x: b.x + b.w/2, y: b.y };
+    return { x: b.x + b.w/2, y: b.y + b.h }; // bottom
+  }
+
+  // wires: from-port -> to-port, label
+  const wires = [
+    { id:"d-gw",  a:["driver","b"], b:["gw","t"],     lbl:"POST loc" },
+    { id:"r-gw",  a:["rider","t"],  b:["gw","b"],     lbl:"req" },
+    { id:"gw-in", a:["gw","r"],     b:["ingest","l"], lbl:"" },
+    { id:"in-rd", a:["ingest","b"], b:["redis","t"],  lbl:"overwrite" },
+    { id:"in-kf", a:["ingest","l"], b:["kafka","l"],  lbl:"stream",  bend:"down" },
+    { id:"kf-cd", a:["kafka","b"],  b:["cold","t"],   lbl:"persist" },
+    { id:"gw-nb", a:["gw","r"],     b:["nearby","l"], lbl:"", bend:"up2" },
+    { id:"nb-rd", a:["nearby","l"], b:["redis","r"],  lbl:"GEOSEARCH" },
+    { id:"gw-mt", a:["gw","r"],     b:["match","l"],  lbl:"", bend:"down2" },
+    { id:"mt-nb", a:["match","t"],  b:["nearby","b"], lbl:"candidates" },
+    { id:"mt-sql",a:["match","b"],  b:["sql","t"],    lbl:"claim (lock)" }
+  ];
+
+  function wirePath(w){
+    const p1 = port(w.a[0], w.a[1]);
+    const p2 = port(w.b[0], w.b[1]);
+    if (w.bend === "down") {
+      const my = Math.max(p1.y, p2.y) + 30;
+      return `M ${p1.x} ${p1.y} C ${p1.x-40} ${p1.y}, ${p2.x-40} ${p2.y}, ${p2.x} ${p2.y}`;
+    }
+    if (w.bend === "up2") {
+      // gateway right -> nearby left, straight-ish at nearby's y
+      return `M ${p1.x} ${p1.y} C ${p1.x+30} ${p1.y}, ${p2.x-30} ${p2.y}, ${p2.x} ${p2.y}`;
+    }
+    if (w.bend === "down2") {
+      return `M ${p1.x} ${p1.y} C ${p1.x+30} ${p1.y}, ${p2.x-30} ${p2.y}, ${p2.x} ${p2.y}`;
+    }
+    // default smooth curve
+    const dx = (p2.x - p1.x) * 0.5;
+    return `M ${p1.x} ${p1.y} C ${p1.x+dx} ${p1.y}, ${p2.x-dx} ${p2.y}, ${p2.x} ${p2.y}`;
+  }
+
+  // ---------- geo grid (mini, overlaid near Redis as a callout) ----------
+  // a 4x4 grid of cells with drivers; rider query point highlights center+neighbours
+  const GEO = { x: 286, y: 138, w: BW, h: BH }; // we draw a popup grid elsewhere when active
+  // We'll render the grid as an inset only on the nearby/geo step, positioned top-right open area.
+  const gridOrigin = { x: 360, y: 30 };
+  const cellSize = 30, gridN = 4;
+  const drivers = [ // grid coords (col,row) of available drivers
+    {c:0,r:0},{c:1,r:1},{c:2,r:1},{c:3,r:0},
+    {c:1,r:2},{c:2,r:2},{c:0,r:3},{c:3,r:3},{c:2,r:3}
+  ];
+  const riderCell = {c:1, r:1}; // rider sits here; neighbours = the 8 around it
+
+  // ---------- steps ----------
+  // packet: {from, to} ids to animate along the wire; or null
+  const steps = [
+    {
+      stage:"Idle", path:"—", store:"—", cons:"—",
+      active:[], hotWires:[], packet:null, geo:false,
+      narr:`<b>0. The cast.</b> Drivers heartbeat their location; riders ask "who's nearby?" and request rides. A <b>Gateway</b> geo-routes everything; behind it sit <b>Location Ingest</b>, a <b>Redis geo-index</b>, <b>Kafka</b>, the <b>Nearby</b> and <b>Matching</b> services, and a transactional <b>SQL Rides</b> store. Watch the orange packet travel.`,
+      cls:""
+    },
+    {
+      stage:"Write firehose", path:"driver → ingest", store:"—", cons:"eventual",
+      active:["driver","gw","ingest"], hotWires:["d-gw","gw-in"], packet:{wire:"gw-in"}, geo:false,
+      narr:`<b>1. Driver heartbeat (the firehose).</b> <code>POST /drivers/{id}/location</code> every <b>4s × 1M drivers = 250K writes/sec</b>. The Gateway geo-routes it to a thin, <b>ack-only</b> Location Ingest service — no heavy response, because this path is the dominant load.`,
+      cls:"move"
+    },
+    {
+      stage:"Hot write", path:"ingest → Redis", store:"Redis (overwrite)", cons:"eventual",
+      active:["ingest","redis"], hotWires:["in-rd"], packet:{wire:"in-rd"}, geo:false,
+      narr:`<b>2. Overwrite the hot location.</b> Ingest writes only the <b>latest</b> position into the Redis geo-index (sorted set keyed by <b>geohash score</b>) — overwrite, never append. Live state is tiny: <code>1M × ~100B ≈ 100 MB</code>, so it fits in memory. A <b>10&ndash;15s TTL</b> auto-evicts disconnected drivers.`,
+      cls:"good"
+    },
+    {
+      stage:"Durable fan-out", path:"ingest → Kafka → cold", store:"Kafka → object store", cons:"eventual",
+      active:["ingest","kafka","cold"], hotWires:["in-kf","kf-cd"], packet:{wire:"in-kf"}, geo:false,
+      narr:`<b>3. Stream history asynchronously.</b> The same update is fanned to <b>Kafka</b> so downstream consumers (trip history, analytics, ETA models) feed off it <b>without slowing ingest</b>. The raw trail is huge — <code>250K/s × 100B × 86400 ≈ 2.16 TB/day ≈ 788 TB/yr</code> — so it lands in cheap <b>cold storage</b>, never the hot path.`,
+      cls:""
+    },
+    {
+      stage:"Nearby read", path:"rider → gateway → Nearby", store:"—", cons:"eventual",
+      active:["rider","gw","nearby"], hotWires:["r-gw","gw-nb"], packet:{wire:"gw-nb"}, geo:false,
+      narr:`<b>4. Rider asks "who's nearby?"</b> <code>GET /drivers/nearby?lat&lng&radiusKm&limit</code> hits the Gateway and routes to the <b>Nearby Service</b>. Reads are far lighter than writes here (~1&ndash;2K QPS) but must feel instant: <b>p99 &lt; 200&ndash;300 ms</b>.`,
+      cls:""
+    },
+    {
+      stage:"Geo lookup", path:"Nearby → Redis GEOSEARCH", store:"Redis geo-index", cons:"eventual",
+      active:["nearby","redis"], hotWires:["nb-rd"], packet:{wire:"nb-rd"}, geo:true,
+      narr:`<b>5. Spatial lookup, not a full scan.</b> <code>GEOSEARCH</code> finds drivers in the rider's <b>geohash cell + 8 neighbours</b> (the orange ring) — an <b>O(log N)</b> query over a handful of cells, not an O(N) scan of 1M drivers. The boundary cells matter: a driver just over the edge would be missed without them. Nearby computes distance/ETA and returns <b>top-K</b>.`,
+      cls:"good"
+    },
+    {
+      stage:"Match request", path:"rider → Matching", store:"—", cons:"async (202)",
+      active:["rider","gw","match","nearby"], hotWires:["gw-mt","mt-nb"], packet:{wire:"gw-mt"}, geo:false,
+      narr:`<b>6. Rider requests a ride.</b> <code>POST /rides</code> returns <b>202 Accepted</b> <code>{rideId, status:MATCHING}</code> immediately — matching is <b>async</b> (search + lock + confirm shouldn't block). Matching Service pulls fresh nearby <b>candidates</b> from the Nearby Service.`,
+      cls:""
+    },
+    {
+      stage:"Atomic claim", path:"Matching → SQL", store:"SQL Rides (ACID)", cons:"STRONG",
+      active:["match","sql"], hotWires:["mt-sql"], packet:{wire:"mt-sql"}, geo:false,
+      narr:`<b>7. Claim exactly one driver.</b> Two riders could race for the same driver. The fix is a <b>strongly consistent atomic claim</b>: <code>SETNX driver:lock:{id}</code> or <code>UPDATE ... WHERE status='AVAILABLE'</code>. Only the <b>winner</b> sends the offer; decline/timeout releases the lock → next candidate. The ride row lives in <b>SQL</b> for ACID state transitions and billing — <b>no double-booking</b>.`,
+      cls:"good"
+    }
+  ];
+
+  // ---------- DOM ----------
+  const gWires = document.getElementById("g-wires");
+  const gBoxes = document.getElementById("g-boxes");
+  const gGeo   = document.getElementById("g-geo");
+  const gPacket= document.getElementById("g-packet");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vStage = document.getElementById("v-stage");
+  const vPath  = document.getElementById("v-path");
+  const vStore = document.getElementById("v-store");
+  const vCons  = document.getElementById("v-cons");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+
+  // build static wires once (paths reused)
+  const wirePathCache = {};
+  function buildWires(active, hot) {
+    gWires.innerHTML = "";
+    for (const w of wires) {
+      const d = wirePath(w);
+      wirePathCache[w.id] = d;
+      const isHot = hot.includes(w.id);
+      const p = svgEl("path", { class: "wire" + (isHot ? " hot" : ""), d, "marker-end":"url(#arrow)" });
+      gWires.appendChild(p);
+      if (w.lbl && isHot) {
+        // midpoint-ish label
+        const p1 = port(w.a[0], w.a[1]), p2 = port(w.b[0], w.b[1]);
+        const mx = (p1.x + p2.x)/2, my = (p1.y + p2.y)/2 - 5;
+        const t = svgEl("text", { class:"wire-label", x:mx, y:my, "text-anchor":"middle", fill:"#f59e0b" });
+        t.textContent = w.lbl;
+        gWires.appendChild(t);
+      }
+    }
+  }
+
+  // arrow marker
+  (function defs(){
+    const svg = document.getElementById("diagram");
+    const defs = svgEl("defs", {});
+    const m = svgEl("marker", { id:"arrow", viewBox:"0 0 10 10", refX:"9", refY:"5",
+      markerWidth:"6", markerHeight:"6", orient:"auto-start-reverse" });
+    const path = svgEl("path", { d:"M 0 0 L 10 5 L 0 10 z", fill:"#3a3a5c" });
+    m.appendChild(path); defs.appendChild(m);
+    svg.insertBefore(defs, svg.firstChild);
+  })();
+
+  function buildBoxes(active) {
+    gBoxes.innerHTML = "";
+    for (const id in boxes) {
+      const b = boxes[id];
+      const on = active.includes(id);
+      const g = svgEl("g", { class: "box" + (on ? " active" : (active.length ? " dim" : "")) });
+      const rect = svgEl("rect", {
+        x:b.x, y:b.y, width:b.w, height:b.h, rx:9,
+        fill: on ? b.c : "#262642",
+        stroke: b.c, "stroke-width": on ? 3 : 1.6,
+        opacity: on ? 1 : 0.95
+      });
+      const t1 = svgEl("text", { class:"title", x:b.x + b.w/2, y:b.y + (b.s?20:28), "text-anchor":"middle",
+        fill: on ? "#fff" : "#cfcfe4" });
+      t1.textContent = b.t;
+      g.appendChild(rect); g.appendChild(t1);
+      if (b.s) {
+        const t2 = svgEl("text", { class:"sub", x:b.x + b.w/2, y:b.y + 34, "text-anchor":"middle" });
+        t2.textContent = b.s;
+        g.appendChild(t2);
+      }
+      gBoxes.appendChild(g);
+    }
+  }
+
+  function buildGeo(show) {
+    gGeo.innerHTML = "";
+    if (!show) return;
+    // backdrop
+    const pad = 8;
+    const gw = gridN*cellSize, gh = gridN*cellSize;
+    const bg = svgEl("rect", { x: gridOrigin.x - pad, y: gridOrigin.y - pad - 14,
+      width: gw + pad*2, height: gh + pad*2 + 14, rx:8, fill:"#1b1b33", stroke:"#3a3a5c", "stroke-width":1 });
+    gGeo.appendChild(bg);
+    const cap = svgEl("text", { x: gridOrigin.x, y: gridOrigin.y - 12, fill:"#9a9ab8",
+      "font-size":"9px", "font-family":"'SF Mono',Menlo,monospace" });
+    cap.textContent = "geohash cells: center + 8 neighbours";
+    gGeo.appendChild(cap);
+
+    // neighbour set = cells adjacent (incl diagonal) to riderCell
+    const isNeighbour = (c,r) =>
+      Math.abs(c - riderCell.c) <= 1 && Math.abs(r - riderCell.r) <= 1;
+
+    for (let r=0; r<gridN; r++){
+      for (let c=0; c<gridN; c++){
+        const x = gridOrigin.x + c*cellSize, y = gridOrigin.y + r*cellSize;
+        const center = (c===riderCell.c && r===riderCell.r);
+        const nb = isNeighbour(c,r);
+        const fill = center ? "#7c2d12" : (nb ? "#3a2a18" : "#222240");
+        const stroke = (center||nb) ? "#f59e0b" : "#2d2d50";
+        const cell = svgEl("rect", { class:"cell", x, y, width:cellSize, height:cellSize,
+          fill, stroke, "stroke-width": (center||nb)?1.6:1, opacity:(center||nb)?1:0.7 });
+        gGeo.appendChild(cell);
+      }
+    }
+    // drivers
+    for (const d of drivers){
+      const cx = gridOrigin.x + d.c*cellSize + cellSize/2;
+      const cy = gridOrigin.y + d.r*cellSize + cellSize/2;
+      const nb = isNeighbour(d.c,d.r);
+      const dot = svgEl("circle", { class:"driver-dot", cx, cy, r:4.5,
+        fill: nb ? "#22d3ee" : "#3a4a66",
+        stroke: nb ? "#a5f3fc" : "#2d2d50", "stroke-width": nb?1.5:1,
+        opacity: nb ? 1 : 0.5 });
+      gGeo.appendChild(dot);
+    }
+    // rider point
+    const rx = gridOrigin.x + riderCell.c*cellSize + cellSize/2;
+    const ry = gridOrigin.y + riderCell.r*cellSize + cellSize/2;
+    const rp = svgEl("circle", { class:"rider-dot", cx:rx, cy:ry, r:6,
+      fill:"#f43f5e", stroke:"#fecdd3", "stroke-width":2 });
+    gGeo.appendChild(rp);
+  }
+
+  // animate packet along a wire path
+  let animId = null;
+  function animatePacket(wireId) {
+    gPacket.innerHTML = "";
+    if (animId) cancelAnimationFrame(animId);
+    if (!wireId) return;
+    const d = wirePathCache[wireId];
+    if (!d) return;
+    const path = svgEl("path", { d, fill:"none", stroke:"none" });
+    // temp attach to measure
+    document.getElementById("diagram").appendChild(path);
+    const len = path.getTotalLength();
+    path.remove();
+
+    const g = svgEl("g", { class:"packet" });
+    const halo = svgEl("circle", { r:11, fill:"#f59e0b", opacity:0.25 });
+    const dot = svgEl("circle", { r:7, fill:"#f59e0b", stroke:"#fbbf24", "stroke-width":2 });
+    g.appendChild(halo); g.appendChild(dot);
+    gPacket.appendChild(g);
+
+    const measure = svgEl("path", { d, fill:"none", stroke:"none" });
+    document.getElementById("diagram").appendChild(measure);
+
+    const DUR = 1100;
+    let start = null;
+    function frame(ts){
+      if (start === null) start = ts;
+      let t = (ts - start) / DUR;
+      if (t > 1) t = 1;
+      // ease in-out
+      const e = t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t;
+      const pt = measure.getPointAtLength(e * len);
+      g.setAttribute("transform", `translate(${pt.x},${pt.y})`);
+      if (t < 1) { animId = requestAnimationFrame(frame); }
+      else {
+        // loop with a small pause
+        setTimeout(() => { start = null; animId = requestAnimationFrame(frame); }, 350);
+      }
+    }
+    animId = requestAnimationFrame(frame);
+  }
+
+  let cursor = 0;
+  function render() {
+    const s = steps[cursor];
+    buildWires(s.active, s.hotWires);
+    buildBoxes(s.active);
+    buildGeo(s.geo);
+    animatePacket(s.packet ? s.packet.wire : null);
+
+    vStage.textContent = s.stage;
+    vPath.textContent  = s.path;
+    vStore.textContent = s.store;
+    vCons.textContent  = s.cons;
+    vCons.className = "value small" + (s.cons === "STRONG" ? " green" : (s.cons === "eventual" ? " amber" : ""));
+
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next(){ if (cursor < steps.length-1){ cursor++; render(); } }
+  function prev(){ if (cursor > 0){ cursor--; render(); } }
+  function reset(){ cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

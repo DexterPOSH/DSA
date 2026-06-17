@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Consistent Hashing — The Hash Ring Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* Ring SVG */
+  .ring-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 480px; height: auto; }
+  .ring-line { fill: none; stroke: #3a3a5c; stroke-width: 6; }
+  .ring-tick { stroke: #2d2d50; stroke-width: 1; }
+  .ring-label { fill: #666680; font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .clock-arrow { fill: #555577; }
+
+  .node circle { transition: all .4s ease; }
+  .node text { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 13px; fill: #fff; }
+  .node.dim { opacity: .25; }
+
+  .vnode circle { transition: all .4s ease; }
+  .vnode text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #cdd; }
+
+  .key circle { transition: all .5s ease; }
+  .key text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #1a1a2e; font-weight: 700; }
+  .key.moving circle { stroke: #f59e0b; stroke-width: 3; }
+  .assign-arc { fill: none; stroke-width: 4; opacity: .8; transition: all .4s ease; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.ring-sw { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.consistent { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.consistent h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 22px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.consistent .big { color: #10b981; }
+  /* mini bucket bars */
+  .buckets { display: flex; gap: 4px; margin: 12px 0 4px; }
+  .bk { flex: 1; text-align: center; font-size: 9px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .bk .bar { height: 30px; border-radius: 4px 4px 0 0; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Consistent Hashing — The Hash Ring</h1>
+  <div class="subtitle">How distributed caches and databases spread keys across nodes so that <b>adding or removing one node moves only a tiny slice of keys</b> — instead of reshuffling almost everything like plain <code>hash(key) % N</code>.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the round dining table</h3>
+    <p>Picture a big <b>round dining table</b>. Dishes (your <b>keys</b>) are placed at spots all around the rim. Waiters (your <b>nodes</b>) also stand at fixed spots around the table. The rule: <b>each dish is served by the first waiter you reach walking clockwise from that dish</b>. If a waiter leaves, only the dishes between them and the <i>previous</i> waiter need a new server — every other dish keeps the same waiter. When a new waiter squeezes in, they only take over the dishes sitting just clockwise-behind them. No full re-seating of the whole table.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">ring:</span><code>hash space 0 .. 2^32-1, wraps clockwise</code></div>
+    <div class="row"><span class="label">nodes:</span><code>A, B, C, D</code> &nbsp;hashed onto ring positions</div>
+    <div class="row"><span class="label">rule:</span><code>key → first node clockwise from hash(key)</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="ring-holder">
+      <svg viewBox="0 0 400 400" id="ring">
+        <!-- ring circle -->
+        <circle class="ring-line" cx="200" cy="200" r="150" />
+        <!-- 0 marker at top -->
+        <line class="ring-tick" x1="200" y1="42" x2="200" y2="58" />
+        <text class="ring-label" x="200" y="34" text-anchor="middle">0 / 2³²</text>
+        <text class="ring-label" x="372" y="204" text-anchor="middle">2³⁰</text>
+        <text class="ring-label" x="200" y="378" text-anchor="middle">2³¹</text>
+        <text class="ring-label" x="28" y="204" text-anchor="middle">3·2³⁰</text>
+        <!-- clockwise hint -->
+        <path class="clock-arrow" d="M250 64 l10 -3 l-2 10 z" />
+        <text class="ring-label" x="262" y="78">clockwise →</text>
+
+        <g id="g-arc"></g>
+        <g id="g-keys"></g>
+        <g id="g-vnodes"></g>
+        <g id="g-nodes"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Nodes (N)</div><div class="value" id="v-nodes">0</div></div>
+        <div class="var"><div class="label">Keys</div><div class="value" id="v-keys">0</div></div>
+        <div class="var"><div class="label">Keys moved</div><div class="value amber" id="v-moved">0</div></div>
+        <div class="var"><div class="label">Keys stable</div><div class="value green" id="v-stable">0</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch ring-sw" style="background:#3b82f6"></span>Node (physical server)</div>
+        <div class="legend-item"><span class="swatch ring-sw" style="background:#94a3b8"></span>Key (data item)</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Key remapping / moving</div>
+        <div class="legend-item"><span class="swatch ring-sw" style="background:#10b981"></span>New node joining</div>
+        <div class="legend-item"><span class="swatch ring-sw" style="background:#64748b"></span>Virtual node (vnode)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to draw the empty ring and start placing nodes.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>Naive&nbsp;&nbsp;hash(key) % N</h3>
+      <div class="formula">node = hash(key) % N</div>
+      <p>Looks simple — until <code>N</code> changes. Go from <code>N=4</code> to <code>N=5</code> and the modulus shifts for almost every key, so <span class="big">~80%+</span> of keys land on a different node at once.</p>
+      <div class="buckets" id="naive-buckets"></div>
+      <p>Result: a <b>cache stampede</b> — nearly every lookup misses, all traffic slams the database simultaneously.</p>
+    </div>
+    <div class="cx consistent">
+      <h3>Consistent hashing (the ring)</h3>
+      <div class="formula">node = first clockwise on ring</div>
+      <p>Adding the 5th node only steals the keys in <i>one arc</i> — its predecessor's slice. With 1000 keys over 4 nodes, only about <span class="big">~K/N = 200</span> keys move; the other ~800 never notice.</p>
+      <div class="buckets" id="consistent-buckets"></div>
+      <p>Result: <b>graceful scaling</b>. Each add/remove disturbs roughly <code>K/N</code> keys, not <code>K</code>.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Why a ring?</b> Wrapping the hash space into a circle means "the largest key" wraps back to "the smallest node," so there is always a next node clockwise — no edge cases at the boundary.</li>
+      <li><b>Virtual nodes (vnodes)</b> — one physical server is hashed to <b>many</b> ring points (e.g. 100-200). This evens out the arc sizes so no single node gets a giant slice (a <b>hot spot</b>), and lets you weight bigger servers by giving them more vnodes.</li>
+      <li><b>Lookup cost</b> — store node positions in a sorted structure and binary-search for the first position ≥ <code>hash(key)</code>: <code>O(log V)</code> where V = total vnodes.</li>
+      <li><b>Replication</b> — for redundancy, a key is often stored on the next <code>R</code> distinct physical nodes clockwise, not just the first.</li>
+      <li><b>Removal</b> — a node's keys all flow to the <i>next node clockwise</i>; only that one neighbor absorbs the load, and only that arc moves.</li>
+      <li><b>Used by</b> — Amazon <b>DynamoDB</b>, Apache <b>Cassandra</b> (token ring), Riak, and distributed caches like <b>memcached</b> rings / Redis Cluster (slot variant).</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Hash both <b>keys and nodes onto the same circular space</b> and assign each key to the first node clockwise. Then a node joining or leaving only reshuffles the <b>~K/N keys in one arc</b> instead of nearly all of them — and <b>virtual nodes</b> keep those arcs evenly sized so no server becomes a hot spot.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- ring geometry ----------
+  const CX = 200, CY = 200, R = 150;
+  // angle 0 = top (position 0 on ring), increasing clockwise. degrees.
+  function pos(angleDeg, radius) {
+    const a = (angleDeg - 90) * Math.PI / 180; // -90 so 0deg is at top
+    return { x: CX + radius * Math.cos(a), y: CY + radius * Math.sin(a) };
+  }
+  // arc path on the ring between two angles, clockwise
+  function arcPath(fromDeg, toDeg, radius) {
+    let sweep = toDeg - fromDeg;
+    while (sweep < 0) sweep += 360;
+    const large = sweep > 180 ? 1 : 0;
+    const p1 = pos(fromDeg, radius), p2 = pos(toDeg, radius);
+    return `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} A ${radius} ${radius} 0 ${large} 1 ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+
+  const NODE_COLOR = { A:"#3b82f6", B:"#8b5cf6", C:"#ec4899", D:"#06b6d4", E:"#10b981" };
+
+  // ---------- model ----------
+  // base nodes on the ring (degrees clockwise from top)
+  const baseNodes = [
+    { id:"A", deg: 35 },
+    { id:"B", deg: 130 },
+    { id:"C", deg: 215 },
+    { id:"D", deg: 300 },
+  ];
+  const newNode = { id:"E", deg: 170 }; // joins between B(130) and C(215)
+
+  // keys placed around the ring (degrees)
+  const keys = [
+    { id:"k1", deg: 12 }, { id:"k2", deg: 70 }, { id:"k3", deg: 100 },
+    { id:"k4", deg: 150 }, { id:"k5", deg: 195 }, { id:"k6", deg: 240 },
+    { id:"k7", deg: 280 }, { id:"k8", deg: 330 },
+  ];
+
+  // given a set of nodes (with deg), find first node clockwise from key deg
+  function owner(nodes, keyDeg) {
+    let best = null, bestGap = Infinity;
+    for (const nd of nodes) {
+      let gap = nd.deg - keyDeg;
+      while (gap < 0) gap += 360;     // clockwise distance
+      if (gap < bestGap) { bestGap = gap; best = nd; }
+    }
+    return best;
+  }
+
+  // ---------- build steps ----------
+  // each step: { nodes:[], vnodes:bool, keysShown:bool, assign:bool,
+  //   moved:Set, removed:id|null, narration, narrClass, stats:{N,K,moved,stable} }
+  const steps = [];
+  const four = baseNodes.slice();
+
+  steps.push({
+    nodes: [], keysShown:false, assign:false, vnodes:false, moved:new Set(),
+    narration:`<b>1. The hash ring.</b> We take the whole hash output space — <code>0</code> up to <code>2³²-1</code> — and bend it into a circle. Position <code>0</code> sits at the top; values grow <b>clockwise</b> and wrap around back to 0.`,
+    narrClass:"", stats:{N:0,K:0,moved:0,stable:0}
+  });
+
+  steps.push({
+    nodes: four.slice(), keysShown:false, assign:false, vnodes:false, moved:new Set(),
+    narration:`<b>2. Place the nodes.</b> Each server is hashed onto the ring: <code>hash("A")</code>, <code>hash("B")</code>, <code>hash("C")</code>, <code>hash("D")</code> land at four spots. The gaps between them define the arcs each node will be responsible for.`,
+    narrClass:"", stats:{N:4,K:0,moved:0,stable:0}
+  });
+
+  steps.push({
+    nodes: four.slice(), keysShown:true, assign:false, vnodes:false, moved:new Set(),
+    narration:`<b>3. Place the keys.</b> Each data item is hashed the same way: <code>hash("k1")</code>, <code>hash("k2")</code>… giving each key a point on the ring. So far they are unassigned grey dots.`,
+    narrClass:"", stats:{N:4,K:keys.length,moved:0,stable:0}
+  });
+
+  steps.push({
+    nodes: four.slice(), keysShown:true, assign:true, vnodes:false, moved:new Set(),
+    narration:`<b>3b. Assign each key clockwise.</b> Walk clockwise from a key until you hit a node — that node owns it. The colored arc shows the journey. This is the entire lookup rule: <code>key → first node clockwise</code>.`,
+    narrClass:"good", stats:{N:4,K:keys.length,moved:0,stable:0}
+  });
+
+  // Step 4: add node E
+  const five = four.concat([newNode]);
+  // which keys change owner from four -> five?
+  const movedAdd = new Set();
+  for (const k of keys) {
+    if (owner(four, k.deg).id !== owner(five, k.deg).id) movedAdd.add(k.id);
+  }
+  steps.push({
+    nodes: five.slice(), keysShown:true, assign:true, vnodes:false, moved:new Set(movedAdd), addedId:"E",
+    narration:`<b>4. A 5th node joins.</b> <code>hash("E")</code> drops <b>E</b> onto the ring between B and C. Only the keys in the arc <b>from B up to E</b> change hands — they used to walk clockwise to C, now they stop at E first. <b>1000 keys / 4 nodes → add 5th → only ~200 move, ~800 untouched.</b>`,
+    narrClass:"move", stats:{N:5,K:keys.length,moved:movedAdd.size,stable:keys.length-movedAdd.size}
+  });
+
+  // Step 5: remove node A (from the five-node ring)
+  const fiveNoA = five.filter(n => n.id !== "A");
+  const movedRemove = new Set();
+  for (const k of keys) {
+    if (owner(five, k.deg).id !== owner(fiveNoA, k.deg).id) movedRemove.add(k.id);
+  }
+  steps.push({
+    nodes: fiveNoA.slice(), keysShown:true, assign:true, vnodes:false, moved:new Set(movedRemove), removedId:"A",
+    narration:`<b>5. A node leaves.</b> Say <b>A</b> crashes. Its keys don't scatter — they each just continue clockwise to the <b>next node</b> (here, B), which absorbs A's arc. Every other key keeps its current owner. Only A's slice moves.`,
+    narrClass:"move", stats:{N:4,K:keys.length,moved:movedRemove.size,stable:keys.length-movedRemove.size}
+  });
+
+  // Step 6: vnodes — back to A,B,C,D but each scattered to multiple points
+  steps.push({
+    nodes: four.slice(), keysShown:true, assign:false, vnodes:true, moved:new Set(),
+    narration:`<b>6. Virtual nodes (vnodes).</b> With only one point per server, arcs can be wildly uneven → a <b>hot spot</b>. Fix: hash each physical node to <b>many</b> ring points (<code>A#1, A#2, A#3…</code>). The small interleaved arcs average out, so load spreads evenly and a leaving node's keys disperse across <i>several</i> survivors, not just one neighbor.`,
+    narrClass:"good", stats:{N:4,K:keys.length,moved:0,stable:keys.length}
+  });
+
+  // vnode layout: each base node scattered to 3 points
+  const vnodeDegs = {
+    A:[35,160,255], B:[130,20,290], C:[215,75,340], D:[300,110,185]
+  };
+
+  // ---------- DOM refs ----------
+  const gNodes = document.getElementById("g-nodes");
+  const gKeys  = document.getElementById("g-keys");
+  const gVnodes= document.getElementById("g-vnodes");
+  const gArc   = document.getElementById("g-arc");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vN = document.getElementById("v-nodes");
+  const vK = document.getElementById("v-keys");
+  const vMoved = document.getElementById("v-moved");
+  const vStable = document.getElementById("v-stable");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  let cursor = 0;
+
+  function render() {
+    const s = steps[cursor];
+    gNodes.innerHTML = ""; gKeys.innerHTML = ""; gVnodes.innerHTML = ""; gArc.innerHTML = "";
+
+    // ---- assignment arcs (from key to its owner, drawn behind) ----
+    if (s.assign && s.keysShown) {
+      for (const k of keys) {
+        const o = owner(s.nodes, k.deg);
+        if (!o) continue;
+        const col = NODE_COLOR[o.id];
+        const moving = s.moved.has(k.id);
+        const p = svgEl("path", {
+          class: "assign-arc",
+          d: arcPath(k.deg, o.deg, R),
+          stroke: moving ? "#f59e0b" : col,
+          "stroke-dasharray": moving ? "6 5" : "none",
+          opacity: moving ? 0.95 : 0.45
+        });
+        gArc.appendChild(p);
+      }
+    }
+
+    // ---- vnodes ----
+    if (s.vnodes) {
+      for (const nd of s.nodes) {
+        const col = NODE_COLOR[nd.id];
+        const degs = vnodeDegs[nd.id] || [nd.deg];
+        degs.forEach((d, i) => {
+          const pt = pos(d, R);
+          const g = svgEl("g", { class:"vnode" });
+          const c = svgEl("circle", { cx:pt.x, cy:pt.y, r:11, fill:col, stroke:"#64748b", "stroke-width":2, opacity:0.92 });
+          const t = svgEl("text", { x:pt.x, y:pt.y+3, "text-anchor":"middle" });
+          t.textContent = nd.id + (i+1);
+          g.appendChild(c); g.appendChild(t);
+          gVnodes.appendChild(g);
+        });
+      }
+    }
+
+    // ---- physical nodes ----
+    if (!s.vnodes) {
+      for (const nd of s.nodes) {
+        const pt = pos(nd.deg, R);
+        const col = NODE_COLOR[nd.id];
+        const isNew = s.addedId === nd.id;
+        const g = svgEl("g", { class:"node" });
+        const c = svgEl("circle", {
+          cx:pt.x, cy:pt.y, r: isNew ? 19 : 16,
+          fill: isNew ? "#10b981" : col,
+          stroke: isNew ? "#6ee7b7" : "#1a1a2e",
+          "stroke-width": isNew ? 4 : 3
+        });
+        const t = svgEl("text", { x:pt.x, y:pt.y+4, "text-anchor":"middle" });
+        t.textContent = nd.id;
+        g.appendChild(c); g.appendChild(t);
+        gNodes.appendChild(g);
+      }
+    } else {
+      // small label legend dots for physical identity already shown as vnodes; nothing extra
+    }
+
+    // ---- keys ----
+    if (s.keysShown) {
+      for (const k of keys) {
+        const pt = pos(k.deg, R);
+        const moving = s.moved.has(k.id);
+        const g = svgEl("g", { class:"key" + (moving ? " moving" : "") });
+        const c = svgEl("circle", {
+          cx:pt.x, cy:pt.y, r:8,
+          fill: moving ? "#f59e0b" : "#94a3b8",
+          stroke: moving ? "#fbbf24" : "#cbd5e1", "stroke-width": moving ? 3 : 1.5
+        });
+        const t = svgEl("text", { x:pt.x, y:pt.y+3, "text-anchor":"middle" });
+        t.textContent = k.id.replace("k","");
+        g.appendChild(c); g.appendChild(t);
+        gKeys.appendChild(g);
+      }
+    }
+
+    // ---- side stats ----
+    vN.textContent = s.stats.N;
+    vK.textContent = s.stats.K;
+    vMoved.textContent = s.stats.moved;
+    vStable.textContent = s.stats.stable;
+
+    // ---- narration ----
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  // ---------- contrast mini-buckets ----------
+  // naive: nearly all keys move when N 4->5 (red-heavy)
+  const naiveEl = document.getElementById("naive-buckets");
+  const consEl  = document.getElementById("consistent-buckets");
+  // 5 buckets representing nodes; "moved" portion in amber, stable in green
+  // naive: ~80% moved
+  function buckets(container, movedFrac) {
+    container.innerHTML = "";
+    for (let i = 0; i < 5; i++) {
+      const wrap = document.createElement("div");
+      wrap.className = "bk";
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      // each bar split: top moved (amber/red), bottom stable (green)
+      const moved = i < Math.round(movedFrac * 5) ? "#ef4444" : "#10b981";
+      bar.style.background = `linear-gradient(${moved} ${movedFrac*100}%, #10b981 ${movedFrac*100}%)`;
+      wrap.appendChild(bar);
+      const lbl = document.createElement("div");
+      lbl.textContent = "n" + (i+1);
+      lbl.style.color = "#8888aa";
+      wrap.appendChild(lbl);
+      container.appendChild(wrap);
+    }
+  }
+  buckets(naiveEl, 0.82);   // ~82% of keys remap
+  buckets(consEl, 0.20);    // ~20% (K/N) remap
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kth Largest in an Array — Min-Heap of Size k</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #1e2a4a;
+    --text: #e0e0e0; --muted: #93a0c0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444; --purple: #a855f7;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6; padding: 36px 20px 80px;
+    display: flex; flex-direction: column; align-items: center; gap: 26px;
+  }
+  .wrap { max-width: 800px; width: 100%; display: flex; flex-direction: column; gap: 24px; }
+  h1 { font-size: 1.65rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+  .analogy {
+    background: var(--panel); border: 1px solid var(--amber); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px;
+  }
+  .analogy .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--amber); margin-bottom: 6px; }
+  .analogy p { font-size: 0.96rem; }
+  .analogy b { color: var(--text); }
+
+  .problem { background: var(--panel); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 14px 22px; font-size: 0.95rem; }
+  .problem code { background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+  .card { background: var(--panel); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 20px;
+    box-shadow: 0 8px 26px rgba(0,0,0,0.3); }
+  .section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+
+  .step-desc { background: var(--panel2); border-left: 4px solid var(--blue);
+    border-radius: 8px; padding: 14px 16px; font-size: 0.95rem; min-height: 64px; }
+  .step-desc b { color: #fff; }
+  .step-desc .hl-green { color: var(--green); font-weight: 700; }
+  .step-desc .hl-amber { color: var(--amber); font-weight: 700; }
+  .step-desc .hl-red { color: var(--red); font-weight: 700; }
+  .step-desc .hl-purple { color: var(--purple); font-weight: 700; }
+
+  .stream { display: flex; gap: 7px; flex-wrap: wrap; }
+  .stream-cell { min-width: 38px; height: 38px; border-radius: 8px;
+    display: grid; place-items: center; font-weight: 700;
+    font-family: 'SF Mono', Menlo, monospace;
+    background: var(--panel2); border: 1px solid rgba(255,255,255,0.1); color: var(--muted);
+    transition: all 0.3s; }
+  .stream-cell.heaped { color: #b6f0d8; border-color: var(--green); opacity: 0.7; }
+  .stream-cell.done { color: var(--text); opacity: 0.4; }
+  .stream-cell.active { background: rgba(245,158,11,0.18); border-color: var(--amber);
+    color: #ffe2ad; transform: translateY(-3px); box-shadow: 0 4px 12px rgba(245,158,11,0.3); }
+  .stream-cell.rejected { border-color: var(--red); color: #fca5a5; }
+
+  .tree-wrap { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 420px; height: 200px; }
+  .edge { stroke: #3a4a6e; stroke-width: 2; }
+  .node-circle { fill: var(--panel2); stroke: var(--blue); stroke-width: 2; transition: all 0.3s; }
+  .node-circle.root { fill: rgba(16,185,129,0.18); stroke: var(--green); stroke-width: 3; }
+  .node-circle.incoming { fill: rgba(168,85,247,0.2); stroke: var(--purple); stroke-width: 3; }
+  .node-circle.sift { fill: rgba(245,158,11,0.2); stroke: var(--amber); stroke-width: 3; }
+  .node-text { fill: var(--text); font-family: 'SF Mono', Menlo, monospace;
+    font-weight: 700; font-size: 15px; text-anchor: middle; dominant-baseline: central; }
+
+  .arr-view { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .arr-cell { min-width: 40px; height: 40px; border-radius: 8px; position: relative;
+    display: grid; place-items: center; font-weight: 700;
+    font-family: 'SF Mono', Menlo, monospace;
+    background: var(--panel2); border: 1px solid var(--blue); color: #bcd4ff; transition: all 0.3s; }
+  .arr-cell.root { border-color: var(--green); background: rgba(16,185,129,0.15); color: #b6f0d8; }
+  .arr-cell.incoming { border-color: var(--purple); background: rgba(168,85,247,0.18); color: #e3c9ff; }
+  .arr-cell.sift { border-color: var(--amber); background: rgba(245,158,11,0.18); color: #ffe2ad; }
+  .arr-idx { position: absolute; bottom: -18px; left: 0; right: 0; text-align: center;
+    font-size: 0.65rem; color: #5a6a90; }
+
+  .answer { display: inline-flex; align-items: center; gap: 10px;
+    background: rgba(16,185,129,0.14); border: 1px solid var(--green);
+    color: #b6f0d8; padding: 10px 18px; border-radius: 10px;
+    font-family: 'SF Mono', Menlo, monospace; font-weight: 700; font-size: 1.05rem;
+    align-self: flex-start; opacity: 0; transition: opacity 0.3s; }
+  .answer.show { opacity: 1; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .counter { font-size: 0.82rem; color: #5a6a90; margin-left: auto;
+    font-family: 'SF Mono', Menlo, monospace; }
+
+  .takeaway { background: linear-gradient(135deg, rgba(59,130,246,0.14), rgba(16,185,129,0.1));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px; padding: 18px 24px; }
+  .takeaway .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 6px; }
+  .takeaway p { font-size: 1rem; }
+  .takeaway b { color: var(--text); }
+  .qs-note { font-size: 0.85rem; color: var(--muted); background: var(--panel2);
+    border-left: 4px solid var(--purple); border-radius: 8px; padding: 12px 16px; }
+  .qs-note b { color: #e3c9ff; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kth Largest in an Array &mdash; <span>Min-Heap of Size k</span></h1>
+
+  <div class="analogy">
+    <div class="label">Real-world analogy</div>
+    <p>Tumhe class ka <b>4th-highest scorer</b> chahiye, poori class rank kiye bina. Ek chhoti <b>leaderboard of size k</b> rakho jisme sirf top-k scorers hain. Naya score top-k me ghuse to leaderboard ka lowest gir jaata hai. Antt me leaderboard ka <b>sabse neeche wala = kth largest</b>. Wahi <b>min-heap ka root</b> hai.</p>
+  </div>
+
+  <div class="problem">
+    <b>nums = [3, 2, 1, 5, 6, 4]</b>, <b>k = 2</b>. Maintain a min-heap of size 2 (the 2 largest seen). Root is the 2nd largest. <span style="color:var(--green)">Answer: 5</span>.
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">What happens</div>
+      <div class="step-desc" id="stepDesc">Press <b>Next</b>. Seed the heap with the first k elements, then scan the rest — only bigger-than-root values get in.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Input array (green = in heap, amber = current)</div>
+      <div class="stream" id="streamRow"></div>
+    </div>
+
+    <div>
+      <div class="section-label">Min-heap (size k = 2) &mdash; root = kth largest so far</div>
+      <div class="tree-wrap"><svg id="treeSvg" viewBox="0 0 420 200"></svg></div>
+    </div>
+
+    <div>
+      <div class="section-label">Underlying array</div>
+      <div class="arr-view" id="arrView"></div>
+    </div>
+
+    <div class="answer" id="answer"></div>
+
+    <div class="legend">
+      <span><i class="dot" style="background:var(--green)"></i> root = kth largest</span>
+      <span><i class="dot" style="background:var(--purple)"></i> incoming</span>
+      <span><i class="dot" style="background:var(--amber)"></i> sifting</span>
+      <span><i class="dot" style="background:var(--red)"></i> rejected</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">‹ Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next ›</button>
+      <span class="counter" id="counter">0 / 0</span>
+    </div>
+  </div>
+
+  <div class="qs-note">
+    <b>Alternative — Quickselect, O(n) average:</b> partition around a random pivot so it lands in its final sorted slot. If that slot is index <code>n − k</code>, it's the answer; otherwise recurse into just one half. No heap, in-place — but worst case O(n²).
+  </div>
+
+  <div class="takeaway">
+    <div class="label">Key takeaway</div>
+    <p>Keep a <b>min-heap of size k</b>: a value enters only if it beats the root (the weakest of the current top-k). When the scan ends, the <b>root is the kth largest</b> — found in <b>O(n log k)</b>, never sorting the whole array.</p>
+  </div>
+</div>
+
+<script>
+const nums = [3, 2, 1, 5, 6, 4];
+const k = 2;
+
+// min-heap, but we track WHICH array index each value came from for stream coloring
+function siftUp(h,i){ while(i>0){const p=(i-1)>>1; if(h[p]<=h[i])break; [h[p],h[i]]=[h[i],h[p]]; i=p;} }
+function siftDown(h){ let i=0; while(true){let s=i,l=2*i+1,r=2*i+2;
+  if(l<h.length&&h[l]<h[s])s=l; if(r<h.length&&h[r]<h[s])s=r; if(s===i)break; [h[s],h[i]]=[h[i],h[s]]; i=s;} }
+function push(h,v){ h.push(v); siftUp(h,h.length-1); }
+function replaceTop(h,v){ h[0]=v; siftDown(h); }
+
+const steps = [];
+let heap = [];
+const heapedIdx = new Set();   // array indices currently represented in heap (by value, loose)
+function snap(desc, opts={}) {
+  steps.push({ heap: heap.slice(), desc,
+    activeIdx: opts.activeIdx ?? -1,
+    processedUpto: opts.processedUpto ?? -1,
+    heapedCount: opts.heapedCount ?? 0,
+    rejectedIdx: opts.rejectedIdx ?? -1,
+    incoming: opts.incoming ?? null,
+    rootHi: opts.rootHi ?? false,
+    answer: opts.answer ?? null });
+}
+
+snap(`Goal: 2nd largest of [3, 2, 1, 5, 6, 4]. Seed a size-2 min-heap with the first k = 2 elements.`);
+// seed
+for (let i = 0; i < k; i++) {
+  push(heap, nums[i]);
+  snap(`Seed: push <span class="hl-purple">${nums[i]}</span> (index ${i}). Heap = [${heap.join(', ')}], root = <span class="hl-green">${heap[0]}</span>.`, {activeIdx:i, processedUpto:i, heapedCount:i+1, incoming:nums[i], rootHi:true});
+}
+snap(`Heap seeded with the first 2. Root <span class="hl-green">${heap[0]}</span> is the current 2nd largest. Now scan the rest.`, {processedUpto:k-1, heapedCount:k, rootHi:true});
+
+for (let i = k; i < nums.length; i++) {
+  const v = nums[i];
+  if (v > heap[0]) {
+    const old = heap[0];
+    snap(`<span class="hl-amber">${v}</span> (index ${i}) > root <b>${old}</b> → it belongs in the top-k. Replace the root and sift down.`, {activeIdx:i, processedUpto:i-1, heapedCount:k, incoming:v});
+    replaceTop(heap, v);
+    snap(`After heapreplace: root pops out (${old} discarded), <span class="hl-amber">${v}</span> sifts to its spot. Heap = [${heap.join(', ')}], root = <span class="hl-green">${heap[0]}</span>.`, {activeIdx:i, processedUpto:i, heapedCount:k, rootHi:true});
+  } else {
+    snap(`<span class="hl-red">${v}</span> (index ${i}) ≤ root <b>${heap[0]}</b> → too small to be in the top-${k}. Skip it. Root stays <span class="hl-green">${heap[0]}</span>.`, {activeIdx:i, processedUpto:i, heapedCount:k, rejectedIdx:i, rootHi:true});
+  }
+}
+snap(`Scan complete. The min-heap holds the ${k} largest values; its root is the kth largest. <b>return ${heap[0]}</b>.`, {processedUpto:nums.length-1, heapedCount:k, rootHi:true, answer:heap[0]});
+
+// ---- render ----
+const TREE_POS = [ {x:210,y:34}, {x:120,y:130}, {x:300,y:130}, {x:60,y:200}, {x:180,y:200} ];
+const TREE_EDGES = [[0,1],[0,2],[1,3],[1,4]];
+const svg = document.getElementById('treeSvg');
+const arrView = document.getElementById('arrView');
+const streamRow = document.getElementById('streamRow');
+const stepDesc = document.getElementById('stepDesc');
+const counter = document.getElementById('counter');
+const answerEl = document.getElementById('answer');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
+streamRow.innerHTML = nums.map((v,i)=>`<div class="stream-cell" id="sc${i}">${v}</div>`).join('');
+
+function render(i) {
+  const st = steps[i];
+  stepDesc.innerHTML = st.desc;
+  counter.textContent = `${i} / ${steps.length - 1}`;
+
+  // stream cells
+  nums.forEach((v, si) => {
+    const c = document.getElementById('sc'+si);
+    c.className = 'stream-cell';
+    if (si <= st.processedUpto) c.classList.add('done');
+    if (st.heap.includes(v) && si <= st.processedUpto) {
+      // best-effort: color heaped values green (loose by value)
+    }
+    if (si === st.rejectedIdx) c.classList.add('rejected');
+    if (si === st.activeIdx) { c.classList.remove('done'); c.classList.add('active'); }
+  });
+  // mark heap members green (by value, first occurrences)
+  const remaining = st.heap.slice();
+  nums.forEach((v, si) => {
+    if (si === st.activeIdx) return;
+    const pos = remaining.indexOf(v);
+    if (pos !== -1 && si <= st.processedUpto) {
+      const c = document.getElementById('sc'+si);
+      c.classList.remove('done'); c.classList.add('heaped');
+      remaining.splice(pos, 1);
+    }
+  });
+
+  // tree
+  let edges = '', nodes = '';
+  TREE_EDGES.forEach(([a,b]) => {
+    if (a < st.heap.length && b < st.heap.length) {
+      const pa = TREE_POS[a], pb = TREE_POS[b];
+      edges += `<line class="edge" x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" />`;
+    }
+  });
+  st.heap.forEach((v, idx) => {
+    if (idx >= TREE_POS.length) return;
+    const p = TREE_POS[idx];
+    let cls = '';
+    if (idx === 0 && st.rootHi) cls = 'root';
+    else if (st.incoming !== null && v === st.incoming) cls = 'incoming';
+    nodes += `<circle class="node-circle ${cls}" cx="${p.x}" cy="${p.y}" r="22" />
+      <text class="node-text" x="${p.x}" y="${p.y}">${v}</text>`;
+  });
+  svg.innerHTML = edges + nodes;
+
+  // array view
+  arrView.innerHTML = st.heap.map((v, idx) => {
+    let cls = '';
+    if (idx === 0 && st.rootHi) cls = 'root';
+    else if (st.incoming !== null && v === st.incoming) cls = 'incoming';
+    return `<div class="arr-cell ${cls}">${v}<span class="arr-idx">[${idx}]</span></div>`;
+  }).join('');
+
+  if (st.answer !== null) { answerEl.textContent = `return ${st.answer}`; answerEl.classList.add('show'); }
+  else answerEl.classList.remove('show');
+
+  prevBtn.disabled = (i === 0);
+  nextBtn.disabled = (i === steps.length - 1);
+}
+
+let cur = 0;
+function next(){ if(cur<steps.length-1){cur++; render(cur);} }
+function prev(){ if(cur>0){cur--; render(cur);} }
+render(0);
+</script>
+</body>
+</html>

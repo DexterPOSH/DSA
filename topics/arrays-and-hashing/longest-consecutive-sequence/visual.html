@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Longest Consecutive Sequence — Set + Run Starts</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px 60px; gap: 26px; line-height: 1.55;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--blue); border-left: 5px solid var(--blue);
+    border-radius: 12px; padding: 18px 24px; max-width: 820px; width: 100%;
+    display: flex; gap: 16px;
+  }
+  .analogy-icon { font-size: 1.9rem; flex-shrink: 0; }
+  .analogy-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .analogy-text { font-size: 0.96rem; color: #c0c0d0; }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 28px; max-width: 860px; width: 100%;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 9px; }
+
+  .step-desc {
+    min-height: 58px; background: var(--panel2); border-radius: 8px; padding: 14px 18px;
+    font-size: 0.95rem; color: #c8c8e0; border-left: 3px solid var(--blue);
+  }
+  .step-desc.start  { border-color: var(--amber); }
+  .step-desc.notstart { border-color: var(--muted); }
+  .step-desc.done   { border-color: var(--green); }
+
+  .arr-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .acell {
+    min-width: 48px; height: 48px; padding: 0 8px;
+    border-radius: 9px; border: 2px solid #2d3a5a; background: var(--panel2);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', Consolas, monospace; font-weight: 700; font-size: 1.05rem;
+    color: #cbd5e1; transition: all .3s;
+  }
+  .acell.inspect    { border-color: var(--blue);  background: #14233f; color: #93c5fd; box-shadow: 0 0 14px rgba(59,130,246,.4); transform: translateY(-3px); }
+  .acell.runstart   { border-color: var(--amber); background: #2a1f08; color: #fcd34d; box-shadow: 0 0 14px rgba(245,158,11,.45); }
+  .acell.inrun      { border-color: var(--green); background: #0c2417; color: #86efac; }
+  .acell.done-best  { border-color: var(--green); background: #0d2a1a; color: #86efac; box-shadow: 0 0 0 2px var(--green); }
+  .acell.notstart   { opacity: 0.5; }
+
+  .set-area {
+    background: var(--panel2); border: 1px dashed #2d3a5a; border-radius: 10px;
+    padding: 14px; display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .schip {
+    min-width: 38px; height: 36px; padding: 0 8px; border-radius: 7px;
+    background: #1e293b; border: 1.5px solid #2d3a5a;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.9rem; color: #93b0d0;
+    transition: all .25s;
+  }
+  .schip.probe { border-color: var(--blue);  color: #93c5fd; box-shadow: 0 0 10px rgba(59,130,246,.4); }
+  .schip.hit   { border-color: var(--green); background: #0c2417; color: #86efac; }
+  .schip.miss  { border-color: var(--red);   background: #2a0d0d; color: #fca5a5; }
+
+  .status { display: flex; gap: 18px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; }
+  .status .pill { background: var(--panel2); border-radius: 8px; padding: 9px 14px; border: 1px solid #2d3a5a; }
+  .status .pill.cur  { border-color: var(--amber); color: #fcd34d; }
+  .status .pill.best { border-color: var(--green); color: #86efac; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 11px 24px; border-radius: 8px; border: none; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.82rem; color: var(--muted); margin-left: auto; font-family: monospace; }
+
+  .takeaway {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 12px;
+    padding: 18px 24px; max-width: 820px; width: 100%; display: flex; gap: 16px;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--green); margin-bottom: 4px; }
+  .takeaway p { font-size: 0.94rem; color: #c0c0d0; }
+  .takeaway strong { color: #e0e0e0; }
+</style>
+</head>
+<body>
+
+  <h1>Longest Consecutive Sequence &mdash; <span>Set + Run Starts</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🎟️</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Random numbered tickets ko ek table pe daal do (hash set) taaki ek nazar me pata chale koi number hai ya nahi.
+        Chain sirf un tickets se shuru karo jinka <strong style="color:#fcd34d">ek kam wala (n−1) maujood hi nahi</strong> —
+        woh run-start hai. Phir <code>n, n+1, n+2…</code> count karo. Har number ek hi baar visit → O(n).
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-desc" id="stepDesc">Press "Next Step". We only start counting from numbers that begin a run (no n−1 in the set).</div>
+    </div>
+
+    <div>
+      <div class="section-label">Input array <code style="color:var(--muted);font-size:0.72rem">[100, 4, 200, 1, 3, 2]</code></div>
+      <div class="arr-row" id="arrRow"></div>
+    </div>
+
+    <div>
+      <div class="section-label">num_set &nbsp;<span style="color:var(--muted);font-size:0.72rem">(O(1) membership)</span></div>
+      <div class="set-area" id="setArea"></div>
+    </div>
+
+    <div class="status">
+      <div class="pill cur"  id="curPill">current run: —</div>
+      <div class="pill best" id="bestPill">longest = 0</div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next Step</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Dump everything into a set, then only extend runs <strong>from their start</strong>
+        (a number whose <code>n−1</code> is absent). That boundary check is what keeps each
+        element visited once, turning a naive O(n²) into a clean <strong>O(n)</strong>.
+      </p>
+    </div>
+  </div>
+
+<script>
+const nums = [100, 4, 200, 1, 3, 2];
+const numSet = new Set(nums);
+const $ = id => document.getElementById(id);
+
+// Build steps. We iterate over the array in order for visual clarity.
+// For each number: a "check start" step, and if it's a start, "walk" steps.
+function buildSteps() {
+  const steps = [];
+  let longest = 0;
+  // iterate unique values in array order
+  const seenIter = new Set();
+  for (const n of nums) {
+    if (seenIter.has(n)) continue;
+    seenIter.add(n);
+    const isStart = !numSet.has(n - 1);
+    if (!isStart) {
+      steps.push({
+        kind: 'notstart', n, longest,
+        desc: `Look at <strong>${n}</strong>: is <strong>${n - 1}</strong> in the set? <strong style="color:#86efac">Yes</strong> → ${n} is NOT a run-start (some earlier number will count it). Skip — no work done here.`
+      });
+      continue;
+    }
+    // it's a start: walk forward
+    let length = 1;
+    const probes = [];                 // record each n+length probe
+    while (numSet.has(n + length)) { probes.push(n + length); length++; }
+    longest = Math.max(longest, length);
+    steps.push({
+      kind: 'start', n, length, probes, longest, runEnd: n + length - 1,
+      desc: `Look at <strong>${n}</strong>: is <strong>${n - 1}</strong> in the set? <strong style="color:#fca5a5">No</strong> → ${n} IS a run-start. ` +
+            `Walk forward counting ${[n, ...probes].join(', ')} → length <strong>${length}</strong>. longest = ${longest}.`
+    });
+  }
+  return steps;
+}
+
+const steps = buildSteps();
+let step = 0;
+
+function renderArr(stateMap) {
+  // stateMap: value -> class
+  $('arrRow').innerHTML = nums.map(v => {
+    const cls = (stateMap && stateMap[v]) ? ' ' + stateMap[v] : '';
+    return `<div class="acell${cls}">${v}</div>`;
+  }).join('');
+}
+
+function renderSet(probeMap) {
+  // probeMap: value -> 'probe'|'hit'|'miss'
+  $('setArea').innerHTML = [...numSet].map(v => {
+    const cls = (probeMap && probeMap[v]) ? ' ' + probeMap[v] : '';
+    return `<div class="schip${cls}">${v}</div>`;
+  }).join('');
+}
+
+function reset() {
+  step = 0;
+  renderArr({});
+  renderSet({});
+  $('curPill').textContent = 'current run: —';
+  $('curPill').className = 'pill cur';
+  $('bestPill').textContent = 'longest = 0';
+  $('stepDesc').className = 'step-desc';
+  $('stepDesc').innerHTML = 'Press "Next Step". We only start counting from numbers that begin a run (no n−1 in the set).';
+  $('nextBtn').disabled = false;
+  $('stepCounter').textContent = `Step 0 / ${steps.length}`;
+}
+
+let bestRunValues = [];   // remember best run to keep it highlighted at the end
+
+function advance() {
+  if (step >= steps.length) return;
+  const st = steps[step];
+
+  if (st.kind === 'notstart') {
+    const sm = { [st.n]: 'notstart' };
+    renderArr(sm);
+    renderSet({});
+    $('stepDesc').className = 'step-desc notstart';
+    $('stepDesc').innerHTML = st.desc;
+    $('curPill').textContent = `current run: — (${st.n} is mid-run)`;
+  } else {
+    // highlight the start + the whole run in array, and probes in set
+    const runVals = [st.n, ...st.probes];
+    const sm = {};
+    sm[st.n] = 'runstart';
+    st.probes.forEach(v => { if (nums.includes(v)) sm[v] = 'inrun'; });
+    renderArr(sm);
+    const pm = { [st.n]: 'probe' };
+    st.probes.forEach(v => pm[v] = 'hit');
+    pm[st.runEnd + 1] = numSet.has(st.runEnd + 1) ? 'hit' : 'miss';  // the failing probe (if in set, won't be miss)
+    // The failing probe value may not exist in the set; mark conceptually — only show misses that ARE keys.
+    Object.keys(pm).forEach(k => { if (!numSet.has(Number(k))) delete pm[k]; });
+    renderSet(pm);
+    $('stepDesc').className = 'step-desc start';
+    $('stepDesc').innerHTML = st.desc;
+    $('curPill').textContent = `current run: [${runVals.join(', ')}] · len ${st.length}`;
+    if (st.length >= (bestRunValues.length || 0)) bestRunValues = runVals;
+  }
+
+  $('bestPill').textContent = `longest = ${st.longest}`;
+
+  step++;
+  $('stepCounter').textContent = `Step ${step} / ${steps.length}`;
+
+  if (step >= steps.length) {
+    // final: highlight the best run
+    const sm = {};
+    bestRunValues.forEach(v => { if (nums.includes(v)) sm[v] = 'done-best'; });
+    renderArr(sm);
+    $('stepDesc').className = 'step-desc done';
+    $('stepDesc').innerHTML = `Done! Longest consecutive run is <strong>[${bestRunValues.join(', ')}]</strong> with length <strong>${steps[steps.length-1].longest}</strong>. ` +
+      `Notice only run-starts triggered the inner walk — every number was touched once.`;
+    $('nextBtn').disabled = true;
+  }
+}
+
+reset();
+</script>
+</body>
+</html>

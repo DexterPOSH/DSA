@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plus One — Carry Propagation Visualized</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 1.85rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 7px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .stage {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 24px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+
+  /* odometer selector */
+  .examples { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 22px; }
+  .ex-btn {
+    background: var(--panel2); color: var(--text);
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    font-family: "SF Mono", Menlo, monospace; font-size: .92rem;
+    transition: all .2s;
+  }
+  .ex-btn:hover { background: #34345e; }
+  .ex-btn.sel { border-color: var(--blue); background: rgba(59,130,246,0.18); color: #bcd4ff; }
+
+  .digits { display: flex; gap: 10px; align-items: center; justify-content: center;
+            margin: 10px 0 6px; min-height: 90px; flex-wrap: wrap; }
+  .digit {
+    width: 60px; height: 76px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.1rem; font-weight: 700;
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--panel2);
+    border: 2px solid rgba(255,255,255,0.10);
+    position: relative;
+    transition: all .35s ease;
+  }
+  .digit.active { border-color: var(--amber); background: rgba(245,158,11,0.16);
+                  color: #ffd479; box-shadow: 0 0 0 3px rgba(245,158,11,0.25); }
+  .digit.done   { border-color: var(--green); background: rgba(16,185,129,0.14); color: #b6f0d8; }
+  .digit.carry  { border-color: var(--red); background: rgba(239,68,68,0.14); color: #ffb3b3; }
+  .digit.fresh  { border-color: var(--blue); background: rgba(59,130,246,0.18); color: #bcd4ff; }
+  .digit .place { position: absolute; bottom: -22px; left: 0; right: 0;
+                  font-size: .68rem; color: var(--muted); font-family: 'Segoe UI', sans-serif; }
+  .digit .carry-tag {
+    position: absolute; top: -26px; left: 50%; transform: translateX(-50%);
+    font-size: .72rem; color: var(--red); white-space: nowrap; opacity: 0;
+    transition: opacity .3s;
+  }
+  .digit.carry .carry-tag { opacity: 1; }
+
+  .caption {
+    margin: 30px 0 6px;
+    background: var(--panel2);
+    border-left: 4px solid var(--blue);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 1rem;
+    min-height: 58px;
+  }
+  .caption.win { border-left-color: var(--green); background: rgba(16,185,129,0.10); }
+  .caption b.amb { color: var(--amber); }
+  .caption b.grn { color: var(--green); }
+  .caption b.red { color: var(--red); }
+
+  .controls { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  button.nav {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button.nav:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button.nav:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); }
+  button.ghost:hover:not(:disabled) { background: #34345e; }
+  .counter { margin-left: auto; color: var(--muted); font-family: "SF Mono", Menlo, monospace; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-top: 30px;
+    text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Plus One — <span>carry</span> travels right to left</h1>
+  <p class="subtitle">Increment a number stored as a digit array, handling the carry exactly like an odometer.</p>
+
+  <div class="analogy">
+    <h3>🚗 Odometer analogy</h3>
+    <p>Ones place se shuru karo. Digit <code>&lt; 9</code> hai? Bas <b>+1</b>, done. Digit <code>9</code> hai? Wo <b>0</b> ban jaata hai aur carry <b>left</b> chala jaata hai. Saare 9 the? Carry bahar nikalta hai → naya leading <code>1</code> (<code>999 → 1000</code>).</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> Given digits (MSB first) representing a number, return the digits of <code>number + 1</code>.
+    <span class="arrow">→</span> e.g. <code>[1,2,9]</code> → <code>[1,3,0]</code>
+  </div>
+
+  <div class="stage">
+    <div class="examples" id="examples"></div>
+    <div class="digits" id="digits"></div>
+    <div class="caption" id="caption">Press <b>Next ▸</b> to start incrementing.</div>
+    <div class="controls">
+      <button class="nav ghost" id="prevBtn" onclick="prev()">◂ Prev</button>
+      <button class="nav" id="nextBtn" onclick="next()">Next ▸</button>
+      <button class="nav ghost" id="resetBtn" onclick="resetEx()">↺ Reset</button>
+      <span class="counter" id="counter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Increment is just grade-school addition on an array: walk right-to-left, stop at the first non-9, and only the all-9s case grows the array by one new leading digit.</p>
+  </div>
+</div>
+
+<script>
+const EXAMPLES = {
+  "[1,2,3]": [1,2,3],
+  "[1,2,9]": [1,2,9],
+  "[9,9,9]": [9,9,9],
+  "[5,9,9]": [5,9,9],
+};
+const PLACES = ['ones','tens','hundreds','thousands','ten-thousands'];
+
+let digits = [];
+let steps = [];
+let cur = 0;
+
+// Build the discrete steps for a given starting array.
+function buildSteps(start) {
+  const d = start.slice();
+  const s = [];
+  // initial snapshot
+  s.push({ arr: d.slice(), active: -1, status: 'start', prepend: false,
+    cap: `Start with <code>[${d.join(',')}]</code> = the number <b>${Number(d.join(''))}</b>. We add 1, beginning at the <b class="amb">ones</b> place (rightmost).` });
+
+  let i = d.length - 1;
+  let grew = false;
+  while (i >= 0) {
+    if (d[i] < 9) {
+      const before = d[i];
+      d[i] += 1;
+      s.push({ arr: d.slice(), active: i, status: 'done', prepend: false,
+        cap: `Digit at index ${i} is <code>${before}</code> &lt; 9 → just <b class="grn">+1</b> = <code>${d[i]}</code>. No carry, so we <b class="grn">stop</b> here. ✅` });
+      i = -1; // done
+      break;
+    } else {
+      d[i] = 0;
+      s.push({ arr: d.slice(), active: i, status: 'carry', prepend: false,
+        cap: `Digit at index ${i} is <code>9</code> → becomes <code>0</code> and a <b class="red">carry</b> moves left. Keep going.` });
+      i--;
+      if (i < 0) grew = true;
+    }
+  }
+  if (grew) {
+    const grown = [1, ...d];
+    s.push({ arr: grown.slice(), active: 0, status: 'grow', prepend: true,
+      cap: `All digits were 9 — the carry fell off the front, so we <b class="grn">prepend a new <code>1</code></b>. Result <code>[${grown.join(',')}]</code> grew by one digit. ✅` });
+  }
+  return s;
+}
+
+function renderExamples(selKey) {
+  const el = document.getElementById('examples');
+  el.innerHTML = Object.keys(EXAMPLES).map(k =>
+    `<button class="ex-btn ${k===selKey?'sel':''}" data-k="${k}">${k}</button>`).join('');
+  el.querySelectorAll('.ex-btn').forEach(b =>
+    b.addEventListener('click', () => loadExample(b.dataset.k)));
+}
+
+function loadExample(key) {
+  digits = EXAMPLES[key].slice();
+  steps = buildSteps(digits);
+  cur = 0;
+  renderExamples(key);
+  render();
+}
+
+function resetEx() { cur = 0; render(); }
+
+function render() {
+  const step = steps[cur];
+  const arr = step.arr;
+  const dEl = document.getElementById('digits');
+  const n = arr.length;
+  dEl.innerHTML = arr.map((v, idx) => {
+    let cls = '';
+    if (step.active === idx) {
+      cls = step.status === 'done' ? 'done'
+          : step.status === 'carry' ? 'carry'
+          : step.status === 'grow' ? 'fresh' : 'active';
+    }
+    const placeName = PLACES[n - 1 - idx] || '';
+    const carryTag = (step.status === 'carry' && step.active === idx) ? '<span class="carry-tag">↰ carry left</span>' : '';
+    return `<div class="digit ${cls}">${carryTag}${v}<span class="place">${placeName}</span></div>`;
+  }).join('');
+
+  const cap = document.getElementById('caption');
+  cap.innerHTML = step.cap;
+  cap.className = 'caption' + ((step.status === 'done' || step.status === 'grow') ? ' win' : '');
+
+  document.getElementById('counter').textContent = `Step ${cur} / ${steps.length - 1}`;
+  document.getElementById('prevBtn').disabled = cur === 0;
+  document.getElementById('nextBtn').disabled = cur === steps.length - 1;
+}
+
+function next() { if (cur < steps.length - 1) { cur++; render(); } }
+function prev() { if (cur > 0) { cur--; render(); } }
+
+loadExample("[1,2,9]");
+</script>
+</body>
+</html>

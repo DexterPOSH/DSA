@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maximum Subarray — Kadane's Running Total Visualized</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.85rem; margin: 0 0 6px; font-weight: 700; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.08));
+    border: 1px solid rgba(245,158,11,0.35);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 22px;
+    margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1rem; }
+  .analogy p { margin: 0; }
+
+  .card {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 22px 24px 26px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; }
+  .step-desc {
+    background: var(--panel2);
+    border-left: 4px solid var(--blue);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-height: 58px;
+    font-size: 1.02rem;
+    margin-bottom: 22px;
+  }
+  .step-desc code { background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 5px; color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .array-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 4px; }
+  .cell {
+    position: relative;
+    min-width: 50px; height: 54px;
+    border-radius: 9px;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 1.05rem;
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--panel2);
+    border: 2px solid rgba(255,255,255,0.08);
+    transition: all .3s ease;
+  }
+  .cell .idx { position: absolute; top: -18px; font-size: 0.7rem; color: #5a6a90; font-weight: 400; }
+  .cell.current { border-color: var(--amber); background: rgba(245,158,11,0.18); box-shadow: 0 0 0 3px rgba(245,158,11,0.25); transform: translateY(-3px); }
+  .cell.inwin   { border-color: var(--blue); background: rgba(59,130,246,0.18); color: #bcd4ff; }
+  .cell.best    { border-color: var(--green); background: rgba(16,185,129,0.20); color: #b6f0d8; }
+  .cell.done    { opacity: 0.55; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 26px; }
+  .stat {
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 14px 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all .3s ease;
+  }
+  .stat h4 { margin: 0 0 4px; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+  .stat .big { font-family: "SF Mono", Menlo, monospace; font-size: 1.7rem; font-weight: 700; }
+  .stat.cur { border-color: var(--amber); }
+  .stat.cur .big { color: var(--amber); }
+  .stat.best { border-color: var(--green); }
+  .stat.best .big { color: var(--green); }
+  .stat .note { font-size: 0.82rem; color: var(--muted); margin-top: 4px; min-height: 18px; }
+
+  .decision {
+    margin-top: 22px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 0.95rem;
+    border: 1px dashed rgba(255,255,255,0.14);
+    min-height: 50px;
+  }
+  .decision .reset { color: var(--red); font-weight: 700; }
+  .decision .extend { color: var(--blue); font-weight: 700; }
+
+  .controls { display: flex; align-items: center; gap: 12px; margin-top: 26px; flex-wrap: wrap; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 24px; border-radius: 10px;
+    font-size: 0.98rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .counter { margin-left: auto; color: var(--muted); font-family: "SF Mono", Menlo, monospace; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin-top: 28px;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; }
+
+  .code-block {
+    background: #11111f; border-radius: 10px; padding: 16px 18px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.9rem;
+    line-height: 1.7; margin-top: 22px; overflow-x: auto; white-space: pre;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .kw { color: #c678dd; } .fn { color: #61afef; } .cm { color: #5a6a90; } .num { color: #d19a66; }
+  @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Maximum Subarray — <span>Kadane's</span> running total</h1>
+  <p class="subtitle">Walk the array once, keeping a <b>cur</b> running sum and the <b>best</b> ever seen.</p>
+
+  <div class="analogy">
+    <h3>🚗 Real-world analogy: the road-trip profit</h3>
+    <p>Har stretch pe paisa kamao (+) ya kharch karo (−). Ek <b>running profit</b> rakho — jaise hi wo negative ho jaaye, use carry mat karo, <b>wahin se fresh start</b> lo. Saath me ab tak ka <b>best profit</b> diary me note karte raho.</p>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Step description</div>
+    <div class="step-desc" id="stepDesc">Press <b>Next</b> to start. We seed <code>cur = best = nums[0]</code>, then scan left to right.</div>
+
+    <div class="section-label">Input array &nbsp;<code style="color:#5a6a90;font-size:0.75rem;font-family:monospace">[-2, 1, -3, 4, -1, 2, 1, -5, 4]</code></div>
+    <div class="array-row" id="arrayRow"></div>
+
+    <div class="stats">
+      <div class="stat cur" id="statCur">
+        <h4>cur &nbsp;<span style="font-weight:400">(best subarray ending here)</span></h4>
+        <div class="big" id="curVal">—</div>
+        <div class="note" id="curNote"></div>
+      </div>
+      <div class="stat best" id="statBest">
+        <h4>best &nbsp;<span style="font-weight:400">(overall maximum)</span></h4>
+        <div class="big" id="bestVal">—</div>
+        <div class="note" id="bestNote"></div>
+      </div>
+    </div>
+
+    <div class="decision" id="decision">The greedy decision at each step: <span class="extend">cur + x</span> vs starting fresh at <span class="reset">x</span> — take the bigger.</div>
+
+    <div class="controls">
+      <button class="ghost" id="prevBtn" onclick="prev()">◀ Prev</button>
+      <button id="nextBtn" onclick="next()">Next ▶</button>
+      <button class="ghost" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="counter" id="counter">Step 0 / 9</span>
+    </div>
+  </div>
+
+  <div class="code-block"><span class="kw">def</span> <span class="fn">max_subarray</span>(nums):
+    cur = best = nums[<span class="num">0</span>]
+    <span class="kw">for</span> x <span class="kw">in</span> nums[<span class="num">1</span>:]:
+        cur  = <span class="fn">max</span>(x, cur + x)   <span class="cm"># extend or fresh-start (greedy)</span>
+        best = <span class="fn">max</span>(best, cur)   <span class="cm"># track overall max</span>
+    <span class="kw">return</span> best</div>
+
+  <div class="takeaway">
+    <h3>💡 Key takeaway</h3>
+    <p>A negative running prefix can only hurt future sums — so the moment <code>cur</code> would do better restarting at <b>x</b> alone, restart. One O(n) pass, O(1) space, and <code>best</code> captures any subarray that peaks mid-stream.</p>
+  </div>
+</div>
+
+<script>
+const nums = [-2, 1, -3, 4, -1, 2, 1, -5, 4];
+
+// Precompute the trace. Each step i (0..n-1) represents processing nums[i].
+// At i=0 we seed cur=best=nums[0]. For i>=1 we apply Kadane's.
+const trace = [];
+{
+  let cur = nums[0], best = nums[0];
+  let winStart = 0, winEnd = 0;      // current cur-subarray window
+  let bestStart = 0, bestEnd = 0;    // best-subarray window
+  trace.push({
+    i: 0, cur, best, winStart, winEnd, bestStart, bestEnd,
+    decision: 'seed',
+    desc: `Seed: <code>cur = best = nums[0] = -2</code>. The running subarray is just <code>[-2]</code>.`
+  });
+  for (let i = 1; i < nums.length; i++) {
+    const x = nums[i];
+    let decision;
+    if (cur + x >= x) {            // extend
+      cur = cur + x;
+      winEnd = i;
+      decision = 'extend';
+    } else {                       // fresh start
+      cur = x;
+      winStart = i; winEnd = i;
+      decision = 'reset';
+    }
+    let bestUpdated = false;
+    if (cur > best) {
+      best = cur; bestStart = winStart; bestEnd = winEnd; bestUpdated = true;
+    }
+    const desc = decision === 'extend'
+      ? `<code>nums[${i}] = ${x}</code>: <b>extend</b> — <code>cur+x = ${cur} ≥ ${x}</code>, so keep the running subarray. ${bestUpdated ? `New <b>best = ${best}</b>! ✅` : `best stays <b>${best}</b>.`}`
+      : `<code>nums[${i}] = ${x}</code>: <b>fresh start</b> — old <code>cur</code> was a drag (<code>cur+x &lt; ${x}</code>), so drop it and restart at ${x}. ${bestUpdated ? `New <b>best = ${best}</b>! ✅` : `best stays <b>${best}</b>.`}`;
+    trace.push({ i, cur, best, winStart, winEnd, bestStart, bestEnd, decision, desc, bestUpdated });
+  }
+}
+
+const $ = id => document.getElementById(id);
+let step = -1; // -1 = nothing processed yet
+const TOTAL = trace.length;
+
+function buildArray() {
+  $('arrayRow').innerHTML = nums.map((v, i) =>
+    `<div class="cell" id="c${i}"><span class="idx">i=${i}</span>${v}</div>`).join('');
+}
+
+function render() {
+  $('counter').textContent = `Step ${step + 1} / ${TOTAL}`;
+  $('prevBtn').disabled = step < 0;
+  $('nextBtn').disabled = step >= TOTAL - 1;
+
+  // clear cells
+  nums.forEach((_, i) => { $('c'+i).className = 'cell'; });
+
+  if (step < 0) {
+    $('stepDesc').innerHTML = 'Press <b>Next</b> to start. We seed <code>cur = best = nums[0]</code>, then scan left to right.';
+    $('curVal').textContent = '—'; $('bestVal').textContent = '—';
+    $('curNote').textContent = ''; $('bestNote').textContent = '';
+    $('decision').innerHTML = 'The greedy decision at each step: <span class="extend">cur + x</span> vs starting fresh at <span class="reset">x</span> — take the bigger.';
+    return;
+  }
+
+  const s = trace[step];
+  $('stepDesc').innerHTML = s.desc;
+  $('curVal').textContent = s.cur;
+  $('bestVal').textContent = s.best;
+  $('curNote').textContent = `window = nums[${s.winStart}..${s.winEnd}]`;
+  $('bestNote').textContent = `window = nums[${s.bestStart}..${s.bestEnd}]`;
+
+  // color: best window (green) underneath, current window (blue), current index (amber on top)
+  for (let i = s.bestStart; i <= s.bestEnd; i++) $('c'+i).classList.add('best');
+  for (let i = s.winStart; i <= s.winEnd; i++) {
+    const el = $('c'+i);
+    if (!el.classList.contains('best')) el.classList.add('inwin');
+  }
+  // dim future cells
+  for (let i = s.i + 1; i < nums.length; i++) $('c'+i).classList.add('done');
+  $('c'+s.i).classList.add('current');
+
+  // decision banner
+  if (s.decision === 'seed') {
+    $('decision').innerHTML = 'Initialize — no decision yet. <code>cur = best = -2</code>.';
+  } else if (s.decision === 'extend') {
+    $('decision').innerHTML = `<span class="extend">EXTEND</span>: cur + x ≥ x → attach <code>nums[${s.i}]</code> to the running subarray. cur = <b>${s.cur}</b>.`;
+  } else {
+    $('decision').innerHTML = `<span class="reset">FRESH START</span>: the old prefix was negative baggage → restart at <code>nums[${s.i}] = ${nums[s.i]}</code>. cur = <b>${s.cur}</b>.`;
+  }
+}
+
+function next() { if (step < TOTAL - 1) { step++; render(); } }
+function prev() { if (step >= 0) { step--; render(); } }
+function reset() { step = -1; render(); }
+
+buildArray();
+render();
+</script>
+</body>
+</html>

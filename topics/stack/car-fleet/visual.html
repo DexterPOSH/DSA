@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Car Fleet — Right-to-Left Stack Walkthrough</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --border: #2d3a5a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6; padding: 36px 20px 70px;
+    display: flex; flex-direction: column; align-items: center; gap: 28px;
+  }
+  h1 { font-size: 1.7rem; text-align: center; }
+  h1 span { color: var(--amber); }
+  .wrap { width: 100%; max-width: 780px; display: flex; flex-direction: column; gap: 26px; }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--amber);
+    border-left: 5px solid var(--amber); border-radius: 12px;
+    padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start;
+  }
+  .analogy .icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px;
+  }
+  .analogy p { color: #c8c8e0; font-size: 0.97rem; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; padding: 26px 28px 30px;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+
+  .step-desc {
+    min-height: 64px; background: var(--panel2); border-radius: 8px;
+    padding: 14px 18px; font-size: 0.95rem; color: #c8c8e0;
+    border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-desc.newfleet { border-color: var(--green); }
+  .step-desc.merge { border-color: var(--amber); }
+  .step-desc code { color: #ffd479; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+  .section-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+
+  /* the road */
+  .road {
+    position: relative;
+    height: 96px;
+    background: repeating-linear-gradient(90deg, #11182b 0 30px, #0c1322 30px 60px);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-top: 6px;
+  }
+  .lane-line {
+    position: absolute; left: 0; right: 0; top: 50%;
+    border-top: 2px dashed #2d3a5a;
+  }
+  .target-flag {
+    position: absolute; right: -2px; top: -8px; bottom: -8px;
+    width: 4px; background: var(--green);
+    box-shadow: 0 0 10px var(--green);
+  }
+  .target-label {
+    position: absolute; right: 0; top: -26px; font-size: 0.72rem;
+    color: var(--green); font-family: 'SF Mono', Menlo, monospace; font-weight: 700;
+  }
+  .car {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 46px; height: 34px; border-radius: 7px;
+    background: #243456; border: 2px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-weight: 700; color: #cdd7f0;
+    transition: left 0.5s ease, all 0.35s ease;
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+  .car .pos { font-size: 0.6rem; color: #8a9ac0; }
+  .car.current { border-color: var(--blue); background: #1e3a6e; box-shadow: 0 0 16px rgba(59,130,246,0.5); z-index: 3; }
+  .car.leader { border-color: var(--green); background: #0d2a1a; color: #86efac; z-index: 2; }
+  .car.merged { border-color: var(--amber); background: #3a2e10; color: #ffd479; opacity: 0.85; }
+
+  /* time table */
+  .timesrow { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tcell {
+    border-radius: 8px; padding: 8px 12px; min-width: 92px;
+    background: var(--panel2); border: 1.5px solid var(--border);
+    font-family: 'SF Mono', Menlo, monospace; font-size: 0.82rem;
+    transition: all 0.3s;
+  }
+  .tcell .car-id { color: #cdd7f0; font-weight: 700; }
+  .tcell .time { color: var(--amber); }
+  .tcell.current { border-color: var(--blue); background: #1e3a6e; }
+  .tcell.leader { border-color: var(--green); background: #0d2a1a; }
+  .tcell.merged { border-color: var(--amber); opacity: 0.7; }
+
+  .grid2 { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
+  @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .stack-area {
+    background: var(--panel2); border: 1px dashed var(--border);
+    border-radius: 10px; padding: 14px; min-height: 130px;
+    display: flex; flex-direction: column-reverse; gap: 8px; justify-content: flex-start;
+  }
+  .stack-hint { font-size: 0.82rem; color: #3a4a6a; font-style: italic; text-align: center; margin: auto; }
+  .schip {
+    border-radius: 8px; padding: 8px 12px;
+    background: #0d2a1a; border: 1.5px solid var(--green); color: #86efac;
+    font-size: 0.85rem; font-weight: 700; font-family: 'SF Mono', Menlo, monospace;
+    display: flex; justify-content: space-between; gap: 10px;
+    animation: popin 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes popin { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .fleet-count {
+    text-align: center; font-size: 1.05rem; font-weight: 700; color: var(--green);
+    font-family: 'SF Mono', Menlo, monospace; margin-top: 6px;
+  }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.93rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid var(--border); }
+  .btn-secondary:hover { background: #263248; }
+  .counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; font-family: 'SF Mono', Menlo, monospace; }
+
+  .takeaway {
+    background: var(--panel); border: 1px solid var(--border);
+    border-left: 5px solid var(--blue); border-radius: 12px;
+    padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start;
+  }
+  .takeaway .icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway .label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.95rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+</style>
+</head>
+<body>
+  <h1>Car Fleet &mdash; <span>Right-to-Left</span> Stack Walkthrough</h1>
+
+  <div class="wrap">
+    <div class="analogy">
+      <div class="icon">🚗</div>
+      <div>
+        <div class="label">Real-world analogy</div>
+        <p>Single lane, no overtaking. Process cars from the one <strong>closest to the target</strong> backwards.
+        A car that would arrive <em>sooner</em> than the fleet ahead catches up and <strong>merges</strong>.
+        A car that's <em>slower</em> can never catch up → it starts a <strong>new fleet</strong> and becomes the new leader.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div>
+        <div class="section-label">Step description</div>
+        <div class="step-desc" id="stepDesc">Press <strong>Next</strong>. Each car's lone arrival time = <code>(target − position) / speed</code>. We sort by position (closest first) and scan.</div>
+      </div>
+
+      <div>
+        <div class="section-label">Road &nbsp;<code style="color:#5a6a90;font-size:0.75rem">target = 12</code></div>
+        <div class="road" id="road">
+          <div class="lane-line"></div>
+          <div class="target-flag"></div>
+          <div class="target-label">🏁 target=12</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Arrival times &nbsp;<span style="color:#5a6a90;font-size:0.72rem">(sorted: closest to target first)</span></div>
+        <div class="timesrow" id="timesRow"></div>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <div class="section-label">Fleet leaders &nbsp;<span style="color:#5a6a90;font-size:0.72rem">(stack of arrival times)</span></div>
+          <div class="stack-area" id="stackArea"><span class="stack-hint">empty</span></div>
+          <div class="fleet-count" id="fleetCount">fleets = 0</div>
+        </div>
+        <div>
+          <div class="section-label">Why merge / new?</div>
+          <div class="step-desc" id="ruleBox" style="min-height:130px">A car merges if its time <code>≤</code> the current leader's time (it catches up). Otherwise it's slower → new fleet.</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-secondary" id="prevBtn" onclick="prev()">◀ Prev</button>
+        <button class="btn btn-primary" id="nextBtn" onclick="next()">Next ▶</button>
+        <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+        <span class="counter" id="counter">Step 0 / 0</span>
+      </div>
+    </div>
+
+    <div class="takeaway">
+      <div class="icon">💡</div>
+      <div>
+        <div class="label">Key takeaway</div>
+        <p>Sort cars by position (closest to target first) and scan once. A car only starts a
+        <strong>new fleet</strong> when its lone arrival time is <strong>strictly greater</strong> than the
+        current leader's — it can't catch up. <strong>O(n log n)</strong> total, dominated by the sort.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+const target = 12;
+const rawPos = [10, 8, 0, 5, 3];
+const rawSpd = [ 2, 4, 1, 1, 3];
+
+// pair + sort by position descending (closest to target first)
+const cars = rawPos.map((p, i) => ({ pos: p, spd: rawSpd[i] }))
+                   .sort((a, b) => b.pos - a.pos)
+                   .map(c => ({ ...c, time: +((target - c.pos) / c.spd).toFixed(2) }));
+const N = cars.length;
+
+// ── Precompute steps ──────────────────────────────────────────────────────
+function buildSteps() {
+  const steps = [];
+  const stack = []; // arrival times of fleet leaders
+  steps.push({
+    i: -1, stack: [], leaders: [], merged: [], kind: 'init',
+    desc: 'Computed each car\'s lone arrival time. Now scan from the car closest to the target backwards.',
+    rule: 'A car merges if its time ≤ leader\'s time (catches up). Else it\'s a new, slower fleet.'
+  });
+
+  const leaders = []; // indices that became leaders
+  const merged = [];  // indices that merged
+
+  for (let i = 0; i < N; i++) {
+    const t = cars[i].time;
+    if (stack.length === 0 || t > stack[stack.length - 1]) {
+      stack.push(t);
+      leaders.push(i);
+      steps.push({
+        i, stack: stack.slice(), leaders: leaders.slice(), merged: merged.slice(), kind: 'newfleet',
+        desc: `Car @pos <code>${cars[i].pos}</code> arrives in <code>${t}</code>. ` +
+              (i === 0 ? 'First car — it leads the first fleet.' :
+               `That's <strong>greater</strong> than the leader (<code>${stack[stack.length-2]}</code>) → it can't catch up → <strong>new fleet</strong>.`),
+        rule: `time <code>${t}</code> ${i===0?'':'&gt; leader → '} <strong style="color:#10b981">NEW FLEET</strong>. This car is now the leader to beat.`
+      });
+    } else {
+      merged.push(i);
+      steps.push({
+        i, stack: stack.slice(), leaders: leaders.slice(), merged: merged.slice(), kind: 'merge',
+        desc: `Car @pos <code>${cars[i].pos}</code> arrives in <code>${t}</code>, which is <strong>≤</strong> the leader's <code>${stack[stack.length-1]}</code>. ` +
+              `It catches up before the target → <strong>merges</strong> into that fleet. Fleet count unchanged.`,
+        rule: `time <code>${t}</code> ≤ leader <code>${stack[stack.length-1]}</code> → <strong style="color:#f59e0b">MERGE</strong>. Leader stays the same.`
+      });
+    }
+  }
+
+  steps.push({
+    i: -1, stack: stack.slice(), leaders: leaders.slice(), merged: merged.slice(), kind: 'done',
+    desc: `Scan done. Number of fleet leaders on the stack = <strong>${stack.length}</strong> → answer is <code>${stack.length}</code>. ✅`,
+    rule: 'Each stack entry is one independent fleet. len(stack) is the answer.'
+  });
+  return steps;
+}
+
+const steps = buildSteps();
+let cur = 0;
+const $ = id => document.getElementById(id);
+
+// place cars on the road
+(function buildCars() {
+  const road = $('road');
+  cars.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'car';
+    el.id = 'car' + i;
+    const leftPct = (c.pos / target) * 100;
+    el.style.left = `calc(${leftPct}% )`;
+    el.innerHTML = `🚗<span class="pos">p${c.pos}/s${c.spd}</span>`;
+    road.appendChild(el);
+  });
+})();
+
+function render() {
+  const s = steps[cur];
+
+  // cars
+  cars.forEach((c, i) => {
+    const el = $('car' + i);
+    el.className = 'car';
+    if (s.leaders && s.leaders.includes(i)) el.classList.add('leader');
+    if (s.merged && s.merged.includes(i)) el.classList.add('merged');
+    if (i === s.i) el.classList.add('current');
+  });
+
+  // time cells
+  const tr = $('timesRow');
+  tr.innerHTML = '';
+  cars.forEach((c, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'tcell';
+    if (s.leaders && s.leaders.includes(i)) cell.classList.add('leader');
+    if (s.merged && s.merged.includes(i)) cell.classList.add('merged');
+    if (i === s.i) cell.classList.add('current');
+    cell.innerHTML = `<div class="car-id">pos ${c.pos}, spd ${c.spd}</div><div class="time">t = ${c.time}</div>`;
+    tr.appendChild(cell);
+  });
+
+  // stack
+  const sa = $('stackArea');
+  sa.innerHTML = '';
+  if (!s.stack.length) sa.innerHTML = '<span class="stack-hint">empty</span>';
+  else s.stack.forEach((t, idx) => {
+    const chip = document.createElement('div');
+    chip.className = 'schip';
+    chip.innerHTML = `<span>fleet ${idx + 1}</span><span>arrive ${t}</span>`;
+    sa.appendChild(chip);
+  });
+  $('fleetCount').textContent = `fleets = ${s.stack.length}`;
+
+  // desc + rule
+  const d = $('stepDesc');
+  d.className = 'step-desc' + (s.kind === 'newfleet' ? ' newfleet' : s.kind === 'merge' ? ' merge' : '');
+  d.innerHTML = s.desc;
+  $('ruleBox').innerHTML = s.rule;
+
+  $('counter').textContent = `Step ${cur} / ${steps.length - 1}`;
+  $('prevBtn').disabled = cur === 0;
+  $('nextBtn').disabled = cur === steps.length - 1;
+}
+
+function next() { if (cur < steps.length - 1) { cur++; render(); } }
+function prev() { if (cur > 0) { cur--; render(); } }
+function reset() { cur = 0; render(); }
+
+render();
+</script>
+</body>
+</html>

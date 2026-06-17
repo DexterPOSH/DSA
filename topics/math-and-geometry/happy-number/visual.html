@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Happy Number — Digit-Square-Sum &amp; Cycle Detection</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px 70px; gap: 26px; line-height: 1.5;
+  }
+  h1 { font-size: 1.65rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--green);
+    border-left: 5px solid var(--green); border-radius: 12px;
+    padding: 18px 24px; max-width: 760px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy .icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy .label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--green); margin-bottom: 4px;
+  }
+  .analogy p { color: #c0c0d0; font-size: 0.98rem; }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 760px; width: 100%;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+
+  .picker { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .picker .lbl { font-size: 0.8rem; color: var(--muted); }
+  .pick-btn {
+    font-size: 0.82rem; font-weight: 600; padding: 6px 14px; border-radius: 18px;
+    background: var(--panel2); border: 1px solid #2d3a5a; color: var(--muted); cursor: pointer;
+    transition: all 0.2s;
+  }
+  .pick-btn.active { background: #1e3a6e; border-color: var(--blue); color: #bcd4ff; }
+
+  .step-desc {
+    min-height: 54px; background: var(--panel2); border-radius: 8px;
+    padding: 14px 18px; font-size: 0.94rem; color: #c8c8e0;
+    border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-desc.happy { border-color: var(--green); }
+  .step-desc.cycle { border-color: var(--red); }
+  .step-desc code { color: #ffd479; font-family: 'Consolas', monospace; }
+
+  .section-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+
+  /* digit breakdown */
+  .digits { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; min-height: 60px; }
+  .digit-box {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  .digit {
+    width: 46px; height: 46px; border-radius: 9px; border: 2px solid var(--amber);
+    background: #3a2a0a; color: #fcd34d; display: flex; align-items: center;
+    justify-content: center; font-size: 1.4rem; font-weight: 700;
+    animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .digit-sq { font-size: 0.72rem; color: var(--muted); font-family: 'Consolas', monospace; }
+  .plus, .eq { font-size: 1.2rem; color: var(--muted); }
+  .sum-result {
+    width: 56px; height: 56px; border-radius: 10px; border: 2px solid var(--blue);
+    background: #1e3a6e; color: #93c5fd; display: flex; align-items: center;
+    justify-content: center; font-size: 1.5rem; font-weight: 700;
+    box-shadow: 0 0 16px rgba(59,130,246,0.4);
+    animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes pop { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+  /* sequence chain */
+  .chain { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; min-height: 58px; }
+  .node {
+    min-width: 50px; height: 50px; padding: 0 10px; border-radius: 10px;
+    border: 2px solid #2d3a5a; background: var(--panel2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; font-weight: 700; color: var(--text);
+    transition: all 0.35s ease;
+  }
+  .node.current {
+    border-color: var(--amber); background: #3a2a0a; color: #fcd34d;
+    box-shadow: 0 0 16px rgba(245,158,11,0.5); transform: scale(1.08);
+  }
+  .node.seen { border-color: var(--blue); background: #14254a; color: #93c5fd; }
+  .node.one { border-color: var(--green); background: #0d2a1a; color: #86efac;
+    box-shadow: 0 0 16px rgba(16,185,129,0.5); }
+  .node.repeat { border-color: var(--red); background: #2a0d0d; color: #fca5a5;
+    box-shadow: 0 0 16px rgba(239,68,68,0.5); }
+  .arrow { color: var(--muted); font-size: 1.1rem; }
+
+  /* seen set */
+  .set-area {
+    min-height: 56px; background: var(--panel2); border: 1px dashed #2d3a5a;
+    border-radius: 10px; padding: 12px; display: flex; flex-wrap: wrap; gap: 8px;
+    align-items: center;
+  }
+  .set-hint { font-size: 0.85rem; color: #3a4a6a; font-style: italic; }
+  .chip {
+    height: 34px; min-width: 34px; padding: 0 10px; border-radius: 8px;
+    background: #14254a; border: 1.5px solid var(--blue); color: #93c5fd;
+    font-size: 0.95rem; font-weight: 700; display: flex; align-items: center;
+    justify-content: center; font-family: 'Consolas', monospace;
+    animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .chip.hit { background: #2a0d0d; border-color: var(--red); color: #fca5a5; }
+
+  .result-badge {
+    display: none; align-items: center; gap: 12px; padding: 14px 20px;
+    border-radius: 10px; font-weight: 600;
+  }
+  .result-badge.show { display: flex; }
+  .result-badge.happy { background: #0d2a1a; border: 1.5px solid var(--green); color: #86efac; }
+  .result-badge.unhappy { background: #2a0d0d; border: 1.5px solid var(--red); color: #fca5a5; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.82rem; color: var(--muted); margin-left: auto; }
+
+  .takeaway {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 12px;
+    padding: 18px 24px; max-width: 760px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway .icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway .label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.93rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+  <h1>Happy Number &mdash; <span>Digit-Square-Sum &amp; Cycle Detection</span></h1>
+
+  <div class="analogy">
+    <div class="icon">🛣️</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>Har number ek chauraaha hai jiska rule batata hai agla kahaan jaana (digit-square-sum).
+      Ya tum manzil <strong>1</strong> pe pahunch jaate ho (happy), ya ek <strong>roundabout
+      me phans</strong> jaate ho jahaan pehle dekha number dobara aata hai (cycle &rarr; not happy).</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="picker">
+      <span class="lbl">Try:</span>
+      <button class="pick-btn active" data-n="19">n = 19 (happy)</button>
+      <button class="pick-btn" data-n="2">n = 2 (unhappy)</button>
+    </div>
+
+    <div class="step-desc" id="stepDesc">Press &quot;Next Step&quot;. We repeatedly replace n with the sum of squares of its digits, tracking seen values to catch a cycle.</div>
+
+    <div>
+      <div class="section-label">Current step &mdash; sum of squared digits</div>
+      <div class="digits" id="digits"></div>
+    </div>
+
+    <div>
+      <div class="section-label">Sequence so far</div>
+      <div class="chain" id="chain"></div>
+    </div>
+
+    <div>
+      <div class="section-label">seen &mdash; numbers we've already produced</div>
+      <div class="set-area" id="setArea"><span class="set-hint" id="setHint">empty</span></div>
+    </div>
+
+    <div class="result-badge" id="resultBadge"><span id="resIcon"></span><span id="resText"></span></div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn">Reset</button>
+      <button class="btn btn-primary" id="nextBtn">Next Step</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key Takeaway</div>
+      <p>The sequence either hits <strong>1</strong> or <strong>revisits a number</strong> —
+      it can't grow forever. So this is pure <strong>cycle detection</strong>: a
+      <code style="color:#ffd479">seen</code> set (O(log n) space) or Floyd's fast/slow
+      pointers (O(1) space). Same trick as Linked List Cycle.</p>
+    </div>
+  </div>
+
+  <script>
+    function sq(x) {
+      let s = 0;
+      while (x > 0) { const d = x % 10; s += d * d; x = Math.floor(x / 10); }
+      return s;
+    }
+
+    // Build the full transition sequence for a starting number.
+    // Each step: { from, digits:[..], squares:[..], to, terminal: 'one'|'cycle'|null }
+    function buildSequence(start) {
+      const seq = [];
+      const seen = new Set();
+      let n = start;
+      let guard = 0;
+      while (guard++ < 30) {
+        const digits = String(n).split('').map(Number);
+        const squares = digits.map(d => d * d);
+        const to = sq(n);
+        let terminal = null;
+        if (to === 1) terminal = 'one';
+        else if (seen.has(to)) terminal = 'cycle';
+        seq.push({ from: n, digits, squares, to, terminal });
+        if (terminal) break;
+        seen.add(to);
+        n = to;
+      }
+      return seq;
+    }
+
+    const examples = { 19: buildSequence(19), 2: buildSequence(2) };
+
+    const stepDesc = document.getElementById('stepDesc');
+    const digitsEl = document.getElementById('digits');
+    const chainEl  = document.getElementById('chain');
+    const setArea  = document.getElementById('setArea');
+    const counter  = document.getElementById('stepCounter');
+    const nextBtn  = document.getElementById('nextBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const resultBadge = document.getElementById('resultBadge');
+    const resIcon = document.getElementById('resIcon');
+    const resText = document.getElementById('resText');
+    const pickBtns = [...document.querySelectorAll('.pick-btn')];
+
+    let curN, seq, stepIdx, seenVals, chainVals;
+
+    function renderChain(highlightLast, kind) {
+      chainEl.innerHTML = '';
+      chainVals.forEach((v, idx) => {
+        if (idx > 0) {
+          const a = document.createElement('span'); a.className = 'arrow'; a.textContent = '→';
+          chainEl.appendChild(a);
+        }
+        const node = document.createElement('div');
+        node.className = 'node';
+        node.textContent = v;
+        if (seenVals.has(v) && !(idx === chainVals.length - 1)) node.classList.add('seen');
+        if (idx === chainVals.length - 1 && highlightLast) node.classList.add(kind || 'current');
+        chainEl.appendChild(node);
+      });
+    }
+
+    function renderSet(hitVal) {
+      setArea.innerHTML = '';
+      if (seenVals.size === 0) {
+        setArea.innerHTML = '<span class="set-hint">empty</span>';
+        return;
+      }
+      [...seenVals].forEach(v => {
+        const chip = document.createElement('div');
+        chip.className = 'chip' + (v === hitVal ? ' hit' : '');
+        chip.textContent = v;
+        setArea.appendChild(chip);
+      });
+    }
+
+    function renderDigits(step) {
+      digitsEl.innerHTML = '';
+      step.digits.forEach((d, i) => {
+        if (i > 0) { const p = document.createElement('span'); p.className = 'plus'; p.textContent = '+'; digitsEl.appendChild(p); }
+        const box = document.createElement('div'); box.className = 'digit-box';
+        const dg = document.createElement('div'); dg.className = 'digit'; dg.textContent = d;
+        const sqv = document.createElement('div'); sqv.className = 'digit-sq'; sqv.textContent = `${d}²=${d*d}`;
+        box.appendChild(dg); box.appendChild(sqv);
+        digitsEl.appendChild(box);
+      });
+      const eq = document.createElement('span'); eq.className = 'eq'; eq.textContent = '='; digitsEl.appendChild(eq);
+      const res = document.createElement('div'); res.className = 'sum-result'; res.textContent = step.to;
+      digitsEl.appendChild(res);
+    }
+
+    function reset() {
+      seq = examples[curN];
+      stepIdx = 0;
+      seenVals = new Set();
+      chainVals = [curN];
+      digitsEl.innerHTML = '<span class="set-hint">press Next Step</span>';
+      renderChain(true, 'current');
+      renderSet(null);
+      stepDesc.className = 'step-desc';
+      stepDesc.innerHTML = `Starting at <code>n = ${curN}</code>. Each step replaces n with the sum of squares of its digits.`;
+      resultBadge.className = 'result-badge';
+      nextBtn.disabled = false;
+      counter.textContent = `Step 0 / ${seq.length}`;
+    }
+
+    function advance() {
+      if (stepIdx >= seq.length) return;
+      const step = seq[stepIdx];
+      renderDigits(step);
+
+      chainVals.push(step.to);
+
+      if (step.terminal === 'one') {
+        renderChain(true, 'one');
+        renderSet(null);
+        stepDesc.className = 'step-desc happy';
+        stepDesc.innerHTML =
+          `<code>${step.from}</code> → sum of digit squares = <code>${step.to}</code>. ` +
+          `Reached <strong style="color:#10b981">1</strong> &mdash; HAPPY number!`;
+        showResult(true);
+        nextBtn.disabled = true;
+      } else if (step.terminal === 'cycle') {
+        renderChain(true, 'repeat');
+        renderSet(step.to);
+        stepDesc.className = 'step-desc cycle';
+        stepDesc.innerHTML =
+          `<code>${step.from}</code> → <code>${step.to}</code>, but <code>${step.to}</code> is ` +
+          `<strong style="color:#ef4444">already in seen</strong> &mdash; cycle detected, never reaches 1. NOT happy.`;
+        showResult(false);
+        nextBtn.disabled = true;
+      } else {
+        seenVals.add(step.to);
+        renderChain(true, 'current');
+        renderSet(null);
+        stepDesc.className = 'step-desc';
+        stepDesc.innerHTML =
+          `<code>${step.from}</code> → ${step.digits.map(d=>`${d}²`).join(' + ')} = ` +
+          `<code>${step.to}</code>. Not 1, not seen before &mdash; add to <code>seen</code> and continue.`;
+      }
+
+      stepIdx++;
+      counter.textContent = `Step ${stepIdx} / ${seq.length}`;
+    }
+
+    function showResult(happy) {
+      resultBadge.className = 'result-badge show ' + (happy ? 'happy' : 'unhappy');
+      resIcon.textContent = happy ? '✅' : '🔴';
+      resIcon.style.fontSize = '1.3rem';
+      resText.textContent = happy
+        ? `return True — ${curN} is a happy number.`
+        : `return False — ${curN} loops forever and never reaches 1.`;
+    }
+
+    pickBtns.forEach(b => b.addEventListener('click', () => {
+      pickBtns.forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      curN = Number(b.dataset.n);
+      reset();
+    }));
+    nextBtn.addEventListener('click', advance);
+    resetBtn.addEventListener('click', reset);
+
+    curN = 19;
+    reset();
+  </script>
+</body>
+</html>

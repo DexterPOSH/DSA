@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Surrounded Regions — border flood + invert</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#202a4d; --text:#e0e0e0; --muted:#9aa4c8;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;
+    line-height:1.6;padding:36px 18px 70px;}
+  .wrap{max-width:880px;margin:0 auto;}
+  h1{font-size:1.7rem;font-weight:700;margin-bottom:6px;letter-spacing:-.02em;}
+  h1 span{color:var(--amber);}
+  .subtitle{color:var(--muted);margin-bottom:26px;}
+  .analogy{background:var(--panel);border:1px solid var(--amber);border-left:5px solid var(--amber);
+    border-radius:12px;padding:16px 22px;margin-bottom:28px;}
+  .analogy h3{color:var(--amber);font-size:1rem;margin-bottom:4px;}
+  .analogy p{margin:0;}
+  .board-wrap{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;align-items:flex-start;}
+  .grid{display:grid;grid-template-columns:repeat(4,56px);grid-gap:6px;background:var(--panel);
+    padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,.06);}
+  .cell{width:56px;height:56px;border-radius:8px;display:grid;place-items:center;font-weight:800;
+    font-family:"SF Mono",Menlo,Consolas,monospace;font-size:1.25rem;transition:all .35s ease;
+    background:var(--panel2);color:#cfe0ff;border:1px solid rgba(255,255,255,.08);}
+  .cell.X{background:#2a2140;color:#caa6ff;border-color:rgba(168,85,247,.4);}
+  .cell.O{background:var(--panel2);color:#bcd4ff;}
+  .cell.cur{background:rgba(245,158,11,.3);border-color:var(--amber);color:#ffe2a8;
+    box-shadow:0 0 0 3px rgba(245,158,11,.35);transform:scale(1.06);}
+  .cell.frontier{background:rgba(59,130,246,.28);border-color:var(--blue);color:#bcd4ff;}
+  .cell.safe{background:rgba(16,185,129,.2);border-color:var(--green);color:#7fe6c0;}
+  .cell.captured{background:rgba(239,68,68,.18);border-color:var(--red);color:#ffb4b4;}
+  .panel{background:var(--panel);border-radius:12px;padding:16px 20px;min-width:230px;
+    border:1px solid rgba(255,255,255,.06);}
+  .phase{display:inline-block;font-size:.78rem;font-weight:700;padding:4px 12px;border-radius:20px;
+    background:var(--panel2);color:var(--muted);margin-bottom:12px;letter-spacing:.03em;}
+  .phase.p1{background:rgba(16,185,129,.18);color:#7fe6c0;border:1px solid var(--green);}
+  .phase.p2{background:rgba(239,68,68,.16);color:#ffb4b4;border:1px solid var(--red);}
+  .panel h4{font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+  .legend{display:flex;flex-direction:column;gap:7px;margin-top:6px;font-size:.86rem;}
+  .legend div{display:flex;align-items:center;gap:8px;}
+  .sw{width:18px;height:18px;border-radius:5px;flex:0 0 auto;}
+  .stack{margin-top:12px;font-family:"SF Mono",Menlo,monospace;font-size:.82rem;color:var(--muted);
+    background:var(--panel2);border-radius:8px;padding:8px 10px;min-height:42px;word-break:break-all;}
+  .caption{background:var(--panel);border-left:4px solid var(--amber);border-radius:10px;
+    padding:14px 18px;margin:24px 0 16px;min-height:62px;font-size:1.02rem;}
+  .caption b{color:var(--amber);}
+  .caption code{background:var(--panel2);padding:1px 6px;border-radius:5px;color:#ffd479;
+    font-family:"SF Mono",Menlo,monospace;}
+  .controls{text-align:center;margin-bottom:8px;}
+  button{background:var(--blue);color:#fff;border:none;padding:10px 24px;border-radius:9px;
+    font-size:.98rem;font-weight:600;cursor:pointer;transition:transform .12s,background .2s;}
+  button:hover:not(:disabled){background:#2f6fd6;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  button.ghost{background:var(--panel2);color:var(--text);margin:0 6px;}
+  button.ghost:hover:not(:disabled){background:#2c3766;}
+  .progress{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:22px;}
+  .takeaway{background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(16,185,129,.12));
+    border:1px solid rgba(245,158,11,.4);border-radius:12px;padding:18px 22px;margin-top:30px;text-align:center;}
+  .takeaway h3{color:var(--amber);margin-bottom:5px;}
+  .takeaway p{margin:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Surrounded Regions — <span>border flood</span>, then invert</h1>
+  <p class="subtitle">Mark every O reachable from the border as safe; whatever's left was surrounded — capture it.</p>
+
+  <div class="analogy">
+    <h3>🎯 Escape-route thinking</h3>
+    <p>Jo <code>O</code> border ko chhoo raha hai (ya border-O se juda hai) woh <b>safe</b> hai — uske paas bhaagne ka raasta hai. Border se flood-fill karke safe mark karo; jo bach gaye woh surrounded → <code>X</code>.</p>
+  </div>
+
+  <div class="board-wrap">
+    <div class="grid" id="grid"></div>
+    <div class="panel">
+      <span class="phase" id="phaseTag">Phase —</span>
+      <h4>Border flood</h4>
+      <div class="stack" id="stack">DFS stack: —</div>
+      <div class="legend">
+        <div><span class="sw" style="background:#2a2140"></span> wall <code>X</code></div>
+        <div><span class="sw" style="background:var(--panel2)"></span> region <code>O</code></div>
+        <div><span class="sw" style="background:rgba(245,158,11,.6)"></span> current cell</div>
+        <div><span class="sw" style="background:rgba(59,130,246,.6)"></span> on DFS stack</div>
+        <div><span class="sw" style="background:rgba(16,185,129,.6)"></span> safe (border-connected)</div>
+        <div><span class="sw" style="background:rgba(239,68,68,.6)"></span> captured → X</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="caption" id="caption">Press <b>Next</b> to flood-fill from the border O cells.</div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn" disabled>◀ Prev</button>
+    <button id="nextBtn">Next ▶</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+  </div>
+  <div class="progress" id="progress"></div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Don't hunt for enclosed regions directly. <b>Flood from the border</b> to find the escapees, then flip the complement — two O(m·n) passes.</p>
+  </div>
+</div>
+
+<script>
+// 'X' wall, 'O' region.  Border-connected O survives; enclosed O captured.
+const board = [
+  ['X','X','X','X'],
+  ['X','O','O','X'],
+  ['X','X','O','X'],
+  ['X','O','X','X'],
+];
+const ROWS=4, COLS=4;
+const gridEl=document.getElementById('grid');
+const cap=document.getElementById('caption');
+const stackEl=document.getElementById('stack');
+const phaseTag=document.getElementById('phaseTag');
+const prevBtn=document.getElementById('prevBtn');
+const nextBtn=document.getElementById('nextBtn');
+const resetBtn=document.getElementById('resetBtn');
+const progress=document.getElementById('progress');
+
+function buildSteps(){
+  const steps=[];
+  const cellState={};   // "r,c" -> 'safe' | 'captured'
+  const key=(r,c)=>r+","+c;
+  function snap(phase,curCell,stack,caption){
+    steps.push({
+      phase, cellState:{...cellState},
+      curCell:curCell?key(...curCell):null,
+      stack:[...stack].map(([r,c])=>`(${r},${c})`),
+      caption
+    });
+  }
+  snap(0,null,[],"Original board. Phase 1: flood-fill every <b>O on the border</b> to mark border-connected O cells as <b>safe</b>.");
+
+  // Phase 1: border DFS
+  const borders=[];
+  for(let c=0;c<COLS;c++){borders.push([0,c]);borders.push([ROWS-1,c]);}
+  for(let r=0;r<ROWS;r++){borders.push([r,0]);borders.push([r,COLS-1]);}
+  for(const [br,bc] of borders){
+    if(board[br][bc]!=='O' || cellState[key(br,bc)]) continue;
+    snap(1,[br,bc],[[br,bc]],`Border <b>O</b> at <b>(${br},${bc})</b> → DFS-mark its region safe.`);
+    const stack=[[br,bc]]; const onStack=new Set([key(br,bc)]);
+    while(stack.length){
+      const [cr,cc]=stack.pop(); onStack.delete(key(cr,cc));
+      if(cellState[key(cr,cc)]) continue;
+      cellState[key(cr,cc)]='safe';
+      const nbrs=[[cr+1,cc],[cr-1,cc],[cr,cc+1],[cr,cc-1]];
+      for(const [nr,nc] of nbrs){
+        if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&board[nr][nc]==='O'&&!cellState[key(nr,nc)]&&!onStack.has(key(nr,nc))){
+          stack.push([nr,nc]); onStack.add(key(nr,nc));
+        }
+      }
+      snap(1,[cr,cc],stack.map(s=>s),`Mark <b>(${cr},${cc})</b> safe. Push connected O neighbours.`);
+    }
+  }
+  snap(1,null,[],"Phase 1 done. Every green O is reachable from the border → it survives. The remaining plain O cells are <b>enclosed</b>.");
+
+  // Phase 2: sweep -> capture remaining O
+  let any=false;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(board[r][c]==='O' && cellState[key(r,c)]!=='safe'){
+      cellState[key(r,c)]='captured'; any=true;
+      snap(2,[r,c],[],`<b>(${r},${c})</b> is an unmarked O → <b>surrounded</b>. Capture it: O → <code>X</code>.`);
+    }
+  }
+  if(!any) snap(2,null,[],"No enclosed O found.");
+  snap(2,null,[],"Phase 2 done. Captured cells flipped to X; safe cells restored to O. ✅");
+  return steps;
+}
+
+const steps=buildSteps();
+let idx=0;
+
+function buildGrid(){
+  gridEl.innerHTML='';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const d=document.createElement('div');
+    d.className='cell '+board[r][c];
+    d.id='c'+r+'_'+c; d.textContent=board[r][c];
+    gridEl.appendChild(d);
+  }
+}
+
+function render(){
+  const s=steps[idx];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const el=document.getElementById('c'+r+'_'+c);
+    const st=s.cellState[r+','+c];
+    let label=board[r][c];
+    el.className='cell '+board[r][c];
+    if(st==='safe') el.classList.add('safe');
+    if(st==='captured'){el.classList.add('captured'); label='X';}
+    if(s.stack.includes(`(${r},${c})`)) el.classList.add('frontier');
+    if(s.curCell===r+','+c) el.classList.add('cur');
+    el.textContent=label;
+  }
+  stackEl.innerHTML='DFS stack: '+(s.stack.length?s.stack.join(' '):'—');
+  phaseTag.textContent = s.phase===0?'Phase —':s.phase===1?'Phase 1 · border flood':'Phase 2 · invert';
+  phaseTag.className='phase '+(s.phase===1?'p1':s.phase===2?'p2':'');
+  cap.innerHTML=s.caption;
+  progress.textContent=`Step ${idx+1} / ${steps.length}`;
+  prevBtn.disabled=idx===0;
+  nextBtn.disabled=idx===steps.length-1;
+}
+
+function reset(){idx=0;render();}
+prevBtn.onclick=()=>{if(idx>0){idx--;render();}};
+nextBtn.onclick=()=>{if(idx<steps.length-1){idx++;render();}};
+resetBtn.onclick=reset;
+
+buildGrid();
+render();
+</script>
+</body>
+</html>

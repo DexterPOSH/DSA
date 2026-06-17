@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detect Squares — Fix the Side, Derive the Square</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 7px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .stage {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 24px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .gridwrap { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-start; }
+  .panelside { flex: 1 1 240px; min-width: 230px; }
+
+  svg { background: #0f1830; border-radius: 12px; display: block; }
+  .axis { stroke: #3a3a5e; stroke-width: 1; }
+  .gridline { stroke: rgba(255,255,255,0.05); stroke-width: 1; }
+  .axislabel { fill: var(--muted); font-size: 11px; font-family: "SF Mono", monospace; }
+
+  .pt { transition: all .3s ease; }
+  .pt-dot { fill: var(--blue); stroke: #0f1830; stroke-width: 2; transition: all .3s ease; }
+  .pt-query .pt-dot { fill: var(--amber); }
+  .pt-cand .pt-dot { fill: var(--purple); }
+  .pt-corner .pt-dot { fill: var(--green); }
+  .pt-bad .pt-dot { fill: var(--red); }
+  .pt-label { fill: var(--text); font-size: 11px; font-family: "SF Mono", monospace; }
+  .pt-cnt { fill: var(--amber); font-size: 10px; font-family: "SF Mono", monospace; }
+
+  .sqline { stroke: var(--green); stroke-width: 2.5; fill: rgba(16,185,129,0.10); transition: all .3s; }
+  .sideline { stroke: var(--purple); stroke-width: 2.5; stroke-dasharray: 5 4; }
+
+  .legend { font-size: .82rem; color: var(--muted); margin-top: 10px; display:flex; gap:14px; flex-wrap:wrap;}
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+
+  .calc {
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: .92rem;
+  }
+  .calc h4 { margin: 0 0 10px; font-family: 'Segoe UI', sans-serif; color: var(--muted); font-size: .85rem; }
+  .calc .line { padding: 3px 0; color: var(--muted); }
+  .calc .line.hot { color: #ffd479; }
+  .calc .total { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.12);
+                 color: var(--green); font-weight: 700; font-size: 1.1rem; }
+
+  .caption {
+    margin: 24px 0 6px;
+    background: var(--panel2);
+    border-left: 4px solid var(--blue);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 1rem;
+    min-height: 64px;
+  }
+  .caption.win { border-left-color: var(--green); background: rgba(16,185,129,0.10); }
+  .caption b.amb { color: var(--amber); }
+  .caption b.grn { color: var(--green); }
+  .caption b.pur { color: var(--purple); }
+  .caption b.red { color: var(--red); }
+
+  .controls { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  button.nav {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button.nav:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button.nav:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); }
+  button.ghost:hover:not(:disabled) { background: #34345e; }
+  .counter { margin-left: auto; color: var(--muted); font-family: "SF Mono", Menlo, monospace; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-top: 30px;
+    text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Detect Squares — fix the <span>vertical side</span>, derive the square</h1>
+  <p class="subtitle">Count axis-aligned squares with a query corner by scanning the same column and multiplying corner counts.</p>
+
+  <div class="analogy">
+    <h3>📌 Graph-paper analogy</h3>
+    <p>Query pin <code>(qx,qy)</code> ke saath, har <b class="pur">same-column</b> point ko ek vertical side ka top maano. Side length <code>|py − qy|</code>. Square left ya right dono taraf ban sakta — baaki teen corners apne-aap fix ho jaate. Unke add-counts <b>multiply</b> karo.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> Added points + repeated <code>count(query)</code>. Here we query <code>(5,5)</code>
+    against the added points and count axis-aligned squares. <span class="arrow">→</span> see the running total.
+  </div>
+
+  <div class="stage">
+    <div class="gridwrap">
+      <div>
+        <svg id="plane" width="420" height="420" viewBox="0 0 420 420"></svg>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--amber)"></i>query</span>
+          <span><i class="dot" style="background:var(--purple)"></i>side candidate</span>
+          <span><i class="dot" style="background:var(--green)"></i>square corner</span>
+          <span><i class="dot" style="background:var(--blue)"></i>other point</span>
+        </div>
+      </div>
+      <div class="panelside">
+        <div class="calc" id="calc"><h4>Running count</h4><div class="line">Press Next to begin…</div></div>
+      </div>
+    </div>
+
+    <div class="caption" id="caption">Press <b>Next ▸</b> to scan the query column.</div>
+    <div class="controls">
+      <button class="nav ghost" id="prevBtn" onclick="prev()">◂ Prev</button>
+      <button class="nav" id="nextBtn" onclick="next()">Next ▸</button>
+      <button class="nav ghost" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="counter" id="counter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>An axis-aligned square is pinned down by one vertical side: choose a same-column point, then the other two corners are forced — so counting is just multiplying three stored point-counts.</p>
+  </div>
+</div>
+
+<script>
+// ---- data ----
+const QUERY = [5, 5];
+// added points with multiplicities; we'll build a count map.
+const ADDED = [
+  [5, 9],  // same column as query (above)  -> candidate, side = 4
+  [9, 5],  // query row, right
+  [9, 9],  // diagonal right
+  [1, 5],  // query row, left
+  [1, 9],  // diagonal left
+  [5, 1],  // same column (below) -> candidate, side = -4
+  [9, 1],  // diagonal for below-right
+  [12, 7], // noise
+];
+const cnt = {};
+for (const [x,y] of ADDED) cnt[x+','+y] = (cnt[x+','+y]||0) + 1;
+const C = (x,y) => cnt[x+','+y] || 0;
+
+// ---- coordinate mapping (data range 0..13) ----
+const PAD = 40, SIZE = 420, SPAN = 13;
+const sx = v => PAD + (v / SPAN) * (SIZE - 2*PAD);
+const sy = v => (SIZE - PAD) - (v / SPAN) * (SIZE - 2*PAD);
+
+// ---- build steps ----
+function buildSteps() {
+  const s = [];
+  const [qx, qy] = QUERY;
+  s.push({ kind:'intro', total:0, lines:[], square:null, side:null, highlight:[],
+    cap:`Query point is <b class="amb">(${qx},${qy})</b>. We scan every added point in the <b class="amb">same column x=${qx}</b> and treat it as the top/bottom of a vertical side.` });
+
+  // candidates: same column as query, py != qy
+  const colYs = ADDED.filter(([x,y]) => x===qx && y!==qy).map(([,y])=>y);
+  const uniqYs = [...new Set(colYs)];
+  let total = 0;
+  const lines = [];
+
+  for (const py of uniqYs) {
+    const side = py - qy;
+    // both directions
+    for (const dx of [side, -side]) {
+      const cTop = C(qx, py);            // (qx,py)
+      const cBottom = C(qx+dx, qy);      // (qx+dx, qy)
+      const cDiag = C(qx+dx, py);        // (qx+dx, py)
+      const contrib = cTop * cBottom * cDiag;
+      const corners = {
+        query:[qx,qy], top:[qx,py], bottom:[qx+dx,qy], diag:[qx+dx,py]
+      };
+      const ok = contrib > 0;
+      total += contrib;
+      if (ok) {
+        lines.push(`(${qx+dx},·): ${cTop}·${cBottom}·${cDiag} = ${contrib}`);
+      }
+      s.push({
+        kind:'check', total, square:corners, side:{from:[qx,qy],to:[qx,py]},
+        ok, contrib, lines: lines.slice(),
+        cap: ok
+          ? `Side to <b class="pur">(${qx},${py})</b> (length ${Math.abs(side)}), extend <b>${dx>0?'right':'left'}</b> by ${Math.abs(dx)}. ` +
+            `Corners <b class="grn">(${qx},${py})·(${qx+dx},${qy})·(${qx+dx},${py})</b> have counts ${cTop}·${cBottom}·${cDiag} = <b class="grn">${contrib}</b>. Square found! ✅`
+          : `Side to <b class="pur">(${qx},${py})</b>, extend ${dx>0?'right':'left'}: corner counts ${cTop}·${cBottom}·${cDiag} = <b class="red">0</b> — at least one corner is missing, no square here.`
+      });
+    }
+  }
+
+  s.push({ kind:'done', total, square:null, side:null, lines: lines.slice(), done:true,
+    cap:`All same-column candidates checked. Total axis-aligned squares with corner (${qx},${qy}) = <b class="grn">${total}</b>. ✅` });
+  return s;
+}
+
+const steps = buildSteps();
+let cur = 0;
+
+function drawPlane(step) {
+  const svg = document.getElementById('plane');
+  let g = '';
+  // grid lines
+  for (let i = 0; i <= SPAN; i++) {
+    g += `<line class="gridline" x1="${sx(i)}" y1="${sy(0)}" x2="${sx(i)}" y2="${sy(SPAN)}"/>`;
+    g += `<line class="gridline" x1="${sx(0)}" y1="${sy(i)}" x2="${sx(SPAN)}" y2="${sy(i)}"/>`;
+  }
+  // axes
+  g += `<line class="axis" x1="${sx(0)}" y1="${sy(0)}" x2="${sx(SPAN)}" y2="${sy(0)}"/>`;
+  g += `<line class="axis" x1="${sx(0)}" y1="${sy(0)}" x2="${sx(0)}" y2="${sy(SPAN)}"/>`;
+  for (let i = 0; i <= SPAN; i += 2) {
+    g += `<text class="axislabel" x="${sx(i)-4}" y="${sy(0)+16}">${i}</text>`;
+    g += `<text class="axislabel" x="${sx(0)-22}" y="${sy(i)+4}">${i}</text>`;
+  }
+
+  // square fill/outline
+  if (step.square) {
+    const c = step.square;
+    const p = a => `${sx(a[0])},${sy(a[1])}`;
+    const cls = step.ok ? '' : 'style="stroke:var(--red);fill:rgba(239,68,68,0.08)"';
+    g += `<polygon class="sqline" ${cls} points="${p(c.query)} ${p(c.top)} ${p(c.diag)} ${p(c.bottom)}"/>`;
+  }
+  // side highlight
+  if (step.side) {
+    g += `<line class="sideline" x1="${sx(step.side.from[0])}" y1="${sy(step.side.from[1])}" x2="${sx(step.side.to[0])}" y2="${sy(step.side.to[1])}"/>`;
+  }
+
+  // points
+  const [qx,qy] = QUERY;
+  const cornerSet = new Set();
+  if (step.square && step.ok) {
+    const c = step.square;
+    [c.top, c.bottom, c.diag].forEach(p => cornerSet.add(p[0]+','+p[1]));
+  }
+  const candY = step.side ? step.side.to[1] : null;
+
+  const drawn = new Set();
+  for (const [x,y] of ADDED) {
+    const key = x+','+y;
+    if (drawn.has(key)) continue;
+    drawn.add(key);
+    let cls = 'pt';
+    if (x===qx && y===qy) cls = 'pt pt-query';
+    else if (step.square && x===qx && y===candY) cls = 'pt pt-cand';
+    else if (cornerSet.has(key)) cls = 'pt pt-corner';
+    const cc = C(x,y);
+    const mult = cc > 1 ? `<text class="pt-cnt" x="${sx(x)+9}" y="${sy(y)-7}">×${cc}</text>` : '';
+    g += `<g class="${cls}">
+      <circle class="pt-dot" cx="${sx(x)}" cy="${sy(y)}" r="7"/>
+      <text class="pt-label" x="${sx(x)+9}" y="${sy(y)+4}">(${x},${y})</text>${mult}
+    </g>`;
+  }
+  // always draw query (even if not in ADDED)
+  if (!drawn.has(qx+','+qy)) {
+    g += `<g class="pt pt-query"><circle class="pt-dot" cx="${sx(qx)}" cy="${sy(qy)}" r="7"/>
+      <text class="pt-label" x="${sx(qx)+9}" y="${sy(qy)+4}">(${qx},${qy})</text></g>`;
+  }
+
+  svg.innerHTML = g;
+}
+
+function render() {
+  const step = steps[cur];
+  drawPlane(step);
+
+  // calc panel
+  const calc = document.getElementById('calc');
+  let inner = '<h4>Running count</h4>';
+  if (step.lines.length === 0) inner += '<div class="line">no squares yet…</div>';
+  else inner += step.lines.map((l,i) =>
+    `<div class="line ${i===step.lines.length-1 && step.kind==='check' && step.ok ? 'hot':''}">${l}</div>`).join('');
+  inner += `<div class="total">total = ${step.total}</div>`;
+  calc.innerHTML = inner;
+
+  const cap = document.getElementById('caption');
+  cap.innerHTML = step.cap;
+  cap.className = 'caption' + (step.done ? ' win' : '');
+
+  document.getElementById('counter').textContent = `Step ${cur} / ${steps.length - 1}`;
+  document.getElementById('prevBtn').disabled = cur === 0;
+  document.getElementById('nextBtn').disabled = cur === steps.length - 1;
+}
+
+function next() { if (cur < steps.length - 1) { cur++; render(); } }
+function prev() { if (cur > 0) { cur--; render(); } }
+function reset() { cur = 0; render(); }
+
+render();
+</script>
+</body>
+</html>

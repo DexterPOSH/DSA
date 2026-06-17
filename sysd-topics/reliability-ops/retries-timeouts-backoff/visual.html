@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Retries, Timeouts &amp; Backoff — The Request Timeline</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* timeline SVG */
+  .tl-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+  .lane-line { stroke: #3a3a5c; stroke-width: 2; }
+  .lane-label { fill: #c8c8d8; font-size: 12px; font-weight: 700; font-family: -apple-system, sans-serif; }
+  .axis-tick { stroke: #2d2d50; stroke-width: 1; }
+  .axis-label { fill: #666680; font-size: 10px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .attempt-box rect { transition: all .4s ease; }
+  .attempt-box text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10px; font-weight: 700; }
+
+  .packet { transition: all .5s cubic-bezier(.4,0,.2,1); }
+  .deadline-bar { transition: all .4s ease; }
+  .backoff-gap { transition: all .4s ease; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.good { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.good h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 22px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.good .big { color: #10b981; }
+  /* mini herd bars */
+  .herd { display: flex; align-items: flex-end; gap: 3px; height: 56px; margin: 12px 0 4px; }
+  .hb { flex: 1; border-radius: 2px 2px 0 0; }
+  .herd-axis { font-size: 9px; color: #8888aa; font-family: "SF Mono", Menlo, Consolas, monospace; text-align: center; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Retries, Timeouts &amp; Backoff — The Request Timeline</h1>
+  <div class="subtitle">How a caller survives a flaky downstream: <b>bound each call with a timeout</b>, <b>retry only transient errors</b>, and <b>space the retries with exponential backoff + jitter</b> — so a small blip doesn't turn into a <code>retry storm</code>.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — calling a friend on a busy line</h3>
+    <p>You call a friend and the line is busy. <b>Timeout</b> decides how long you let it ring before hanging up — you don't hold forever. <b>Retry</b> is hanging up and dialling again, in case it was just a glitch. But if you redial <i>instantly</i> over and over, you (and everyone else calling) jam the line worse. Smarter: wait <b>1s, then 2s, then 4s</b> between tries (<b>exponential backoff</b>). And add a little random wait — <b>jitter</b> — so the whole town doesn't redial at the exact same instant (that synchronized rush is the <b>thundering herd</b>). Backoff + jitter keeps retries calm and spread out, giving the line room to clear.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">call:</span><code>client → payment-svc</code> &nbsp;(downstream is overloaded, returning 503)</div>
+    <div class="row"><span class="label">timeout:</span><code>200ms</code> per attempt &nbsp; <span class="label">p99:</span><code>~20ms</code> when healthy</div>
+    <div class="row"><span class="label">policy:</span><code>max 3 attempts</code>, retry on <code>503 / timeout</code>, <code>wait = random(0, 100·2^n)</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="tl-holder">
+      <svg viewBox="0 0 560 360" id="tl">
+        <!-- lanes -->
+        <text class="lane-label" x="14" y="48">CLIENT</text>
+        <line class="lane-line" x1="14" y1="58" x2="546" y2="58" />
+        <text class="lane-label" x="14" y="312">payment-svc</text>
+        <line class="lane-line" x1="14" y1="322" x2="546" y2="322" />
+
+        <!-- time axis -->
+        <line class="axis-tick" x1="120" y1="58" x2="120" y2="322" />
+        <g id="g-axis"></g>
+
+        <g id="g-deadline"></g>
+        <g id="g-backoff"></g>
+        <g id="g-attempts"></g>
+        <g id="g-packet"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Attempt</div><div class="value" id="v-attempt">0 / 3</div></div>
+        <div class="var"><div class="label">Timeout</div><div class="value amber" id="v-timeout">200ms</div></div>
+        <div class="var"><div class="label">Backoff wait</div><div class="value" id="v-backoff">—</div></div>
+        <div class="var"><div class="label">Outcome</div><div class="value" id="v-outcome">—</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch round" style="background:#3b82f6"></span>Request packet (in flight)</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Timeout deadline window</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Failed attempt (503 / timed out)</div>
+        <div class="legend-item"><span class="swatch" style="background:#8b5cf6"></span>Backoff + jitter wait</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Success (200 OK)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to fire the first request at the downstream service.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>Retries with NO backoff / jitter</h3>
+      <div class="formula">on fail → retry immediately, forever</div>
+      <p>A brief slowdown makes every client time out and re-fire at the same instant. Load spikes to <span class="big">3–4×</span> right when the downstream is already struggling — the classic <b>retry storm / thundering herd</b>. Synchronized bursts pile up:</p>
+      <div class="herd" id="herd-bad"></div>
+      <div class="herd-axis">time →&nbsp;&nbsp;sharp synchronized spikes</div>
+      <p>Result: a minor blip <b>cascades into a full outage</b>.</p>
+    </div>
+    <div class="cx good">
+      <h3>Exponential backoff + full jitter</h3>
+      <div class="formula">wait = random(0, base · 2^n), cap attempts</div>
+      <p>Each client waits a longer, <i>randomized</i> gap before retrying, so the same retries smear out over time instead of hammering at once. Peak load stays low and the downstream gets room to recover:</p>
+      <div class="herd" id="herd-good"></div>
+      <div class="herd-axis">time →&nbsp;&nbsp;smooth, spread-out load</div>
+      <p>Result: <b>transient blips absorbed</b>, no amplification.</p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Timeout off the p99, not a guess</b> — set timeout a bit above the downstream's p99 latency (p99 ~20ms → timeout ~100–200ms), never the default 30s. Too tight → healthy calls fail; too loose → threads leak on a hung dependency.</li>
+      <li><b>Retry only transient errors</b> — <code>timeout</code>, connection reset, <code>503</code>, <code>429</code>. <b>Never</b> retry <code>400/401/403/404</code>: they fail deterministically, so retrying just adds load.</li>
+      <li><b>"Backoff" alone is incomplete</b> — say <b>"exponential backoff with jitter"</b>. Pure exponential still lets clients retry in lock-step at 100ms, 200ms… Full jitter <code>random(0, base·2^n)</code> is the AWS-recommended fix.</li>
+      <li><b>Cap attempts + overall deadline</b> — e.g. 3 attempts total. Infinite retry DDoSes a truly-down service with your own traffic.</li>
+      <li><b>Idempotency required</b> — a timeout doesn't mean the work didn't happen; the response may just be lost. Blindly retrying "charge card" double-charges. Use <b>idempotency keys</b>.</li>
+      <li><b>Don't nest retries</b> — 3× at layer A times 3× at layer B = <b>9× load</b>. Centralize retries at one layer or use a <b>retry budget</b> (e.g. retries ≤ 10% of requests, like gRPC/Envoy).</li>
+      <li><b>Pair with a circuit breaker</b> — when failures are sustained (not transient), open the circuit and fail-fast instead of retrying, so the downstream can recover.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p><b>Timeout</b> bounds one slow call, <b>retry</b> re-attempts transient failures, and <b>exponential backoff + jitter</b> spreads those retries out so a struggling service isn't hammered. Always <b>cap the attempts</b>, retry only <b>idempotent</b> calls on <b>retryable</b> errors, and back it with a <b>circuit breaker</b> — otherwise retries amplify a small blip into a cascading outage.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- geometry ----------
+  const T0 = 120;            // x where the timeline starts
+  const TEND = 540;          // x max
+  const CLIENT_Y = 58;
+  const SVC_Y = 322;
+  // ms-to-x scale: compress so 3 attempts + backoffs fit
+  const PXPERMS = 0.46;      // pixels per ms
+  function x(ms) { return Math.min(TEND, T0 + ms * PXPERMS); }
+
+  // ---------- model: attempts on a flaky downstream ----------
+  // attempt n (0-based): start time, the timeout window, the result.
+  // a1: arrives, svc replies 503 at 30ms.   then backoff jitter ~70ms
+  // a2: arrives, request HANGS -> times out at 200ms.  then backoff jitter ~150ms
+  // a3: arrives, svc recovered -> 200 OK at 25ms.  success.
+  const attempts = [
+    { n:1, start:0,   timeout:200, respAt:30,  result:"503",     backoff:70,  cap:200 },
+    { n:2, start:300, timeout:200, respAt:null, result:"timeout", backoff:160, cap:400 },
+    { n:3, start:660, timeout:200, respAt:25,  result:"200",     backoff:null,cap:null },
+  ];
+  const COLORS = { "503":"#ef4444", "timeout":"#ef4444", "200":"#10b981" };
+
+  // ---------- steps ----------
+  // each step reveals progressively; packet position is animated.
+  const steps = [
+    {
+      reveal:0, phase:"intro",
+      narration:`<b>1. One call, one deadline.</b> The client sends a request to <code>payment-svc</code> and immediately arms a <b>timeout</b> of <code>200ms</code>. Without this deadline, a hung downstream would block the caller's thread indefinitely and the failure would cascade upward.`,
+      cls:"", side:{attempt:"1 / 3", timeout:"200ms", backoff:"—", outcome:"in flight…", outcomeCls:""}
+    },
+    {
+      reveal:0, phase:"a1-send",
+      narration:`<b>2. Attempt 1 in flight.</b> The packet travels down to <code>payment-svc</code>, which is currently overloaded. The amber bar is the live timeout window — the response must come back before it runs out.`,
+      cls:"", side:{attempt:"1 / 3", timeout:"200ms", backoff:"—", outcome:"in flight…", outcomeCls:""}
+    },
+    {
+      reveal:0, phase:"a1-fail",
+      narration:`<b>3. Attempt 1 fails — <code>503</code>.</b> The service replies fast but with <b>Service Unavailable</b>. That's a <b>transient, retryable</b> error (unlike <code>400/404</code>, which we'd never retry). So we'll retry — but not instantly.`,
+      cls:"bad", side:{attempt:"1 / 3", timeout:"200ms", backoff:"—", outcome:"503 ✗", outcomeCls:"red"}
+    },
+    {
+      reveal:1, phase:"backoff1",
+      narration:`<b>4. Backoff + jitter before retry.</b> Instead of redialling immediately, we wait <code>random(0, 100·2¹) = random(0, 200ms)</code> → here <b>~70ms</b>. The randomness (jitter) is the bit that stops thousands of clients retrying at the exact same instant.`,
+      cls:"move", side:{attempt:"1 → 2", timeout:"200ms", backoff:"~70ms", outcome:"waiting…", outcomeCls:"amber"}
+    },
+    {
+      reveal:1, phase:"a2-send",
+      narration:`<b>5. Attempt 2 — and it hangs.</b> This time the downstream accepts the request but never responds (a slow/stuck call). No reply comes back…`,
+      cls:"", side:{attempt:"2 / 3", timeout:"200ms", backoff:"~70ms", outcome:"in flight…", outcomeCls:""}
+    },
+    {
+      reveal:1, phase:"a2-timeout",
+      narration:`<b>6. Timeout fires at 200ms.</b> Because no response arrived within the deadline, the client <b>gives up on this attempt</b> and reclaims its thread. This is exactly why timeouts exist — a hung dependency can't pin our resources forever.`,
+      cls:"bad", side:{attempt:"2 / 3", timeout:"200ms ⏱", backoff:"~70ms", outcome:"timed out ✗", outcomeCls:"red"}
+    },
+    {
+      reveal:2, phase:"backoff2",
+      narration:`<b>7. Backoff grows exponentially.</b> Second retry waits <code>random(0, 100·2²) = random(0, 400ms)</code> → here <b>~160ms</b>, a <i>longer</i> gap than before. Each retry gives the struggling service progressively more breathing room.`,
+      cls:"move", side:{attempt:"2 → 3", timeout:"200ms", backoff:"~160ms", outcome:"waiting…", outcomeCls:"amber"}
+    },
+    {
+      reveal:2, phase:"a3-send",
+      narration:`<b>8. Attempt 3 — final try.</b> We're at our <b>cap of 3 attempts</b>. By now the downstream has had ~660ms to recover. The packet goes out one last time…`,
+      cls:"", side:{attempt:"3 / 3", timeout:"200ms", backoff:"~160ms", outcome:"in flight…", outcomeCls:""}
+    },
+    {
+      reveal:2, phase:"a3-ok",
+      narration:`<b>9. Success — <code>200 OK</code>.</b> The recovered service answers in ~25ms, well inside the deadline. The spaced-out, jittered retries let the blip pass <i>without</i> piling on load. Had we hit the cap with no success, we'd fail-fast (and a circuit breaker would trip).`,
+      cls:"good", side:{attempt:"3 / 3", timeout:"200ms", backoff:"done", outcome:"200 OK ✓", outcomeCls:"green"}
+    },
+  ];
+
+  // ---------- DOM refs ----------
+  const gAxis = document.getElementById("g-axis");
+  const gDeadline = document.getElementById("g-deadline");
+  const gBackoff = document.getElementById("g-backoff");
+  const gAttempts = document.getElementById("g-attempts");
+  const gPacket = document.getElementById("g-packet");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vAttempt = document.getElementById("v-attempt");
+  const vTimeout = document.getElementById("v-timeout");
+  const vBackoff = document.getElementById("v-backoff");
+  const vOutcome = document.getElementById("v-outcome");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // ---------- static axis ticks ----------
+  function drawAxis() {
+    gAxis.innerHTML = "";
+    [0,100,200,300,400,500,600,700,800].forEach(ms => {
+      const px = x(ms);
+      const tick = svgEl("line", { class:"axis-tick", x1:px, y1:SVC_Y, x2:px, y2:SVC_Y+6 });
+      gAxis.appendChild(tick);
+      const lbl = svgEl("text", { class:"axis-label", x:px, y:SVC_Y+18, "text-anchor":"middle" });
+      lbl.textContent = ms + (ms===0?"ms":"");
+      gAxis.appendChild(lbl);
+    });
+  }
+
+  let cursor = 0;
+
+  function render() {
+    const s = steps[cursor];
+    gDeadline.innerHTML = ""; gBackoff.innerHTML = ""; gAttempts.innerHTML = ""; gPacket.innerHTML = "";
+
+    // ---- draw completed/active attempts up to reveal index & phase ----
+    // Determine how many attempts to fully draw and what the "active" packet does.
+    attempts.forEach((a, idx) => {
+      // decide visibility based on current phase
+      const fullyDone = isAttemptResolved(a, s.phase);
+      const started = isAttemptStarted(a, s.phase);
+      if (!started) return;
+
+      const ax0 = x(a.start);
+      const deadlineEnd = x(a.start + a.timeout);
+
+      // timeout deadline window (amber bar along client lane)
+      const showDeadline = (phaseAttempt(s.phase) === a.n) || fullyDone;
+      if (showDeadline) {
+        const timedOut = (a.respAt === null && fullyDone);
+        const endX = (a.respAt !== null && fullyDone) ? x(a.start + a.respAt) : deadlineEnd;
+        const bar = svgEl("rect", {
+          class:"deadline-bar",
+          x:ax0, y:CLIENT_Y-9, width: Math.max(2, endX-ax0), height:8,
+          rx:3, fill: timedOut ? "#ef4444" : "#f59e0b", opacity: timedOut ? 0.75 : 0.55
+        });
+        gDeadline.appendChild(bar);
+        // dashed deadline marker
+        const dl = svgEl("line", {
+          x1:deadlineEnd, y1:CLIENT_Y-14, x2:deadlineEnd, y2:CLIENT_Y+6,
+          stroke:"#f59e0b", "stroke-width":1.5, "stroke-dasharray":"3 3", opacity:0.8
+        });
+        gDeadline.appendChild(dl);
+      }
+
+      // the request line (diagonal down) once resolved
+      if (fullyDone) {
+        const respX = a.respAt !== null ? x(a.start + a.respAt) : deadlineEnd;
+        const reqLine = svgEl("line", {
+          x1:ax0+4, y1:CLIENT_Y+2, x2:x(a.start + Math.min(a.respAt ?? a.timeout, a.timeout)*0.4), y2:(CLIENT_Y+SVC_Y)/2,
+          stroke:"#3b82f6", "stroke-width":2, opacity:0.5
+        });
+        // response/result marker at svc lane
+        const col = COLORS[a.result];
+        const dot = svgEl("circle", { cx:respX, cy:SVC_Y-2, r:7, fill:col, stroke:"#1a1a2e", "stroke-width":2 });
+        gAttempts.appendChild(dot);
+
+        // attempt label box on client lane
+        const g = svgEl("g", { class:"attempt-box" });
+        const lblW = 54;
+        const boxX = Math.min(ax0, TEND-lblW);
+        const r = svgEl("rect", { x:boxX, y:CLIENT_Y+10, width:lblW, height:18, rx:4,
+          fill:"#24243e", stroke:col, "stroke-width":1.5 });
+        const t = svgEl("text", { x:boxX+lblW/2, y:CLIENT_Y+23, "text-anchor":"middle", fill:col });
+        t.textContent = "#" + a.n + " " + (a.result==="200" ? "OK" : a.result==="timeout" ? "T/O" : a.result);
+        g.appendChild(r); g.appendChild(t);
+        gAttempts.appendChild(g);
+
+        // diagonal result arrow back up (for resolved)
+        const back = svgEl("line", {
+          x1:respX, y1:SVC_Y-6, x2:respX, y2:CLIENT_Y+30,
+          stroke:col, "stroke-width":1.5, "stroke-dasharray":"4 3", opacity:0.45
+        });
+        gAttempts.appendChild(back);
+      }
+    });
+
+    // ---- backoff gaps (purple) ----
+    attempts.forEach((a) => {
+      if (a.backoff === null) return;
+      if (!backoffVisible(a, s.phase)) return;
+      const gapStart = a.respAt !== null ? a.start + a.respAt : a.start + a.timeout;
+      const next = attempts.find(z => z.n === a.n+1);
+      const gapEnd = next ? next.start : gapStart + a.backoff;
+      const gx0 = x(gapStart), gx1 = x(gapEnd);
+      const active = isBackoffActive(a, s.phase);
+      const bar = svgEl("rect", {
+        class:"backoff-gap",
+        x:gx0, y:CLIENT_Y-9, width:Math.max(3, gx1-gx0), height:8, rx:3,
+        fill:"#8b5cf6", opacity: active ? 0.9 : 0.5
+      });
+      gBackoff.appendChild(bar);
+      // cap bracket: random(0, cap) — show the full jitter window faintly
+      const capEnd = x(gapStart + a.cap);
+      const capBar = svgEl("rect", {
+        x:gx0, y:CLIENT_Y-15, width:Math.max(3, capEnd-gx0), height:4, rx:2,
+        fill:"#8b5cf6", opacity:0.18
+      });
+      gBackoff.appendChild(capBar);
+      if (active) {
+        const lbl = svgEl("text", {
+          class:"axis-label", x:(gx0+gx1)/2, y:CLIENT_Y-20, "text-anchor":"middle", fill:"#c4b5fd"
+        });
+        lbl.textContent = "wait " + a.backoff + "ms";
+        gBackoff.appendChild(lbl);
+        // faint cap range label
+        const cl = svgEl("text", { class:"axis-label", x:gx0, y:CLIENT_Y+44, fill:"#8b5cf6", opacity:0.7 });
+        cl.textContent = "jitter range 0–" + a.cap + "ms";
+        gBackoff.appendChild(cl);
+      }
+    });
+
+    // ---- the live travelling packet ----
+    const pkt = packetState(s.phase);
+    if (pkt) {
+      const c = svgEl("circle", {
+        class:"packet", cx:pkt.x, cy:pkt.y, r:9,
+        fill: pkt.color, stroke:"#fff", "stroke-width":2
+      });
+      gPacket.appendChild(c);
+      if (pkt.label) {
+        const t = svgEl("text", { x:pkt.x, y:pkt.y-14, "text-anchor":"middle",
+          fill:"#fff", "font-size":"10", "font-family":'"SF Mono", Menlo, monospace', "font-weight":"700" });
+        t.textContent = pkt.label;
+        gPacket.appendChild(t);
+      }
+    }
+
+    // ---- side vars ----
+    vAttempt.textContent = s.side.attempt;
+    vTimeout.textContent = s.side.timeout;
+    vBackoff.textContent = s.side.backoff;
+    vOutcome.textContent = s.side.outcome;
+    vOutcome.className = "value" + (s.side.outcomeCls ? " " + s.side.outcomeCls : "");
+
+    // ---- narration ----
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narration;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  // ---- phase helpers ----
+  const ORDER = ["intro","a1-send","a1-fail","backoff1","a2-send","a2-timeout","backoff2","a3-send","a3-ok"];
+  function phaseIdx(p) { return ORDER.indexOf(p); }
+  function phaseAttempt(p) {
+    if (p==="a1-send"||p==="a1-fail"||p==="backoff1") return 1;
+    if (p==="a2-send"||p==="a2-timeout"||p==="backoff2") return 2;
+    if (p==="a3-send"||p==="a3-ok") return 3;
+    return 0;
+  }
+  function isAttemptStarted(a, p) {
+    const pi = phaseIdx(p);
+    if (a.n===1) return pi >= phaseIdx("a1-send");
+    if (a.n===2) return pi >= phaseIdx("a2-send");
+    if (a.n===3) return pi >= phaseIdx("a3-send");
+    return false;
+  }
+  function isAttemptResolved(a, p) {
+    const pi = phaseIdx(p);
+    if (a.n===1) return pi >= phaseIdx("a1-fail");
+    if (a.n===2) return pi >= phaseIdx("a2-timeout");
+    if (a.n===3) return pi >= phaseIdx("a3-ok");
+    return false;
+  }
+  function backoffVisible(a, p) {
+    const pi = phaseIdx(p);
+    if (a.n===1) return pi >= phaseIdx("backoff1");
+    if (a.n===2) return pi >= phaseIdx("backoff2");
+    return false;
+  }
+  function isBackoffActive(a, p) {
+    if (a.n===1) return p==="backoff1";
+    if (a.n===2) return p==="backoff2";
+    return false;
+  }
+  // returns position of the live packet for "send" phases, or null
+  function packetState(p) {
+    if (p==="intro") return { x:x(0), y:CLIENT_Y+18, color:"#3b82f6", label:"req" };
+    if (p==="a1-send") return { x:x(15), y:(CLIENT_Y+SVC_Y)/2, color:"#3b82f6", label:"req →" };
+    if (p==="a2-send") return { x:x(330), y:(CLIENT_Y+SVC_Y)/2, color:"#3b82f6", label:"req →" };
+    if (p==="a3-send") return { x:x(690), y:(CLIENT_Y+SVC_Y)/2, color:"#3b82f6", label:"req →" };
+    return null;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  // ---------- contrast mini herd bars ----------
+  function herd(container, vals, color) {
+    container.innerHTML = "";
+    const max = Math.max.apply(null, vals);
+    vals.forEach(v => {
+      const b = document.createElement("div");
+      b.className = "hb";
+      b.style.height = (10 + (v / max) * 90) + "%";
+      b.style.background = color;
+      b.style.opacity = 0.4 + 0.6 * (v / max);
+      container.appendChild(b);
+    });
+  }
+  // no-backoff: two huge synchronized spikes (everyone retries at 100ms, 200ms)
+  herd(document.getElementById("herd-bad"),
+       [9,1,1,9,1,1,8,1,1,1,1,1], "#ef4444");
+  // backoff+jitter: same total retries smeared into a low flat band
+  herd(document.getElementById("herd-good"),
+       [3,3,2,3,2,3,2,3,2,3,2,3], "#10b981");
+
+  drawAxis();
+  render();
+})();
+</script>
+</body>
+</html>

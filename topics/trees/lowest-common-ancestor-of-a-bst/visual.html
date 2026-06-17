@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lowest Common Ancestor of a BST — Guided Descent</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a; --text: #e0e0e0;
+    --muted: #7a8ab0; --blue: #3b82f6; --amber: #f59e0b; --green: #10b981;
+    --red: #ef4444; --edge: #2d3a5a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 36px 18px 64px; gap: 26px;
+  }
+  h1 { font-size: 1.7rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel); border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue); border-radius: 12px;
+    padding: 16px 22px; max-width: 820px; width: 100%;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 1.8rem; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.96rem; line-height: 1.55; color: #c0c0d0; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--edge);
+    border-radius: 16px; padding: 26px; max-width: 880px; width: 100%;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .section-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px;
+  }
+  .targets {
+    display: flex; gap: 14px; align-items: center; font-size: 0.92rem; color: #c0c0d0;
+  }
+  .pill {
+    padding: 5px 14px; border-radius: 20px; font-weight: 700; font-size: 0.9rem;
+    border: 1.5px solid var(--green); color: #86efac; background: #0d2a1a;
+  }
+  .step-description {
+    min-height: 56px; background: var(--panel2); border-radius: 8px;
+    padding: 14px 18px; font-size: 0.95rem; line-height: 1.55;
+    color: #c8c8e0; border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-description.found { border-color: var(--green); }
+
+  .tree-box {
+    background: var(--panel2); border: 1px solid var(--edge);
+    border-radius: 12px; padding: 8px;
+  }
+  .node circle {
+    fill: var(--panel2); stroke: var(--edge); stroke-width: 2.5;
+    transition: fill 0.35s, stroke 0.35s;
+  }
+  .node text.val {
+    fill: var(--text); font-size: 15px; font-weight: 700;
+    text-anchor: middle; dominant-baseline: central;
+  }
+  .node text.tag {
+    font-size: 11px; font-weight: 700; text-anchor: middle;
+  }
+  .edge { stroke: var(--edge); stroke-width: 2.5; transition: stroke 0.35s; }
+  .edge.path { stroke: var(--blue); stroke-width: 4; }
+  .node.target circle { stroke: var(--green); stroke-width: 3; }
+  .node.visited circle { fill: #1c2540; stroke: #3a4a6a; }
+  .node.current circle { fill: #1e3a6e; stroke: var(--blue); filter: drop-shadow(0 0 9px rgba(59,130,246,0.6)); }
+  .node.lca circle { fill: #3a2e0d; stroke: var(--amber); stroke-width: 3.5; filter: drop-shadow(0 0 11px rgba(245,158,11,0.7)); }
+  .node.lca text.val { fill: #fcd34d; }
+  .node.pTag text.tag { fill: #86efac; }
+  .node.qTag text.tag { fill: #86efac; }
+
+  .compare-box {
+    background: var(--panel2); border: 1px solid var(--edge);
+    border-radius: 10px; padding: 14px 18px; font-size: 0.95rem;
+    font-family: 'JetBrains Mono', 'Consolas', monospace; color: #c8c8e0;
+    min-height: 48px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .compare-box .go { color: var(--amber); font-weight: 700; }
+  .compare-box .hit { color: #fcd34d; font-weight: 700; }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid var(--edge); }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+
+  .takeaway {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 12px;
+    padding: 18px 24px; max-width: 820px; width: 100%;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.94rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+  code { color: #93c5fd; }
+</style>
+</head>
+<body>
+
+  <h1>Lowest Common Ancestor of a BST &mdash; <span>Guided Descent</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🏛️</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Org chart me do employees ka "sabse chhota common boss". BST me left wale chhote,
+        right wale bade — to root se neeche jao. Jis pal dono <strong>alag-alag taraf</strong>
+        bant gaye (ya ek node khud target ho), wahi <strong>split point = LCA</strong>.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="targets">
+      <span>Find LCA of</span>
+      <span class="pill">p = 3</span>
+      <span class="pill">q = 5</span>
+    </div>
+
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press "Next". Starting at the root, we compare both p and q against the current node to choose a direction.</div>
+    </div>
+
+    <div class="tree-box">
+      <svg id="treeSvg" viewBox="0 0 520 320" width="100%" height="280"></svg>
+    </div>
+
+    <div class="compare-box" id="compareBox">comparison shown here</div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Both bigger → go right; both smaller → go left; otherwise the split (or a node equal to
+        p/q) <strong>is the LCA</strong>. We never explore the whole tree — just one root-to-LCA
+        path. <strong>O(h) time, O(1) space.</strong>
+      </p>
+    </div>
+  </div>
+
+<script>
+  // BST:            6
+  //              /     \
+  //             2       8
+  //            / \     / \
+  //           0   4   7   9
+  //              / \
+  //             3   5
+  // p = 3, q = 5.  Descend 6 -> 2 -> 4, where they split (3<4, 5>4) -> LCA = 4.
+  const nodes = {
+    n6: { val: 6, x: 260, y: 40 },
+    n2: { val: 2, x: 140, y: 120, parent: 'n6' },
+    n8: { val: 8, x: 380, y: 120, parent: 'n6' },
+    n0: { val: 0, x:  80, y: 200, parent: 'n2' },
+    n4: { val: 4, x: 200, y: 200, parent: 'n2' },
+    n7: { val: 7, x: 320, y: 200, parent: 'n8' },
+    n9: { val: 9, x: 440, y: 200, parent: 'n8' },
+    n3: { val: 3, x: 160, y: 280, parent: 'n4' },
+    n5: { val: 5, x: 250, y: 280, parent: 'n4' },
+  };
+  const order = ['n6','n2','n8','n0','n4','n7','n9','n3','n5'];
+  const TARGETS = { p: 'n3', q: 'n5' };
+  const svg = document.getElementById('treeSvg');
+  const ns = 'http://www.w3.org/2000/svg';
+  (function build() {
+    for (const id of order) {
+      const n = nodes[id];
+      if (n.parent) {
+        const p = nodes[n.parent];
+        const l = document.createElementNS(ns, 'line');
+        l.setAttribute('x1', p.x); l.setAttribute('y1', p.y);
+        l.setAttribute('x2', n.x); l.setAttribute('y2', n.y);
+        l.setAttribute('class', 'edge'); l.id = 'e-' + id;
+        svg.appendChild(l);
+      }
+    }
+    for (const id of order) {
+      const n = nodes[id];
+      const g = document.createElementNS(ns, 'g'); g.setAttribute('class', 'node'); g.id = id;
+      const c = document.createElementNS(ns, 'circle');
+      c.setAttribute('cx', n.x); c.setAttribute('cy', n.y); c.setAttribute('r', 22);
+      const t = document.createElementNS(ns, 'text');
+      t.setAttribute('class', 'val'); t.setAttribute('x', n.x); t.setAttribute('y', n.y);
+      t.textContent = n.val;
+      g.appendChild(c); g.appendChild(t);
+      // p/q tag
+      let tag = '';
+      if (id === TARGETS.p) tag = 'p';
+      if (id === TARGETS.q) tag = 'q';
+      if (tag) {
+        const tg = document.createElementNS(ns, 'text');
+        tg.setAttribute('class', 'tag'); tg.setAttribute('x', n.x + 28); tg.setAttribute('y', n.y - 20);
+        tg.textContent = tag; g.appendChild(tg);
+        g.classList.add(tag === 'p' ? 'pTag' : 'qTag', 'target');
+      }
+      svg.appendChild(g);
+    }
+  })();
+
+  // steps: desc, current(id), visited[ids], pathEdges[ids], compare(html), lca(id|null), found
+  const steps = [
+    {
+      desc: 'Start at root <strong>6</strong>. Compare both targets (p=3, q=5) against 6.',
+      current: 'n6', visited: [], pathEdges: [],
+      compare: 'p=3 &lt; 6 and q=5 &lt; 6 → <span class="go">both smaller → go LEFT</span>',
+    },
+    {
+      desc: 'Both p and q are smaller than 6, so the LCA must be in the left subtree. Move to <strong>2</strong>.',
+      current: 'n2', visited: ['n6'], pathEdges: ['n2'],
+      compare: 'now at node 2: p=3 &gt; 2 and q=5 &gt; 2 → <span class="go">both bigger → go RIGHT</span>',
+    },
+    {
+      desc: 'Both are bigger than 2, so descend right to <strong>4</strong>.',
+      current: 'n4', visited: ['n6','n2'], pathEdges: ['n2','n4'],
+      compare: 'now at node 4: p=3 &lt; 4 but q=5 &gt; 4 → <span class="hit">split!</span>',
+    },
+    {
+      desc: 'At <strong>4</strong> the targets split — p=3 goes left, q=5 goes right. This is the deepest node with both in its subtree → <strong>LCA = 4</strong>.',
+      current: 'n4', visited: ['n6','n2'], pathEdges: ['n2','n4'],
+      compare: 'not (both &gt;) and not (both &lt;) → <span class="hit">node 4 is the LCA</span>',
+      lca: 'n4', found: true,
+    },
+  ];
+
+  let cur = 0;
+  const stepDesc = document.getElementById('stepDesc');
+  const stepCtr = document.getElementById('stepCounter');
+  const compareBox = document.getElementById('compareBox');
+  const nextBtn = document.getElementById('nextBtn');
+  const prevBtn = document.getElementById('prevBtn');
+
+  function clearAll() {
+    document.querySelectorAll('#treeSvg .node').forEach(g => {
+      g.setAttribute('class', 'node' + (g.id === TARGETS.p ? ' pTag target' : g.id === TARGETS.q ? ' qTag target' : ''));
+    });
+    document.querySelectorAll('#treeSvg .edge').forEach(e => e.setAttribute('class', 'edge'));
+  }
+  function render() {
+    clearAll();
+    if (cur === 0) {
+      stepDesc.innerHTML = 'Press "Next". Starting at the root, we compare both p and q against the current node to choose a direction.';
+      stepDesc.className = 'step-description';
+      compareBox.innerHTML = 'comparison shown here';
+      stepCtr.textContent = 'Step 0 / ' + steps.length;
+      prevBtn.disabled = true; nextBtn.disabled = false; return;
+    }
+    const s = steps[cur - 1];
+    stepDesc.innerHTML = s.desc;
+    stepDesc.className = 'step-description ' + (s.found ? 'found' : '');
+    compareBox.innerHTML = s.compare;
+    (s.visited || []).forEach(id => {
+      const g = document.getElementById(id);
+      if (g) g.classList.add('visited');
+    });
+    (s.pathEdges || []).forEach(id => {
+      const e = document.getElementById('e-' + id); if (e) e.setAttribute('class', 'edge path');
+    });
+    if (s.current) {
+      const g = document.getElementById(s.current); if (g) g.classList.add('current');
+    }
+    if (s.lca) {
+      const g = document.getElementById(s.lca); if (g) { g.classList.remove('current'); g.classList.add('lca'); }
+    }
+    stepCtr.textContent = 'Step ' + cur + ' / ' + steps.length;
+    prevBtn.disabled = false; nextBtn.disabled = (cur >= steps.length);
+  }
+  function next() { if (cur < steps.length) { cur++; render(); } }
+  function prev() { if (cur > 0) { cur--; render(); } }
+  function reset() { cur = 0; render(); }
+  reset();
+</script>
+</body>
+</html>

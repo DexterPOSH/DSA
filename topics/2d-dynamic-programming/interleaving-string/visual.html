@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interleaving String — Weaving Two Strings on a DP Grid</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.85rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.05rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel); border-radius: 12px; padding: 16px 22px;
+    margin-bottom: 22px; border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .s3bar { text-align:center; margin-bottom:18px; }
+  .s3bar .lab { color: var(--muted); font-size:.85rem; margin-bottom:6px; }
+  .s3char {
+    display:inline-grid; place-items:center; width:30px; height:34px; margin:0 2px;
+    border-radius:6px; font-family:"SF Mono",Menlo,monospace; font-weight:700;
+    background: var(--panel2); border:1px solid rgba(255,255,255,0.08); color:var(--muted);
+    transition: all .3s ease;
+  }
+  .s3char.used { background: rgba(16,185,129,0.14); border-color: rgba(16,185,129,0.4); color:#b6f0d8; }
+  .s3char.cur { background: rgba(245,158,11,0.24); border-color: var(--amber); color:#ffe6b0; box-shadow:0 0 0 3px rgba(245,158,11,0.35); }
+
+  .recurrence {
+    font-family:"SF Mono",Menlo,monospace; color:#ffd479; background: var(--panel2);
+    border-radius:8px; padding:10px 14px; margin: 4px 0 18px; font-size:.9rem; line-height:1.85;
+  }
+  .recurrence .up { color: var(--blue); }
+  .recurrence .left { color: var(--purple); }
+
+  .controls { text-align: center; margin: 6px 0 22px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); margin: 0 6px; }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+
+  .stage {
+    background: var(--panel); border-radius: 14px; padding: 22px 22px 26px;
+    border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .tablewrap { display:flex; justify-content:center; overflow-x:auto; padding-bottom:6px; }
+  table.dp { border-collapse: separate; border-spacing: 6px; }
+  .dp th {
+    color: var(--muted); font-family:"SF Mono",Menlo,monospace; font-weight:700;
+    width: 46px; height: 36px; font-size: 1.02rem;
+  }
+  .dp th.s2chr { color: var(--purple); }
+  .dp th.s1chr { color: var(--blue); }
+  .dp th.corner { color:#555; }
+  .dp td {
+    width: 46px; height: 44px; border-radius: 9px; text-align:center; vertical-align:middle;
+    font-family:"SF Mono",Menlo,monospace; font-weight:700; font-size:1.2rem;
+    background: var(--panel2); border: 1px solid rgba(255,255,255,0.08);
+    color: #555; transition: all .3s ease;
+  }
+  .dp td.tcell { color: var(--green); }
+  .dp td.fcell { color: var(--red); }
+  .dp td.base { background: rgba(59,130,246,0.14); border-color: rgba(59,130,246,0.4); }
+  .dp td.doneT { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.32); }
+  .dp td.doneF { background: rgba(239,68,68,0.10); border-color: rgba(239,68,68,0.28); }
+  .dp td.active {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.45); transform: scale(1.10);
+  }
+  .dp td.srcUp { box-shadow: 0 0 0 3px var(--blue); background: rgba(59,130,246,0.26); }
+  .dp td.srcLeft { box-shadow: 0 0 0 3px var(--purple); background: rgba(168,85,247,0.26); }
+
+  .caption {
+    margin-top: 18px; background: var(--panel2); border-radius: 10px;
+    padding: 14px 16px; border-left: 4px solid var(--amber); font-size:.98rem; min-height: 76px;
+  }
+  .caption .eq { color: #ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .caption .up { color: #8db4f7; font-weight:700; }
+  .caption .left { color: #d3a8f7; font-weight:700; }
+  .caption .yes { color: var(--green); font-weight:700; }
+  .caption .no { color: var(--red); font-weight:700; }
+  .stepcount { text-align:center; color:var(--muted); font-size:.85rem; margin-top:12px; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-top:16px; font-size:.8rem; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .swatch { width:14px; height:14px; border-radius:4px; display:inline-block; border:1px solid rgba(255,255,255,.15); }
+  .sw-active { background: var(--amber); }
+  .sw-up { background: var(--blue); }
+  .sw-left { background: var(--purple); }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px;
+    padding: 18px 24px; margin-top: 28px; text-align:center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.05rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Interleaving String — <span>weaving two strings</span></h1>
+  <p class="subtitle">Can <b>s3</b> be formed by interleaving <b>s1</b> and <b>s2</b>, keeping each one's order?</p>
+
+  <div class="analogy">
+    <h3>⌨️ Analogy: two typists, one screen</h3>
+    <p>Do typists ek shared screen pe type karte hain — ek apne <b>s1</b> ke letters order me, dusra <b>s2</b> ke. Screen pe bana combined text <b>s3</b> hai. Har grid cell <code>dp[i][j]</code> poochta hai: kya <b>s3</b> ke pehle <code>i+j</code> letters, <code>s1</code> ke pehle <b>i</b> aur <code>s2</code> ke pehle <b>j</b> letters se woven ho sakte hain?</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> <code>s1 = "abc"</code>, <code>s2 = "aed"</code>, <code>s3 = "aabecd"</code>.
+    Interleaving valid? <span class="arrow">→</span> Answer: <code>true</code>
+  </div>
+
+  <div class="s3bar">
+    <div class="lab">s3 = "aabecd" &nbsp;(highlighted = the char being placed at the current cell)</div>
+    <div id="s3row"></div>
+  </div>
+
+  <div class="recurrence">
+    dp[i][j] = ( s1[i-1]==s3[i+j-1] AND <span class="up">dp[i-1][j]</span> ) &nbsp;OR&nbsp; ( s2[j-1]==s3[i+j-1] AND <span class="left">dp[i][j-1]</span> )<br>
+    <span style="color:var(--muted)">i.e. the last char came from <span class="up">s1 (cell above)</span> or <span class="left">s2 (cell left)</span></span>
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn">‹ Prev</button>
+    <button id="nextBtn">Next ›</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+  </div>
+
+  <div class="stage">
+    <div class="tablewrap"><table class="dp" id="dp"></table></div>
+    <div class="legend">
+      <span><i class="swatch sw-active"></i>computing now</span>
+      <span><i class="swatch sw-up"></i>from s1 (cell above)</span>
+      <span><i class="swatch sw-left"></i>from s2 (cell left)</span>
+    </div>
+    <div class="caption" id="caption">Press <b>Next</b>. <code>dp[0][0] = T</code> — using zero chars from each, the empty <b>s3</b> prefix is trivially an interleaving.</div>
+    <div class="stepcount" id="stepcount"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Each cell asks "could the last placed char have come from <b>s1 (above)</b> or <b>s2 (left)</b>?" — true if that neighbor was reachable AND the char matches. The bottom-right cell answers the whole question in <b>O(m·n)</b>.</p>
+  </div>
+</div>
+
+<script>
+const s1 = "abc";   // rows
+const s2 = "aed";   // cols
+const s3 = "aabecd";
+const M = s1.length, N = s2.length;
+
+// build dp
+const dp = Array.from({length:M+1}, () => Array(N+1).fill(false));
+dp[0][0] = true;
+for (let i=0;i<=M;i++){
+  for (let j=0;j<=N;j++){
+    if (i===0 && j===0) continue;
+    const k = i + j - 1;
+    let v = false;
+    if (i>0 && s1[i-1]===s3[k] && dp[i-1][j]) v = true;
+    if (j>0 && s2[j-1]===s3[k] && dp[i][j-1]) v = true;
+    dp[i][j] = v;
+  }
+}
+
+// steps (row-major, skip base [0][0] which is pre-filled)
+const steps = [];
+steps.push({ filledUpto:0, active:null, srcUp:null, srcLeft:null,
+  caption:`<b>Base:</b> <code>dp[0][0]=<span class="yes">T</span></code> — zero chars from each string forms the empty prefix of s3. (Cells in row 0 / col 0 just chain one string.)` });
+
+function order(i,j){ return i*(N+1)+j; }     // linear order
+for (let i=0;i<=M;i++){
+  for (let j=0;j<=N;j++){
+    if (i===0 && j===0) continue;
+    const k = i + j - 1;
+    const c3 = s3[k];
+    let srcUp=null, srcLeft=null, parts=[];
+    const upOK   = i>0 && s1[i-1]===c3 && dp[i-1][j];
+    const leftOK = j>0 && s2[j-1]===c3 && dp[i][j-1];
+    if (i>0){
+      const cond = s1[i-1]===c3;
+      parts.push(`<span class="up">from s1</span>: s1[${i-1}]=<span class="eq">'${s1[i-1]}'</span> ${cond?'==':'≠'} s3[${k}]=<span class="eq">'${c3}'</span>${cond?` and above dp[${i-1}][${j}]=<span class="eq">${dp[i-1][j]?'T':'F'}</span>`:''} → ${upOK?'<span class="yes">T</span>':'<span class="no">F</span>'}`);
+      if (upOK) srcUp=[i-1,j];
+    }
+    if (j>0){
+      const cond = s2[j-1]===c3;
+      parts.push(`<span class="left">from s2</span>: s2[${j-1}]=<span class="eq">'${s2[j-1]}'</span> ${cond?'==':'≠'} s3[${k}]=<span class="eq">'${c3}'</span>${cond?` and left dp[${i}][${j-1}]=<span class="eq">${dp[i][j-1]?'T':'F'}</span>`:''} → ${leftOK?'<span class="yes">T</span>':'<span class="no">F</span>'}`);
+      if (leftOK) srcLeft=[i,j-1];
+    }
+    let cap = `<code>dp[${i}][${j}]</code> places s3[${k}]=<span class="eq">'${c3}'</span>. ${parts.join('; ')}. → <code>dp[${i}][${j}] = ${dp[i][j]?'<span class="yes">T</span>':'<span class="no">F</span>'}</code>.`;
+    if (i===M && j===N) cap += ` 🎯 Bottom-right — final answer <b>${dp[i][j]?'true':'false'}</b>.`;
+    steps.push({ filledUpto:order(i,j), active:[i,j], srcUp, srcLeft, k, caption:cap });
+  }
+}
+
+const $ = id => document.getElementById(id);
+let cur = 0;
+
+function buildS3(){
+  $('s3row').innerHTML = [...s3].map((c,idx)=>`<span class="s3char" id="s3c${idx}">${c}</span>`).join('');
+}
+function buildTable(){
+  let html = '<tr><th class="corner"></th><th class="s2chr">∅</th>';
+  for (let j=0;j<N;j++) html += `<th class="s2chr">${s2[j]}</th>`;
+  html += '</tr>';
+  for (let i=0;i<=M;i++){
+    html += '<tr>';
+    html += i===0 ? '<th class="s1chr">∅</th>' : `<th class="s1chr">${s1[i-1]}</th>`;
+    for (let j=0;j<=N;j++) html += `<td id="t${i}-${j}">·</td>`;
+    html += '</tr>';
+  }
+  $('dp').innerHTML = html;
+}
+
+function render(){
+  const st = steps[cur];
+  const activeKey = st.active ? st.active[0]+','+st.active[1] : null;
+  const upKey = st.srcUp ? st.srcUp[0]+','+st.srcUp[1] : null;
+  const leftKey = st.srcLeft ? st.srcLeft[0]+','+st.srcLeft[1] : null;
+
+  // s3 bar
+  const k = (st.active===null) ? -1 : st.k;
+  for (let idx=0; idx<s3.length; idx++){
+    const el = $('s3c'+idx); el.className = 's3char';
+    if (idx === k) el.classList.add('cur');
+    else if (idx < k) el.classList.add('used');
+  }
+
+  for (let i=0;i<=M;i++){
+    for (let j=0;j<=N;j++){
+      const cell = $('t'+i+'-'+j);
+      cell.className = '';
+      const shown = order(i,j) <= st.filledUpto;
+      const val = dp[i][j];
+      cell.textContent = shown ? (val?'T':'F') : '·';
+      if (!shown) continue;
+      cell.classList.add(val?'tcell':'fcell');
+      const kk = i+','+j;
+      if (kk === activeKey) cell.classList.add('active');
+      else if (kk === upKey) cell.classList.add('srcUp');
+      else if (kk === leftKey) cell.classList.add('srcLeft');
+      else if (i===0 && j===0) cell.classList.add('base');
+      else cell.classList.add(val?'doneT':'doneF');
+    }
+  }
+  $('caption').innerHTML = st.caption;
+  $('stepcount').textContent = `Step ${cur} / ${steps.length-1}`;
+  $('prevBtn').disabled = cur === 0;
+  $('nextBtn').disabled = cur === steps.length-1;
+}
+
+$('nextBtn').addEventListener('click', ()=>{ if(cur<steps.length-1){cur++;render();}});
+$('prevBtn').addEventListener('click', ()=>{ if(cur>0){cur--;render();}});
+$('resetBtn').addEventListener('click', ()=>{ cur=0; render(); });
+
+buildS3();
+buildTable();
+render();
+</script>
+</body>
+</html>

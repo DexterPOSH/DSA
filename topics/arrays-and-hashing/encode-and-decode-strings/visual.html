@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Encode and Decode Strings — Length-Prefix Framing</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+    gap: 28px;
+    line-height: 1.55;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel);
+    border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue);
+    border-radius: 12px;
+    padding: 18px 24px;
+    max-width: 760px;
+    width: 100%;
+    display: flex;
+    gap: 16px;
+  }
+  .analogy-icon { font-size: 1.9rem; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.96rem; color: #c0c0d0; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid #2d3a5a;
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 820px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .mode-tabs { display: flex; gap: 10px; }
+  .tab {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    background: #1e293b;
+    border: 1px solid #2d3a5a;
+    color: var(--muted);
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: all .2s;
+  }
+  .tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+  .section-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 9px;
+  }
+
+  .step-desc {
+    min-height: 56px;
+    background: var(--panel2);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 0.95rem;
+    color: #c8c8e0;
+    border-left: 3px solid var(--blue);
+  }
+  .step-desc.encode { border-color: var(--amber); }
+  .step-desc.done { border-color: var(--green); }
+
+  /* word chips */
+  .words-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .word-chip {
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: var(--panel2);
+    border: 1.5px solid #2d3a5a;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-weight: 700;
+    transition: all .3s;
+  }
+  .word-chip.active { border-color: var(--amber); background: #3a2a0a; color: #fcd34d; box-shadow: 0 0 16px rgba(245,158,11,0.35); }
+  .word-chip.done   { border-color: var(--green); background: #0d2a1a; color: #86efac; }
+
+  /* encoded stream of character cells */
+  .stream { display: flex; flex-wrap: wrap; gap: 4px; }
+  .ch {
+    width: 30px; height: 38px;
+    border-radius: 6px;
+    background: var(--panel2);
+    border: 1px solid #2d3a5a;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-weight: 700; font-size: 0.95rem;
+    color: #9fb0d0;
+    position: relative;
+    transition: all .3s;
+  }
+  .ch.len   { border-color: var(--blue);  background: #14233f; color: #93c5fd; }
+  .ch.hash  { border-color: var(--amber); background: #2a1f08; color: #fcd34d; }
+  .ch.body  { border-color: var(--green); background: #0d2a1a; color: #86efac; }
+  .ch.scan  { box-shadow: 0 0 0 2px var(--amber); transform: translateY(-3px); }
+  .ch.read  { box-shadow: 0 0 0 2px var(--blue);  transform: translateY(-3px); }
+  .ch .tag {
+    position: absolute; top: -16px; font-size: 0.55rem; color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
+  .legend span::before {
+    content: ''; display: inline-block; width: 12px; height: 12px;
+    border-radius: 3px; margin-right: 6px; vertical-align: middle;
+  }
+  .lg-len::before  { background: #14233f; border: 1px solid var(--blue); }
+  .lg-hash::before { background: #2a1f08; border: 1px solid var(--amber); }
+  .lg-body::before { background: #0d2a1a; border: 1px solid var(--green); }
+
+  .pointer-info {
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 0.85rem; color: var(--amber);
+    background: var(--panel2); border-radius: 8px; padding: 10px 14px;
+  }
+
+  .out-row { display: flex; gap: 10px; flex-wrap: wrap; min-height: 44px; align-items: center; }
+  .out-empty { font-style: italic; color: #3a4a6a; font-size: 0.85rem; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: all .15s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.82rem; color: var(--muted); margin-left: auto; font-family: monospace; }
+
+  .takeaway {
+    background: var(--panel);
+    border: 1px solid #2d3a5a;
+    border-radius: 12px;
+    padding: 18px 24px;
+    max-width: 760px;
+    width: 100%;
+    display: flex;
+    gap: 16px;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--green); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.94rem; color: #c0c0d0; }
+  .takeaway strong { color: #e0e0e0; }
+</style>
+</head>
+<body>
+
+  <h1>Encode &amp; Decode Strings &mdash; <span>Length-Prefix Framing</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">📦</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Har parcel se pehle ek label chipka do: <strong>"agla parcel exactly 4 chars ka hai"</strong>.
+        Receiver label padhta hai, exactly utne characters ginta hai — chahe andar
+        <code>#</code> ho ya kuch bhi, length kabhi jhooth nahi bolti.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="mode-tabs">
+      <div class="tab active" id="tabEncode" onclick="setMode('encode')">① Encode &nbsp;list → string</div>
+      <div class="tab" id="tabDecode" onclick="setMode('decode')">② Decode &nbsp;string → list</div>
+    </div>
+
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-desc" id="stepDesc">Press "Next Step" to begin.</div>
+    </div>
+
+    <div id="inputArea">
+      <div class="section-label" id="inputLabel">Input list of strings</div>
+      <div class="words-row" id="wordsRow"></div>
+    </div>
+
+    <div>
+      <div class="section-label">Encoded stream &nbsp;<code style="color:var(--muted);font-size:0.72rem">len#word len#word …</code></div>
+      <div class="stream" id="stream"></div>
+    </div>
+
+    <div class="legend">
+      <span class="lg-len">length digits</span>
+      <span class="lg-hash"># delimiter</span>
+      <span class="lg-body">string content</span>
+    </div>
+
+    <div class="pointer-info" id="pointerInfo" style="display:none"></div>
+
+    <div id="outArea" style="display:none">
+      <div class="section-label">Decoded list (output)</div>
+      <div class="out-row" id="outRow"><span class="out-empty">empty</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next Step</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        A <strong>length prefix is self-delimiting</strong> — it tells the decoder exactly how
+        many characters to consume, so the content can contain <em>any</em> character (even the
+        <code>#</code> delimiter). Same trick that frames messages in TCP and protobuf.
+        Both directions run in <strong>O(N)</strong>.
+      </p>
+    </div>
+  </div>
+
+<script>
+const words = ["neet", "code", "lo#e", "you"];   // note: "lo#e" contains a '#'!
+
+// Build the encoded string + a typed map of each char
+function buildEncoded() {
+  let s = "", meta = [];           // meta[i] = {type:'len'|'hash'|'body', wi: wordIndex}
+  words.forEach((w, wi) => {
+    const lenStr = String(w.length);
+    for (const d of lenStr) { s += d; meta.push({type:'len', wi}); }
+    s += '#'; meta.push({type:'hash', wi});
+    for (const c of w)     { s += c; meta.push({type:'body', wi}); }
+  });
+  return { s, meta };
+}
+const { s: encoded, meta } = buildEncoded();
+
+let mode = 'encode';
+let step = 0;
+let timers = [];
+
+const $ = id => document.getElementById(id);
+const after = (ms, fn) => timers.push(setTimeout(fn, ms));
+const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+
+// ---------- ENCODE STEPS ----------
+// one step per word: append its len#word block
+function encodeSteps() {
+  return words.map((w, wi) => ({
+    wi,
+    desc: `Take <strong>"${w}"</strong> (length ${w.length}). Write its length <strong>${w.length}</strong>, ` +
+          `then <strong>#</strong>, then the ${w.length} characters. ` +
+          (w.includes('#') ? `Notice "${w}" itself contains a <strong style="color:var(--amber)">#</strong> — the length prefix handles it fine.` : ``)
+  }));
+}
+
+// ---------- DECODE STEPS ----------
+// walk the encoded string; each step decodes one word
+function decodeSteps() {
+  const steps = [];
+  let i = 0;
+  while (i < encoded.length) {
+    let j = i;
+    while (encoded[j] !== '#') j++;
+    const length = parseInt(encoded.slice(i, j), 10);
+    const word = encoded.slice(j + 1, j + 1 + length);
+    steps.push({ i, j, length, word, end: j + 1 + length });
+    i = j + 1 + length;
+  }
+  return steps;
+}
+
+function setMode(m) {
+  mode = m;
+  $('tabEncode').classList.toggle('active', m === 'encode');
+  $('tabDecode').classList.toggle('active', m === 'decode');
+  reset();
+}
+
+function renderWords(activeWi, doneUpTo) {
+  $('wordsRow').innerHTML = words.map((w, wi) => {
+    let cls = 'word-chip';
+    if (mode === 'encode') {
+      if (wi < doneUpTo) cls += ' done';
+      if (wi === activeWi) cls += ' active';
+    }
+    return `<div class="${cls}">"${w.replace(/#/g,'<span style="color:var(--amber)">#</span>')}"</div>`;
+  }).join('');
+}
+
+function renderStream(revealUpTo, scanRange, mode2) {
+  // revealUpTo: number of chars shown; scanRange optional {from,to,type}
+  $('stream').innerHTML = encoded.split('').map((c, idx) => {
+    if (idx >= revealUpTo) return '';
+    let cls = 'ch ' + meta[idx].type;
+    if (scanRange && idx >= scanRange.from && idx < scanRange.to) cls += ' ' + scanRange.cls;
+    const ch = c === '#' ? '#' : c;
+    return `<div class="${cls}">${ch}</div>`;
+  }).join('');
+}
+
+function reset() {
+  clearTimers();
+  step = 0;
+  $('nextBtn').disabled = false;
+  $('stepDesc').className = 'step-desc';
+  $('stepDesc').innerHTML = 'Press "Next Step" to begin.';
+
+  if (mode === 'encode') {
+    $('inputArea').style.display = '';
+    $('inputLabel').textContent = 'Input list of strings';
+    $('outArea').style.display = 'none';
+    $('pointerInfo').style.display = 'none';
+    renderWords(-1, 0);
+    renderStream(0);
+    $('stepCounter').textContent = `Step 0 / ${encodeSteps().length}`;
+  } else {
+    $('inputArea').style.display = 'none';
+    $('outArea').style.display = '';
+    $('pointerInfo').style.display = '';
+    $('pointerInfo').textContent = 'i = 0  (pointer at start of stream)';
+    $('outRow').innerHTML = '<span class="out-empty">empty</span>';
+    renderStream(encoded.length);          // show full encoded string greyed/typed
+    $('stepCounter').textContent = `Step 0 / ${decodeSteps().length}`;
+  }
+}
+
+function advance() {
+  if (mode === 'encode') advanceEncode();
+  else advanceDecode();
+}
+
+function advanceEncode() {
+  const steps = encodeSteps();
+  if (step >= steps.length) return;
+  clearTimers();
+  const st = steps[step];
+
+  // how many chars correspond to words 0..st.wi inclusive
+  const charsUpToInclusive = meta.filter(m => m.wi <= st.wi).length;
+
+  renderWords(st.wi, st.wi);
+  $('stepDesc').className = 'step-desc encode';
+  $('stepDesc').innerHTML = st.desc;
+  renderStream(charsUpToInclusive);
+
+  step++;
+  $('stepCounter').textContent = `Step ${step} / ${steps.length}`;
+
+  if (step >= steps.length) {
+    after(50, () => {
+      renderWords(-1, words.length);
+      $('stepDesc').className = 'step-desc done';
+      $('stepDesc').innerHTML = `Done! Encoded string: <code style="color:#86efac">${encoded.replace(/#/g,'#')}</code>. ` +
+        `Ek hi flat string me poori list — ab decode kar sakte ho.`;
+      $('nextBtn').disabled = true;
+    });
+  }
+}
+
+function advanceDecode() {
+  const steps = decodeSteps();
+  if (step >= steps.length) return;
+  clearTimers();
+  const st = steps[step];
+
+  // Phase A: scan length digits then find #
+  $('stepDesc').className = 'step-desc';
+  $('stepDesc').innerHTML =
+    `From <strong>i=${st.i}</strong>, read digits until <strong>#</strong> → length is ` +
+    `<strong>${st.length}</strong>. The # sits at index ${st.j}.`;
+  renderStream(encoded.length, {from: st.i, to: st.j, cls: 'read'});
+  $('pointerInfo').textContent = `i = ${st.i}  ·  reading length digits → ${st.length}  ·  # at ${st.j}`;
+
+  // Phase B: grab exactly `length` chars after #
+  after(750, () => {
+    renderStream(encoded.length, {from: st.j + 1, to: st.end, cls: 'scan'});
+    $('stepDesc').innerHTML =
+      `Grab exactly <strong>${st.length}</strong> chars after the # → <strong style="color:#fcd34d">"${st.word.replace(/#/g,'#')}"</strong>. ` +
+      (st.word.includes('#') ? `It contains a <strong style="color:var(--amber)">#</strong>, but we counted by length so it's captured correctly.` : ``);
+    $('pointerInfo').textContent = `grabbed s[${st.j+1}:${st.end}] = "${st.word}"  ·  next i = ${st.end}`;
+
+    // append to output
+    const cur = $('outRow');
+    if (cur.querySelector('.out-empty')) cur.innerHTML = '';
+    const chip = document.createElement('div');
+    chip.className = 'word-chip done';
+    chip.style.animation = 'none';
+    chip.innerHTML = `"${st.word.replace(/#/g,'<span style="color:var(--amber)">#</span>')}"`;
+    cur.appendChild(chip);
+  });
+
+  step++;
+  $('stepCounter').textContent = `Step ${step} / ${steps.length}`;
+
+  if (step >= steps.length) {
+    after(800, () => {
+      $('stepDesc').className = 'step-desc done';
+      $('stepDesc').innerHTML = `Pointer reached the end. Decoded list fully reconstructed — original order preserved.`;
+      $('nextBtn').disabled = true;
+    });
+  }
+}
+
+reset();
+</script>
+</body>
+</html>

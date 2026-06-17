@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gas Station — Running Tank & Start Reset Visualized</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; font-weight: 700; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(16,185,129,0.08));
+    border: 1px solid rgba(245,158,11,0.35);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1rem; }
+  .analogy p { margin: 0; }
+
+  .card {
+    background: var(--panel); border-radius: 14px;
+    padding: 22px 24px 26px; margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; }
+  .step-desc {
+    background: var(--panel2); border-left: 4px solid var(--blue);
+    border-radius: 8px; padding: 14px 16px; min-height: 58px;
+    font-size: 1.02rem; margin-bottom: 22px;
+  }
+  .step-desc code { background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 5px; color: #ffd479; font-family: "SF Mono", Menlo, monospace; }
+
+  .feas {
+    background: rgba(0,0,0,0.22); border-radius: 10px; padding: 12px 16px;
+    margin-bottom: 22px; font-family: "SF Mono", Menlo, monospace; font-size: 0.95rem;
+    border: 1px dashed rgba(255,255,255,0.14);
+  }
+  .feas b.ok { color: var(--green); } .feas b.bad { color: var(--red); }
+
+  .stations { display: flex; gap: 8px; margin: 8px 0 4px; }
+  .stn {
+    position: relative; flex: 1 1 0; min-width: 56px;
+    border-radius: 9px; padding: 8px 4px 22px;
+    text-align: center;
+    background: var(--panel2); border: 2px solid rgba(255,255,255,0.08);
+    transition: all .3s ease;
+  }
+  .stn .si { position: absolute; bottom: 4px; left: 0; right: 0; font-size: 0.7rem; color: #5a6a90; }
+  .stn .net { font-family: "SF Mono", Menlo, monospace; font-weight: 700; font-size: 1.15rem; }
+  .stn .gc  { font-size: 0.72rem; color: var(--muted); font-family: "SF Mono", Menlo, monospace; }
+  .stn .net.pos { color: var(--green); }
+  .stn .net.neg { color: var(--red); }
+  .stn.current  { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(245,158,11,0.25); transform: translateY(-4px); }
+  .stn.skipped  { opacity: 0.4; border-color: var(--red); }
+  .stn.candidate{ border-color: var(--blue); background: rgba(59,130,246,0.12); }
+  .stn .flag { position: absolute; top: -20px; left: 0; right: 0; font-size: 0.7rem; font-weight: 700; color: var(--blue); }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 30px; }
+  .stat { background: var(--panel2); border-radius: 10px; padding: 14px 18px; border: 1px solid rgba(255,255,255,0.08); transition: all .3s ease; }
+  .stat h4 { margin: 0 0 4px; font-size: 0.82rem; color: var(--muted); font-weight: 600; }
+  .stat .big { font-family: "SF Mono", Menlo, monospace; font-size: 1.7rem; font-weight: 700; }
+  .stat.tank { border-color: var(--green); } .stat.tank .big { color: var(--green); }
+  .stat.tank.neg { border-color: var(--red); } .stat.tank.neg .big { color: var(--red); }
+  .stat.start { border-color: var(--blue); } .stat.start .big { color: var(--blue); }
+
+  .verdict {
+    margin-top: 22px; border-radius: 10px; padding: 14px 18px;
+    font-weight: 700; font-size: 1.05rem; display: none;
+    font-family: "SF Mono", Menlo, monospace;
+    background: rgba(16,185,129,0.15); border: 1px solid var(--green); color: #b6f0d8;
+  }
+  .verdict.show { display: block; }
+
+  .controls { display: flex; align-items: center; gap: 12px; margin-top: 26px; flex-wrap: wrap; }
+  button { background: var(--blue); color: #fff; border: none; padding: 11px 24px; border-radius: 10px; font-size: 0.98rem; font-weight: 600; cursor: pointer; transition: transform .15s, background .2s; }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .counter { margin-left: auto; color: var(--muted); font-family: "SF Mono", Menlo, monospace; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px;
+    padding: 18px 24px; margin-top: 28px;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; }
+
+  .code-block {
+    background: #11111f; border-radius: 10px; padding: 16px 18px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 0.88rem;
+    line-height: 1.7; margin-top: 22px; overflow-x: auto; white-space: pre;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .kw { color: #c678dd; } .fn { color: #61afef; } .cm { color: #5a6a90; } .num { color: #d19a66; }
+  @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Gas Station — running <span>tank</span> &amp; start reset</h1>
+  <p class="subtitle">Drive the circle once. Whenever the tank dips below zero, the whole prefix is disqualified — restart at the next station.</p>
+
+  <div class="analogy">
+    <h3>⛽ Real-world analogy: the circular road-trip</h3>
+    <p>Har pump pe <code>gas[i]</code> milta hai, agle pump tak <code>cost[i]</code> lagta hai. Do sach: (1) total gas &lt; total cost → koi start nahi, <code>-1</code>. (2) total gas ≥ total cost → valid start zaroor hai. Jahan running <b>tank</b> negative ho, us start se yahan tak ka poora prefix invalid → next pump ko naya candidate maano.</p>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Step description</div>
+    <div class="step-desc" id="stepDesc">Press <b>Next</b> to start. First we check overall feasibility, then sweep once.</div>
+
+    <div class="feas" id="feasBox">
+      Feasibility: <code>sum(gas) = 15</code>, <code>sum(cost) = 15</code> → press Next to evaluate…
+    </div>
+
+    <div class="section-label">Stations &nbsp;<code style="color:#5a6a90;font-size:0.75rem;font-family:monospace">gas=[1,2,3,4,5]  cost=[3,4,5,1,2]</code> &nbsp;— shown value is net = gas − cost</div>
+    <div class="stations" id="stationsRow"></div>
+
+    <div class="stats">
+      <div class="stat start">
+        <h4>start &nbsp;<span style="font-weight:400">(current candidate)</span></h4>
+        <div class="big" id="startVal">0</div>
+      </div>
+      <div class="stat tank" id="tankStat">
+        <h4>tank &nbsp;<span style="font-weight:400">(running balance from start)</span></h4>
+        <div class="big" id="tankVal">0</div>
+      </div>
+    </div>
+
+    <div class="verdict" id="verdict"></div>
+
+    <div class="controls">
+      <button class="ghost" id="prevBtn" onclick="prev()">◀ Prev</button>
+      <button id="nextBtn" onclick="next()">Next ▶</button>
+      <button class="ghost" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="counter" id="counter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="code-block"><span class="kw">def</span> <span class="fn">can_complete_circuit</span>(gas, cost):
+    <span class="kw">if</span> <span class="fn">sum</span>(gas) &lt; <span class="fn">sum</span>(cost):
+        <span class="kw">return</span> -<span class="num">1</span>                 <span class="cm"># not enough fuel anywhere</span>
+    start, tank = <span class="num">0</span>, <span class="num">0</span>
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="fn">len</span>(gas)):
+        tank += gas[i] - cost[i]
+        <span class="kw">if</span> tank &lt; <span class="num">0</span>:              <span class="cm"># can't reach i+1 from start</span>
+            start = i + <span class="num">1</span>         <span class="cm"># whole prefix disqualified</span>
+            tank = <span class="num">0</span>              <span class="cm"># fresh restart</span>
+    <span class="kw">return</span> start</div>
+
+  <div class="takeaway">
+    <h3>💡 Key takeaway</h3>
+    <p>Two independent things: a global feasibility check (<code>sum(gas) ≥ sum(cost)</code>), and a running tank that, whenever it goes negative, proves no station in the failed prefix can be the start — so jump <code>start</code> past it. When feasible, the final reset point is the unique answer. O(n) time, O(1) space.</p>
+  </div>
+</div>
+
+<script>
+const gas  = [1, 2, 3, 4, 5];
+const cost = [3, 4, 5, 1, 2];
+const n = gas.length;
+const net = gas.map((g, i) => g - cost[i]);
+const sumGas = gas.reduce((a,b)=>a+b,0);
+const sumCost = cost.reduce((a,b)=>a+b,0);
+const feasible = sumGas >= sumCost;
+
+// Build trace.
+// frame 0: feasibility check.
+// frames 1..n: process station i.
+// final frame: answer.
+const trace = [];
+trace.push({
+  kind: 'feas',
+  desc: `Feasibility check: <code>sum(gas) = ${sumGas}</code> vs <code>sum(cost) = ${sumCost}</code>. ` +
+        (feasible
+          ? `${sumGas} ≥ ${sumCost} → a valid start <b>must</b> exist. Now find which one.`
+          : `${sumGas} &lt; ${sumCost} → impossible, return <b>-1</b>.`)
+});
+
+if (feasible) {
+  let start = 0, tank = 0;
+  for (let i = 0; i < n; i++) {
+    const before = tank;
+    tank += net[i];
+    if (tank < 0) {
+      const oldStart = start;
+      start = i + 1; tank = 0;
+      trace.push({
+        kind: 'reset', i, start, tank, candidate: start, skippedUpto: i, oldStart,
+        desc: `Station ${i}: tank = ${before} ${net[i] >= 0 ? '+' : '−'} ${Math.abs(net[i])} = <b style="color:#ef4444">${before + net[i]}</b> &lt; 0. ` +
+              `Can't reach station ${i+1} from start ${oldStart}. Disqualify stations ${oldStart}…${i}, set <code>start = ${start}</code>, reset tank to 0.`
+      });
+    } else {
+      trace.push({
+        kind: 'ok', i, start, tank, candidate: start,
+        desc: `Station ${i}: tank = ${before} ${net[i] >= 0 ? '+' : '−'} ${Math.abs(net[i])} = <b style="color:#10b981">${tank}</b> ≥ 0. ` +
+              `Still alive from candidate start ${start}. Keep driving.`
+      });
+    }
+  }
+  trace.push({
+    kind: 'answer', start, tank,
+    desc: `Swept the whole array; feasibility was guaranteed, so the last reset point is the unique answer: <b>start = ${start}</b>.`
+  });
+} else {
+  trace.push({ kind: 'answer', start: -1, desc: `Return <b>-1</b> — no station can complete the circuit.` });
+}
+
+const $ = id => document.getElementById(id);
+let step = -1;
+const TOTAL = trace.length;
+
+function buildStations() {
+  $('stationsRow').innerHTML = gas.map((g, i) => {
+    const cls = net[i] >= 0 ? 'pos' : 'neg';
+    const sign = net[i] >= 0 ? '+' : '';
+    return `<div class="stn" id="s${i}">
+      <span class="flag" id="flag${i}"></span>
+      <div class="net ${cls}">${sign}${net[i]}</div>
+      <div class="gc">${g}−${cost[i]}</div>
+      <span class="si">i=${i}</span>
+    </div>`;
+  }).join('');
+}
+
+function render() {
+  $('counter').textContent = step < 0 ? 'Step 0' : `Step ${step + 1} / ${TOTAL}`;
+  $('prevBtn').disabled = step < 0;
+  $('nextBtn').disabled = step >= TOTAL - 1;
+  $('verdict').className = 'verdict';
+
+  gas.forEach((_, i) => { $('s'+i).className = 'stn'; $('flag'+i).textContent = ''; });
+
+  if (step < 0) {
+    $('stepDesc').innerHTML = 'Press <b>Next</b> to start. First we check overall feasibility, then sweep once.';
+    $('feasBox').innerHTML = `Feasibility: <code>sum(gas) = ${sumGas}</code>, <code>sum(cost) = ${sumCost}</code> → press Next to evaluate…`;
+    $('startVal').textContent = '0'; $('tankVal').textContent = '0';
+    $('tankStat').className = 'stat tank';
+    return;
+  }
+
+  const s = trace[step];
+  $('stepDesc').innerHTML = s.desc;
+
+  if (s.kind === 'feas') {
+    $('feasBox').innerHTML = feasible
+      ? `Feasibility: <code>sum(gas)=${sumGas}</code> ≥ <code>sum(cost)=${sumCost}</code> → <b class="ok">a valid start exists ✅</b>`
+      : `Feasibility: <code>sum(gas)=${sumGas}</code> &lt; <code>sum(cost)=${sumCost}</code> → <b class="bad">return -1 ❌</b>`;
+    $('startVal').textContent = '0'; $('tankVal').textContent = '0';
+    $('tankStat').className = 'stat tank';
+    return;
+  }
+
+  $('feasBox').innerHTML = `Feasibility: <code>sum(gas)=${sumGas}</code> ≥ <code>sum(cost)=${sumCost}</code> → <b class="ok">a valid start exists ✅</b>`;
+  $('startVal').textContent = s.start;
+  $('tankVal').textContent = s.tank;
+  $('tankStat').className = 'stat tank' + (s.kind === 'reset' ? ' neg' : '');
+
+  if (s.kind === 'answer') {
+    if (s.start >= 0) {
+      $('s'+s.start).classList.add('candidate');
+      $('flag'+s.start).textContent = 'START';
+      const v = $('verdict'); v.className = 'verdict show';
+      v.textContent = `✅ Answer: start at station ${s.start}`;
+    }
+    return;
+  }
+
+  // mark skipped prefix, candidate, current
+  for (let i = 0; i < s.start; i++) $('s'+i).classList.add('skipped');
+  if (s.start <= n - 1) { $('s'+s.start).classList.add('candidate'); $('flag'+s.start).textContent = 'start'; }
+  $('s'+s.i).classList.add('current');
+}
+
+function next() { if (step < TOTAL - 1) { step++; render(); } }
+function prev() { if (step >= 0) { step--; render(); } }
+function reset() { step = -1; render(); }
+
+buildStations();
+render();
+</script>
+</body>
+</html>

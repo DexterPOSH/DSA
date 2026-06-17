@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cheapest Flights Within K Stops — Bellman-Ford</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444; --purple:#a855f7;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:30px 18px 70px;}
+  .wrap{max-width:940px;margin:0 auto;}
+  h1{font-size:1.7rem;margin:0 0 6px;}
+  h1 span{color:var(--purple);}
+  .subtitle{color:var(--muted);margin:0 0 24px;}
+  .analogy{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(168,85,247,.10));
+    border:1px solid rgba(245,158,11,.4);border-left:5px solid var(--amber);border-radius:12px;padding:16px 20px;margin-bottom:24px;}
+  .analogy h3{margin:0 0 6px;color:var(--amber);font-size:1.02rem;}
+  .analogy p{margin:0;}
+  .stage{display:grid;grid-template-columns:1fr 330px;gap:18px;background:var(--panel);
+    border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:18px 20px;margin-bottom:18px;}
+  @media(max-width:760px){.stage{grid-template-columns:1fr;}}
+  svg{width:100%;height:auto;background:#12182e;border-radius:10px;}
+  .side{display:flex;flex-direction:column;gap:14px;}
+  .panel-box{background:var(--panel2);border-radius:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);}
+  .panel-box h4{margin:0 0 8px;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);}
+  table{width:100%;border-collapse:collapse;font-family:"SF Mono",Menlo,monospace;font-size:.9rem;}
+  th,td{padding:6px 4px;text-align:center;border:1px solid rgba(255,255,255,.08);}
+  th{color:var(--muted);font-weight:600;}
+  td.cur{background:rgba(168,85,247,.2);color:#e3c9ff;border-color:var(--purple);}
+  td.upd{background:rgba(16,185,129,.2);color:#b6f0d8;border-color:var(--green);font-weight:700;}
+  td.src{color:var(--amber);}
+  .caption{background:var(--panel2);border-left:4px solid var(--purple);border-radius:8px;
+    padding:12px 16px;margin:0 0 16px;font-size:.98rem;min-height:54px;}
+  .caption b{color:#e3c9ff;}
+  .controls{display:flex;align-items:center;gap:10px;margin:6px 0 22px;}
+  button{background:var(--purple);color:#fff;border:none;padding:10px 22px;border-radius:9px;font-size:.98rem;font-weight:700;cursor:pointer;transition:transform .12s,background .2s;}
+  button:hover{background:#9333ea;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  button.ghost{background:var(--panel2);font-weight:600;}
+  button.ghost:hover{background:#33457a;}
+  .stepind{color:var(--muted);font-size:.9rem;margin-left:auto;}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:4px 0 18px;font-size:.84rem;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:13px;height:13px;border-radius:50%;display:inline-block;}
+  .takeaway{background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(59,130,246,.12));
+    border:1px solid rgba(168,85,247,.4);border-radius:12px;padding:18px 22px;margin-top:26px;text-align:center;}
+  .takeaway h3{margin:0 0 6px;color:var(--purple);}
+  .takeaway p{margin:0;font-size:1.05rem;}
+  .nlabel{font:700 15px 'Segoe UI';fill:#fff;}
+  .nsub{font:600 11px "SF Mono",monospace;}
+  .ew{font:600 12px "SF Mono",monospace;fill:#9fb0e0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cheapest Flights Within K Stops — <span>Bellman-Ford</span></h1>
+  <p class="subtitle">Relax every edge once per round; round R = paths using at most R flights. The snapshot copy enforces the hop limit.</p>
+
+  <div class="analogy">
+    <h3>✈️ The round-by-round analogy</h3>
+    <p>Sasti flight dhoondho <b>src→dst</b> me, par zyada se zyada <b>k layovers</b>. Har <b>round</b> me ek aur flight (hop) lene ki ijaazat do — Round 1: direct flights, Round 2: ek aur hop aage, … <code>k+1</code> rounds tak. Har round ka update pichhle round ki <b>copy</b> se, taaki ek round me do hops na ho jaayein.</p>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#3a4a78"></i>city</span>
+    <span><i class="dot" style="background:var(--amber)"></i>src</span>
+    <span><i class="dot" style="background:var(--green)"></i>dst</span>
+    <span><i class="dot" style="width:18px;height:4px;border-radius:2px;background:var(--purple)"></i>relaxing edge</span>
+  </div>
+
+  <div class="stage">
+    <svg id="graph" viewBox="0 0 420 300"></svg>
+    <div class="side">
+      <div class="panel-box">
+        <h4>prices[] across rounds</h4>
+        <table id="ptable"></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="caption" id="caption">Press <b>Next</b>. Goal: cheapest 0→3 with at most k=1 stop (≤2 flights).</div>
+  <div class="controls">
+    <button id="prev" class="ghost">‹ Prev</button>
+    <button id="next">Next ›</button>
+    <button id="auto" class="ghost">▶ Auto</button>
+    <span class="stepind" id="ind"></span>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>K stops = K+1 edges = K+1 relaxation rounds. Updating from a per-round <i>snapshot</i> guarantees each path gains exactly one hop per round — so the cheapest-but-too-long path can't sneak in.</p>
+  </div>
+</div>
+
+<script>
+const n=4, SRC=0, DST=3, K=1;
+const flights=[[0,1,100],[1,2,100],[2,0,100],[1,3,600],[2,3,200]];
+const pos={0:[60,150],1:[185,60],2:[185,240],3:[340,150]};
+const INF=Infinity;
+
+function buildSteps(){
+  const steps=[];
+  let prices=Array(n).fill(INF); prices[SRC]=0;
+  const fmt=a=>a.map(v=>v===INF?'∞':v);
+  // history rows: each row is a prices snapshot after a round
+  const history=[{label:'init',arr:[...prices]}];
+  const snap=(o)=>({
+    caption:o.caption,
+    history:history.map(h=>({label:h.label,arr:[...h.arr]})),
+    cur:o.cur??[...prices],      // working tmp shown as "current round"
+    roundLabel:o.roundLabel??'',
+    relaxEdge:o.relaxEdge?[...o.relaxEdge]:null,
+    updIdx:o.updIdx??null,
+    curRow:o.curRow??null
+  });
+  steps.push(snap({caption:`Initialize: prices = [0, ∞, ∞, ∞]. Only src (city 0) costs 0.`,cur:[...prices]}));
+  for(let r=0;r<K+1;r++){
+    let tmp=[...prices];
+    steps.push(snap({caption:`<b>Round ${r+1}</b> of ${K+1}: copy prices into a snapshot <code>tmp</code>. We relax all edges against the <i>frozen</i> previous round.`,cur:[...tmp],roundLabel:`round ${r+1}`,curRow:true}));
+    for(const [u,v,w] of flights){
+      if(prices[u]!==INF && prices[u]+w<tmp[v]){
+        tmp[v]=prices[u]+w;
+        steps.push(snap({caption:`Edge ${u}→${v} (${w}): prices[${u}]+${w} = ${prices[u]+w} &lt; tmp[${v}]. Update <b>tmp[${v}] = ${tmp[v]}</b>.`,cur:[...tmp],relaxEdge:[u,v],updIdx:v,roundLabel:`round ${r+1}`,curRow:true}));
+      } else {
+        steps.push(snap({caption:`Edge ${u}→${v} (${w}): no improvement (${prices[u]===INF?'src ∞':prices[u]+w} ≥ tmp[${v}]=${tmp[v]===INF?'∞':tmp[v]}). Skip.`,cur:[...tmp],relaxEdge:[u,v],roundLabel:`round ${r+1}`,curRow:true}));
+      }
+    }
+    prices=tmp;
+    history.push({label:`after R${r+1}`,arr:[...prices]});
+    steps.push(snap({caption:`End of round ${r+1}: commit <code>prices = tmp</code>. Now prices = [${fmt(prices).join(', ')}].`,cur:[...prices],roundLabel:`round ${r+1}`}));
+  }
+  const ans=prices[DST]===INF?-1:prices[DST];
+  steps.push(snap({caption:`After ${K+1} rounds, prices[${DST}] = <b>${ans}</b>. Path 0→1→3 = 700 (1 stop). 0→1→2→3 = 400 needs 2 stops — too many, correctly excluded. ✅`}));
+  return steps;
+}
+const steps=buildSteps();
+let cur=0,timer=null;
+const $=id=>document.getElementById(id);
+
+function drawGraph(s){
+  let h=`<defs><marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6678ad"/></marker><marker id="arrP" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#a855f7"/></marker></defs>`;
+  flights.forEach(([u,v,w])=>{
+    const [x1,y1]=pos[u],[x2,y2]=pos[v];
+    const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),r=20;
+    // offset curve a bit to separate bidirectional pairs
+    const sx=x1+dx/len*r, sy=y1+dy/len*r, ex=x2-dx/len*r, ey=y2-dy/len*r;
+    const active=s.relaxEdge&&s.relaxEdge[0]===u&&s.relaxEdge[1]===v;
+    const col=active?'#a855f7':'#3a4a78', wdt=active?3.5:2, mk=active?'arrP':'arr';
+    h+=`<line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="${col}" stroke-width="${wdt}" marker-end="url(#${mk})"/>`;
+    const mx=sx+(ex-sx)*0.42, my=sy+(ey-sy)*0.42-6;
+    h+=`<rect x="${mx-11}" y="${my-9}" width="24" height="15" rx="4" fill="#12182e"/>`;
+    h+=`<text class="ew" x="${mx}" y="${my+3}" text-anchor="middle" ${active?'fill="#e3c9ff"':''}>${w}</text>`;
+  });
+  for(let i=0;i<n;i++){
+    const [x,y]=pos[i];
+    let fill='#3a4a78',stroke='#5a6aa0';
+    if(i===SRC){fill='#f59e0b';stroke='#d98a08';}
+    if(i===DST){fill='#10b981';stroke='#0c8f63';}
+    const p=s.cur[i];
+    h+=`<circle cx="${x}" cy="${y}" r="20" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>`;
+    h+=`<text class="nlabel" x="${x}" y="${y-1}" text-anchor="middle">${i}</text>`;
+    h+=`<text class="nsub" x="${x}" y="${y+36}" text-anchor="middle" fill="#9fb0e0">$${p===INF?'∞':p}</text>`;
+  }
+  $('graph').innerHTML=h;
+}
+function drawTable(s){
+  let h='<tr><th>round</th>';
+  for(let i=0;i<n;i++) h+=`<th>c${i}</th>`;
+  h+='</tr>';
+  s.history.forEach(row=>{
+    h+=`<tr><td style="color:var(--muted)">${row.label}</td>`;
+    row.arr.forEach((v,i)=>{h+=`<td class="${i===SRC?'src':''}">${v===INF?'∞':v}</td>`;});
+    h+='</tr>';
+  });
+  if(s.curRow){
+    h+=`<tr><td class="cur">${s.roundLabel}<br>(tmp)</td>`;
+    s.cur.forEach((v,i)=>{
+      let cls=(s.updIdx===i)?'upd':'cur';
+      h+=`<td class="${cls}">${v===INF?'∞':v}</td>`;
+    });
+    h+='</tr>';
+  }
+  $('ptable').innerHTML=h;
+}
+function render(){
+  const s=steps[cur];
+  drawGraph(s); drawTable(s);
+  $('caption').innerHTML=s.caption;
+  $('ind').textContent=`Step ${cur+1} / ${steps.length}`;
+  $('prev').disabled=cur===0; $('next').disabled=cur===steps.length-1;
+}
+$('next').onclick=()=>{if(cur<steps.length-1){cur++;render();}};
+$('prev').onclick=()=>{if(cur>0){cur--;render();}};
+$('auto').onclick=function(){
+  if(timer){clearInterval(timer);timer=null;this.textContent='▶ Auto';return;}
+  this.textContent='⏸ Pause';
+  timer=setInterval(()=>{if(cur<steps.length-1){cur++;render();}else{clearInterval(timer);timer=null;$('auto').textContent='▶ Auto';}},1000);
+};
+render();
+</script>
+</body>
+</html>

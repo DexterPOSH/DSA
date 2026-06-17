@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Clone Graph — DFS + old→new map</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#202a4d; --text:#e0e0e0; --muted:#9aa4c8;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444; --purple:#a855f7;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;
+    line-height:1.6;padding:36px 18px 70px;}
+  .wrap{max-width:920px;margin:0 auto;}
+  h1{font-size:1.65rem;font-weight:700;margin-bottom:6px;letter-spacing:-.02em;}
+  h1 span{color:var(--blue);}
+  .subtitle{color:var(--muted);margin-bottom:26px;}
+  .analogy{background:var(--panel);border:1px solid var(--blue);border-left:5px solid var(--blue);
+    border-radius:12px;padding:16px 22px;margin-bottom:28px;}
+  .analogy h3{color:var(--blue);font-size:1rem;margin-bottom:4px;}
+  .analogy p{margin:0;}
+  .stage{display:flex;gap:26px;flex-wrap:wrap;justify-content:center;align-items:flex-start;}
+  .graphbox{background:var(--panel);border-radius:12px;padding:8px;border:1px solid rgba(255,255,255,.06);}
+  .graphbox h4{text-align:center;font-size:.82rem;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.06em;margin:8px 0 0;}
+  svg{display:block;}
+  .edge{stroke:#3a4470;stroke-width:3;transition:stroke .3s;}
+  .edge.lit{stroke:var(--amber);}
+  .node circle{transition:all .35s ease;}
+  .node text{font-family:"SF Mono",Menlo,monospace;font-weight:800;font-size:18px;fill:#fff;}
+  .panel{background:var(--panel);border-radius:12px;padding:16px 20px;min-width:220px;
+    border:1px solid rgba(255,255,255,.06);}
+  .panel h4{font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;}
+  .maprow{display:flex;align-items:center;gap:8px;font-family:"SF Mono",Menlo,monospace;
+    background:var(--panel2);border-radius:8px;padding:7px 10px;margin-bottom:7px;font-size:.95rem;
+    border:1px solid rgba(255,255,255,.06);animation:pop .4s ease;}
+  .maprow .o{color:var(--blue);font-weight:800;}
+  .maprow .arr{color:var(--muted);}
+  .maprow .n{color:var(--green);font-weight:800;}
+  @keyframes pop{0%{transform:scale(.6);opacity:0;}100%{transform:scale(1);opacity:1;}}
+  .stack{margin-top:14px;font-family:"SF Mono",Menlo,monospace;font-size:.82rem;color:var(--muted);
+    background:var(--panel2);border-radius:8px;padding:8px 10px;min-height:40px;}
+  .legend{display:flex;flex-direction:column;gap:7px;margin-top:14px;font-size:.84rem;}
+  .legend div{display:flex;align-items:center;gap:8px;}
+  .sw{width:16px;height:16px;border-radius:50%;flex:0 0 auto;}
+  .caption{background:var(--panel);border-left:4px solid var(--amber);border-radius:10px;
+    padding:14px 18px;margin:24px 0 16px;min-height:62px;font-size:1.0rem;}
+  .caption b{color:var(--amber);}
+  .caption code{background:var(--panel2);padding:1px 6px;border-radius:5px;color:#ffd479;
+    font-family:"SF Mono",Menlo,monospace;}
+  .controls{text-align:center;margin-bottom:8px;}
+  button{background:var(--blue);color:#fff;border:none;padding:10px 24px;border-radius:9px;
+    font-size:.98rem;font-weight:600;cursor:pointer;transition:transform .12s,background .2s;}
+  button:hover:not(:disabled){background:#2f6fd6;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  button.ghost{background:var(--panel2);color:var(--text);margin:0 6px;}
+  button.ghost:hover:not(:disabled){background:#2c3766;}
+  .progress{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:22px;}
+  .takeaway{background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(16,185,129,.12));
+    border:1px solid rgba(59,130,246,.4);border-radius:12px;padding:18px 22px;margin-top:30px;text-align:center;}
+  .takeaway h3{color:var(--blue);margin-bottom:5px;}
+  .takeaway p{margin:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Clone Graph — <span>DFS</span> with an old→new map</h1>
+  <p class="subtitle">Deep-copy a cyclic graph; a hash map "original → clone" stops us re-cloning and breaks cycles.</p>
+
+  <div class="analogy">
+    <h3>👥 Carbon-copy a friend network</h3>
+    <p>Naya network banao with same friendships. Cycles (A↔B↔C↔A) ki wajah se ek <b>register</b> chahiye — "original banda → uska clone". Pehle register dekho; agar clone bana hai to <b>reuse</b> karo, naya mat banao.</p>
+  </div>
+
+  <div class="stage">
+    <div>
+      <div class="graphbox">
+        <svg id="origSvg" width="300" height="300" viewBox="0 0 300 300"></svg>
+        <h4>Original graph</h4>
+      </div>
+    </div>
+    <div>
+      <div class="graphbox">
+        <svg id="cloneSvg" width="300" height="300" viewBox="0 0 300 300"></svg>
+        <h4>Clone (built live)</h4>
+      </div>
+    </div>
+    <div class="panel">
+      <h4>old → new map</h4>
+      <div id="mapList"><span style="color:var(--muted);font-size:.9rem">(empty)</span></div>
+      <div class="stack" id="stack">call: —</div>
+      <div class="legend">
+        <div><span class="sw" style="background:var(--amber)"></span> current node (visiting)</div>
+        <div><span class="sw" style="background:var(--green)"></span> cloned (in map)</div>
+        <div><span class="sw" style="background:var(--purple)"></span> reuse — already cloned</div>
+        <div><span class="sw" style="background:#3a4470"></span> not visited yet</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="caption" id="caption">Press <b>Next</b> to begin DFS from node 1.</div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn" disabled>◀ Prev</button>
+    <button id="nextBtn">Next ▶</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+  </div>
+  <div class="progress" id="progress"></div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Register each clone in the map <b>before</b> recursing on neighbours — the map both deduplicates clones and breaks cycles. O(V+E).</p>
+  </div>
+</div>
+
+<script>
+// Square graph: 1-2, 2-3, 3-4, 4-1  (undirected, has a cycle)
+const adj = {1:[2,4], 2:[1,3], 3:[2,4], 4:[3,2]};
+const pos = {1:[80,80], 2:[220,80], 3:[220,220], 4:[80,220]};
+const edges = [[1,2],[2,3],[3,4],[4,1]];
+
+const origSvg=document.getElementById('origSvg');
+const cloneSvg=document.getElementById('cloneSvg');
+const mapList=document.getElementById('mapList');
+const stackEl=document.getElementById('stack');
+const cap=document.getElementById('caption');
+const prevBtn=document.getElementById('prevBtn');
+const nextBtn=document.getElementById('nextBtn');
+const resetBtn=document.getElementById('resetBtn');
+const progress=document.getElementById('progress');
+
+// ---- build the recursive DFS as discrete snapshots ----
+function buildSteps(){
+  const steps=[];
+  const map={};            // old val -> true (cloned)
+  const cloneEdges=[];     // edges present in clone so far
+  const callStack=[];
+  function snap(cur, status, reuse, caption){
+    steps.push({
+      mapped:Object.keys(map).map(Number),
+      cloneEdges:cloneEdges.map(e=>[...e]),
+      cur, status, reuse:reuse??null,
+      stack:[...callStack], caption
+    });
+  }
+  function dfs(v, fromVal){
+    callStack.push(v);
+    if(map[v]){
+      snap(v,'reuse',true,
+        `<code>dfs(${v})</code>: node ${v} is <b>already in the map</b> → reuse its clone, don't recurse. (This is what breaks the cycle.)`);
+      callStack.pop();
+      return;
+    }
+    map[v]=true;
+    snap(v,'clone',false,
+      `<code>dfs(${v})</code>: node ${v} not cloned yet → create clone ${v}, <b>add to map first</b>, then visit its neighbours ${JSON.stringify(adj[v])}.`);
+    for(const nei of adj[v]){
+      // record the clone edge once (undirected, avoid dup by ordering)
+      const a=Math.min(v,nei), b=Math.max(v,nei);
+      if(!cloneEdges.some(e=>e[0]===a&&e[1]===b)) cloneEdges.push([a,b]);
+      dfs(nei, v);
+    }
+    callStack.pop();
+    snap(v,'done',false,
+      `Finished all neighbours of ${v}. <code>dfs(${v})</code> returns clone ${v}.`);
+  }
+  snap(null,'start',null,"Start: <code>old_to_new</code> map is empty. Call <code>dfs(1)</code>.");
+  dfs(1,null);
+  snap(null,'end',null,"DFS complete. Every original node has exactly one clone, all links rewired to clones. ✅");
+  return steps;
+}
+
+const steps=buildSteps();
+let idx=0;
+
+function drawGraph(svg, nodeStatus, presentNodes, litEdges, edgesToDraw){
+  let h='';
+  // edges
+  for(const [a,b] of edgesToDraw){
+    if(presentNodes && (!presentNodes.includes(a)||!presentNodes.includes(b))) continue;
+    const lit = litEdges && litEdges.some(e=>(e[0]===a&&e[1]===b)||(e[0]===b&&e[1]===a));
+    const [x1,y1]=pos[a], [x2,y2]=pos[b];
+    h+=`<line class="edge ${lit?'lit':''}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+  }
+  // nodes
+  for(const v of [1,2,3,4]){
+    if(presentNodes && !presentNodes.includes(v)) continue;
+    const [x,y]=pos[v];
+    let fill='#3a4470';
+    const st=nodeStatus[v];
+    if(st==='clone') fill='var(--green)';
+    else if(st==='reuse') fill='var(--purple)';
+    else if(st==='cur') fill='var(--amber)';
+    else if(st==='done') fill='var(--green)';
+    h+=`<g class="node"><circle cx="${x}" cy="${y}" r="26" fill="${fill}" stroke="rgba(255,255,255,.25)" stroke-width="2"/>`
+      +`<text x="${x}" y="${y+6}" text-anchor="middle">${v}</text></g>`;
+  }
+  svg.innerHTML=h;
+}
+
+function render(){
+  const s=steps[idx];
+  // original graph node statuses
+  const origStatus={};
+  s.mapped.forEach(v=>origStatus[v]='done');
+  if(s.cur!=null) origStatus[s.cur]= s.status==='reuse' ? 'reuse' : 'cur';
+  drawGraph(origSvg, origStatus, null, s.cur!=null?adj[s.cur].map(n=>[s.cur,n]):[], edges);
+
+  // clone graph: only mapped nodes present
+  const cloneStatus={};
+  s.mapped.forEach(v=>cloneStatus[v]='done');
+  if(s.cur!=null && s.mapped.includes(s.cur)) cloneStatus[s.cur]= s.status==='reuse'?'reuse':'clone';
+  drawGraph(cloneSvg, cloneStatus, s.mapped, [], s.cloneEdges);
+
+  // map list
+  if(s.mapped.length===0){
+    mapList.innerHTML='<span style="color:var(--muted);font-size:.9rem">(empty)</span>';
+  } else {
+    mapList.innerHTML=s.mapped.sort((a,b)=>a-b).map(v=>
+      `<div class="maprow"><span class="o">${v}</span><span class="arr">→</span><span class="n">clone(${v})</span></div>`).join('');
+  }
+  stackEl.textContent='call stack: '+(s.stack.length?s.stack.map(v=>'dfs('+v+')').join(' › '):'—');
+  cap.innerHTML=s.caption;
+  progress.textContent=`Step ${idx+1} / ${steps.length}`;
+  prevBtn.disabled=idx===0;
+  nextBtn.disabled=idx===steps.length-1;
+}
+
+function reset(){idx=0;render();}
+prevBtn.onclick=()=>{if(idx>0){idx--;render();}};
+nextBtn.onclick=()=>{if(idx<steps.length-1){idx++;render();}};
+resetBtn.onclick=reset;
+
+render();
+</script>
+</body>
+</html>

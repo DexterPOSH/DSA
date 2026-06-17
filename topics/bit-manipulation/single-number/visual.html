@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Single Number — XOR Cancellation Walkthrough</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e; color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px 60px; gap: 28px;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: #3b82f6; }
+
+  .analogy {
+    background: #16213e; border: 1px solid #3b82f6; border-radius: 12px;
+    padding: 18px 26px; max-width: 720px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 2rem; line-height: 1; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.97rem; line-height: 1.5; color: #c0c0d0; }
+
+  .card {
+    background: #16213e; border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 820px; width: 100%;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+  .section-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #7a8ab0; margin-bottom: 10px;
+  }
+  .step-description {
+    min-height: 56px; background: #0f172a; border-radius: 8px;
+    padding: 14px 20px; font-size: 0.95rem; line-height: 1.55;
+    color: #c8c8e0; border-left: 3px solid #3b82f6; transition: border-color 0.3s;
+  }
+  .step-description.done { border-color: #10b981; }
+  .step-description strong { color: #fff; }
+
+  /* array of numbers */
+  .num-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .num-cell {
+    min-width: 54px; height: 54px; border-radius: 10px; border: 2px solid #2d3a5a;
+    background: #0f172a; display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; font-weight: 700; color: #e0e0e0;
+    transition: all 0.3s; position: relative;
+  }
+  .num-cell.active { border-color: #f59e0b; background: #3a2a10; box-shadow: 0 0 16px rgba(245,158,11,0.4); transform: translateY(-3px); }
+  .num-cell.consumed { opacity: 0.35; }
+  .num-cell.answer { border-color: #10b981; background: #0d2a1a; color: #6ee7b7; box-shadow: 0 0 18px rgba(16,185,129,0.5); }
+
+  /* bit rows */
+  .bitcalc { display: flex; flex-direction: column; gap: 12px; }
+  .bit-line { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 14px; }
+  .bit-line-label { font-size: 0.82rem; color: #94a3b8; font-family: 'Consolas', monospace; text-align: right; }
+  .bit-line-label .accLbl { color: #3b82f6; font-weight: 700; }
+  .bit-line-label .curLbl { color: #f59e0b; font-weight: 700; }
+  .bit-cells { display: flex; gap: 6px; }
+  .bit {
+    width: 34px; height: 38px; border-radius: 6px; border: 1.5px solid #2d3a5a;
+    background: #0f172a; display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; font-weight: 700; font-family: 'Consolas', monospace;
+    transition: all 0.25s;
+  }
+  .bit.one { color: #93c5fd; border-color: #3b82f6; background: #14233f; }
+  .bit.zero { color: #44506e; }
+  .bit.acc.one { color: #93c5fd; border-color: #3b82f6; background: #1e3a6e; }
+  .bit.cur.one { color: #fcd34d; border-color: #f59e0b; background: #3a2a10; }
+  .bit.flip { animation: flip 0.45s ease; }
+  .bit.cancel { color: #44506e !important; background: #0f172a !important; border-color: #2d3a5a !important; }
+  @keyframes flip { 0%{transform:rotateX(0)} 50%{transform:rotateX(90deg)} 100%{transform:rotateX(0)} }
+
+  .divider { height: 1px; background: #2d3a5a; margin: 2px 0; }
+
+  .result-badge {
+    display: none; align-items: center; gap: 12px; padding: 14px 20px;
+    border-radius: 10px; font-size: 1rem; font-weight: 600;
+    background: #0d2a1a; border: 1.5px solid #10b981; color: #6ee7b7;
+  }
+  .result-badge.show { display: flex; }
+
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none; font-size: 0.92rem;
+    font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+  .takeaway {
+    background: #16213e; border: 1px solid #2d3a5a; border-radius: 12px;
+    padding: 18px 26px; max-width: 720px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #10b981; margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.95rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: #e0e0e0; }
+  .legend { display:flex; gap:18px; flex-wrap:wrap; font-size:0.78rem; color:#7a8ab0; }
+  .legend span::before { content:''; display:inline-block; width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px; }
+  .legend .l-acc::before { background:#3b82f6; }
+  .legend .l-cur::before { background:#f59e0b; }
+  .legend .l-ans::before { background:#10b981; }
+</style>
+</head>
+<body>
+
+  <h1>Single Number &mdash; <span>XOR Cancellation</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">💃</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Log <strong>jodi me</strong> aaye hain — ek hi akela hai. Do same log milte hi
+        <strong>cancel</strong> ho jaate (<code>x ^ x = 0</code>). Poore array ka XOR lo —
+        saare pairs khatam, sirf akela bachta hai (<code>x ^ 0 = x</code>).
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press &ldquo;Next&rdquo; to fold each number into the running XOR.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Input &nbsp;<code style="color:#5a6a90;font-size:0.75rem">[4, 1, 2, 1, 2]</code></div>
+      <div class="num-row" id="numRow"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="bitcalc">
+      <div class="bit-line">
+        <div class="bit-line-label"><span class="curLbl">current n</span></div>
+        <div class="bit-cells" id="curBits"></div>
+      </div>
+      <div class="bit-line">
+        <div class="bit-line-label"><span class="accLbl">result</span> (XOR)</div>
+        <div class="bit-cells" id="accBits"></div>
+      </div>
+    </div>
+
+    <div class="result-badge" id="resultBadge">
+      <span style="font-size:1.3rem">🟢</span>
+      <span id="resultText"></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">&larr; Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next &rarr;</button>
+      <button class="btn btn-secondary" id="autoBtn" onclick="toggleAuto()">&#9654; Auto-play</button>
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+
+    <div class="legend">
+      <span class="l-acc">result bit = 1</span>
+      <span class="l-cur">current n bit = 1</span>
+      <span class="l-ans">final answer</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        XOR is its own inverse: <strong>x ^ x = 0</strong> and <strong>x ^ 0 = x</strong>.
+        Folding the whole array cancels every paired bit, leaving only the unique number &mdash;
+        <strong>O(n) time, O(1) space</strong>, no hash map needed.
+      </p>
+    </div>
+  </div>
+
+<script>
+  const arr = [4, 1, 2, 1, 2];
+  const WIDTH = 5; // 5 bits enough for these values (max 4)
+
+  function toBits(v) {
+    return v.toString(2).padStart(WIDTH, '0').split('').map(Number);
+  }
+
+  // Build steps: each folds arr[i] into result
+  const steps = [];
+  let acc = 0;
+  // step 0: initial
+  steps.push({ i: -1, acc: 0, prevAcc: 0, cur: 0, desc:
+    'Start: <strong>result = 0</strong> (all zero bits). Har number ko isme XOR karenge.' });
+  for (let i = 0; i < arr.length; i++) {
+    const prevAcc = acc;
+    acc = acc ^ arr[i];
+    steps.push({
+      i, acc, prevAcc, cur: arr[i],
+      desc: `XOR in <strong>arr[${i}] = ${arr[i]}</strong> (binary <code>${toBits(arr[i]).join('')}</code>). ` +
+            `Bits jahan dono same the wahan <strong style="color:#10b981">cancel</strong> (→0), jahan alag the wahan <strong>1</strong>. ` +
+            `result = <code>${toBits(prevAcc).join('')}</code> ^ <code>${toBits(arr[i]).join('')}</code> = <code>${toBits(acc).join('')}</code> (${acc}).`
+    });
+  }
+  steps.push({ i: arr.length, acc, prevAcc: acc, cur: null, done: true,
+    desc: `Saare paired numbers cancel ho gaye. <strong style="color:#10b981">result = ${acc}</strong> &mdash; yahi single number hai. ✅` });
+
+  const TOTAL = steps.length;
+  let cur = 0;
+  let auto = null;
+
+  const numRow = document.getElementById('numRow');
+  const curBits = document.getElementById('curBits');
+  const accBits = document.getElementById('accBits');
+  const stepDesc = document.getElementById('stepDesc');
+  const stepCounter = document.getElementById('stepCounter');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const autoBtn = document.getElementById('autoBtn');
+  const resultBadge = document.getElementById('resultBadge');
+  const resultText = document.getElementById('resultText');
+
+  // build num cells
+  arr.forEach((v, i) => {
+    const c = document.createElement('div');
+    c.className = 'num-cell'; c.id = 'num-' + i; c.textContent = v;
+    numRow.appendChild(c);
+  });
+  // build bit cells
+  function buildBitRow(container, cls) {
+    container.innerHTML = '';
+    for (let b = 0; b < WIDTH; b++) {
+      const el = document.createElement('div');
+      el.className = 'bit ' + cls; el.textContent = '0';
+      container.appendChild(el);
+    }
+  }
+  buildBitRow(curBits, 'cur');
+  buildBitRow(accBits, 'acc');
+
+  function renderBits(container, bits, cls, prevBits) {
+    [...container.children].forEach((el, b) => {
+      el.className = 'bit ' + cls + (bits[b] ? ' one' : ' zero');
+      el.textContent = bits[b];
+      if (prevBits && prevBits[b] === 1 && bits[b] === 0) el.classList.add('cancel', 'flip');
+      else if (prevBits && prevBits[b] !== bits[b]) el.classList.add('flip');
+    });
+  }
+
+  function render() {
+    const s = steps[cur];
+    stepDesc.innerHTML = s.desc;
+    stepDesc.className = 'step-description' + (s.done ? ' done' : '');
+
+    // numbers
+    arr.forEach((v, i) => {
+      const c = document.getElementById('num-' + i);
+      c.className = 'num-cell';
+      if (i < s.i) c.classList.add('consumed');
+      else if (i === s.i) c.classList.add('active');
+    });
+
+    // current n bits
+    if (s.cur === null || s.i < 0) {
+      [...curBits.children].forEach(el => { el.className = 'bit cur zero'; el.textContent = '0'; });
+    } else {
+      renderBits(curBits, toBits(s.cur), 'cur');
+    }
+
+    // acc bits (animate cancellations relative to prevAcc when stepping forward)
+    renderBits(accBits, toBits(s.acc), 'acc', toBits(s.prevAcc));
+
+    // result
+    if (s.done) {
+      resultBadge.classList.add('show');
+      resultText.textContent = `return ${s.acc} — the single, unpaired number.`;
+      arr.forEach((v, i) => {
+        const c = document.getElementById('num-' + i);
+        c.className = 'num-cell' + (v === s.acc ? ' answer' : ' consumed');
+      });
+    } else {
+      resultBadge.classList.remove('show');
+    }
+
+    stepCounter.textContent = `Step ${cur} / ${TOTAL - 1}`;
+    prevBtn.disabled = cur === 0;
+    nextBtn.disabled = cur === TOTAL - 1;
+  }
+
+  function next() { if (cur < TOTAL - 1) { cur++; render(); } if (cur === TOTAL - 1) stopAuto(); }
+  function prev() { if (cur > 0) { cur--; render(); } }
+  function reset() { stopAuto(); cur = 0; render(); }
+  function toggleAuto() {
+    if (auto) { stopAuto(); }
+    else {
+      if (cur === TOTAL - 1) cur = 0;
+      auto = setInterval(() => { if (cur < TOTAL - 1) next(); else stopAuto(); }, 1200);
+      autoBtn.innerHTML = '&#10073;&#10073; Pause';
+      render();
+    }
+  }
+  function stopAuto() { if (auto) { clearInterval(auto); auto = null; autoBtn.innerHTML = '&#9654; Auto-play'; } }
+
+  render();
+</script>
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Counting Bits — DP Table Walkthrough</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e; color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px 60px; gap: 28px;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: #3b82f6; }
+
+  .analogy {
+    background: #16213e; border: 1px solid #3b82f6; border-radius: 12px;
+    padding: 18px 26px; max-width: 760px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy-icon { font-size: 2rem; line-height: 1; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.97rem; line-height: 1.5; color: #c0c0d0; }
+
+  .card {
+    background: #16213e; border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 860px; width: 100%;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+  .section-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #7a8ab0; margin-bottom: 10px;
+  }
+  .step-description {
+    min-height: 56px; background: #0f172a; border-radius: 8px;
+    padding: 14px 20px; font-size: 0.95rem; line-height: 1.55;
+    color: #c8c8e0; border-left: 3px solid #3b82f6; transition: border-color 0.3s;
+  }
+  .step-description.done { border-color: #10b981; }
+  .step-description strong { color: #fff; }
+
+  /* DP table */
+  .dp-table { display: flex; gap: 9px; flex-wrap: wrap; }
+  .dp-col {
+    display: flex; flex-direction: column; gap: 6px; align-items: center;
+    border: 1.5px solid #2d3a5a; border-radius: 10px; padding: 8px 6px; min-width: 70px;
+    background: #0f172a; transition: all 0.3s;
+  }
+  .dp-col .idx { font-size: 0.72rem; color: #5a6a90; font-family: 'Consolas', monospace; }
+  .dp-col .bits { display: flex; gap: 3px; }
+  .dp-col .bits .b {
+    width: 18px; height: 22px; border-radius: 4px; border: 1px solid #2d3a5a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-family: 'Consolas', monospace; color: #44506e;
+  }
+  .dp-col .bits .b.one { color: #93c5fd; border-color: #3b82f6; background: #14233f; }
+  .dp-col .bits .b.lowbit { border-color: #f59e0b; color: #fcd34d; background: #3a2a10; }
+  .dp-col .val {
+    width: 36px; height: 36px; border-radius: 8px; background: #16213e;
+    border: 1.5px solid #2d3a5a; color: #5a6a90; font-size: 1.05rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; transition: all 0.3s;
+  }
+  .dp-col.filled .val { color: #93c5fd; border-color: #3b82f6; background: #14233f; }
+  .dp-col.current { border-color: #f59e0b; box-shadow: 0 0 16px rgba(245,158,11,0.4); transform: translateY(-4px); }
+  .dp-col.current .val { border-color: #f59e0b; color: #fcd34d; background: #3a2a10; }
+  .dp-col.source { border-color: #10b981; box-shadow: 0 0 14px rgba(16,185,129,0.35); }
+  .dp-col.source .val { border-color: #10b981; color: #6ee7b7; background: #0d2a1a; }
+  .dp-col .val.pop { animation: pop 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes pop { 0%{transform:scale(0.4);opacity:0} 100%{transform:scale(1);opacity:1} }
+
+  .formula {
+    background: #0f172a; border: 1px solid #2d3a5a; border-radius: 10px;
+    padding: 14px 20px; font-family: 'Consolas', monospace; font-size: 0.95rem;
+    color: #c8c8e0; line-height: 1.6; min-height: 52px;
+  }
+  .formula .src { color: #6ee7b7; font-weight: 700; }
+  .formula .cur { color: #fcd34d; font-weight: 700; }
+  .formula .lb { color: #f59e0b; font-weight: 700; }
+
+  .result-badge {
+    display: none; align-items: center; gap: 12px; padding: 14px 20px;
+    border-radius: 10px; font-size: 1rem; font-weight: 600;
+    background: #0d2a1a; border: 1.5px solid #10b981; color: #6ee7b7;
+  }
+  .result-badge.show { display: flex; }
+
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none; font-size: 0.92rem;
+    font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+  .takeaway {
+    background: #16213e; border: 1px solid #2d3a5a; border-radius: 12px;
+    padding: 18px 26px; max-width: 760px; width: 100%;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #10b981; margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.95rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: #e0e0e0; }
+  .legend { display:flex; gap:18px; flex-wrap:wrap; font-size:0.78rem; color:#7a8ab0; }
+  .legend span::before { content:''; display:inline-block; width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px; }
+  .legend .l-cur::before { background:#f59e0b; }
+  .legend .l-src::before { background:#10b981; }
+  .legend .l-fil::before { background:#3b82f6; }
+</style>
+</head>
+<body>
+
+  <h1>Counting Bits &mdash; <span>DP: dp[i] = dp[i&gt;&gt;1] + (i&amp;1)</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🏢</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Har flat <code>i</code> ke ON-bulbs ginnne ke liye, uska <strong>half</strong>
+        (<code>i &gt;&gt; 1</code>, last bit gira ke) pehle hi gina hua hai &mdash; table se uthao.
+        Bas wapas se gira hua last bit (<code>i &amp; 1</code>) add kar do. Purana kaam dobara nahi.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press &ldquo;Next&rdquo; to fill the dp table left to right.</div>
+    </div>
+
+    <div>
+      <div class="section-label">dp table &nbsp;<code style="color:#5a6a90;font-size:0.75rem">i = 0 .. 8 &nbsp;(bits shown above each value)</code></div>
+      <div class="dp-table" id="dpTable"></div>
+    </div>
+
+    <div class="formula" id="formula">dp[i] = dp[i &gt;&gt; 1] + (i &amp; 1)</div>
+
+    <div class="result-badge" id="resultBadge">
+      <span style="font-size:1.3rem">🟢</span>
+      <span id="resultText"></span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">&larr; Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next &rarr;</button>
+      <button class="btn btn-secondary" id="autoBtn" onclick="toggleAuto()">&#9654; Auto-play</button>
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+
+    <div class="legend">
+      <span class="l-cur">current i</span>
+      <span class="l-src">source dp[i&gt;&gt;1]</span>
+      <span class="l-fil">already filled</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Each <strong>dp[i]</strong> reuses an already-computed smaller answer
+        (<strong>dp[i&gt;&gt;1]</strong>) plus the dropped low bit (<strong>i&amp;1</strong>).
+        One O(1) lookup per number &rarr; <strong>O(n) total</strong>, beating O(n log n) naive popcount.
+      </p>
+    </div>
+  </div>
+
+<script>
+  const N = 8;
+  const BITW = 4;
+
+  function toBits(v) { return v.toString(2).padStart(BITW, '0').split('').map(Number); }
+
+  // compute dp
+  const dp = [0];
+  for (let i = 1; i <= N; i++) dp[i] = dp[i >> 1] + (i & 1);
+
+  // steps: 0..N, each reveals dp[i]
+  const steps = [];
+  steps.push({ i: -1, filled: 0, desc:
+    'Start: <strong>dp[0] = 0</strong> (number 0 ke zero set bits). Ab i = 1 se aage bharo.' });
+  for (let i = 1; i <= N; i++) {
+    const src = i >> 1;
+    const low = i & 1;
+    steps.push({
+      i, src, low, filled: i,
+      desc: `<strong>i = ${i}</strong> (<code>${toBits(i).join('')}</code>). i &gt;&gt; 1 = ${src} ` +
+            `(last bit gira do → <code>${toBits(src).join('')}</code>), uska dp pehle se = <strong style="color:#10b981">${dp[src]}</strong>. ` +
+            `Dropped low bit i &amp; 1 = <strong style="color:#f59e0b">${low}</strong>. ` +
+            `So dp[${i}] = ${dp[src]} + ${low} = <strong>${dp[i]}</strong>.`
+    });
+  }
+  steps.push({ i: N + 1, filled: N + 1, done: true, desc:
+    `Poora table bhar gaya: <strong style="color:#10b981">[${dp.join(', ')}]</strong>. Har value ek lookup + add me &mdash; O(n).` });
+
+  const TOTAL = steps.length;
+  let cur = 0, auto = null;
+
+  const dpTable = document.getElementById('dpTable');
+  const stepDesc = document.getElementById('stepDesc');
+  const stepCounter = document.getElementById('stepCounter');
+  const formula = document.getElementById('formula');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const autoBtn = document.getElementById('autoBtn');
+  const resultBadge = document.getElementById('resultBadge');
+  const resultText = document.getElementById('resultText');
+
+  // build columns
+  for (let i = 0; i <= N; i++) {
+    const col = document.createElement('div');
+    col.className = 'dp-col'; col.id = 'col-' + i;
+    const bits = toBits(i).map((bit, bi) =>
+      `<div class="b${bit ? ' one' : ''}" data-pos="${BITW - 1 - bi}">${bit}</div>`).join('');
+    col.innerHTML =
+      `<div class="bits">${bits}</div>` +
+      `<div class="val" id="val-${i}">·</div>` +
+      `<div class="idx">i=${i}</div>`;
+    dpTable.appendChild(col);
+  }
+
+  function render() {
+    const s = steps[cur];
+    stepDesc.innerHTML = s.desc;
+    stepDesc.className = 'step-description' + (s.done ? ' done' : '');
+
+    for (let i = 0; i <= N; i++) {
+      const col = document.getElementById('col-' + i);
+      const valEl = document.getElementById('val-' + i);
+      col.className = 'dp-col';
+      // low-bit highlight reset
+      const bcells = col.querySelectorAll('.bits .b');
+      bcells.forEach(b => b.classList.remove('lowbit'));
+
+      if (i < s.filled || (s.done)) {
+        col.classList.add('filled');
+        valEl.textContent = dp[i];
+      } else {
+        valEl.textContent = '·';
+        valEl.classList.remove('pop');
+      }
+    }
+
+    if (s.i >= 1 && s.i <= N) {
+      const curCol = document.getElementById('col-' + s.i);
+      const srcCol = document.getElementById('col-' + s.src);
+      curCol.classList.add('current', 'filled');
+      const curVal = document.getElementById('val-' + s.i);
+      curVal.textContent = dp[s.i];
+      curVal.classList.remove('pop'); void curVal.offsetWidth; curVal.classList.add('pop');
+      if (srcCol && s.src !== s.i) srcCol.classList.add('source');
+      // highlight the low bit (rightmost) of current i
+      const lowCell = curCol.querySelector('.bits .b[data-pos="0"]');
+      if (lowCell) lowCell.classList.add('lowbit');
+
+      formula.innerHTML =
+        `dp[<span class="cur">${s.i}</span>] = dp[${s.i} &gt;&gt; 1] + (${s.i} &amp; 1) = ` +
+        `dp[<span class="src">${s.src}</span>] + <span class="lb">${s.low}</span> = ` +
+        `<span class="src">${dp[s.src]}</span> + <span class="lb">${s.low}</span> = ` +
+        `<span class="cur">${dp[s.i]}</span>`;
+    } else if (s.i < 0) {
+      formula.innerHTML = 'dp[0] = 0 &nbsp;&nbsp;<span style="color:#5a6a90">// base case</span>';
+    }
+
+    if (s.done) {
+      resultBadge.classList.add('show');
+      resultText.textContent = `return [${dp.join(', ')}]`;
+      formula.innerHTML = 'dp[i] = dp[i &gt;&gt; 1] + (i &amp; 1) &nbsp;&nbsp;<span style="color:#10b981">// O(n) done</span>';
+    } else {
+      resultBadge.classList.remove('show');
+    }
+
+    stepCounter.textContent = `Step ${cur} / ${TOTAL - 1}`;
+    prevBtn.disabled = cur === 0;
+    nextBtn.disabled = cur === TOTAL - 1;
+  }
+
+  function next() { if (cur < TOTAL - 1) { cur++; render(); } if (cur === TOTAL - 1) stopAuto(); }
+  function prev() { if (cur > 0) { cur--; render(); } }
+  function reset() { stopAuto(); cur = 0; render(); }
+  function toggleAuto() {
+    if (auto) stopAuto();
+    else {
+      if (cur === TOTAL - 1) cur = 0;
+      auto = setInterval(() => { if (cur < TOTAL - 1) next(); else stopAuto(); }, 1200);
+      autoBtn.innerHTML = '&#10073;&#10073; Pause';
+      render();
+    }
+  }
+  function stopAuto() { if (auto) { clearInterval(auto); auto = null; autoBtn.innerHTML = '&#9654; Auto-play'; } }
+
+  render();
+</script>
+</body>
+</html>

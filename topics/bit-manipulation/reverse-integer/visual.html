@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reverse Integer — peel a digit, push it, guard the 32-bit edge</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.08));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .ex-tabs { display: flex; gap: 10px; margin-bottom: 18px; }
+  .ex-tabs button {
+    background: var(--panel2); color: var(--muted);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 8px 16px; border-radius: 8px; font-size: 0.9rem;
+    font-weight: 600; cursor: pointer; transition: all .2s;
+  }
+  .ex-tabs button.active { background: rgba(59,130,246,0.2); color: #bcd4ff; border-color: var(--blue); }
+
+  .card {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 22px 24px 26px;
+    margin-bottom: 26px;
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 6px 22px rgba(0,0,0,0.28);
+  }
+  .section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; }
+  code { background: var(--panel2); padding: 1px 7px; border-radius: 5px; color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .step-desc {
+    background: var(--panel2);
+    border-left: 4px solid var(--blue);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-height: 76px;
+    margin-bottom: 22px;
+    font-size: 1.02rem;
+  }
+  .step-desc.danger { border-left-color: var(--red); }
+
+  .reg { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+  .reg-label {
+    width: 168px; flex: 0 0 auto;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 0.9rem; color: var(--muted);
+  }
+  .reg-label b { color: var(--text); }
+
+  .digits { display: flex; gap: 7px; min-height: 48px; }
+  .digit {
+    width: 42px; height: 46px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+    font-family: "SF Mono", Menlo, monospace;
+    font-weight: 700; font-size: 1.3rem;
+    background: var(--panel2);
+    border: 2px solid rgba(255,255,255,0.12);
+    color: var(--text);
+    transition: all .3s ease;
+  }
+  .digit.peel { border-color: var(--amber); background: rgba(245,158,11,0.2); color: #ffe0a3; box-shadow: 0 0 0 3px rgba(245,158,11,0.4); }
+  .digit.pushed { border-color: var(--green); background: rgba(16,185,129,0.18); color: #b6f0d8; animation: pop .4s ease; }
+  .digit.placeholder { border-style: dashed; color: #555a7a; }
+  @keyframes pop {
+    0% { transform: scale(0.3); opacity: 0; }
+    60% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* overflow guard meter */
+  .meter-wrap { margin: 22px 0 8px; }
+  .meter-top { display: flex; justify-content: space-between; font-size: 0.84rem; color: var(--muted); margin-bottom: 6px; font-family: "SF Mono", monospace; }
+  .meter {
+    height: 26px; border-radius: 8px;
+    background: var(--panel2);
+    border: 1px solid rgba(255,255,255,0.12);
+    overflow: hidden; position: relative;
+  }
+  .meter-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--green), var(--blue));
+    transition: width .45s ease, background .3s;
+  }
+  .meter-fill.warn { background: linear-gradient(90deg, var(--amber), var(--red)); }
+  .meter-fill.over { background: var(--red); width: 100% !important; }
+  .meter-cap { position: absolute; right: 8px; top: 3px; font-size: 0.78rem; color: var(--muted); font-family: "SF Mono", monospace; }
+
+  .calc-line {
+    margin-top: 12px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 0.98rem;
+    min-height: 26px;
+    color: var(--green);
+  }
+  .calc-line .sx { color: var(--amber); }
+  .calc-line .res { color: var(--blue); font-weight: 700; }
+  .calc-line .bad { color: var(--red); font-weight: 700; }
+
+  .result-badge {
+    margin-top: 18px; display: none;
+    background: rgba(16,185,129,0.15);
+    border: 1px solid var(--green);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-weight: 700;
+    font-family: "SF Mono", Menlo, monospace;
+    color: #b6f0d8;
+  }
+  .result-badge.bad { background: rgba(239,68,68,0.15); border-color: var(--red); color: #ffc2c2; }
+  .result-badge.show { display: inline-block; }
+
+  .controls { display: flex; align-items: center; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+  button.nav {
+    background: var(--blue); color: #fff; border: none;
+    padding: 10px 22px; border-radius: 9px;
+    font-size: 0.98rem; font-weight: 600; cursor: pointer;
+    transition: transform .12s, background .2s;
+  }
+  button.nav:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button.nav:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #34345e; }
+  .step-counter { margin-left: auto; color: var(--muted); font-size: 0.9rem; font-family: "SF Mono", monospace; }
+
+  .code-block {
+    background: #11111f; border-radius: 12px; padding: 18px 20px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.86rem;
+    line-height: 1.7; overflow-x: auto; margin-top: 6px;
+    border: 1px solid rgba(255,255,255,0.06); white-space: pre;
+  }
+  .kw { color: #c792ea; } .fn { color: #82aaff; } .cm { color: #5a6a90; } .num { color: #f78c6c; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px; padding: 18px 22px; margin-top: 30px;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Reverse Integer — <span>peel</span> a digit, <span style="color:var(--green)">push</span> it, guard the 32-bit edge</h1>
+  <p class="subtitle">Reverse the digits of <code>x</code>, returning <code>0</code> if the result escapes <b>[-2³¹, 2³¹-1]</b>.</p>
+
+  <div class="analogy">
+    <h3>🔢 Real-world analogy</h3>
+    <p>Odometer ulta padho: aakhri digit <b>peel</b> karo (<code>x % 10</code>), use naye number ke aage <b>push</b> karo (<code>res*10 + digit</code>). Par meter sirf <code>2147483647</code> tak jaata hai — to har push se <i>pehle</i> poocho "kya phat jaayega?" Agar haan → <code>0</code>.</p>
+  </div>
+
+  <div class="ex-tabs">
+    <button id="tabA" class="active" onclick="loadExample(0)">x = 123 (fits)</button>
+    <button id="tabB" onclick="loadExample(1)">x = 1534236469 (overflows → 0)</button>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Step description</div>
+    <div class="step-desc" id="stepDesc">Press <b>Next →</b> to peel the first digit.</div>
+
+    <div class="reg">
+      <div class="reg-label">remaining <b>x</b></div>
+      <div class="digits" id="xDigits"></div>
+    </div>
+    <div class="reg">
+      <div class="reg-label">reversed <b>res</b></div>
+      <div class="digits" id="resDigits"></div>
+    </div>
+
+    <div class="meter-wrap">
+      <div class="meter-top">
+        <span>32-bit overflow guard</span>
+        <span id="meterVal">res = 0</span>
+      </div>
+      <div class="meter">
+        <div class="meter-fill" id="meterFill"></div>
+        <div class="meter-cap">cap = 2147483647</div>
+      </div>
+    </div>
+
+    <div class="calc-line" id="calcLine"></div>
+    <div class="result-badge" id="resultBadge"></div>
+
+    <div class="controls">
+      <button class="nav ghost" id="prevBtn" onclick="prev()">← Prev</button>
+      <button class="nav" id="nextBtn" onclick="next()">Next →</button>
+      <button class="nav ghost" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="section-label">The whole algorithm</div>
+  <div class="code-block"><span class="kw">def</span> <span class="fn">reverse</span>(x):
+    INT_MAX = <span class="num">2</span>**<span class="num">31</span> - <span class="num">1</span>            <span class="cm"># 2147483647</span>
+    sign, x, res = (<span class="num">1</span> <span class="kw">if</span> x >= <span class="num">0</span> <span class="kw">else</span> -<span class="num">1</span>), <span class="fn">abs</span>(x), <span class="num">0</span>
+    <span class="kw">while</span> x:
+        digit = x % <span class="num">10</span>;  x //= <span class="num">10</span>
+        <span class="kw">if</span> res > INT_MAX // <span class="num">10</span> <span class="kw">or</span> (res == INT_MAX // <span class="num">10</span> <span class="kw">and</span> digit > <span class="num">7</span>):
+            <span class="kw">return</span> <span class="num">0</span>             <span class="cm"># pre-multiply overflow guard</span>
+        res = res * <span class="num">10</span> + digit
+    <span class="kw">return</span> sign * res</div>
+
+  <div class="takeaway">
+    <h3>💡 Key takeaway</h3>
+    <p>Reverse a number by repeatedly peeling the last digit (<code>x%10</code>) and pushing it onto <code>res = res*10 + digit</code>. The trick is checking overflow <b>before</b> the multiply — comparing against <code>INT_MAX // 10</code> — so you never actually overflow a fixed-width int. <b>O(number of digits) time, O(1) space.</b></p>
+  </div>
+</div>
+
+<script>
+  const INT_MAX = 2147483647;
+  const examples = [
+    { x: 123,        overflows: false },
+    { x: 1534236469, overflows: true  }  // reversed = 9646324351 > INT_MAX
+  ];
+  let exIdx = 0;
+  let steps = [];
+  let cur = 0;
+
+  // Build step list for a given x. Each step = peel one digit, guard, push.
+  function buildSteps(x) {
+    const list = [{ type: 'init', x: x, res: 0 }];
+    let curX = x, res = 0;
+    while (curX > 0) {
+      const digit = curX % 10;
+      const nextX = Math.floor(curX / 10);
+      const willOverflow = res > Math.floor(INT_MAX / 10) ||
+                           (res === Math.floor(INT_MAX / 10) && digit > 7);
+      if (willOverflow) {
+        list.push({ type: 'overflow', x: curX, res, digit, nextX });
+        break;
+      }
+      const newRes = res * 10 + digit;
+      list.push({ type: 'push', x: curX, res, digit, nextX, newRes });
+      res = newRes;
+      curX = nextX;
+    }
+    if (list[list.length - 1].type !== 'overflow') {
+      list.push({ type: 'done', res });
+    }
+    return list;
+  }
+
+  const $ = id => document.getElementById(id);
+
+  function renderDigits(container, value, opts) {
+    opts = opts || {};
+    if (value === 0 && !opts.showZero) { container.innerHTML = `<div class="digit placeholder">0</div>`; return; }
+    const s = String(value);
+    container.innerHTML = s.split('').map((d, idx) => {
+      let c = 'digit';
+      if (opts.peelLast && idx === s.length - 1) c += ' peel';
+      if (opts.pushFirst && idx === 0) c += ' pushed';
+      return `<div class="${c}">${d}</div>`;
+    }).join('');
+  }
+
+  function setMeter(res, state) {
+    const fill = $('meterFill');
+    fill.className = 'meter-fill';
+    let pct = Math.min(100, (res / INT_MAX) * 100);
+    if (state === 'over') { fill.classList.add('over'); pct = 100; }
+    else if (pct > 70) fill.classList.add('warn');
+    fill.style.width = pct + '%';
+    $('meterVal').textContent = state === 'over' ? 'res*10 + digit > cap !' : `res = ${res}`;
+  }
+
+  function render() {
+    const st = steps[cur];
+    const desc = $('stepDesc'), calc = $('calcLine'), badge = $('resultBadge');
+    desc.classList.remove('danger');
+    badge.className = 'result-badge';
+    calc.innerHTML = '';
+
+    if (st.type === 'init') {
+      renderDigits($('xDigits'), st.x);
+      renderDigits($('resDigits'), 0);
+      setMeter(0, 'ok');
+      desc.innerHTML = `Press <b>Next →</b> to peel the last digit of <code>x = ${st.x}</code>.`;
+    } else if (st.type === 'push') {
+      renderDigits($('xDigits'), st.x, { peelLast: true });
+      renderDigits($('resDigits'), st.newRes, { pushFirst: true });
+      setMeter(st.newRes, 'ok');
+      desc.innerHTML =
+        `<b>Peel & push:</b> last digit <code>${st.digit}</code> ko utha (amber), ` +
+        `phir <code>res = res*10 + ${st.digit}</code> = <code>${st.newRes}</code> (green). ` +
+        `Bachi hui <code>x = ${st.nextX || 0}</code>.`;
+      calc.innerHTML =
+        `guard ok &nbsp;·&nbsp; res = <span class="sx">${st.res}</span>*10 + <span class="sx">${st.digit}</span> = <span class="res">${st.newRes}</span>`;
+    } else if (st.type === 'overflow') {
+      renderDigits($('xDigits'), st.x, { peelLast: true });
+      renderDigits($('resDigits'), st.res);
+      setMeter(st.res, 'over');
+      desc.classList.add('danger');
+      desc.innerHTML =
+        `<b>🛑 Overflow guard fires!</b> Push karne se <i>pehle</i> check: <code>res = ${st.res}</code> already ` +
+        `<code>INT_MAX//10 = ${Math.floor(INT_MAX/10)}</code> se bada/barabar hai aur digit <code>${st.digit} > 7</code>. ` +
+        `<code>res*10 + ${st.digit}</code> 32-bit range ke bahar chala jaata. Return <code>0</code>.`;
+      calc.innerHTML =
+        `<span class="bad">${st.res}*10 + ${st.digit} = ${st.res*10+st.digit} > ${INT_MAX}</span> &nbsp;→&nbsp; overflow`;
+    } else if (st.type === 'done') {
+      renderDigits($('xDigits'), 0, { showZero: false });
+      renderDigits($('resDigits'), st.res);
+      setMeter(st.res, 'ok');
+      const finalVal = examples[exIdx].x < 0 ? -st.res : st.res;
+      desc.innerHTML = `<b>Done!</b> <code>x</code> khaali ho gaya. Reversed result = <code>${st.res}</code> (sign laga ke <code>${finalVal}</code>).`;
+    }
+
+    // result badge
+    if (st.type === 'overflow') {
+      badge.textContent = 'return 0';
+      badge.classList.add('bad', 'show');
+    } else if (st.type === 'done') {
+      const finalVal = examples[exIdx].x < 0 ? -st.res : st.res;
+      badge.textContent = `return ${finalVal}`;
+      badge.classList.add('show');
+    } else {
+      badge.classList.remove('show');
+    }
+
+    $('stepCounter').textContent = `Step ${cur} / ${steps.length - 1}`;
+    $('prevBtn').disabled = cur === 0;
+    $('nextBtn').disabled = cur === steps.length - 1;
+  }
+
+  function loadExample(i) {
+    exIdx = i;
+    $('tabA').classList.toggle('active', i === 0);
+    $('tabB').classList.toggle('active', i === 1);
+    steps = buildSteps(Math.abs(examples[i].x));
+    cur = 0;
+    render();
+  }
+
+  function next() { if (cur < steps.length - 1) cur++; render(); }
+  function prev() { if (cur > 0) cur--; render(); }
+  function reset() { cur = 0; render(); }
+
+  loadExample(0);
+</script>
+</body>
+</html>

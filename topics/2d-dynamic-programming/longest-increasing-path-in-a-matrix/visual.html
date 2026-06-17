@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Longest Increasing Path — DFS + Memo on a Grid</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.05rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel); border-radius: 12px; padding: 16px 22px;
+    margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .controls { text-align: center; margin: 6px 0 22px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); margin: 0 6px; }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+
+  .stage {
+    background: var(--panel); border-radius: 14px; padding: 22px 22px 26px;
+    border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .gridwrap { display:flex; justify-content:center; }
+  .grid { display:grid; gap:8px; }
+  .cell {
+    width: 78px; height: 70px; border-radius: 10px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background: var(--panel2); border:1px solid rgba(255,255,255,0.08);
+    font-family:"SF Mono",Menlo,monospace; transition: all .3s ease; position:relative;
+  }
+  .cell .val { font-size:1.4rem; font-weight:700; color:var(--text); }
+  .cell .memo {
+    font-size:.72rem; margin-top:2px; color:var(--muted);
+  }
+  .cell.memoed { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.35); }
+  .cell.memoed .memo { color:#7ef0c0; font-weight:700; }
+  .cell.cur {
+    background: rgba(245,158,11,0.22); border-color: var(--amber);
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.4); transform: scale(1.06);
+  }
+  .cell.path {
+    border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.45);
+    background: rgba(59,130,246,0.14);
+  }
+  .cell.neigh { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(168,85,247,0.4); }
+  .cell .pill {
+    position:absolute; top:-9px; right:-9px; background:var(--green); color:#06281d;
+    font-size:.7rem; font-weight:800; border-radius:8px; padding:1px 6px;
+  }
+
+  .caption {
+    margin-top: 20px; background: var(--panel2); border-radius: 10px;
+    padding: 14px 16px; border-left: 4px solid var(--amber); font-size:.98rem; min-height: 74px;
+  }
+  .caption .eq { color: #ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .caption .hi { color: var(--purple); font-weight:700; }
+  .caption .mm { color: var(--green); font-weight:700; }
+  .stepcount { text-align:center; color:var(--muted); font-size:.85rem; margin-top:12px; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-top:18px; font-size:.8rem; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .swatch { width:14px; height:14px; border-radius:4px; display:inline-block; border:1px solid rgba(255,255,255,.15); }
+  .sw-cur { background: var(--amber); }
+  .sw-neigh { background: var(--purple); }
+  .sw-memo { background: rgba(16,185,129,0.5); }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px;
+    padding: 18px 24px; margin-top: 28px; text-align:center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.05rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Longest Increasing Path — <span>DFS + memo</span></h1>
+  <p class="subtitle">Longest strictly-increasing walk through a grid, moving only up/down/left/right.</p>
+
+  <div class="analogy">
+    <h3>⛰️ Analogy: uphill-only hiking</h3>
+    <p>Grid ek height-map hai, har cell ki value altitude. Hiker sirf <b>strictly upar</b> ja sakta hai (4 padosi cells). "Is cell se aage longest uphill trail" fixed hai aur koi cycle possible nahi — to har cell ka answer ek baar nikaal ke <b>memo</b> me likh do. Green badge = memoized length.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> 3×3 grid below. Longest strictly increasing path?
+    <span class="arrow">→</span> Answer: <code>4</code> (path <code>1 → 2 → 6 → 9</code>)
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn">‹ Prev</button>
+    <button id="nextBtn">Next ›</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+  </div>
+
+  <div class="stage">
+    <div class="gridwrap"><div class="grid" id="grid"></div></div>
+    <div class="legend">
+      <span><i class="swatch sw-cur"></i>current cell (computing)</span>
+      <span><i class="swatch sw-neigh"></i>higher neighbor explored</span>
+      <span><i class="swatch sw-memo"></i>memoized = best path length</span>
+    </div>
+    <div class="caption" id="caption">Press <b>Next</b>. We compute <code>dfs(r,c)</code> = longest increasing path starting at each cell. Strict increase means no cycles, so a memo gives each cell's answer in O(1) after the first visit.</div>
+    <div class="stepcount" id="stepcount"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Because heights strictly increase, the grid is a DAG — no <code>visited</code> set needed. Memoizing "longest path from this cell" turns an exponential search into <b>O(m·n)</b>; the answer is the max memo value, here <b>4</b>.</p>
+  </div>
+</div>
+
+<script>
+const grid = [
+  [9, 9, 4],
+  [6, 6, 8],
+  [2, 1, 1]
+];
+const R = grid.length, C = grid[0].length;
+const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+
+// We narrate a focused DFS that discovers the optimal path 1->2->6->9,
+// then note the final memo table. Build memo by full computation first.
+const memo = Array.from({length:R}, () => Array(C).fill(0));
+function compute(r,c){
+  if (memo[r][c]) return memo[r][c];
+  let best = 1;
+  for (const [dr,dc] of DIRS){
+    const nr=r+dr, nc=c+dc;
+    if (nr>=0&&nr<R&&nc>=0&&nc<C && grid[nr][nc]>grid[r][c])
+      best = Math.max(best, 1+compute(nr,nc));
+  }
+  return memo[r][c]=best;
+}
+for (let r=0;r<R;r++) for(let c=0;c<C;c++) compute(r,c);
+// memo:
+// 9:1 9:1 4:2
+// 6:2 6:2 8:1
+// 2:3 1:4 1:1   -> max = 4 (cell (2,1)=1)
+
+// hand-authored steps following the optimal chain bottom-up.
+// memoShown: which cells display a memo badge at this step.
+// path: cells on the highlighted current path. cur: active cell. neigh: neighbor being looked at.
+const steps = [
+  { memo:{}, cur:[2,1], path:[[2,1]], neigh:null,
+    cap:`Start a DFS from the smallest cell <span class="eq">(2,1)=1</span> (bottom middle). <code>best=1</code> for the cell itself; now scan its higher neighbors.` },
+  { memo:{}, cur:[2,1], path:[[2,1]], neigh:[2,0],
+    cap:`Left neighbor <span class="hi">(2,0)=2</span> &gt; 1 ✓ — a valid uphill step. Recurse into it.` },
+  { memo:{}, cur:[2,0], path:[[2,1],[2,0]], neigh:[1,0],
+    cap:`At <span class="eq">(2,0)=2</span>. Its only higher neighbor is up <span class="hi">(1,0)=6</span> &gt; 2 ✓. Recurse.` },
+  { memo:{}, cur:[1,0], path:[[2,1],[2,0],[1,0]], neigh:[0,0],
+    cap:`At <span class="eq">(1,0)=6</span>. Higher neighbor up <span class="hi">(0,0)=9</span> &gt; 6 ✓. Recurse.` },
+  { memo:{'0,0':1}, cur:[0,0], path:[[2,1],[2,0],[1,0],[0,0]], neigh:null,
+    cap:`At <span class="eq">(0,0)=9</span>. No neighbor is higher → dead end. <span class="mm">memo[0][0] = 1</span> (just itself).` },
+  { memo:{'0,0':1,'1,0':2}, cur:[1,0], path:[[2,1],[2,0],[1,0]], neigh:null,
+    cap:`Back at <span class="eq">(1,0)=6</span>: best = 1 + memo[0][0] = 1+1 = <span class="mm">2</span>. <span class="mm">memo[1][0] = 2</span>.` },
+  { memo:{'0,0':1,'1,0':2,'2,0':3}, cur:[2,0], path:[[2,1],[2,0]], neigh:null,
+    cap:`Back at <span class="eq">(2,0)=2</span>: best = 1 + memo[1][0] = 1+2 = <span class="mm">3</span>. <span class="mm">memo[2][0] = 3</span>.` },
+  { memo:{'0,0':1,'1,0':2,'2,0':3}, cur:[2,1], path:[[2,1]], neigh:[2,2],
+    cap:`Back at <span class="eq">(2,1)=1</span>. The left branch gave 1+3 = 4 so far. Also check right neighbor <span class="hi">(2,2)=1</span> — not &gt; 1, so skip it.` },
+  { memo:{'0,0':1,'1,0':2,'2,0':3,'2,1':4}, cur:[2,1], path:[[2,1],[2,0],[1,0],[0,0]], neigh:null,
+    cap:`<span class="eq">(2,1)</span> best = 1 + memo[2][0] = 1+3 = <span class="mm">4</span>. <span class="mm">memo[2][1] = 4</span> — the path <code>1→2→6→9</code> 🎯.` },
+  { memo:{'0,0':1,'1,0':2,'2,0':3,'2,1':4,'0,2':2,'1,1':2,'1,2':1,'0,1':1,'2,2':1}, cur:null, path:[], neigh:null,
+    cap:`Remaining cells get memoized similarly (each computed once). The <b>answer is the max memo value = <span class="mm">4</span></b>. Every cell touched O(1) times → O(m·n) total.` }
+];
+
+const $ = id => document.getElementById(id);
+let cur = 0;
+
+function buildGrid(){
+  $('grid').style.gridTemplateColumns = `repeat(${C}, 78px)`;
+  let html='';
+  for (let r=0;r<R;r++) for(let c=0;c<C;c++){
+    html += `<div class="cell" id="g${r}-${c}"><div class="val">${grid[r][c]}</div><div class="memo" id="m${r}-${c}"></div></div>`;
+  }
+  $('grid').innerHTML = html;
+}
+
+function render(){
+  const st = steps[cur];
+  const curKey = st.cur ? st.cur[0]+','+st.cur[1] : null;
+  const neighKey = st.neigh ? st.neigh[0]+','+st.neigh[1] : null;
+  const pathSet = new Set(st.path.map(p=>p[0]+','+p[1]));
+
+  for (let r=0;r<R;r++) for(let c=0;c<C;c++){
+    const cell = $('g'+r+'-'+c);
+    const mlabel = $('m'+r+'-'+c);
+    cell.className = 'cell';
+    const kk = r+','+c;
+    const hasMemo = Object.prototype.hasOwnProperty.call(st.memo, kk);
+    // remove any old pill
+    const oldPill = cell.querySelector('.pill'); if (oldPill) oldPill.remove();
+    if (hasMemo){
+      cell.classList.add('memoed');
+      mlabel.textContent = 'memo='+st.memo[kk];
+      const pill = document.createElement('div'); pill.className='pill'; pill.textContent=st.memo[kk];
+      cell.appendChild(pill);
+    } else {
+      mlabel.textContent = '';
+    }
+    if (pathSet.has(kk)) cell.classList.add('path');
+    if (kk === neighKey) cell.classList.add('neigh');
+    if (kk === curKey) cell.classList.add('cur');
+  }
+  $('caption').innerHTML = st.cap;
+  $('stepcount').textContent = `Step ${cur} / ${steps.length-1}`;
+  $('prevBtn').disabled = cur === 0;
+  $('nextBtn').disabled = cur === steps.length-1;
+}
+
+$('nextBtn').addEventListener('click', ()=>{ if(cur<steps.length-1){cur++;render();}});
+$('prevBtn').addEventListener('click', ()=>{ if(cur>0){cur--;render();}});
+$('resetBtn').addEventListener('click', ()=>{ cur=0; render(); });
+
+buildGrid();
+render();
+</script>
+</body>
+</html>

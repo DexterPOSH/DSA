@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Min Cost Climbing Stairs — a DP row picking the cheaper predecessor</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.08));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 20px; margin-bottom: 28px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .card {
+    background: var(--panel); border-radius: 14px;
+    padding: 22px 24px 26px; margin-bottom: 26px;
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 6px 22px rgba(0,0,0,0.28);
+  }
+  .section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; margin-top: 18px; }
+  .section-label:first-child { margin-top: 0; }
+  code { background: var(--panel2); padding: 1px 7px; border-radius: 5px; color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .step-desc {
+    background: var(--panel2); border-left: 4px solid var(--blue);
+    border-radius: 8px; padding: 14px 16px; min-height: 64px;
+    margin-bottom: 8px; font-size: 1.02rem;
+  }
+
+  .cost-row, .dp-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+  .cell { width: 58px; display: flex; flex-direction: column; align-items: center; }
+  .box {
+    width: 58px; height: 52px; border-radius: 10px;
+    display: grid; place-items: center; font-weight: 700; font-size: 1.25rem;
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--panel2); border: 2px solid rgba(255,255,255,0.1);
+    transition: all .3s ease;
+  }
+  .cost-box { color: #ffd479; }
+  .dp-box { color: #6b7299; }
+  .dp-box.filled { color: var(--text); border-color: rgba(255,255,255,0.25); background: #2a2a4a; }
+  .dp-box.active { border-color: var(--blue); background: rgba(59,130,246,0.22); color: #bcd4ff; box-shadow: 0 0 0 3px rgba(59,130,246,0.35); transform: translateY(-3px); }
+  .dp-box.src-win { border-color: var(--green); background: rgba(16,185,129,0.18); color: #b6f0d8; }
+  .dp-box.src-lose { border-color: var(--red); background: rgba(239,68,68,0.12); color: #f3b4b4; }
+  .dp-box.done { border-color: var(--green); background: rgba(16,185,129,0.16); color: #b6f0d8; }
+  .cost-box.point { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(245,158,11,0.3); }
+  .idx { margin-top: 6px; font-size: 0.72rem; color: var(--muted); font-family: "SF Mono", monospace; }
+  .cell.is-active .idx { color: var(--blue); font-weight: 700; }
+
+  .calc-line {
+    margin-top: 18px; font-family: "SF Mono", Menlo, monospace;
+    font-size: 1.0rem; min-height: 26px; color: var(--green);
+  }
+  .calc-line .win { color: var(--green); font-weight: 700; }
+  .calc-line .lose { color: var(--red); text-decoration: line-through; opacity: 0.8; }
+  .calc-line .amb { color: var(--amber); }
+  .calc-line .res { color: var(--blue); font-weight: 700; }
+
+  .result-badge {
+    margin-top: 18px; display: none;
+    background: rgba(16,185,129,0.15); border: 1px solid var(--green);
+    border-radius: 10px; padding: 12px 18px; font-weight: 700;
+    font-family: "SF Mono", Menlo, monospace; color: #b6f0d8;
+  }
+  .result-badge.show { display: inline-block; }
+
+  .controls { display: flex; align-items: center; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 10px 22px; border-radius: 9px; font-size: 0.98rem; font-weight: 600;
+    cursor: pointer; transition: transform .12s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #34345e; }
+  .step-counter { margin-left: auto; color: var(--muted); font-size: 0.9rem; font-family: "SF Mono", monospace; }
+
+  .code-block {
+    background: #11111f; border-radius: 12px; padding: 18px 20px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.88rem;
+    line-height: 1.7; overflow-x: auto; margin-top: 6px;
+    border: 1px solid rgba(255,255,255,0.06); white-space: pre;
+  }
+  .kw { color: #c792ea; } .fn { color: #82aaff; } .cm { color: #5a6a90; } .num { color: #f78c6c; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px; padding: 18px 22px; margin-top: 30px;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Min Cost Climbing Stairs — pick the <span>cheaper predecessor</span></h1>
+  <p class="subtitle">Minimum cost to reach the top of <code>cost = [10, 15, 20, 5, 30, 8]</code>, paying to stand on each step.</p>
+
+  <div class="analogy">
+    <h3>🎟️ Real-world analogy</h3>
+    <p>Har step ek toll booth hai. Step <code>i</code> par do hi raaste aate hain — <b>i-1</b> ya <b>i-2</b> se. Dono raaston ka jo ab tak ka kharcha sasta hai usse chuno, phir apna toll <code>cost[i]</code> jodo: <code>dp[i] = cost[i] + min(dp[i-1], dp[i-2])</code>.</p>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Step description</div>
+    <div class="step-desc" id="stepDesc">Press <b>Next →</b> to start filling the DP table.</div>
+
+    <div class="section-label">cost[i] — toll to stand on step i</div>
+    <div class="cost-row" id="costRow"></div>
+
+    <div class="section-label">dp[i] = min cost to stand on step i</div>
+    <div class="dp-row" id="dpRow"></div>
+
+    <div class="calc-line" id="calcLine"></div>
+    <div class="result-badge" id="resultBadge"></div>
+
+    <div class="controls">
+      <button class="ghost" id="prevBtn" onclick="prev()">← Prev</button>
+      <button id="nextBtn" onclick="next()">Next →</button>
+      <button class="ghost" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="section-label" style="color:var(--muted)">The whole algorithm</div>
+  <div class="code-block"><span class="kw">def</span> <span class="fn">minCostClimbingStairs</span>(cost):
+    n = <span class="fn">len</span>(cost)
+    dp = [<span class="num">0</span>] * n
+    dp[<span class="num">0</span>], dp[<span class="num">1</span>] = cost[<span class="num">0</span>], cost[<span class="num">1</span>]      <span class="cm"># start free at 0 or 1</span>
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="num">2</span>, n):
+        dp[i] = cost[i] + <span class="fn">min</span>(dp[i-<span class="num">1</span>], dp[i-<span class="num">2</span>])
+    <span class="kw">return</span> <span class="fn">min</span>(dp[n-<span class="num">1</span>], dp[n-<span class="num">2</span>])    <span class="cm"># top is past the last step</span></div>
+
+  <div class="takeaway">
+    <h3>💡 Key takeaway</h3>
+    <p>Har cell apne do predecessors me se <b>sasta</b> chunta hai aur apna cost jodta hai. Top last index ke aage hai, toh answer <code>min(dp[n-1], dp[n-2])</code>. <b>O(n) time, O(1) space.</b></p>
+  </div>
+</div>
+
+<script>
+  const cost = [10, 15, 20, 5, 30, 8];
+  const n = cost.length;
+  const dp = new Array(n).fill(0);
+  dp[0] = cost[0]; dp[1] = cost[1];
+  for (let i = 2; i < n; i++) dp[i] = cost[i] + Math.min(dp[i-1], dp[i-2]);
+  const answer = Math.min(dp[n-1], dp[n-2]);
+
+  const steps = [
+    { type:'base', i:0,
+      desc:'<b>Base case:</b> <code>dp[0] = cost[0] = '+cost[0]+'</code>. Start step 0 par free hai, sirf uska toll lagta hai.' },
+    { type:'base', i:1,
+      desc:'<b>Base case:</b> <code>dp[1] = cost[1] = '+cost[1]+'</code>. Start step 1 par bhi free hai (do start options the).' },
+    { type:'compute', i:2 },
+    { type:'compute', i:3 },
+    { type:'compute', i:4 },
+    { type:'compute', i:5 },
+    { type:'done' },
+  ];
+
+  const $ = id => document.getElementById(id);
+  const costRow = $('costRow'), dpRow = $('dpRow'), stepDesc = $('stepDesc');
+  const calcLine = $('calcLine'), resultBadge = $('resultBadge'), counter = $('stepCounter');
+  const prevBtn = $('prevBtn'), nextBtn = $('nextBtn');
+
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    c.innerHTML = `<div class="box cost-box" id="cost-${i}">${cost[i]}</div><div class="idx">[${i}]</div>`;
+    costRow.appendChild(c);
+    const d = document.createElement('div');
+    d.className = 'cell';
+    d.innerHTML = `<div class="box dp-box" id="dp-${i}">·</div><div class="idx">dp[${i}]</div>`;
+    dpRow.appendChild(d);
+  }
+
+  let cur = 0;
+
+  function render() {
+    for (let i = 0; i < n; i++) {
+      const d = $('dp-'+i); d.className = 'box dp-box'; d.textContent = '·';
+      d.parentElement.classList.remove('is-active');
+      $('cost-'+i).className = 'box cost-box';
+    }
+    calcLine.innerHTML = ''; resultBadge.classList.remove('show');
+
+    let filledUpto = -1;
+    for (let s = 0; s < cur; s++) {
+      const st = steps[s];
+      if (st.type === 'base' || st.type === 'compute') filledUpto = Math.max(filledUpto, st.i);
+    }
+    for (let i = 0; i <= filledUpto; i++) {
+      $('dp-'+i).textContent = dp[i];
+      $('dp-'+i).classList.add('filled');
+    }
+
+    const active = cur > 0 ? steps[cur-1] : null;
+
+    if (!active) {
+      stepDesc.innerHTML = 'Press <b>Next →</b> to start filling the DP table.';
+    } else if (active.type === 'base') {
+      const d = $('dp-'+active.i);
+      d.classList.remove('filled'); d.classList.add('active');
+      d.parentElement.classList.add('is-active');
+      $('cost-'+active.i).classList.add('point');
+      stepDesc.innerHTML = active.desc;
+    } else if (active.type === 'compute') {
+      const i = active.i;
+      $('dp-'+i).classList.remove('filled'); $('dp-'+i).classList.add('active');
+      $('dp-'+i).parentElement.classList.add('is-active');
+      $('cost-'+i).classList.add('point');
+      const a = dp[i-1], b = dp[i-2];
+      const winIdx = a <= b ? i-1 : i-2;
+      const loseIdx = a <= b ? i-2 : i-1;
+      $('dp-'+winIdx).classList.add('src-win');
+      $('dp-'+loseIdx).classList.add('src-lose');
+      const winVal = Math.min(a, b), loseVal = Math.max(a, b);
+      stepDesc.innerHTML =
+        `<b>Compute dp[${i}]:</b> step ${i} par <code>${i-1}</code> ya <code>${i-2}</code> se aaya ja sakta hai. ` +
+        `Sasta predecessor = <b style="color:#10b981">dp[${winIdx}] = ${winVal}</b>. Usme apna toll <code>cost[${i}] = ${cost[i]}</code> jodo.`;
+      calcLine.innerHTML =
+        `dp[${i}] = cost[${i}] + min(<span class="${a<=b?'win':'lose'}">${a}</span>, <span class="${b<a?'win':'lose'}">${b}</span>) ` +
+        `= <span class="amb">${cost[i]}</span> + <span class="win">${winVal}</span> = <span class="res">${dp[i]}</span>`;
+    } else if (active.type === 'done') {
+      const lastIdx = dp[n-1] <= dp[n-2] ? n-1 : n-2;
+      $('dp-'+lastIdx).classList.remove('filled'); $('dp-'+lastIdx).classList.add('done');
+      stepDesc.innerHTML =
+        `<b>Done!</b> Top last step ke aage hai, toh answer = <code>min(dp[${n-1}], dp[${n-2}]) = min(${dp[n-1]}, ${dp[n-2]}) = ${answer}</code>. ` +
+        `Cheapest way to reach the top costs <b>${answer}</b>.`;
+      calcLine.innerHTML =
+        `answer = min(dp[${n-1}], dp[${n-2}]) = min(${dp[n-1]}, ${dp[n-2]}) = <span class="res">${answer}</span>`;
+      resultBadge.textContent = `return ${answer}`;
+      resultBadge.classList.add('show');
+    }
+
+    counter.textContent = `Step ${cur} / ${steps.length}`;
+    prevBtn.disabled = cur === 0;
+    nextBtn.disabled = cur === steps.length;
+  }
+
+  function next() { if (cur < steps.length) cur++; render(); }
+  function prev() { if (cur > 0) cur--; render(); }
+  function reset() { cur = 0; render(); }
+  render();
+</script>
+</body>
+</html>

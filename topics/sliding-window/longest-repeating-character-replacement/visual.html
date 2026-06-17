@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Longest Repeating Character Replacement — Sliding Window</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px 60px; gap: 28px; }
+  h1 { font-size: 1.55rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: #3b82f6; }
+
+  .analogy { background: #16213e; border: 1px solid #3b82f6; border-radius: 12px; padding: 18px 26px; max-width: 760px; width: 100%; display: flex; gap: 16px; align-items: flex-start; }
+  .analogy-icon { font-size: 2rem; line-height: 1; flex-shrink: 0; }
+  .analogy-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px; }
+  .analogy-text { font-size: 0.96rem; line-height: 1.5; color: #c0c0d0; }
+
+  .card { background: #16213e; border: 1px solid #2d3a5a; border-radius: 16px; padding: 30px; max-width: 800px; width: 100%; display: flex; flex-direction: column; gap: 26px; }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #7a8ab0; margin-bottom: 12px; }
+  .step-description { min-height: 56px; background: #0f172a; border-radius: 8px; padding: 14px 20px; font-size: 0.95rem; line-height: 1.55; color: #c8c8e0; border-left: 3px solid #3b82f6; transition: border-color 0.3s; }
+  .step-description.shrink { border-color: #ef4444; }
+  .step-description.grow   { border-color: #10b981; }
+
+  .str-area { position: relative; padding-top: 30px; overflow-x: auto; }
+  .str-row { display: flex; gap: 10px; align-items: center; justify-content: center; min-width: max-content; }
+  .ch-wrap { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .ch { width: 50px; height: 50px; border-radius: 10px; border: 2px solid #2d3a5a; background: #0f172a; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 700; color: #e0e0e0; transition: all 0.35s; }
+  .ch.inwin { border-color: #10b981; background: #0d2a1a; color: #86efac; }
+  .ch.majority { border-color: #3b82f6; background: #1e3a6e; color: #93c5fd; }
+  .ch.repaint { border-color: #f59e0b; background: #3a2a0a; color: #fcd34d; }
+  .ch.right-cur { box-shadow: 0 0 16px rgba(59,130,246,0.55); transform: translateY(-3px); }
+  .ch-idx { font-size: 0.62rem; color: #5a6a90; }
+  .ptr { position: absolute; top: -24px; left: 50%; transform: translateX(-50%); font-size: 0.62rem; font-weight: 700; padding: 2px 7px; border-radius: 5px; white-space: nowrap; opacity: 0; transition: opacity 0.25s; }
+  .ptr.show { opacity: 1; }
+  .ptr.l { background: #f59e0b; color: #1a1a2e; }
+  .ptr.r { background: #3b82f6; color: #fff; }
+
+  .state-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+  .state-box { flex: 1; min-width: 100px; background: #0f172a; border: 1px solid #2d3a5a; border-radius: 10px; padding: 12px 14px; }
+  .state-box .lbl { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: #7a8ab0; }
+  .state-box .val { font-size: 1.3rem; font-weight: 700; margin-top: 2px; }
+  .state-box.best .val { color: #86efac; }
+  .state-box.cost .val { color: #fcd34d; }
+  .state-box.cost.bad .val { color: #fca5a5; }
+
+  .freq-area { display: flex; gap: 10px; flex-wrap: wrap; }
+  .freq { background: #0f172a; border: 1px solid #2d3a5a; border-radius: 8px; padding: 8px 14px; font-family: 'Consolas', monospace; font-size: 0.95rem; }
+  .freq .k { color: #93c5fd; font-weight: 700; }
+  .freq .v { color: #e0e0e0; }
+  .freq.max { border-color: #3b82f6; background: #16264a; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 12px 26px; border-radius: 8px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: #5a6a90; margin-left: auto; }
+
+  .takeaway { background: #16213e; border: 1px solid #2d3a5a; border-radius: 12px; padding: 18px 26px; max-width: 760px; width: 100%; display: flex; gap: 16px; align-items: flex-start; }
+  .takeaway-icon { font-size: 1.6rem; flex-shrink: 0; }
+  .takeaway-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #3b82f6; margin-bottom: 4px; }
+  .takeaway p { font-size: 0.94rem; line-height: 1.55; color: #c0c0d0; }
+  .takeaway strong { color: #e0e0e0; }
+</style>
+</head>
+<body>
+
+  <h1>Longest Repeating Character Replacement &mdash; <span>k Repaints Allowed</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🎨</div>
+    <div class="analogy-body">
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Tiles ki ek deewar, aur sirf <strong>k repaint stickers</strong>. Ek lagatar
+        stretch choose karo, usme <strong style="color:#3b82f6">majority color</strong>
+        rakho aur baaki <strong style="color:#f59e0b">repaint</strong> karo. Repaints
+        (window_len − max_count) jab k se zyada ho jaaye, window slide karo.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description &nbsp;<code style="color:#5a6a90;font-size:0.75rem">k = 1</code></div>
+      <div class="step-description" id="stepDesc">Press "Next Step". We expand right, count letters, and check if replacements needed (window_len − max_count) exceed k.</div>
+    </div>
+
+    <div>
+      <div class="section-label">String &nbsp;<code style="color:#5a6a90;font-size:0.75rem">"AABABBA", k = 1</code></div>
+      <div class="str-area"><div class="str-row" id="strRow"></div></div>
+    </div>
+
+    <div class="state-grid">
+      <div class="state-box"><div class="lbl">window</div><div class="val" id="winVal">0</div></div>
+      <div class="state-box"><div class="lbl">max_count</div><div class="val" id="maxVal">0</div></div>
+      <div class="state-box cost" id="costBox"><div class="lbl">replaces</div><div class="val" id="costVal">0</div></div>
+      <div class="state-box best"><div class="lbl">best</div><div class="val" id="bestVal">0</div></div>
+    </div>
+
+    <div>
+      <div class="section-label">count &mdash; letter frequencies in window</div>
+      <div class="freq-area" id="freqArea"></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next Step</button>
+      <span class="step-counter" id="stepCounter">Step 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div class="takeaway-body">
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        Window is valid while <strong>window_len − max_count ≤ k</strong> (replacements
+        fit your budget). When it isn't, slide <strong style="color:#f59e0b">left</strong>
+        forward by one. <strong>max_count never needs to shrink</strong> — the answer only
+        grows when a more frequent letter appears. <strong>O(n) time, O(1) space.</strong>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const s = "AABABBA", k = 1;
+
+    function buildSteps() {
+      const out = [];
+      const count = {};
+      let left = 0, maxCount = 0, best = 0;
+      for (let right = 0; right < s.length; right++) {
+        const ch = s[right];
+        count[ch] = (count[ch] || 0) + 1;
+        maxCount = Math.max(maxCount, count[ch]);
+        let winLen = right - left + 1;
+        let cost = winLen - maxCount;
+        let shrank = false, removed = null;
+        if (cost > k) {
+          removed = s[left];
+          count[removed] -= 1;
+          left += 1;
+          shrank = true;
+          winLen = right - left + 1;
+          cost = winLen - maxCount;
+        }
+        best = Math.max(best, winLen);
+        out.push({
+          left, right, winLen, maxCount, cost, best, shrank, removed,
+          freq: { ...count },
+          majorityLetter: dominant(count),
+          desc: shrank
+            ? `Add <strong style="color:#3b82f6">s[${right}]='${ch}'</strong>: replacements would be ${winLen+1 - maxCount} &gt; k=${k}. Slide left: drop <strong style="color:#f59e0b">'${removed}'</strong>, left&rarr;${left}. Window <strong style="color:#10b981">"${s.slice(left, right+1)}"</strong>, replaces=${cost} ≤ ${k}. best=${best}.`
+            : `Add <strong style="color:#3b82f6">s[${right}]='${ch}'</strong>. Window <strong style="color:#10b981">"${s.slice(left, right+1)}"</strong>: replaces = ${winLen} − ${maxCount} = <strong style="color:${cost>k?'#ef4444':'#fcd34d'}">${cost}</strong> ≤ k=${k}. ${best===winLen?`New best = ${best}!`:`best stays ${best}.`}`
+        });
+      }
+      out.push({ done: true, best, desc: `Done. Longest window convertible to one letter with ≤ ${k} replacements has length <strong style="color:#10b981">${best}</strong>.` });
+      return out;
+    }
+    function dominant(count) {
+      let bestK = null, bestV = -1;
+      for (const key in count) if (count[key] > bestV) { bestV = count[key]; bestK = key; }
+      return bestK;
+    }
+
+    const steps = buildSteps();
+    let currentStep = 0;
+
+    const row = document.getElementById('strRow');
+    for (let i = 0; i < s.length; i++) {
+      const wrap = document.createElement('div'); wrap.className = 'ch-wrap';
+      const ptr = document.createElement('div'); ptr.className = 'ptr'; ptr.id = 'ptr-' + i;
+      const cell = document.createElement('div'); cell.className = 'ch'; cell.id = 'ch-' + i; cell.textContent = s[i];
+      const idx = document.createElement('div'); idx.className = 'ch-idx'; idx.textContent = i;
+      wrap.appendChild(ptr); wrap.appendChild(cell); wrap.appendChild(idx); row.appendChild(wrap);
+    }
+
+    const stepDesc = document.getElementById('stepDesc');
+    const winVal = document.getElementById('winVal');
+    const maxVal = document.getElementById('maxVal');
+    const costVal = document.getElementById('costVal');
+    const costBox = document.getElementById('costBox');
+    const bestVal = document.getElementById('bestVal');
+    const freqArea = document.getElementById('freqArea');
+    const stepCtr = document.getElementById('stepCounter');
+    const nextBtn = document.getElementById('nextBtn');
+
+    function clearCells() {
+      for (let i = 0; i < s.length; i++) {
+        document.getElementById('ch-' + i).className = 'ch';
+        document.getElementById('ptr-' + i).className = 'ptr';
+      }
+    }
+    function setPtr(i, kind) {
+      const p = document.getElementById('ptr-' + i);
+      if (kind === 'l') { p.textContent = '⬆ left'; p.className = 'ptr show l'; }
+      else { p.textContent = '⬆ right'; p.className = 'ptr show r'; }
+    }
+    function renderFreq(freq, majority) {
+      freqArea.innerHTML = '';
+      Object.keys(freq).filter(kk => freq[kk] > 0).forEach(kk => {
+        const d = document.createElement('div');
+        d.className = 'freq' + (kk === majority ? ' max' : '');
+        d.innerHTML = `<span class="k">${kk}</span>: <span class="v">${freq[kk]}</span>`;
+        freqArea.appendChild(d);
+      });
+    }
+
+    function render(step) {
+      clearCells();
+      if (step.done) {
+        stepDesc.innerHTML = step.desc; stepDesc.className = 'step-description grow';
+        bestVal.textContent = step.best; return;
+      }
+      for (let i = step.left; i <= step.right; i++) {
+        const c = document.getElementById('ch-' + i);
+        c.classList.add('inwin');
+        if (s[i] === step.majorityLetter) c.classList.add('majority');
+        else c.classList.add('repaint');
+      }
+      document.getElementById('ch-' + step.right).classList.add('right-cur');
+      setPtr(step.left, 'l'); setPtr(step.right, 'r');
+      winVal.textContent = step.winLen;
+      maxVal.textContent = step.maxCount;
+      costVal.textContent = step.cost;
+      costBox.className = 'state-box cost' + (step.cost > k ? ' bad' : '');
+      bestVal.textContent = step.best;
+      renderFreq(step.freq, step.majorityLetter);
+      stepDesc.innerHTML = step.desc;
+      stepDesc.className = 'step-description ' + (step.shrank ? 'shrink' : 'grow');
+    }
+
+    function advance() {
+      if (currentStep >= steps.length) return;
+      render(steps[currentStep]);
+      currentStep++;
+      stepCtr.textContent = 'Step ' + currentStep + ' / ' + steps.length;
+      if (currentStep >= steps.length) nextBtn.disabled = true;
+    }
+    function reset() {
+      currentStep = 0; clearCells(); freqArea.innerHTML = '';
+      winVal.textContent = '0'; maxVal.textContent = '0'; costVal.textContent = '0';
+      costBox.className = 'state-box cost'; bestVal.textContent = '0';
+      stepDesc.innerHTML = 'Press "Next Step". We expand right, count letters, and check if replacements needed (window_len − max_count) exceed k.';
+      stepDesc.className = 'step-description';
+      nextBtn.disabled = false;
+      stepCtr.textContent = 'Step 0 / ' + steps.length;
+    }
+    stepCtr.textContent = 'Step 0 / ' + steps.length;
+  </script>
+</body>
+</html>

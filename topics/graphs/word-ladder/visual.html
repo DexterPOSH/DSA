@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Ladder — BFS finds the shortest transformation</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.05rem; }
+  .analogy p { margin: 0; }
+
+  .panel {
+    background: var(--panel); border-radius: 14px;
+    padding: 20px 24px 26px; margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  code {
+    background: var(--panel2); padding: 2px 7px; border-radius: 5px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .stage-grid { display: grid; grid-template-columns: 1.45fr 1fr; gap: 20px; }
+  @media (max-width: 760px) { .stage-grid { grid-template-columns: 1fr; } }
+
+  svg { width: 100%; height: 420px; background: var(--panel2); border-radius: 12px; }
+  .gnode rect, .gnode text { transition: all .4s ease; }
+  .edge-line { transition: all .4s ease; }
+
+  .side h4 { margin: 0 0 8px; font-size: .95rem; color: var(--muted); }
+  .queue { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; min-height: 40px; }
+  .qitem {
+    background: rgba(59,130,246,0.14); border: 1px solid var(--blue);
+    border-radius: 8px; padding: 7px 12px; font-family: "SF Mono", Menlo, monospace;
+    display: flex; justify-content: space-between; align-items: center;
+    transition: all .3s ease;
+  }
+  .qitem .w { font-weight: 700; }
+  .qitem .d { color: var(--amber); font-size: .82rem; }
+  .qitem.head { border-color: var(--amber); background: rgba(245,158,11,0.16); box-shadow: 0 0 0 2px rgba(245,158,11,0.25); }
+  .qempty { color: var(--muted); font-style: italic; font-size: .9rem; }
+
+  .visited { display: flex; flex-wrap: wrap; gap: 6px; }
+  .vchip {
+    background: var(--panel2); border: 1px solid rgba(16,185,129,0.5);
+    border-radius: 16px; padding: 4px 11px; font-family: "SF Mono", Menlo, monospace;
+    font-size: .85rem; color: #b6f0d8;
+  }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0 2px; font-size: .82rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 13px; height: 13px; border-radius: 4px; display: inline-block; border: 1px solid; }
+
+  .caption {
+    margin-top: 18px; background: var(--panel2); border-radius: 10px;
+    padding: 14px 18px; border-left: 4px solid var(--blue);
+    font-size: .98rem; min-height: 56px;
+  }
+  .caption.found { border-left-color: var(--green); background: rgba(16,185,129,0.10); }
+  .caption.expand { border-left-color: var(--amber); }
+  .caption b.u { color: var(--amber); }
+  .caption b.g { color: var(--green); }
+  .caption b.b { color: #93c5fd; }
+
+  .controls { text-align: center; margin: 4px 0 6px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 10px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); margin: 0 6px; }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .stepcount { color: var(--muted); font-size: .9rem; margin-top: 10px; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px; padding: 18px 24px; margin-top: 30px; text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Word Ladder — <span>BFS</span> finds the shortest transformation</h1>
+  <p class="subtitle">Each word is a node; an edge joins words differing by exactly one letter. BFS fans out level by level — the first ripple to touch the target wins.</p>
+
+  <div class="analogy">
+    <h3>🌊 Real-world analogy: ripples in a word-maze</h3>
+    <p>Paani <b>hit</b> pe giraao — ripples ek-letter-door wale rooms me ek saath failte hain. Jo ripple sabse pehle <b>cog</b> ko chhuye, wahi shortest path. DFS ek raasta andar tak ghuste rehta — shortest guarantee nahi.</p>
+  </div>
+
+  <div class="panel">
+    <b>Input.</b> <code>begin = "hit"</code>, <code>end = "cog"</code>,
+    <code>wordList = [hot, dot, dog, lot, log, cog]</code>
+    <span class="arrow">→</span> shortest length <code>5</code>
+
+    <div class="legend">
+      <span><i class="dot" style="background:rgba(59,130,246,0.22); border-color:#3b82f6;"></i> unvisited</span>
+      <span><i class="dot" style="background:rgba(245,158,11,0.25); border-color:#f59e0b;"></i> in queue / frontier</span>
+      <span><i class="dot" style="background:rgba(16,185,129,0.22); border-color:#10b981;"></i> dequeued (settled)</span>
+      <span><i class="dot" style="background:rgba(239,68,68,0.0); border-color:#a855f7;"></i> path</span>
+    </div>
+
+    <div class="stage-grid">
+      <svg id="graph" viewBox="0 0 460 420" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="side">
+        <h4>BFS queue (word, dist)</h4>
+        <div class="queue" id="queue"></div>
+        <h4>visited</h4>
+        <div class="visited" id="visited"></div>
+      </div>
+    </div>
+
+    <div class="caption" id="caption">Press <b>Next</b> to run BFS from <code>hit</code> (distance 1).</div>
+
+    <div class="controls">
+      <button class="ghost" id="prevBtn">‹ Prev</button>
+      <button id="nextBtn">Next ›</button>
+      <button class="ghost" id="resetBtn">↺ Reset</button>
+      <div class="stepcount" id="stepcount"></div>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>On an unweighted graph, BFS dequeues nodes in non-decreasing distance order — so the moment <code>endWord</code> comes off the queue, its distance is provably the shortest. That's why it's BFS, never DFS.</p>
+  </div>
+</div>
+
+<script>
+// ----- graph: words as nodes, one-letter-diff edges -----
+const begin = "hit", end = "cog";
+const wordList = ["hot","dot","dog","lot","log","cog"];
+const allWords = [begin, ...wordList];
+
+// fixed layout by BFS level (viewBox 460x420)
+const pos = {
+  hit: {x: 230, y: 40},
+  hot: {x: 230, y: 130},
+  dot: {x: 140, y: 220},
+  lot: {x: 320, y: 220},
+  dog: {x: 140, y: 310},
+  log: {x: 320, y: 310},
+  cog: {x: 230, y: 390},
+};
+function oneDiff(a,b){ let d=0; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) d++; return d===1; }
+// build edges among words we will visualize
+const gEdges = [];
+for (let i=0;i<allWords.length;i++)
+  for (let j=i+1;j<allWords.length;j++)
+    if (oneDiff(allWords[i], allWords[j])) gEdges.push([allWords[i], allWords[j]]);
+
+// ----- precompute BFS steps -----
+function buildSteps(){
+  const words = new Set(wordList);
+  const adj = {};
+  allWords.forEach(w => adj[w] = allWords.filter(x => x!==w && oneDiff(w,x)));
+  const steps = [];
+  const q = [[begin, 1]];
+  const visited = new Set([begin]);
+  const parentOf = {};
+  steps.push({ queue: q.map(x=>[...x]), visited: new Set(visited), active: null,
+    discovered: [], treeEdges: [], path: null, found: false,
+    cap: `Init: enqueue <b class="u">hit</b> at distance <b>1</b>, mark it visited.` });
+
+  let foundDist = null, foundWord = null;
+  while (q.length){
+    const [word, dist] = q.shift();
+    if (word === end){
+      foundDist = dist; foundWord = word;
+      // reconstruct path
+      const path=[]; let cw=word; while(cw){ path.unshift(cw); cw=parentOf[cw]; }
+      steps.push({ queue: q.map(x=>[...x]), visited: new Set(visited), active: word,
+        discovered: [], treeEdges: [], path, found: true,
+        cap: `Dequeue <b class="g">cog</b> (dist <b>${dist}</b>) — that's the target! Shortest sequence length = <b class="g">${dist}</b>: <code>${path.join(' → ')}</code>.` });
+      break;
+    }
+    const newlyDisc = [];
+    const newTreeEdges = [];
+    for (const nb of adj[word]){
+      if (words.has(nb) && !visited.has(nb)){
+        visited.add(nb); parentOf[nb]=word;
+        q.push([nb, dist+1]);
+        newlyDisc.push(nb);
+        newTreeEdges.push([word, nb]);
+      }
+    }
+    steps.push({ queue: q.map(x=>[...x]), visited: new Set(visited), active: word,
+      discovered: newlyDisc.slice(), treeEdges: newTreeEdges.slice(), path: null, found: false,
+      cap: newlyDisc.length
+        ? `Dequeue <b class="b">${word}</b> (dist <b>${dist}</b>). Discover neighbours <b class="u">${newlyDisc.join(', ')}</b> → enqueue at dist <b>${dist+1}</b>, mark visited.`
+        : `Dequeue <b class="b">${word}</b> (dist <b>${dist}</b>). No new neighbours (all visited).` });
+  }
+  return steps;
+}
+const steps = buildSteps();
+let cur = 0;
+const $ = id => document.getElementById(id);
+
+// track which nodes have been settled (dequeued) up to a step
+function settledUpTo(stepIdx){
+  const s = new Set();
+  for (let i=1;i<=stepIdx;i++){ if (steps[i].active) s.add(steps[i].active); }
+  return s;
+}
+// track tree (path) edges discovered so far
+function treeEdgesUpTo(stepIdx){
+  const e = [];
+  for (let i=0;i<=stepIdx;i++){ (steps[i].treeEdges||[]).forEach(te=>e.push(te)); }
+  return e;
+}
+
+function edgeKey(a,b){ return [a,b].sort().join('~'); }
+
+function render(){
+  const s = steps[cur];
+  const settled = settledUpTo(cur);
+  const treeEdges = treeEdgesUpTo(cur);
+  const treeSet = new Set(treeEdges.map(([a,b])=>edgeKey(a,b)));
+  const pathSet = s.path ? new Set(s.path.slice(1).map((w,i)=>edgeKey(s.path[i], w))) : null;
+
+  let svg = '';
+  // base edges
+  gEdges.forEach(([a,b])=>{
+    const k = edgeKey(a,b);
+    let stroke = '#3a3a5e', sw = 2;
+    if (treeSet.has(k)) { stroke = '#5b6b9e'; sw = 3; }
+    if (pathSet && pathSet.has(k)) { stroke = '#a855f7'; sw = 5; }
+    svg += `<line class="edge-line" x1="${pos[a].x}" y1="${pos[a].y}" x2="${pos[b].x}" y2="${pos[b].y}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  });
+  // nodes
+  const inQueue = new Set(s.queue.map(q=>q[0]));
+  allWords.forEach(w=>{
+    const p = pos[w];
+    let fill='rgba(59,130,246,0.22)', stroke='#3b82f6', sw=2;
+    if (s.visited.has(w) && !inQueue.has(w) && (settled.has(w) || w===s.active)) { fill='rgba(16,185,129,0.22)'; stroke='#10b981'; }
+    if (inQueue.has(w)) { fill='rgba(245,158,11,0.25)'; stroke='#f59e0b'; }
+    if (w===s.active) { stroke='#f59e0b'; sw=4; fill = s.found ? 'rgba(16,185,129,0.30)' : 'rgba(245,158,11,0.30)'; if (s.found) stroke='#10b981'; }
+    if (s.discovered.includes(w)) { sw=4; }
+    if (s.path && s.path.includes(w)) { stroke='#a855f7'; sw=4; fill='rgba(168,85,247,0.22)'; }
+    const wpx = 70;
+    svg += `<g class="gnode">
+      <rect x="${p.x-wpx/2}" y="${p.y-17}" width="${wpx}" height="34" rx="9" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>
+      <text x="${p.x}" y="${p.y+6}" text-anchor="middle" font-size="17" font-weight="700" fill="#e0e0e0" font-family="SF Mono, monospace">${w}</text>
+    </g>`;
+  });
+  $('graph').innerHTML = svg;
+
+  // queue
+  if (s.queue.length===0){
+    $('queue').innerHTML = `<div class="qempty">— empty —</div>`;
+  } else {
+    $('queue').innerHTML = s.queue.map((q,i)=>
+      `<div class="qitem${i===0?' head':''}"><span class="w">${q[0]}</span><span class="d">dist ${q[1]}${i===0?'  ← next':''}</span></div>`).join('');
+  }
+
+  // visited
+  $('visited').innerHTML = [...s.visited].map(w=>`<span class="vchip">${w}</span>`).join('');
+
+  // caption
+  const cap = $('caption');
+  cap.className = 'caption' + (s.found ? ' found' : (s.active && !s.found ? ' expand' : ''));
+  cap.innerHTML = s.cap;
+
+  $('prevBtn').disabled = cur===0;
+  $('nextBtn').disabled = cur===steps.length-1;
+  $('stepcount').textContent = `Step ${cur} / ${steps.length-1}`;
+}
+
+$('nextBtn').onclick=()=>{ if(cur<steps.length-1){cur++;render();} };
+$('prevBtn').onclick=()=>{ if(cur>0){cur--;render();} };
+$('resetBtn').onclick=()=>{ cur=0; render(); };
+
+render();
+</script>
+</body>
+</html>

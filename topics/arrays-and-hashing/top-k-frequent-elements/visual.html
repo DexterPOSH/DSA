@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Top K Frequent Elements — Bucket Sort Visualized</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #232342;
+    --panel2: #2c2c52;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 {
+    font-size: 1.9rem;
+    margin: 0 0 6px;
+    background: linear-gradient(90deg, var(--blue), var(--purple));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: var(--muted); margin: 0 0 28px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 32px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.05rem; }
+  .analogy p { margin: 0; color: var(--text); }
+
+  .problem {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 36px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .problem code {
+    background: var(--panel2);
+    padding: 2px 8px;
+    border-radius: 6px;
+    color: #ffd479;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .step {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 22px 24px 26px;
+    margin-bottom: 26px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .step-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .badge {
+    flex: 0 0 auto;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-weight: 700;
+    color: #fff;
+    background: var(--blue);
+    font-size: 1rem;
+  }
+  .step h2 { margin: 0; font-size: 1.2rem; }
+  .step p.desc { color: var(--muted); margin: 4px 0 18px; }
+  .step p.desc code {
+    background: var(--panel2); padding: 1px 6px; border-radius: 5px;
+    color: #ffd479; font-family: "SF Mono", Menlo, monospace;
+  }
+
+  /* input array row */
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .cell {
+    min-width: 40px; height: 40px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+    font-weight: 700;
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--panel2);
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all .35s ease;
+  }
+  .cell.v1 { background: rgba(59,130,246,0.25); border-color: var(--blue); color: #bcd4ff; }
+  .cell.v2 { background: rgba(16,185,129,0.22); border-color: var(--green); color: #b6f0d8; }
+  .cell.v3 { background: rgba(168,85,247,0.22); border-color: var(--purple); color: #e3c9ff; }
+
+  /* hashmap */
+  .map { display: flex; flex-wrap: wrap; gap: 14px; }
+  .entry {
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 10px 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 1.05rem;
+    transition: all .4s ease;
+  }
+  .entry .key { color: #ffd479; }
+  .entry .val { color: var(--green); font-weight: 700; }
+  .entry.e1 { border-color: var(--blue); }
+  .entry.e2 { border-color: var(--green); }
+  .entry.e3 { border-color: var(--purple); }
+
+  /* buckets */
+  .buckets { display: flex; gap: 12px; align-items: flex-end; margin-top: 6px; }
+  .bucket { flex: 1; text-align: center; }
+  .bucket-box {
+    min-height: 56px;
+    border-radius: 10px 10px 4px 4px;
+    border: 2px dashed rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.03);
+    display: flex; flex-direction: column-reverse;
+    align-items: center; justify-content: flex-start;
+    gap: 6px; padding: 8px 6px;
+    transition: all .4s ease;
+  }
+  .bucket-box.filled { border-style: solid; }
+  .bucket.b3 .bucket-box.filled { border-color: var(--blue); background: rgba(59,130,246,0.14); }
+  .bucket.b2 .bucket-box.filled { border-color: var(--green); background: rgba(16,185,129,0.14); }
+  .bucket.b1 .bucket-box.filled { border-color: var(--purple); background: rgba(168,85,247,0.14); }
+  .chip {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+    font-weight: 700;
+    font-family: "SF Mono", Menlo, monospace;
+    color: #fff;
+  }
+  .bucket.b3 .chip { background: var(--blue); }
+  .bucket.b2 .chip { background: var(--green); }
+  .bucket.b1 .chip { background: var(--purple); }
+  .bucket-label { margin-top: 8px; font-size: .85rem; color: var(--muted); }
+  .bucket-label b { color: var(--text); }
+  .freq-axis { font-size: .78rem; color: var(--amber); margin-top: 2px; }
+
+  .scan-note {
+    margin-top: 18px;
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border-left: 4px solid var(--green);
+    font-size: .96rem;
+  }
+  .result {
+    margin-top: 16px;
+    display: inline-flex; gap: 8px; align-items: center;
+    background: rgba(16,185,129,0.15);
+    border: 1px solid var(--green);
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #b6f0d8;
+  }
+
+  .controls { text-align: center; margin: 8px 0 30px; }
+  button {
+    background: var(--blue);
+    color: #fff; border: none;
+    padding: 11px 26px;
+    border-radius: 10px;
+    font-size: 1rem; font-weight: 600;
+    cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover { background: #2f6fd6; transform: translateY(-1px); }
+  button.ghost { background: var(--panel2); color: var(--text); margin-left: 8px; }
+  button.ghost:hover { background: #3a3a66; }
+
+  .complexity {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px;
+  }
+  .cbox {
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 16px 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .cbox.win { border-color: var(--green); background: rgba(16,185,129,0.08); }
+  .cbox h4 { margin: 0 0 6px; font-size: .95rem; }
+  .cbox .big { font-family: "SF Mono", Menlo, monospace; font-size: 1.4rem; font-weight: 700; }
+  .cbox.win .big { color: var(--green); }
+  .cbox.lose .big { color: var(--amber); }
+  .cbox p { margin: 8px 0 0; font-size: .88rem; color: var(--muted); }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-top: 34px;
+    text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.08rem; }
+
+  .hidden-stage { opacity: 0.25; filter: grayscale(0.6); transition: opacity .5s, filter .5s; }
+  .active-stage { opacity: 1; filter: none; }
+  .pop { animation: pop .45s ease; }
+  @keyframes pop {
+    0% { transform: scale(0.4); opacity: 0; }
+    60% { transform: scale(1.12); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @media (max-width: 560px) {
+    .complexity { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Top K Frequent Elements</h1>
+  <p class="subtitle">Find the <b>k</b> most frequent numbers in an array — in O(n) time using bucket sort.</p>
+
+  <div class="analogy">
+    <h3>🏤 Real-world analogy: the post office</h3>
+    <p>Imagine a wall of <b>PO boxes numbered by how many letters arrived</b>. Box #3 holds names that received exactly 3 letters, box #2 holds names with 2 letters, and so on. To find the most popular recipients you don't sort anyone — you just <b>start reading from the fullest box and walk down</b> until you've collected enough names. That walk <i>is</i> bucket sort.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> Given <code>nums = [1, 1, 1, 2, 2, 3]</code> and <code>k = 2</code>,
+    return the <code>k</code> most frequent elements. <span class="arrow">→</span> Answer: <code>[1, 2]</code>
+  </div>
+
+  <div class="controls">
+    <button id="playBtn">▶ Play walkthrough</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step hidden-stage" id="stage1">
+    <div class="step-head"><div class="badge">1</div><h2>Build a frequency hashmap</h2></div>
+    <p class="desc">One pass over the array, counting how many times each number appears. This is the "letters arrived" count.</p>
+    <div class="row" id="inputRow"></div>
+    <div style="margin:18px 0 10px; color:var(--muted);">Resulting counts:</div>
+    <div class="map" id="mapRow"></div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step hidden-stage" id="stage2">
+    <div class="step-head"><div class="badge" style="background:var(--amber)">2</div><h2>Bucket sort by frequency</h2></div>
+    <p class="desc">Create buckets indexed <code>0 … n</code>. Drop each number into <b>bucket[its frequency]</b>. A frequency can never exceed <b>n</b> (the array length), so <code>n + 1</code> boxes is always enough.</p>
+    <div class="buckets" id="bucketsRow"></div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step hidden-stage" id="stage3">
+    <div class="step-head"><div class="badge" style="background:var(--green)">3</div><h2>Scan from the fullest box down</h2></div>
+    <p class="desc">Walk buckets from highest frequency to lowest, collecting numbers until you have <b>k</b> of them.</p>
+    <div class="scan-note" id="scanNote">Press Play to scan…</div>
+    <div id="resultWrap"></div>
+  </div>
+
+  <!-- WHY O(n) -->
+  <div class="step hidden-stage" id="stage4">
+    <div class="step-head"><div class="badge" style="background:var(--purple)">★</div><h2>Why this is O(n), not O(n log n)</h2></div>
+    <p class="desc">The heap approach pushes every distinct element through a size-k priority queue.</p>
+    <div class="complexity">
+      <div class="cbox lose">
+        <h4>Min-heap of size k</h4>
+        <div class="big">O(n log k)</div>
+        <p>Each of the n distinct counts costs a log-k push/pop. Simple to write, but the log factor is real work.</p>
+      </div>
+      <div class="cbox win">
+        <h4>Bucket sort</h4>
+        <div class="big">O(n)</div>
+        <p>A frequency is at most <b>n</b>, so there are only <b>n + 1</b> buckets. Counting is O(n), filling buckets is O(n), and one linear scan collects the answer. No sorting, no log factor.</p>
+      </div>
+    </div>
+    <div class="scan-note" style="border-left-color:var(--purple); margin-top:18px;">
+      <b>The key insight:</b> we never need to <i>sort</i> frequencies — the bucket <i>index itself is the frequency</i>. Bounded keys (0…n) let us replace comparison sorting with direct array indexing.
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Because frequency is bounded by the array length, bucketing numbers by their count and reading the fullest buckets first finds the top k in <b>O(n)</b> — no heap, no sort.</p>
+  </div>
+</div>
+
+<script>
+const nums = [1,1,1,2,2,3];
+const n = nums.length;
+const k = 2;
+const cls = { 1:'v1', 2:'v2', 3:'v3' };
+const echip = { 1:'e1', 2:'e2', 3:'e3' };
+const counts = { 1:3, 2:2, 3:1 };
+const buckets = Array.from({length: n+1}, () => []);
+Object.entries(counts).forEach(([num,c]) => buckets[c].push(Number(num)));
+
+const $ = id => document.getElementById(id);
+let timers = [];
+const after = (ms, fn) => timers.push(setTimeout(fn, ms));
+const clearAll = () => { timers.forEach(clearTimeout); timers = []; };
+
+function buildStatic() {
+  $('inputRow').innerHTML = nums.map(v =>
+    `<div class="cell ${cls[v]}">${v}</div>`).join('');
+  let bh = '';
+  for (let f = 0; f <= n; f++) {
+    const bclass = f===3?'b3':f===2?'b2':f===1?'b1':'';
+    bh += `<div class="bucket ${bclass}">
+      <div class="bucket-box" id="bk${f}"></div>
+      <div class="bucket-label">bucket[<b>${f}</b>]</div>
+      <div class="freq-axis">freq ${f}</div>
+    </div>`;
+  }
+  $('bucketsRow').innerHTML = bh;
+}
+
+function reset() {
+  clearAll();
+  buildStatic();
+  ['stage1','stage2','stage3','stage4'].forEach(s => {
+    $(s).classList.add('hidden-stage');
+    $(s).classList.remove('active-stage');
+  });
+  $('mapRow').innerHTML = '';
+  $('scanNote').textContent = 'Press Play to scan…';
+  $('resultWrap').innerHTML = '';
+  for (let f=0; f<=n; f++) {
+    const b = $('bk'+f);
+    b.classList.remove('filled');
+    b.style.boxShadow = '';
+  }
+}
+
+function play() {
+  reset();
+  let t = 200;
+
+  // STAGE 1
+  after(t, () => $('stage1').classList.replace('hidden-stage','active-stage'));
+  [1,2,3].forEach((num, i) => {
+    after(t + 500 + i*550, () => {
+      const e = document.createElement('div');
+      e.className = `entry ${echip[num]} pop`;
+      e.innerHTML = `<span class="key">${num}</span> : <span class="val">${counts[num]}</span>`;
+      $('mapRow').appendChild(e);
+    });
+  });
+
+  // STAGE 2
+  t = 2700;
+  after(t, () => $('stage2').classList.replace('hidden-stage','active-stage'));
+  [[1,3],[2,2],[3,1]].forEach(([num,freq], i) => {
+    after(t + 500 + i*650, () => {
+      const box = $('bk'+freq);
+      box.classList.add('filled');
+      const chip = document.createElement('div');
+      chip.className = 'chip pop';
+      chip.textContent = num;
+      box.appendChild(chip);
+    });
+  });
+
+  // STAGE 3
+  t = 5000;
+  after(t, () => $('stage3').classList.replace('hidden-stage','active-stage'));
+  const collected = [];
+  let step = 0;
+  for (let f = n; f >= 0 && collected.length < k; f--) {
+    if (buckets[f].length === 0) continue;
+    const freq = f;
+    const grabbed = [...buckets[f]];
+    after(t + 500 + step*1000, () => {
+      grabbed.forEach(num => { if (collected.length < k) collected.push(num); });
+      $('bk'+freq).style.boxShadow = '0 0 0 3px var(--green)';
+      $('scanNote').innerHTML =
+        `Looking at <b>bucket[${freq}]</b> (freq ${freq}) → grab <b>${grabbed.join(', ')}</b>. ` +
+        `Collected so far: <b>[${collected.join(', ')}]</b> ` +
+        (collected.length >= k ? `— reached k=${k}, stop! ✅` : `(need ${k-collected.length} more)`);
+      if (collected.length >= k) {
+        $('resultWrap').innerHTML =
+          `<div class="result pop">return [${collected.join(', ')}]</div>`;
+      }
+    });
+    step++;
+  }
+
+  // STAGE 4
+  t = t + 500 + step*1000 + 800;
+  after(t, () => $('stage4').classList.replace('hidden-stage','active-stage'));
+}
+
+$('playBtn').addEventListener('click', play);
+$('resetBtn').addEventListener('click', reset);
+buildStatic();
+</script>
+</body>
+</html>

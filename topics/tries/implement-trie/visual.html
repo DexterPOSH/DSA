@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Implement Trie — Prefix Tree, Step by Step</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 {
+    font-size: 1.85rem;
+    margin: 0 0 6px;
+  }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 22px;
+    margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; color: var(--text); font-size: .98rem; }
+
+  .panel {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 20px 22px;
+    border: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 22px;
+  }
+  code {
+    background: var(--panel2); padding: 2px 7px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: .92em;
+  }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 0 18px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 10px 20px; border-radius: 10px;
+    font-size: .96rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .opbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .opbtn { background: var(--panel2); border: 1px solid rgba(255,255,255,0.1); padding: 8px 14px; font-size:.9rem; }
+  .opbtn.active { background: var(--purple); border-color: var(--purple); }
+
+  .stepcount { color: var(--muted); font-size: .9rem; margin-left: auto; }
+
+  svg { width: 100%; height: auto; display: block; }
+  .edge { stroke: #3a3a66; stroke-width: 2.5; transition: stroke .35s, stroke-width .35s; }
+  .edge.lit { stroke: var(--blue); stroke-width: 4; }
+  .edge.amber { stroke: var(--amber); stroke-width: 4; }
+  .edge.green { stroke: var(--green); stroke-width: 4; }
+  .edge.red { stroke: var(--red); stroke-width: 4; }
+  .node circle {
+    fill: var(--panel2); stroke: #4a4a7a; stroke-width: 2.5;
+    transition: fill .35s, stroke .35s, stroke-width .35s, r .25s;
+  }
+  .node.lit circle { fill: rgba(59,130,246,0.32); stroke: var(--blue); stroke-width: 4; }
+  .node.amber circle { fill: rgba(245,158,11,0.30); stroke: var(--amber); stroke-width: 4; }
+  .node.green circle { fill: rgba(16,185,129,0.32); stroke: var(--green); stroke-width: 4; }
+  .node.red circle { fill: rgba(239,68,68,0.30); stroke: var(--red); stroke-width: 4; }
+  .node.newnode circle { fill: rgba(168,85,247,0.30); stroke: var(--purple); stroke-width: 4; }
+  .node text { fill: var(--text); font-family: "SF Mono", Menlo, monospace; font-weight: 700; font-size: 17px; text-anchor: middle; dominant-baseline: central; }
+  .node text.rootlbl { fill: var(--muted); font-size: 12px; font-weight: 600; }
+  .endmark {
+    fill: var(--green); stroke: #0c3d2c; stroke-width: 1.5;
+    opacity: 0; transition: opacity .4s;
+  }
+  .endmark.show { opacity: 1; }
+
+  .caption {
+    background: var(--panel2);
+    border-left: 4px solid var(--blue);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-top: 8px;
+    font-size: .98rem;
+    min-height: 26px;
+  }
+  .caption.amber { border-left-color: var(--amber); }
+  .caption.green { border-left-color: var(--green); }
+  .caption.red { border-left-color: var(--red); }
+  .caption b.k { color: #ffd479; font-family: "SF Mono", Menlo, monospace; }
+  .verdict { font-weight: 700; }
+  .verdict.t { color: var(--green); }
+  .verdict.f { color: var(--red); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; font-size: .86rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid; }
+  .dot.blue { border-color: var(--blue); background: rgba(59,130,246,0.32); }
+  .dot.green { border-color: var(--green); background: rgba(16,185,129,0.32); }
+  .dot.purple { border-color: var(--purple); background: rgba(168,85,247,0.30); }
+  .dot.endd { background: var(--green); border-color: #0c3d2c; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin-top: 28px;
+    text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.04rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Implement <span>Trie</span> — a prefix tree, step by step</h1>
+  <p class="subtitle">Watch <code>insert</code>, <code>search</code>, and <code>startsWith</code> walk the same tree char by char.</p>
+
+  <div class="analogy">
+    <h3>📚 Analogy: shelf-of-shelves dictionary</h3>
+    <p>Har node ek dabba hai jiske andar agle 26 chhote dabbe (<code>a…z</code>). Word rakhne ke liye char-by-char dabbe kholte jao; jis node pe word khatam ho uspe ek <b style="color:var(--green)">green end-flag</b> laga do. <code>startsWith</code> sirf raasta dhoondhta hai, <code>search</code> raasta + end-flag dono.</p>
+  </div>
+
+  <div class="panel">
+    <div class="opbtns" id="opbtns"></div>
+    <div class="controls">
+      <button class="ghost" id="prevBtn">‹ Prev</button>
+      <button id="nextBtn">Next ›</button>
+      <button class="ghost" id="resetBtn">↺ Reset op</button>
+      <span class="stepcount" id="stepcount"></span>
+    </div>
+
+    <svg id="svg" viewBox="0 0 880 430" role="img" aria-label="Trie tree"></svg>
+
+    <div class="caption" id="caption">Pick an operation above, then step through with Next.</div>
+
+    <div class="legend">
+      <span><span class="dot blue"></span> active path</span>
+      <span><span class="dot purple"></span> newly created node</span>
+      <span><span class="dot green"></span> matched / end node</span>
+      <span><span class="dot endd"></span> end-of-word flag</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>All three operations are the <b>same O(L) char-by-char walk</b> from the root — <code>search</code> just also checks the <b>is_end</b> flag, which is exactly why <code>search("app")</code> can be False while <code>startsWith("app")</code> is True.</p>
+  </div>
+</div>
+
+<script>
+// ---- Trie layout (precomputed positions for words: apple, app, apt) ----
+// Node ids and tree structure.
+const NODES = {
+  root: { x: 440, y: 40, label: '•', root: true, end: false },
+  a:    { x: 440, y: 120, label: 'a', end: false },
+  ap:   { x: 440, y: 200, label: 'p', end: false },
+  app:  { x: 340, y: 280, label: 'p', end: true },   // "app"
+  appl: { x: 340, y: 360, label: 'l', end: false },
+  apple:{ x: 340, y: 430, label: 'e', end: true },   // "apple"  (kept inside via viewBox pad)
+  apt:  { x: 560, y: 280, label: 't', end: true },   // "apt"
+};
+// adjust apple to fit
+NODES.appl.y = 350; NODES.apple = { x: 340, y: 410, label: 'e', end: true };
+
+const EDGES = [
+  ['root','a'], ['a','ap'], ['ap','app'], ['app','appl'], ['appl','apple'], ['ap','apt']
+];
+// path from root for each word (node-id sequence after root)
+const PATHS = {
+  apple: ['a','ap','app','appl','apple'],
+  app:   ['a','ap','app'],
+  apt:   ['a','ap','apt'],
+};
+
+const $ = id => document.getElementById(id);
+const svg = $('svg');
+const SVGNS = 'http://www.w3.org/2000/svg';
+
+function buildSVG() {
+  svg.innerHTML = '';
+  // edges first
+  for (const [u,v] of EDGES) {
+    const a = NODES[u], b = NODES[v];
+    const line = document.createElementNS(SVGNS,'line');
+    line.setAttribute('x1', a.x); line.setAttribute('y1', a.y+22);
+    line.setAttribute('x2', b.x); line.setAttribute('y2', b.y-22);
+    line.setAttribute('class','edge');
+    line.id = 'edge-'+u+'-'+v;
+    svg.appendChild(line);
+  }
+  // nodes
+  for (const id in NODES) {
+    const n = NODES[id];
+    const g = document.createElementNS(SVGNS,'g');
+    g.setAttribute('class','node'); g.id = 'node-'+id;
+    const c = document.createElementNS(SVGNS,'circle');
+    c.setAttribute('cx', n.x); c.setAttribute('cy', n.y); c.setAttribute('r', 22);
+    g.appendChild(c);
+    const t = document.createElementNS(SVGNS,'text');
+    t.setAttribute('x', n.x); t.setAttribute('y', n.y);
+    if (n.root) t.setAttribute('class','rootlbl');
+    t.textContent = n.root ? 'root' : n.label;
+    g.appendChild(t);
+    // end-of-word flag (small green dot bottom-right)
+    const e = document.createElementNS(SVGNS,'circle');
+    e.setAttribute('cx', n.x+18); e.setAttribute('cy', n.y+18); e.setAttribute('r', 7);
+    e.setAttribute('class','endmark'); e.id = 'end-'+id;
+    g.appendChild(e);
+    svg.appendChild(g);
+  }
+}
+
+function clearHighlights() {
+  document.querySelectorAll('.node').forEach(n => n.className.baseVal='node');
+  document.querySelectorAll('.edge').forEach(e => e.setAttribute('class','edge'));
+}
+
+// ---- Operation step builders ----
+// Each op is a list of {fn} closures applied cumulatively; we re-render from scratch
+// each step for prev/next determinism.
+
+let endState = {};         // which nodes currently show end flag
+let presence = {};         // which nodes "exist" in the trie (always true for layout)
+let currentOp = null;
+let steps = [];
+let idx = 0;
+
+function nodeId(seq) { return seq.join(''); }
+
+// build steps for an operation; each step is a function(state) -> caption/coloring
+function makeInsert(word) {
+  const path = PATHS[word];
+  const st = [];
+  st.push(() => caption('blue',
+    `<b>insert("${word}")</b> — start at <b class="k">root</b>. We'll walk down one char at a time, creating nodes that don't exist.`,
+    {lit:['root']}));
+  let acc = [];
+  for (let i=0;i<path.length;i++) {
+    const id = path[i];
+    const prev = i===0 ? 'root' : path[i-1];
+    const ch = NODES[id].label;
+    const isNew = false; // for this demo nodes pre-exist; we narrate creation logically
+    st.push(() => {
+      caption('blue',
+        `Char <b class="k">'${ch}'</b>: ${i<2||word!=='apt'? 'follow / create the child node':'create the child node'} <b class="k">'${ch}'</b>. Move the pointer down.`,
+        {litNodes: ['root', ...path.slice(0,i+1)], litEdges: edgesFor(path.slice(0,i+1)), newNode: id});
+    });
+    acc.push(id);
+  }
+  const last = path[path.length-1];
+  st.push(() => {
+    endState[last] = true;
+    caption('green',
+      `Word finished → set <b class="k">is_end = True</b> on the last node (the green flag). <b>"${word}" is now stored.</b>`,
+      {greenNodes:['root',...path], litEdges: edgesFor(path), endShow:[last]});
+  });
+  return st;
+}
+
+function makeSearch(word, exact) {
+  // exact==true -> search; false -> startsWith
+  const opname = exact ? 'search' : 'startsWith';
+  const path = PATHS[word] || partialPath(word);
+  const st = [];
+  st.push(() => caption('blue',
+    `<b>${opname}("${word}")</b> — start at <b class="k">root</b> and follow each char. ${exact?'At the end we also check the end-flag.':'We only need the path to exist.'}`,
+    {lit:['root']}));
+  for (let i=0;i<path.length;i++) {
+    const id = path[i];
+    const ch = NODES[id].label;
+    st.push(() => caption('blue',
+      `Char <b class="k">'${ch}'</b>: child exists → step into node <b class="k">'${ch}'</b>.`,
+      {litNodes:['root',...path.slice(0,i+1)], litEdges: edgesFor(path.slice(0,i+1))}));
+  }
+  const last = path[path.length-1];
+  if (exact) {
+    st.push(() => {
+      const hasEnd = !!endState[last];
+      caption(hasEnd?'green':'red',
+        `Path found. Now check <b class="k">is_end</b> on node <b class="k">'${NODES[last].label}'</b>: it is <b>${hasEnd}</b>. ` +
+        `→ <span class="verdict ${hasEnd?'t':'f'}">search("${word}") = ${hasEnd?'True':'False'}</span>` +
+        (!hasEnd?` &nbsp;<span style="color:var(--muted)">(path exists because of a longer word, but "${word}" was never inserted as a whole)</span>`:''),
+        hasEnd?{greenNodes:['root',...path], litEdges:edgesFor(path), endShow:[last]}
+              :{litNodes:['root',...path], litEdges:edgesFor(path), redNodes:[last]});
+    });
+  } else {
+    st.push(() => caption('green',
+      `Whole prefix path exists. → <span class="verdict t">startsWith("${word}") = True</span> ` +
+      `<span style="color:var(--muted)">(no end-flag needed)</span>`,
+      {greenNodes:['root',...path], litEdges:edgesFor(path)}));
+  }
+  return st;
+}
+
+function makeSearchMiss(word) {
+  // search a word whose path breaks, e.g. "axe"
+  const st = [];
+  st.push(() => caption('blue',
+    `<b>search("axe")</b> — follow each char from <b class="k">root</b>.`,
+    {lit:['root']}));
+  st.push(() => caption('blue',
+    `Char <b class="k">'a'</b>: child exists → step into <b class="k">'a'</b>.`,
+    {litNodes:['root','a'], litEdges: edgesFor(['a'])}));
+  st.push(() => caption('red',
+    `Char <b class="k">'x'</b>: node <b class="k">'a'</b> has no child <b class="k">'x'</b> → path breaks. ` +
+    `→ <span class="verdict f">search("axe") = False</span> immediately, no need to read 'e'.`,
+    {litNodes:['root','a'], litEdges: edgesFor(['a']), redNodes:['a']}));
+  return st;
+}
+
+function partialPath(word) {
+  // not used heavily; map known
+  return PATHS[word] || [];
+}
+
+function edgesFor(seq) {
+  const ids = ['root', ...seq];
+  const out = [];
+  for (let i=0;i<ids.length-1;i++) out.push('edge-'+ids[i]+'-'+ids[i+1]);
+  return out;
+}
+
+// ---- render a step state ----
+function caption(kind, html, vis) {
+  $('caption').className = 'caption ' + (kind==='blue'?'':kind);
+  $('caption').innerHTML = html;
+  renderVis(vis||{});
+}
+
+function renderVis(v) {
+  clearHighlights();
+  // edges
+  (v.litEdges||[]).forEach(eid => { const e=$(eid); if(e) e.setAttribute('class','edge lit'); });
+  // nodes
+  (v.lit||[]).forEach(id => mark(id,'lit'));
+  (v.litNodes||[]).forEach(id => mark(id,'lit'));
+  (v.greenNodes||[]).forEach(id => mark(id,'green'));
+  (v.redNodes||[]).forEach(id => mark(id,'red'));
+  if (v.newNode) mark(v.newNode,'newnode');
+  // end flags: show all currently-true end states
+  for (const id in NODES) {
+    const flag = $('end-'+id);
+    if (flag) flag.setAttribute('class', endState[id] ? 'endmark show' : 'endmark');
+  }
+  (v.endShow||[]).forEach(id => { const f=$('end-'+id); if(f) f.setAttribute('class','endmark show'); });
+}
+
+function mark(id, cls) {
+  const n = $('node-'+id);
+  if (n) n.setAttribute('class','node '+cls);
+}
+
+// ---- operation registry ----
+const OPS = [
+  { key:'i1', label:'insert("app")',  build: () => makeInsert('app') },
+  { key:'i2', label:'insert("apple")',build: () => makeInsert('apple') },
+  { key:'i3', label:'insert("apt")',  build: () => makeInsert('apt') },
+  { key:'s1', label:'search("app")',  build: () => makeSearch('app', true) },
+  { key:'s2', label:'startsWith("app")', build: () => makeSearch('app', false) },
+  { key:'s3', label:'search("axe")',  build: () => makeSearchMiss() },
+];
+
+function buildOpButtons() {
+  $('opbtns').innerHTML = OPS.map(o =>
+    `<button class="opbtn" data-key="${o.key}">${o.label}</button>`).join('');
+  document.querySelectorAll('.opbtn').forEach(b =>
+    b.addEventListener('click', () => selectOp(b.dataset.key)));
+}
+
+// Initial trie state: pretend app/apple/apt already inserted so search demos make sense,
+// EXCEPT we let insert ops re-narrate. End-flags reflect the "stored" set.
+function baseEndState() {
+  return { app: true, apple: true, apt: true };
+}
+
+function selectOp(key) {
+  currentOp = OPS.find(o => o.key === key);
+  document.querySelectorAll('.opbtn').forEach(b =>
+    b.classList.toggle('active', b.dataset.key===key));
+  // reset end-flags for a clean story:
+  if (key.startsWith('i')) {
+    // insert demo: start from the OTHER words present, drop the one being inserted
+    const word = currentOp.label.match(/"([^"]+)"/)[1];
+    endState = baseEndState();
+    delete endState[word];   // show it getting created
+  } else {
+    endState = baseEndState();  // search demos: all three present
+  }
+  steps = currentOp.build();
+  idx = 0;
+  applyStep();
+}
+
+function applyStep() {
+  // rebuild end flags cleanly each render is handled inside step closures for inserts;
+  // for search steps endState stays as set in selectOp.
+  steps[idx]();
+  $('stepcount').textContent = `step ${idx+1} / ${steps.length}`;
+  $('prevBtn').disabled = idx===0;
+  $('nextBtn').disabled = idx===steps.length-1;
+}
+
+$('nextBtn').addEventListener('click', () => { if(idx<steps.length-1){idx++;applyStep();} });
+$('prevBtn').addEventListener('click', () => {
+  if(idx>0){ idx--;
+    // re-run from start so cumulative endState (for inserts) is correct
+    const word = currentOp.key.startsWith('i') ? currentOp.label.match(/"([^"]+)"/)[1] : null;
+    if (word) { endState = baseEndState(); delete endState[word]; }
+    else endState = baseEndState();
+    for(let i=0;i<=idx;i++) steps[i]();
+    $('stepcount').textContent = `step ${idx+1} / ${steps.length}`;
+    $('prevBtn').disabled = idx===0; $('nextBtn').disabled = idx===steps.length-1;
+  }
+});
+$('resetBtn').addEventListener('click', () => { if(currentOp) selectOp(currentOp.key); });
+
+// init
+buildSVG();
+buildOpButtons();
+endState = baseEndState();
+renderVis({});
+$('prevBtn').disabled = true; $('nextBtn').disabled = true;
+</script>
+</body>
+</html>

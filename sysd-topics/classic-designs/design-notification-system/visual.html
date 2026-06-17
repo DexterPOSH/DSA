@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Design a Notification System — The Event Pipeline</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 860px) { .stage { grid-template-columns: 1fr; } }
+
+  /* architecture SVG */
+  .arch-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 600px; height: auto; }
+
+  .box rect { transition: all .35s ease; }
+  .box text { font-family: -apple-system, sans-serif; fill: #fff; }
+  .box .ttl { font-weight: 700; font-size: 12px; }
+  .box .sub { font-size: 9px; fill: #b9c0d8; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .box.dim { opacity: .28; }
+  .box.active rect { stroke-width: 3.5; }
+
+  .wire { fill: none; stroke: #3a3a5c; stroke-width: 2.5; transition: stroke .3s ease; }
+  .wire.live { stroke: #f59e0b; }
+  .wire-arrow { fill: #3a3a5c; transition: fill .3s ease; }
+  .wire-arrow.live { fill: #f59e0b; }
+
+  .packet { transition: opacity .25s ease; }
+  .packet circle { fill: #f59e0b; stroke: #fbbf24; stroke-width: 2; }
+  .packet text { font-size: 8px; fill: #1a1a2e; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; text-anchor: middle; }
+
+  .qslot { transition: all .3s ease; }
+
+  .badge { font-size: 9px; font-family: "SF Mono", Menlo, Consolas, monospace; font-weight: 700; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 64px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Design a Notification System — The Event Pipeline</h1>
+  <div class="subtitle">How one trigger event from a sender service flows through a <b>decoupled, queue-based pipeline</b> and fans out to <b>millions of users</b> across Push, SMS, and Email — reliably and near-real-time. Scale anchor: <code>10M DAU</code>, <code>50M notifications/day</code>, <code>~580 QPS</code> avg → <code>~3K QPS</code> peak.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the restaurant kitchen</h3>
+    <p>A sender service is a <b>waiter</b> who shouts an order. Instead of running it to the stove themselves, they clip the ticket onto the <b>order rail</b> (the <b>Kafka queue</b>) and immediately go back to the floor — that is the <code>202 Accepted</code>. <b>Line cooks</b> (the channel workers) pull tickets off the rail at their own pace: each one checks the recipe card (<b>preferences + DND</b>), confirms the table hasn't already been served too much (<b>rate limit</b>), plates the dish (<b>template render</b>), and hands it to the right station — grill, fryer, or salad (<b>Push, SMS, Email providers</b>). If the fryer is jammed, tickets just wait on the rail; nobody at the front desk is blocked, and no order is thrown away.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">ingest:</span><code>POST /v1/notifications</code> → <code>202 Accepted {status:"queued"}</code> &nbsp;(async, never blocks the sender)</div>
+    <div class="row"><span class="label">flow:</span><code>Sender → API → Kafka → Channel Worker → (pref/DND · rate · template) → Provider → Status</code></div>
+    <div class="row"><span class="label">guarantee:</span><code>at-least-once</code> delivery + <code>dedup_key</code> idempotency &nbsp;(exactly-once is impractical)</div>
+  </div>
+
+  <div class="stage">
+    <div class="arch-holder">
+      <svg viewBox="0 0 600 440" id="arch">
+        <defs></defs>
+        <!-- wires + arrows drawn first (behind boxes) -->
+        <g id="g-wires"></g>
+        <!-- queue slots -->
+        <g id="g-queue"></g>
+        <!-- component boxes -->
+        <g id="g-boxes"></g>
+        <!-- travelling packet -->
+        <g id="g-packet"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Stage</div><div class="value" id="v-stage">—</div></div>
+        <div class="var"><div class="label">Queue depth</div><div class="value amber" id="v-depth">0</div></div>
+        <div class="var"><div class="label">Delivery</div><div class="value green" id="v-guar">at-least-once</div></div>
+        <div class="var"><div class="label">Status</div><div class="value" id="v-status">—</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Notification Service (API gateway)</div>
+        <div class="legend-item"><span class="swatch" style="background:#8b5cf6"></span>Kafka queue (buffer / decouple)</div>
+        <div class="legend-item"><span class="swatch" style="background:#06b6d4"></span>Channel worker (consumer)</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Stores: Redis · Prefs DB · Cassandra</div>
+        <div class="legend-item"><span class="swatch round" style="background:#f59e0b"></span>The notification event (packet)</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Failure / retry / DLQ path</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to send an <code>order_shipped</code> event from a sender service into the pipeline.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Why a queue at all?</b> Calling providers synchronously is the anti-pattern — one slow provider blocks the sender and a spike topples the system. <b>Kafka</b> decouples producer from consumer: spikes grow <b>queue depth</b> instead of dropping, and failed messages can be re-enqueued.</li>
+      <li><b>Priority isolation</b> — separate topics for <code>transactional</code> (OTP, password reset) vs <code>bulk</code> (marketing) so an OTP never gets stuck behind a campaign. Partition <b>by user_id</b> for soft per-user ordering.</li>
+      <li><b>At-least-once + dedup</b> — exactly-once is impractical in distributed delivery, so accept duplicates and kill them: <code>SETNX dedup_key</code> in Redis (with TTL) before the provider call; already set → skip.</li>
+      <li><b>Failure handling</b> — provider errors → <b>retry with exponential backoff</b>; poison messages → <b>Dead Letter Queue</b> so one bad event can't block a whole consumer.</li>
+      <li><b>Provider resilience</b> — wrap each adapter in a <b>circuit breaker</b>; if APNs error rate spikes, open the circuit and hold traffic in the queue instead of cascading. Multi-provider failover (SES → SendGrid).</li>
+      <li><b>Two stores, two access patterns</b> — preferences in <b>SQL</b> (low write, strong consistency, compliance), notification log in <b>Cassandra</b> (write-heavy <code>50M/day</code>, append-only, partition by user + cluster by time).</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>The whole design hinges on <b>decoupling via a message queue</b>: the API returns <code>202</code> instantly and drops the event on Kafka, so traffic spikes and provider outages absorb into <b>queue depth</b> rather than dropped notifications. Channel workers then independently apply <b>preferences/DND, rate limits, templating, and dedup</b> before calling third-party providers — with <b>at-least-once delivery + idempotency, retries, DLQ, and circuit breakers</b> turning an unreliable fan-out into a reliable one.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  // ---------- component layout (anchor = center of each box) ----------
+  const C = {
+    sender:  { x: 80,  y: 60,  w: 120, h: 50, color: "#475569", ttl: "Sender svc", sub: "order_shipped" },
+    api:     { x: 80,  y: 175, w: 120, h: 56, color: "#3b82f6", ttl: "Notif Service", sub: "validate · 202" },
+    kafka:   { x: 300, y: 175, w: 130, h: 56, color: "#8b5cf6", ttl: "Kafka queue", sub: "txn / bulk topics" },
+    worker:  { x: 300, y: 320, w: 130, h: 60, color: "#06b6d4", ttl: "Channel Worker", sub: "consumer" },
+    redis:   { x: 80,  y: 320, w: 120, h: 50, color: "#10b981", ttl: "Redis", sub: "dedup · ratelimit" },
+    prefs:   { x: 80,  y: 400, w: 120, h: 44, color: "#10b981", ttl: "Prefs DB (SQL)", sub: "opt-out · DND" },
+    push:    { x: 500, y: 250, w: 92,  h: 36, color: "#ec4899", ttl: "Push", sub: "APNs/FCM" },
+    sms:     { x: 500, y: 300, w: 92,  h: 36, color: "#ec4899", ttl: "SMS", sub: "Twilio/SNS" },
+    email:   { x: 500, y: 350, w: 92,  h: 36, color: "#ec4899", ttl: "Email", sub: "SES" },
+    cass:    { x: 500, y: 405, w: 92,  h: 40, color: "#10b981", ttl: "Cassandra", sub: "notif log" },
+  };
+  function cx(id){ return C[id].x + C[id].w/2; }
+  function cy(id){ return C[id].y + C[id].h/2; }
+
+  // wires: [from, to, fromSide, toSide]  sides: T B L R
+  const WIRES = [
+    ["sender","api","B","T"],
+    ["api","kafka","R","L"],
+    ["kafka","worker","B","T"],
+    ["worker","redis","L","R"],
+    ["worker","prefs","L","R"],
+    ["worker","push","R","L"],
+    ["worker","sms","R","L"],
+    ["worker","email","R","L"],
+    ["worker","cass","R","L"],
+  ];
+  function sidePt(id, side) {
+    const b = C[id];
+    if (side === "T") return { x: b.x + b.w/2, y: b.y };
+    if (side === "B") return { x: b.x + b.w/2, y: b.y + b.h };
+    if (side === "L") return { x: b.x, y: b.y + b.h/2 };
+    return { x: b.x + b.w, y: b.y + b.h/2 }; // R
+  }
+  function wireKey(a,b){ return a+"->"+b; }
+
+  // ---------- build the static scene ----------
+  const gWires = document.getElementById("g-wires");
+  const gQueue = document.getElementById("g-queue");
+  const gBoxes = document.getElementById("g-boxes");
+  const gPacket = document.getElementById("g-packet");
+
+  const wireEls = {}; // key -> {path, arrow}
+  WIRES.forEach(([a,b,sa,sb]) => {
+    const p1 = sidePt(a, sa), p2 = sidePt(b, sb);
+    // elbow routing for nicer right angles
+    let d;
+    if (sa === "B" && sb === "T") d = `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
+    else if (sa === "R" && sb === "L") {
+      const mx = (p1.x + p2.x) / 2;
+      d = `M ${p1.x} ${p1.y} L ${mx} ${p1.y} L ${mx} ${p2.y} L ${p2.x} ${p2.y}`;
+    } else if (sa === "L" && sb === "R") {
+      const mx = (p1.x + p2.x) / 2;
+      d = `M ${p1.x} ${p1.y} L ${mx} ${p1.y} L ${mx} ${p2.y} L ${p2.x} ${p2.y}`;
+    } else d = `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
+    const path = el("path", { class: "wire", d }, gWires);
+    // arrowhead at target, pointing in
+    let ax = p2.x, ay = p2.y, tri;
+    if (sb === "T") tri = `${ax-5},${ay-8} ${ax+5},${ay-8} ${ax},${ay}`;
+    else if (sb === "L") tri = `${ax-8},${ay-5} ${ax-8},${ay+5} ${ax},${ay}`;
+    else if (sb === "R") tri = `${ax+8},${ay-5} ${ax+8},${ay+5} ${ax},${ay}`;
+    else tri = `${ax-5},${ay+8} ${ax+5},${ay+8} ${ax},${ay}`;
+    const arrow = el("polygon", { class: "wire-arrow", points: tri }, gWires);
+    wireEls[wireKey(a,b)] = { path, arrow };
+  });
+
+  // queue slots inside kafka (5 cells)
+  const QSLOTS = 5;
+  const qCells = [];
+  (function buildQueue(){
+    const k = C.kafka;
+    const slotW = 18, gap = 4, startX = k.x + 9, yy = k.y + k.h - 13;
+    for (let i = 0; i < QSLOTS; i++) {
+      const r = el("rect", {
+        class: "qslot", x: startX + i*(slotW+gap), y: yy, width: slotW, height: 8,
+        rx: 2, fill: "#3a3a5c", stroke: "#5b5b86", "stroke-width": 1
+      }, gQueue);
+      qCells.push(r);
+    }
+  })();
+
+  // boxes
+  const boxEls = {};
+  for (const id in C) {
+    const b = C[id];
+    const g = el("g", { class: "box", id: "box-" + id }, gBoxes);
+    el("rect", { x: b.x, y: b.y, width: b.w, height: b.h, rx: 9,
+      fill: b.color + "22", stroke: b.color, "stroke-width": 2 }, g);
+    const t1 = el("text", { class: "ttl", x: b.x + b.w/2, y: b.y + b.h/2 - 2, "text-anchor": "middle" }, g);
+    t1.textContent = b.ttl;
+    const t2 = el("text", { class: "sub", x: b.x + b.w/2, y: b.y + b.h/2 + 12, "text-anchor": "middle" }, g);
+    t2.textContent = b.sub;
+    boxEls[id] = g;
+  }
+
+  // packet
+  const gP = el("g", { class: "packet" }, gPacket);
+  const pCircle = el("circle", { cx: 0, cy: 0, r: 11 }, gP);
+  const pText = el("text", { x: 0, y: 3 }, gP);
+  pText.textContent = "evt";
+  gP.style.opacity = "0";
+  function placePacket(x, y, label, color) {
+    gP.style.opacity = "1";
+    gP.setAttribute("transform", `translate(${x},${y})`);
+    pText.textContent = label || "evt";
+    pCircle.setAttribute("fill", color || "#f59e0b");
+    pCircle.setAttribute("stroke", color === "#ef4444" ? "#fca5a5" : "#fbbf24");
+  }
+  function hidePacket(){ gP.style.opacity = "0"; }
+
+  // ---------- helpers to set visual state per step ----------
+  function setActive(activeIds, dimIds) {
+    for (const id in boxEls) {
+      boxEls[id].classList.remove("active", "dim");
+      if (activeIds && activeIds.includes(id)) boxEls[id].classList.add("active");
+      else if (dimIds && dimIds.includes(id)) boxEls[id].classList.add("dim");
+    }
+  }
+  function setLiveWires(keys) {
+    for (const key in wireEls) {
+      const live = keys && keys.includes(key);
+      wireEls[key].path.classList.toggle("live", live);
+      wireEls[key].arrow.classList.toggle("live", live);
+    }
+  }
+  function setQueue(depth, color) {
+    qCells.forEach((c, i) => {
+      const on = i < depth;
+      c.setAttribute("fill", on ? (color || "#f59e0b") : "#3a3a5c");
+      c.setAttribute("stroke", on ? (color || "#fbbf24") : "#5b5b86");
+    });
+  }
+
+  const ALL = Object.keys(C);
+
+  // ---------- steps ----------
+  const steps = [
+    {
+      stage: "ingest", depth: 0, dval: "0", dcls: "amber", status: "—", scls: "",
+      packet: { id: "sender", label: "evt" }, pcolor: "#f59e0b",
+      active: ["sender"], dim: ALL.filter(i => i !== "sender"), wires: [], queue: [0,""],
+      narr: `<b>1. The trigger event.</b> A sender service fires <code>POST /v1/notifications</code> with <code>user_id</code>, <code>event_type:"order_shipped"</code>, channels, <code>template_data</code>, <code>priority</code>, and an idempotency <code>dedup_key</code>. This single event will become up to three deliveries (push + SMS + email).`,
+      ncls: ""
+    },
+    {
+      stage: "validate", depth: 0, dval: "0", dcls: "amber", status: "queued", scls: "",
+      packet: { id: "api", label: "evt" }, pcolor: "#f59e0b",
+      active: ["api"], dim: ["push","sms","email","cass","redis","prefs","worker"], wires: [wireKey("sender","api")], queue: [0,""],
+      narr: `<b>2. Notification Service (API gateway).</b> Authenticates the service token, validates the schema, and does a quick <code>dedup_key</code> check. It does <b>not</b> call any provider — it returns <code>202 Accepted</code> immediately. <b>~3K QPS at peak</b> is absorbed here because the real work is pushed off the hot path.`,
+      ncls: ""
+    },
+    {
+      stage: "enqueue", depth: 1, dval: "1", dcls: "amber", status: "queued", scls: "",
+      packet: { id: "kafka", label: "evt" }, pcolor: "#f59e0b",
+      active: ["api","kafka"], dim: ["push","sms","email","cass","redis","prefs"], wires: [wireKey("api","kafka")], queue: [1,"#f59e0b"],
+      narr: `<b>3. Drop it on Kafka — the decoupling core.</b> The event lands on a topic chosen by <code>priority</code>: <code>transactional</code> (OTP, password reset) vs <code>bulk</code> (marketing), so an OTP never queues behind a campaign. Partitioning <b>by user_id</b> gives soft per-user ordering. The sender is now fully shielded from any downstream slowness.`,
+      ncls: "good"
+    },
+    {
+      stage: "consume", depth: 0, dval: "0", dcls: "amber", status: "processing", scls: "",
+      packet: { id: "worker", label: "evt" }, pcolor: "#f59e0b",
+      active: ["kafka","worker"], dim: ["push","sms","email","cass","redis","prefs","api","sender"], wires: [wireKey("kafka","worker")], queue: [0,""],
+      narr: `<b>4. A channel worker pulls the event.</b> Consumers run as an autoscaled fleet, each tied to a channel. They consume at their own pace — if a provider is slow, the queue depth grows but nothing is dropped. Now the per-notification checks begin.`,
+      ncls: ""
+    },
+    {
+      stage: "pref + DND", depth: 0, dval: "0", dcls: "amber", status: "checking prefs", scls: "",
+      packet: { id: "prefs", label: "?" }, pcolor: "#f59e0b",
+      active: ["worker","prefs","redis"], dim: ["push","sms","email","cass","api","sender","kafka"],
+      wires: [wireKey("worker","prefs"), wireKey("worker","redis")], queue: [0,""],
+      narr: `<b>5a. Preferences, DND & rate limit.</b> Worker reads user prefs from <b>Redis cache</b> (source of truth in the <b>SQL prefs DB</b>): is this channel opted-in? Inside the DND window <code>22:00–08:00</code>? Then a per-user <b>token bucket in Redis</b> caps spam (e.g. max N/hour). If opted-out or DND → drop silently.`,
+      ncls: ""
+    },
+    {
+      stage: "dedup", depth: 0, dval: "0", dcls: "amber", status: "SETNX dedup_key", scls: "",
+      packet: { id: "redis", label: "1x" }, pcolor: "#10b981",
+      active: ["worker","redis"], dim: ["push","sms","email","cass","api","sender","kafka","prefs"],
+      wires: [wireKey("worker","redis")], queue: [0,""],
+      narr: `<b>5b. Idempotency / dedup.</b> Delivery is <b>at-least-once</b> (exactly-once is impractical), so the same event may arrive twice. Before sending, the worker does <code>SETNX dedup_key</code> in Redis with a TTL. If the key already exists → this is a duplicate → skip. This is how at-least-once becomes effectively once-seen.`,
+      ncls: "good"
+    },
+    {
+      stage: "render", depth: 0, dval: "0", dcls: "amber", status: "rendering", scls: "",
+      packet: { id: "worker", label: "txt" }, pcolor: "#f59e0b",
+      active: ["worker"], dim: ["push","sms","email","cass","api","sender","kafka","prefs","redis"], wires: [], queue: [0,""],
+      narr: `<b>6. Template render.</b> The worker merges the template for <code>order_shipped</code> with <code>template_data</code> (<code>order_id:"A42"</code>, <code>eta:"Jun 18"</code>) to produce the final personalized content for this channel. Ready to hand to the third-party provider.`,
+      ncls: ""
+    },
+    {
+      stage: "fan-out", depth: 0, dval: "0", dcls: "amber", status: "sent", scls: "green",
+      packet: null, pcolor: "#f59e0b",
+      active: ["worker","push","sms","email"], dim: ["api","sender","kafka","prefs","redis","cass"],
+      wires: [wireKey("worker","push"), wireKey("worker","sms"), wireKey("worker","email")], queue: [0,""],
+      narr: `<b>7. Provider fan-out.</b> The worker calls the channel adapter — <b>APNs/FCM</b> (push), <b>Twilio/SNS</b> (SMS), <b>SES/SendGrid</b> (email). Each adapter is wrapped in a <b>retry + circuit breaker</b>: if a provider's error rate spikes, the circuit opens and traffic is held in the queue instead of cascading.`,
+      ncls: "good"
+    },
+    {
+      stage: "retry / DLQ", depth: 2, dval: "2", dcls: "red", status: "retrying", scls: "red",
+      packet: { id: "kafka", label: "↻" }, pcolor: "#ef4444",
+      active: ["worker","kafka"], dim: ["api","sender","prefs","redis","cass","push","sms","email"],
+      wires: [wireKey("kafka","worker")], queue: [2,"#ef4444"],
+      narr: `<b>8. When a provider fails.</b> A transient error → <b>retry with exponential backoff</b> (depth climbs, nothing lost). A repeatedly-failing "poison" message is moved to a <b>Dead Letter Queue</b> for manual inspection, so one bad event can't block the whole consumer. This is the reliability backbone of at-least-once.`,
+      ncls: "bad"
+    },
+    {
+      stage: "log status", depth: 0, dval: "0", dcls: "amber", status: "delivered", scls: "green",
+      packet: { id: "cass", label: "✓" }, pcolor: "#10b981",
+      active: ["worker","cass"], dim: ["api","sender","kafka","prefs","redis","push","sms","email"],
+      wires: [wireKey("worker","cass")], queue: [0,""],
+      narr: `<b>9. Persist the outcome.</b> Every attempt + final status (<code>sent → delivered → failed/bounced</code>) is appended to the <b>Cassandra notification log</b> — write-heavy <code>50M/day</code>, partitioned by <code>user_id</code>, clustered by <code>created_at</code>. This powers the status API, analytics, and debugging. Preferences stay in <b>SQL</b>; logs in <b>NoSQL</b> — access-pattern-driven split.`,
+      ncls: "good"
+    },
+  ];
+
+  // ---------- render ----------
+  const stepEl = document.getElementById("step-indicator");
+  const narrEl = document.getElementById("narration");
+  const vStage = document.getElementById("v-stage");
+  const vDepth = document.getElementById("v-depth");
+  const vGuar  = document.getElementById("v-guar");
+  const vStatus = document.getElementById("v-status");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  let cursor = 0;
+
+  function render() {
+    const s = steps[cursor];
+    setActive(s.active, s.dim);
+    setLiveWires(s.wires);
+    setQueue(s.queue[0], s.queue[1]);
+
+    if (s.packet) placePacket(cx(s.packet.id), cy(s.packet.id), s.packet.label, s.pcolor);
+    else hidePacket();
+
+    vStage.textContent = s.stage;
+    vDepth.textContent = s.dval;
+    vDepth.className = "value " + (s.dcls || "amber");
+    vStatus.textContent = s.status;
+    vStatus.className = "value " + (s.scls || "");
+
+    narrEl.className = "narration" + (s.ncls ? " " + s.ncls : "");
+    narrEl.innerHTML = s.narr;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

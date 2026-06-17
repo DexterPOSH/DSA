@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sum of Two Integers — XOR is the sum, AND-shift is the carry</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.75rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.08));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .card {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 22px 24px 26px;
+    margin-bottom: 26px;
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 6px 22px rgba(0,0,0,0.28);
+  }
+  .section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; }
+  code { background: var(--panel2); padding: 1px 7px; border-radius: 5px; color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .step-desc {
+    background: var(--panel2);
+    border-left: 4px solid var(--blue);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-height: 76px;
+    margin-bottom: 22px;
+    font-size: 1.02rem;
+  }
+
+  .registers { display: flex; flex-direction: column; gap: 14px; }
+  .reg { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .reg-label {
+    width: 118px; flex: 0 0 auto;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 0.9rem; color: var(--muted);
+  }
+  .reg-label b { color: var(--text); }
+  .reg-dec {
+    width: 48px; flex: 0 0 auto; text-align: right;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 1.2rem; font-weight: 700; color: var(--text);
+  }
+
+  .bits { display: flex; gap: 6px; }
+  .bit {
+    width: 36px; height: 40px;
+    border-radius: 7px;
+    display: grid; place-items: center;
+    font-family: "SF Mono", Menlo, monospace;
+    font-weight: 700; font-size: 1.1rem;
+    background: var(--panel2);
+    border: 2px solid rgba(255,255,255,0.12);
+    color: #6b7299;
+    transition: all .3s ease;
+  }
+  .bit.one { background: rgba(59,130,246,0.22); border-color: var(--blue); color: #bcd4ff; }
+  .reg.r-sum .bit.one { background: rgba(16,185,129,0.20); border-color: var(--green); color: #b6f0d8; }
+  .reg.r-carry .bit.one { background: rgba(245,158,11,0.20); border-color: var(--amber); color: #ffe0a3; }
+  .bit.hl { box-shadow: 0 0 0 3px rgba(245,158,11,0.45); }
+  .bit.shifted { animation: nudge .5s ease; }
+  @keyframes nudge {
+    0% { transform: translateX(14px); opacity: 0.3; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+  .divider { margin: 18px 0; border: 0; border-top: 1px dashed rgba(255,255,255,0.14); }
+
+  .calc-line {
+    margin-top: 16px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 0.98rem;
+    min-height: 26px;
+    color: var(--green);
+  }
+  .calc-line .sx { color: var(--amber); }
+  .calc-line .res { color: var(--blue); font-weight: 700; }
+
+  .result-badge {
+    margin-top: 18px; display: none;
+    background: rgba(16,185,129,0.15);
+    border: 1px solid var(--green);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-weight: 700;
+    font-family: "SF Mono", Menlo, monospace;
+    color: #b6f0d8;
+  }
+  .result-badge.show { display: inline-block; }
+
+  .controls { display: flex; align-items: center; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 10px 22px; border-radius: 9px;
+    font-size: 0.98rem; font-weight: 600; cursor: pointer;
+    transition: transform .12s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #34345e; }
+  .step-counter { margin-left: auto; color: var(--muted); font-size: 0.9rem; font-family: "SF Mono", monospace; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 4px 0 18px; font-size: 0.85rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .dot.b { background: var(--blue); } .dot.g { background: var(--green); } .dot.a { background: var(--amber); }
+
+  .code-block {
+    background: #11111f; border-radius: 12px; padding: 18px 20px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.88rem;
+    line-height: 1.7; overflow-x: auto; margin-top: 6px;
+    border: 1px solid rgba(255,255,255,0.06); white-space: pre;
+  }
+  .kw { color: #c792ea; } .fn { color: #82aaff; } .cm { color: #5a6a90; } .num { color: #f78c6c; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px; padding: 18px 22px; margin-top: 30px;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Sum of Two Integers — <span>XOR</span> is the sum, <span style="color:var(--amber)">AND&lt;&lt;1</span> is the carry</h1>
+  <p class="subtitle">Adding <b>a = 7</b> and <b>b = 5</b> with no <code>+</code> — just XOR, AND and left-shift, looping until the carry is gone.</p>
+
+  <div class="analogy">
+    <h3>➕ Real-world analogy</h3>
+    <p>Grade-school binary addition: <b>sum-without-carry = XOR</b> (1+1 gives 0, carry leaves), <b>carry = AND</b> (banta hi tab hai jab dono bits 1 hon) aur carry agle column me jaata hai → <code>&lt;&lt; 1</code>. Repeat jab tak carry 0 na ho.</p>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Step description</div>
+    <div class="step-desc" id="stepDesc">Press <b>Next →</b>. Each round computes a new partial sum (<code>a ^ b</code>) and a new carry (<code>(a &amp; b) &lt;&lt; 1</code>).</div>
+
+    <div class="legend">
+      <span><i class="dot b"></i> operand bit = 1</span>
+      <span><i class="dot g"></i> partial sum (a^b)</span>
+      <span><i class="dot a"></i> carry ((a&amp;b)&lt;&lt;1)</span>
+    </div>
+
+    <div class="registers">
+      <div class="reg" id="regA">
+        <div class="reg-label"><b>a</b></div>
+        <div class="reg-dec" id="aDec">7</div>
+        <div class="bits" id="aBits"></div>
+      </div>
+      <div class="reg" id="regB">
+        <div class="reg-label"><b>b</b> (carry-in)</div>
+        <div class="reg-dec" id="bDec">5</div>
+        <div class="bits" id="bBits"></div>
+      </div>
+      <hr class="divider">
+      <div class="reg r-sum" id="regSum">
+        <div class="reg-label">a ^ b</div>
+        <div class="reg-dec" id="sumDec">·</div>
+        <div class="bits" id="sumBits"></div>
+      </div>
+      <div class="reg r-carry" id="regCarry">
+        <div class="reg-label">(a &amp; b) &lt;&lt; 1</div>
+        <div class="reg-dec" id="carryDec">·</div>
+        <div class="bits" id="carryBits"></div>
+      </div>
+    </div>
+
+    <div class="calc-line" id="calcLine"></div>
+    <div class="result-badge" id="resultBadge"></div>
+
+    <div class="controls">
+      <button class="ghost" id="prevBtn" onclick="prev()">← Prev</button>
+      <button id="nextBtn" onclick="next()">Next →</button>
+      <button class="ghost" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="section-label">The whole algorithm</div>
+  <div class="code-block"><span class="kw">def</span> <span class="fn">get_sum</span>(a, b):
+    <span class="kw">while</span> b != <span class="num">0</span>:                 <span class="cm"># while a carry still exists</span>
+        carry = (a & b) << <span class="num">1</span>     <span class="cm"># both-1 bits, bumped one column left</span>
+        a = a ^ b                  <span class="cm"># add the bits, ignoring carry</span>
+        b = carry                  <span class="cm"># the carry becomes the next addend</span>
+    <span class="kw">return</span> a</div>
+
+  <div class="takeaway">
+    <h3>💡 Key takeaway</h3>
+    <p>Addition splits into two independent bit operations: <b>XOR adds without carrying</b>, <b>AND finds where a carry is born</b>, and shifting moves that carry to the next column. Loop until no carry remains. <b>O(1) for fixed-width ints — this is literally how a CPU adder works.</b></p>
+  </div>
+</div>
+
+<script>
+  const A0 = 7, B0 = 5;     // 0111 + 0101 = 1100 (12)
+  const WIDTH = 5;          // enough bits for the carry to climb into
+
+  // Build steps. Each "round" snapshots a,b at the start, plus the computed
+  // partial sum and carry. After the round a<-a^b, b<-carry.
+  const rounds = [];
+  let a = A0, b = B0;
+  while (b !== 0 && rounds.length < 8) {
+    const carry = (a & b) << 1;
+    const newA = a ^ b;
+    rounds.push({ a, b, carry, newA });
+    a = newA; b = carry;
+  }
+  const finalSum = a; // b is 0 here
+
+  // steps: index 0 = initial state (nothing computed). Then one step per round.
+  // Final step = done.
+  const steps = [{ type: 'init' }];
+  rounds.forEach((r, i) => steps.push({ type: 'round', idx: i }));
+  steps.push({ type: 'done' });
+
+  const $ = id => document.getElementById(id);
+  const bitsOf = v => {
+    const arr = [];
+    for (let bb = WIDTH - 1; bb >= 0; bb--) arr.push((v >> bb) & 1);
+    return arr;
+  };
+  function paint(container, val, highlightMask, extraClass) {
+    const bits = bitsOf(val);
+    container.innerHTML = bits.map((bit, idx) => {
+      const pos = WIDTH - 1 - idx; // bit position
+      let c = 'bit';
+      if (bit === 1) c += ' one';
+      if (highlightMask != null && ((highlightMask >> pos) & 1)) c += ' hl';
+      if (extraClass) c += ' ' + extraClass;
+      return `<div class="${c}">${bit}</div>`;
+    }).join('');
+  }
+
+  let cur = 0;
+
+  function render() {
+    const stepDesc = $('stepDesc'), calcLine = $('calcLine'), resultBadge = $('resultBadge');
+    calcLine.innerHTML = '';
+    resultBadge.classList.remove('show');
+    const st = steps[cur];
+
+    if (st.type === 'init') {
+      $('aDec').textContent = A0; $('bDec').textContent = B0;
+      paint($('aBits'), A0); paint($('bBits'), B0);
+      $('sumDec').textContent = '·'; $('carryDec').textContent = '·';
+      paint($('sumBits'), 0); paint($('carryBits'), 0);
+      stepDesc.innerHTML = 'Press <b>Next →</b>. Each round computes a new partial sum (<code>a ^ b</code>) and a new carry (<code>(a &amp; b) &lt;&lt; 1</code>).';
+    } else if (st.type === 'round') {
+      const r = rounds[st.idx];
+      const both = r.a & r.b; // where carry is born (before shift)
+      $('aDec').textContent = r.a; $('bDec').textContent = r.b;
+      paint($('aBits'), r.a, both); paint($('bBits'), r.b, both);
+      $('sumDec').textContent = r.newA; $('carryDec').textContent = r.carry;
+      paint($('sumBits'), r.newA);
+      paint($('carryBits'), r.carry, r.carry, 'shifted');
+      stepDesc.innerHTML =
+        `<b>Round ${st.idx + 1}:</b> jahan <code>a</code> aur <code>b</code> dono 1 hain (amber-highlighted) wahan carry banta hai. ` +
+        `<code>a ^ b</code> = partial sum (green), <code>(a &amp; b) &lt;&lt; 1</code> = carry one column left (amber). ` +
+        `Next round me <code>a = ${r.newA}</code>, <code>b = ${r.carry}</code>.`;
+      calcLine.innerHTML =
+        `a ^ b = <span class="res">${r.newA}</span> &nbsp;·&nbsp; (a &amp; b)&lt;&lt;1 = <span class="sx">${r.carry}</span>` +
+        (r.carry === 0 ? ' &nbsp;→&nbsp; carry is 0, loop ends next' : '');
+    } else if (st.type === 'done') {
+      $('aDec').textContent = finalSum; $('bDec').textContent = 0;
+      paint($('aBits'), finalSum); paint($('bBits'), 0);
+      $('sumDec').textContent = '·'; $('carryDec').textContent = '·';
+      paint($('sumBits'), 0); paint($('carryBits'), 0);
+      stepDesc.innerHTML =
+        `<b>Done!</b> Carry <code>b</code> ab <code>0</code> hai, to loop ruk gaya. ` +
+        `<code>a = ${finalSum}</code> me final sum hai: <code>${A0} + ${B0} = ${finalSum}</code>.`;
+      resultBadge.textContent = `return a = ${finalSum}`;
+      resultBadge.classList.add('show');
+    }
+
+    $('stepCounter').textContent = `Step ${cur} / ${steps.length - 1}`;
+    $('prevBtn').disabled = cur === 0;
+    $('nextBtn').disabled = cur === steps.length - 1;
+  }
+
+  function next() { if (cur < steps.length - 1) cur++; render(); }
+  function prev() { if (cur > 0) cur--; render(); }
+  function reset() { cur = 0; render(); }
+
+  render();
+</script>
+</body>
+</html>

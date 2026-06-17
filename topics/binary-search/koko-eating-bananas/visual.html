@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koko Eating Bananas — binary search on the answer (speed)</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.75rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.10));
+    border: 1px solid rgba(245,158,11,0.4); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 20px; margin-bottom: 28px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel); border-radius: 12px; padding: 16px 20px; margin-bottom: 26px;
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+  .problem code { background: var(--panel2); padding: 2px 8px; border-radius: 6px; color:#ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .panel {
+    background: var(--panel); border-radius: 14px; padding: 24px 22px 28px;
+    border: 1px solid rgba(255,255,255,0.07); box-shadow: 0 6px 20px rgba(0,0,0,0.25); margin-bottom: 26px;
+  }
+  .sectlabel { font-size:.8rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:0 0 10px; }
+
+  /* speed range bar: each candidate speed is a cell */
+  .speedbar { display:flex; justify-content:center; gap:5px; flex-wrap:wrap; margin: 40px 0 6px; }
+  .scellwrap { position:relative; }
+  .scell {
+    width: 38px; height: 44px; border-radius:8px;
+    display:grid; place-items:center;
+    font-weight:700; font-family:"SF Mono",Menlo,monospace; font-size:.95rem;
+    background: var(--panel2); border:2px solid rgba(255,255,255,0.10);
+    transition: all .35s ease;
+  }
+  .scell.out { opacity:.24; filter:grayscale(.7); }
+  .scell.inrange { border-color: rgba(59,130,246,0.45); background: rgba(59,130,246,0.10); }
+  .scell.mid { border-color: var(--amber); background: rgba(245,158,11,0.24); color:#ffe2a8; box-shadow:0 0 0 3px rgba(245,158,11,0.25); }
+  .scell.answer { border-color: var(--green); background: rgba(16,185,129,0.28); color:#b6f0d8; box-shadow:0 0 0 3px rgba(16,185,129,0.35); }
+  .sidx { text-align:center; font-size:.62rem; color:var(--muted); margin-top:5px; }
+  .marker { position:absolute; left:50%; transform:translateX(-50%); font-size:.66rem; font-weight:700; padding:1px 6px; border-radius:5px; white-space:nowrap; transition:all .35s ease; }
+  .marker.lo  { top:-24px; background:var(--blue); color:#fff; }
+  .marker.hi  { top:-24px; background:var(--purple); color:#fff; }
+  .marker.lohi{ top:-24px; background:linear-gradient(90deg,var(--blue),var(--purple)); color:#fff; }
+  .marker.mid { bottom:-24px; background:var(--amber); color:#1a1a2e; }
+
+  /* feasibility check panel */
+  .feas { margin-top: 24px; background: var(--panel2); border-radius:10px; padding:14px 16px; border:1px solid rgba(255,255,255,0.08); }
+  .feas .fhead { font-size:.92rem; color:var(--muted); margin-bottom:10px; }
+  .piles { display:flex; gap:10px; flex-wrap:wrap; }
+  .pile {
+    flex:0 0 auto; min-width:74px; text-align:center; border-radius:9px;
+    background:#1c1c38; border:1px solid rgba(255,255,255,0.08); padding:8px 6px;
+    font-family:"SF Mono",Menlo,monospace; transition: all .3s ease;
+  }
+  .pile .pcount { font-size:1.05rem; font-weight:700; color:#ffd479; }
+  .pile .phours { font-size:.74rem; color:var(--blue); margin-top:3px; }
+  .pile.lit { border-color:var(--amber); background:#262040; }
+  .feas-total { margin-top:12px; font-family:"SF Mono",Menlo,monospace; font-size:.95rem; }
+  .feas-total .ok { color: var(--green); font-weight:700; }
+  .feas-total .bad { color: var(--red); font-weight:700; }
+
+  .vars { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; justify-content:center; }
+  .var { font-family:"SF Mono",Menlo,monospace; font-size:.88rem; padding:6px 12px; border-radius:8px; background:var(--panel2); border:1px solid rgba(255,255,255,0.1); }
+  .var .lbl{ color:var(--muted); }
+  .var.lo{ border-color:var(--blue);}  .var.lo b{ color:#bcd4ff;}
+  .var.hi{ border-color:var(--purple);}.var.hi b{ color:#e3c9ff;}
+  .var.mid{border-color:var(--amber);} .var.mid b{ color:#ffe2a8;}
+
+  .caption { margin-top:22px; background:var(--panel2); border-radius:10px; padding:14px 16px; border-left:4px solid var(--blue); min-height:58px; font-size:.97rem; transition:border-color .3s; }
+  .caption code{ color:#ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .caption.win{ border-left-color:var(--green); }
+
+  .controls { text-align:center; margin: 6px 0 26px; }
+  button { background:var(--blue); color:#fff; border:none; padding:11px 22px; border-radius:10px; font-size:.98rem; font-weight:600; cursor:pointer; transition: transform .15s, background .2s; }
+  button:hover:not(:disabled){ background:#2f6fd6; transform:translateY(-1px); }
+  button:disabled{ opacity:.4; cursor:not-allowed; }
+  button.ghost{ background:var(--panel2); color:var(--text); }
+  button.ghost:hover:not(:disabled){ background:#34345e; }
+  .stepcount{ color:var(--muted); font-size:.85rem; margin-top:10px; }
+
+  .takeaway { background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12)); border:1px solid rgba(59,130,246,0.4); border-radius:12px; padding:18px 22px; margin-top:30px; text-align:center; }
+  .takeaway h3{ margin:0 0 6px; color:var(--blue); }
+  .takeaway p{ margin:0; font-size:1.05rem; }
+  .takeaway code{ color:#ffd479; font-family:"SF Mono",Menlo,monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Koko Eating Bananas — binary search on the <span>answer</span></h1>
+  <p class="subtitle">Array me kuch nahi dhoond rahe — speed <b>k</b> dhoond rahe. Slowest feasible speed.</p>
+
+  <div class="analogy">
+    <h3>🚿 Analogy: shower temperature knob</h3>
+    <p>Dheere (low k) → time zyada. Tez (high k) → jaldi. Ek <b>threshold</b> hai: usse upar har speed feasible (kaam in time), neeche har speed infeasible. Monotonic flip <code>F F F T T T</code> — binary search ke liye perfect. Hum <b>smallest feasible</b> dhoond rahe.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> <code>piles = [3, 6, 7, 11]</code>, <code>h = 8</code> hours. Find minimum eating speed <code>k</code>.
+    <span class="arrow">→</span> answer <code>4</code>.
+  </div>
+
+  <div class="panel">
+    <p class="sectlabel">Candidate speeds — search space is the answer range [1 … max(piles)=11]</p>
+    <div class="speedbar" id="speedbar"></div>
+    <div class="vars" id="vars"></div>
+
+    <div class="feas" id="feas">
+      <div class="fhead" id="fhead">Feasibility check for the current mid speed</div>
+      <div class="piles" id="piles"></div>
+      <div class="feas-total" id="feastotal"></div>
+    </div>
+
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="controls">
+    <button class="ghost" id="prevBtn">‹ Prev</button>
+    <button id="nextBtn">Next ›</button>
+    <button class="ghost" id="resetBtn">↺ Reset</button>
+    <div class="stepcount" id="stepcount"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Jab "minimum/maximum value such that condition holds" + monotonic ho → binary search on the answer range, ek <code>feasible(k)</code> checker ke saath. O(n·log(max)).</p>
+  </div>
+</div>
+
+<script>
+const piles = [3, 6, 7, 11];
+const h = 8;
+const ceilDiv = (p, k) => Math.ceil(p / k);
+const hoursFor = k => piles.reduce((s, p) => s + ceilDiv(p, k), 0);
+
+function buildSteps() {
+  const steps = [];
+  let lo = 1, hi = Math.max(...piles);
+  steps.push({ lo, hi, mid: null, kind:'init', done:false,
+    text: `A speed below 1 never finishes; above max(piles)=${hi} is wasteful. Search range <code>[1, ${hi}]</code>. Using <code>lo &lt; hi</code> (boundary search).` });
+  while (lo < hi) {
+    const k = Math.floor((lo + hi) / 2);
+    const hrs = hoursFor(k);
+    if (hrs <= h) {
+      steps.push({ lo, hi, mid:k, kind:'feasible', done:false,
+        text: `<code>mid = ${k}</code> → needs <code>${hrs} ≤ ${h}</code> hours. <b>Feasible.</b> Maybe slower works too → keep k, <code>hi = ${k}</code>.` });
+      hi = k;
+    } else {
+      steps.push({ lo, hi, mid:k, kind:'infeasible', done:false,
+        text: `<code>mid = ${k}</code> → needs <code>${hrs} &gt; ${h}</code> hours. <b>Too slow.</b> Need faster → <code>lo = ${k+1}</code>.` });
+      lo = k + 1;
+    }
+  }
+  steps.push({ lo, hi, mid: lo, kind:'answer', done:true,
+    text: `<code>lo == hi == ${lo}</code> → smallest feasible speed. <b>return ${lo}</b> ✅ (needs ${hoursFor(lo)} hours).` });
+  return steps;
+}
+
+const steps = buildSteps();
+let i = 0;
+const $ = id => document.getElementById(id);
+const MAX = Math.max(...piles);
+
+function render() {
+  const s = steps[i];
+
+  // speed bar 1..MAX
+  let sb = '';
+  for (let k = 1; k <= MAX; k++) {
+    const inRange = k >= s.lo && k <= s.hi;
+    let cls = 'scell ';
+    if (s.kind === 'answer' && k === s.mid) cls += 'answer';
+    else if (s.mid !== null && k === s.mid && s.kind !== 'init') cls += 'mid';
+    else if (inRange) cls += 'inrange';
+    else cls += 'out';
+    let mk = '';
+    if (s.lo === s.hi && k === s.lo) mk += `<div class="marker lohi">lo·hi</div>`;
+    else {
+      if (k === s.lo) mk += `<div class="marker lo">lo</div>`;
+      if (k === s.hi) mk += `<div class="marker hi">hi</div>`;
+    }
+    if (s.mid !== null && s.kind !== 'init' && s.kind !== 'answer' && k === s.mid) mk += `<div class="marker mid">mid</div>`;
+    sb += `<div class="scellwrap">${mk}<div class="${cls}">${k}</div><div class="sidx">${k}</div></div>`;
+  }
+  $('speedbar').innerHTML = sb;
+
+  // vars
+  let v = `<div class="var lo"><span class="lbl">lo</span> = <b>${s.lo}</b></div>` +
+          `<div class="var hi"><span class="lbl">hi</span> = <b>${s.hi}</b></div>`;
+  if (s.mid !== null && s.kind !== 'init')
+    v += `<div class="var mid"><span class="lbl">${s.kind==='answer'?'k*':'mid'}</span> = <b>${s.mid}</b></div>`;
+  $('vars').innerHTML = v;
+
+  // feasibility detail
+  if (s.mid !== null && s.kind !== 'init') {
+    const k = s.mid;
+    $('fhead').innerHTML = `At speed <b style="color:#ffe2a8">k = ${k}</b>: hours per pile = <code style="color:#ffd479">ceil(pile / ${k})</code>`;
+    $('piles').innerHTML = piles.map(p =>
+      `<div class="pile lit"><div class="pcount">${p}</div><div class="phours">${ceilDiv(p,k)} hr</div></div>`).join('');
+    const hrs = hoursFor(k);
+    const ok = hrs <= h;
+    $('feastotal').innerHTML =
+      `total = <b>${piles.map(p=>ceilDiv(p,k)).join(' + ')} = ${hrs}</b> hours ` +
+      (ok ? `<span class="ok">≤ ${h} ✓ feasible</span>` : `<span class="bad">&gt; ${h} ✗ too slow</span>`);
+  } else {
+    $('fhead').innerHTML = `Feasibility check appears here once we pick a <b>mid</b> speed.`;
+    $('piles').innerHTML = piles.map(p => `<div class="pile"><div class="pcount">${p}</div><div class="phours">— hr</div></div>`).join('');
+    $('feastotal').innerHTML = '';
+  }
+
+  const cap = $('caption');
+  cap.className = 'caption' + (s.kind === 'answer' ? ' win' : '');
+  cap.innerHTML = s.text;
+
+  $('stepcount').textContent = `Step ${i + 1} / ${steps.length}`;
+  $('prevBtn').disabled = i === 0;
+  $('nextBtn').disabled = i === steps.length - 1;
+}
+
+$('nextBtn').onclick = () => { if (i < steps.length - 1) { i++; render(); } };
+$('prevBtn').onclick = () => { if (i > 0) { i--; render(); } };
+$('resetBtn').onclick = () => { i = 0; render(); };
+render();
+</script>
+</body>
+</html>

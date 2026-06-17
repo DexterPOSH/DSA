@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCP vs UDP — Visual Explainer</title>
+<style>
+:root{--bg:#1a1a2e;--sf:#16213e;--sf2:#0f3460;--ac:#3b82f6;--v:#8b5cf6;--gn:#10b981;--yl:#f59e0b;--rd:#ef4444;--og:#f97316;--pk:#ec4899;--tx:#e0e0e0;--mt:#94a3b8;--br:#1e3a5f;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--tx);font-family:'Segoe UI',system-ui,sans-serif;line-height:1.6;min-height:100vh;}
+header{background:linear-gradient(135deg,#0f3460 0%,#1a1a2e 100%);padding:30px 24px 22px;text-align:center;border-bottom:2px solid var(--br);}
+header h1{font-size:2.1rem;font-weight:800;letter-spacing:-.5px;}
+.tc{color:var(--ac);}.ud{color:var(--og);}
+header p{color:var(--mt);margin-top:8px;font-size:1rem;}
+.ana{background:linear-gradient(135deg,rgba(59,130,246,.12),rgba(139,92,246,.12));border:1px solid rgba(59,130,246,.3);border-radius:12px;padding:15px 20px;margin:22px auto;max-width:900px;font-size:.94rem;}
+.ana strong{color:var(--ac);}
+.tabs{display:flex;gap:4px;padding:16px 24px 0;max-width:1000px;margin:0 auto;flex-wrap:wrap;}
+.tb{background:var(--sf);border:1px solid var(--br);color:var(--mt);padding:9px 14px;border-radius:8px 8px 0 0;cursor:pointer;font-size:.82rem;font-weight:600;transition:all .2s;white-space:nowrap;}
+.tb:hover{background:var(--sf2);color:var(--tx);}
+.tb.on{background:var(--sf2);color:white;border-bottom-color:var(--sf2);}
+.pns{max-width:1000px;margin:0 auto;padding:0 24px 48px;}
+.pn{display:none;background:var(--sf2);border:1px solid var(--br);border-radius:0 8px 8px 8px;padding:26px;animation:fi .3s ease;}
+.pn.on{display:block;}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.pn h2{font-size:1.22rem;margin-bottom:7px;}
+.sb{color:var(--mt);font-size:.87rem;margin-bottom:18px;}
+.stg{background:var(--bg);border-radius:10px;border:1px solid var(--br);padding:14px;margin-bottom:18px;overflow:hidden;}
+.sv{width:100%;}
+.ct{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:4px;}
+.btn{background:var(--ac);color:white;border:none;padding:8px 18px;border-radius:8px;font-size:.87rem;font-weight:600;cursor:pointer;transition:all .2s;}
+.btn:hover{filter:brightness(1.14);transform:translateY(-1px);}
+.btn.sc{background:var(--sf);border:1px solid var(--br);color:var(--tx);}
+.btn.sc:hover{background:var(--sf2);}
+.lbl{color:var(--mt);font-size:.82rem;margin-left:auto;}
+.lg{background:var(--bg);border-radius:8px;border:1px solid var(--br);padding:11px 15px;font-size:.82rem;min-height:68px;max-height:160px;overflow-y:auto;margin-top:10px;}
+.le{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:flex-start;gap:8px;}
+.le:last-child{border-bottom:none;}
+.ld{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.pk{display:inline-flex;align-items:center;padding:1px 8px;border-radius:20px;font-size:.72rem;font-weight:700;}
+.pk.s{background:rgba(59,130,246,.2);border:1px solid var(--ac);color:var(--ac);}
+.pk.a{background:rgba(16,185,129,.2);border:1px solid var(--gn);color:var(--gn);}
+.pk.d{background:rgba(245,158,11,.2);border:1px solid var(--yl);color:var(--yl);}
+.pk.f{background:rgba(236,72,153,.2);border:1px solid var(--pk);color:var(--pk);}
+.pk.l{background:rgba(239,68,68,.2);border:1px solid var(--rd);color:var(--rd);}
+.pk.b{background:rgba(139,92,246,.2);border:1px solid var(--v);color:var(--v);}
+.hg{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.hc{background:var(--bg);border-radius:10px;border:2px solid;padding:18px;}
+.hc.tc2{border-color:var(--ac);}
+.hc.uc2{border-color:var(--og);}
+.hc h3{font-size:1.03rem;margin-bottom:4px;}
+.bg2{display:inline-block;font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:20px;margin-bottom:11px;}
+.tc2 .bg2{background:rgba(59,130,246,.2);color:var(--ac);}
+.uc2 .bg2{background:rgba(249,115,22,.2);color:var(--og);}
+.fr{display:flex;align-items:center;padding:6px 9px;border-radius:6px;margin-bottom:3px;font-size:.79rem;gap:7px;transition:background .2s;}
+.fr:hover{background:rgba(255,255,255,.04);}
+.fn{font-weight:600;flex:1;}
+.fb{font-size:.69rem;font-family:monospace;color:var(--mt);background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px;}
+.fd{color:var(--mt);font-size:.71rem;flex:1.5;text-align:right;}
+.dt{width:100%;border-collapse:separate;border-spacing:0 5px;font-size:.85rem;}
+.dt thead th{text-align:left;padding:8px 12px;color:var(--mt);font-size:.73rem;text-transform:uppercase;letter-spacing:.8px;font-weight:700;}
+.dt tbody tr{background:var(--bg);transition:background .2s;}
+.dt tbody tr:hover{background:rgba(59,130,246,.07);}
+.dt td{padding:10px 12px;vertical-align:middle;}
+.dt td:first-child{border-radius:8px 0 0 8px;}
+.dt td:last-child{border-radius:0 8px 8px 0;}
+.pb{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700;}
+.pb.tcp{background:rgba(59,130,246,.2);color:var(--ac);border:1px solid var(--ac);}
+.pb.udp{background:rgba(249,115,22,.2);color:var(--og);border:1px solid var(--og);}
+.ql{display:flex;flex-direction:column;gap:5px;max-width:310px;margin:0 auto;}
+.ql-l{padding:10px 16px;border-radius:8px;text-align:center;font-weight:700;font-size:.87rem;transition:all .3s;cursor:default;}
+.ql-l:hover{transform:scale(1.02);}
+.ql-a{text-align:center;color:var(--mt);font-size:1.1rem;line-height:1;}
+.tw{background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(59,130,246,.1));border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:13px 16px;font-size:.87rem;margin-top:16px;}
+.tw strong{color:var(--gn);}
+@media(max-width:640px){.hg{grid-template-columns:1fr;}.tabs{padding:10px 10px 0;}.pns{padding:0 10px 40px;}.pn{padding:14px;}header h1{font-size:1.4rem;}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌐 <span class="tc">TCP</span> vs <span class="ud">UDP</span></h1>
+  <p>Reliability vs Speed — the fundamental network protocol tradeoff</p>
+</header>
+
+<div style="max-width:900px;margin:0 auto;padding:0 24px">
+  <div class="ana">
+    <strong>📦 Real-world analogy:</strong>
+    <strong>TCP</strong> is like a <em>certified letter</em> — you get confirmation of delivery, packages arrive in order, and lost ones are re-sent.
+    <strong>UDP</strong> is like <em>shouting across a crowded room</em> — instant, but you don't know who heard, and you never repeat yourself.
+    Choose TCP when every word matters; choose UDP when freshness beats completeness.
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tb on" onclick="sw('hs',this)">① TCP Handshake</button>
+  <button class="tb" onclick="sw('hol',this)">② HOL Blocking</button>
+  <button class="tb" onclick="sw('udp',this)">③ UDP Fire &amp; Forget</button>
+  <button class="tb" onclick="sw('hdr',this)">④ Header Anatomy</button>
+  <button class="tb" onclick="sw('quic',this)">⑤ QUIC</button>
+  <button class="tb" onclick="sw('when',this)">⑥ When to Use</button>
+</div>
+
+<div class="pns">
+
+<!-- ══ PANEL 1: HANDSHAKE ══ -->
+<div id="pn-hs" class="pn on">
+  <h2>🤝 TCP 3-Way Handshake + Data Transfer + Teardown</h2>
+  <p class="sb">TCP establishes a reliable connection before any data flows. Both sides negotiate sequence numbers, window sizes, and capabilities.</p>
+  <div class="stg">
+    <svg class="sv" viewBox="0 0 700 366" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="mb" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#3b82f6"/></marker>
+        <marker id="mg" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#10b981"/></marker>
+        <marker id="my" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/></marker>
+        <marker id="mp" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ec4899"/></marker>
+        <marker id="mr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
+        <marker id="mo" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f97316"/></marker>
+        <marker id="mv" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#8b5cf6"/></marker>
+      </defs>
+      <rect x="20" y="8" width="100" height="42" rx="10" fill="#0f3460" stroke="#3b82f6" stroke-width="2"/>
+      <text x="70" y="33" text-anchor="middle" fill="#e0e0e0" font-family="Segoe UI,system-ui" font-size="13" font-weight="bold">💻 Client</text>
+      <rect x="580" y="8" width="100" height="42" rx="10" fill="#0f3460" stroke="#3b82f6" stroke-width="2"/>
+      <text x="630" y="33" text-anchor="middle" fill="#e0e0e0" font-family="Segoe UI,system-ui" font-size="13" font-weight="bold">🖥 Server</text>
+      <line x1="70" y1="50" x2="70" y2="362" stroke="#1e3a5f" stroke-width="2" stroke-dasharray="6,4"/>
+      <line x1="630" y1="50" x2="630" y2="362" stroke="#1e3a5f" stroke-width="2" stroke-dasharray="6,4"/>
+      <text x="350" y="70" text-anchor="middle" fill="#94a3b8" font-size="10" font-style="italic">── ESTABLISH (1.5 RTT) ──</text>
+      <text x="350" y="196" text-anchor="middle" fill="#94a3b8" font-size="10" font-style="italic">── DATA TRANSFER ──</text>
+      <text x="350" y="288" text-anchor="middle" fill="#94a3b8" font-size="10" font-style="italic">── TEARDOWN ──</text>
+      <g id="h1" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="82" x2="622" y2="97" stroke="#3b82f6" stroke-width="2" marker-end="url(#mb)"/>
+        <rect x="274" y="77" width="152" height="22" rx="11" fill="rgba(59,130,246,.18)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="350" y="92" text-anchor="middle" fill="#3b82f6" font-size="11" font-weight="bold">SYN  seq=100</text>
+      </g>
+      <g id="h2" opacity="0" style="transition:opacity .4s">
+        <line x1="625" y1="111" x2="78" y2="127" stroke="#10b981" stroke-width="2" marker-end="url(#mg)"/>
+        <rect x="236" y="106" width="228" height="22" rx="11" fill="rgba(16,185,129,.18)" stroke="#10b981" stroke-width="1"/>
+        <text x="350" y="121" text-anchor="middle" fill="#10b981" font-size="11" font-weight="bold">SYN-ACK  seq=300, ack=101</text>
+      </g>
+      <g id="h3" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="141" x2="622" y2="155" stroke="#10b981" stroke-width="2" marker-end="url(#mg)"/>
+        <rect x="274" y="136" width="152" height="22" rx="11" fill="rgba(16,185,129,.18)" stroke="#10b981" stroke-width="1"/>
+        <text x="350" y="151" text-anchor="middle" fill="#10b981" font-size="11" font-weight="bold">ACK  ack=301</text>
+      </g>
+      <g id="h4" opacity="0" style="transition:opacity .4s">
+        <rect x="214" y="165" width="272" height="20" rx="10" fill="rgba(16,185,129,.14)" stroke="rgba(16,185,129,.5)" stroke-width="1"/>
+        <text x="350" y="179" text-anchor="middle" fill="#10b981" font-size="10" font-weight="bold">✓ Connection Established — data can now flow</text>
+      </g>
+      <g id="h5" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="208" x2="622" y2="222" stroke="#f59e0b" stroke-width="2" marker-end="url(#my)"/>
+        <rect x="234" y="203" width="232" height="22" rx="11" fill="rgba(245,158,11,.18)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="350" y="218" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="bold">DATA  [GET /index.html]</text>
+      </g>
+      <g id="h6" opacity="0" style="transition:opacity .4s">
+        <line x1="625" y1="236" x2="78" y2="250" stroke="#10b981" stroke-width="2" marker-end="url(#mg)"/>
+        <rect x="254" y="231" width="192" height="22" rx="11" fill="rgba(16,185,129,.14)" stroke="#10b981" stroke-width="1"/>
+        <text x="350" y="246" text-anchor="middle" fill="#10b981" font-size="11">ACK + HTTP 200 OK response</text>
+      </g>
+      <g id="h7" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="300" x2="622" y2="314" stroke="#ec4899" stroke-width="2" marker-end="url(#mp)"/>
+        <rect x="288" y="295" width="124" height="22" rx="11" fill="rgba(236,72,153,.18)" stroke="#ec4899" stroke-width="1"/>
+        <text x="350" y="310" text-anchor="middle" fill="#ec4899" font-size="11" font-weight="bold">FIN</text>
+      </g>
+      <g id="h8" opacity="0" style="transition:opacity .4s">
+        <line x1="625" y1="328" x2="78" y2="342" stroke="#ec4899" stroke-width="2" marker-end="url(#mp)"/>
+        <rect x="222" y="323" width="256" height="22" rx="11" fill="rgba(236,72,153,.18)" stroke="#ec4899" stroke-width="1"/>
+        <text x="350" y="338" text-anchor="middle" fill="#ec4899" font-size="11" font-weight="bold">FIN-ACK → Client ACKs → TIME_WAIT</text>
+      </g>
+    </svg>
+  </div>
+  <div class="ct">
+    <button class="btn" onclick="playHS()">▶ Play</button>
+    <button class="btn sc" onclick="resetHS()">↺ Reset</button>
+    <span class="lbl" id="hslbl">Ready — click Play</span>
+  </div>
+  <div class="lg" id="hslog"><div style="color:var(--mt)">Steps appear here…</div></div>
+  <div class="tw"><strong>Key insight:</strong> TCP spends <strong>1.5 RTTs before a single data byte</strong>. On a 100ms RTT link that's 150ms overhead — before TLS adds another RTT. QUIC combines crypto + transport handshake, cutting this to 1 RTT for new connections and 0 RTT for resumptions.</div>
+</div>
+
+<!-- ══ PANEL 2: HOL ══ -->
+<div id="pn-hol" class="pn">
+  <h2>🚧 TCP Retransmission &amp; Head-of-Line Blocking</h2>
+  <p class="sb">TCP guarantees in-order delivery. A single lost packet freezes every packet that follows it in the kernel buffer — even if the app could use them right now.</p>
+  <div class="stg" style="min-height:400px">
+    <svg class="sv" viewBox="0 0 700 405" preserveAspectRatio="xMidYMid meet">
+      <rect x="20" y="8" width="100" height="42" rx="10" fill="#0f3460" stroke="#3b82f6" stroke-width="2"/>
+      <text x="70" y="33" text-anchor="middle" fill="#e0e0e0" font-family="Segoe UI,system-ui" font-size="13" font-weight="bold">💻 Sender</text>
+      <rect x="580" y="8" width="100" height="42" rx="10" fill="#0f3460" stroke="#3b82f6" stroke-width="2"/>
+      <text x="630" y="33" text-anchor="middle" fill="#e0e0e0" font-family="Segoe UI,system-ui" font-size="13" font-weight="bold">🖥 Receiver</text>
+      <line x1="70" y1="50" x2="70" y2="401" stroke="#1e3a5f" stroke-width="2" stroke-dasharray="6,4"/>
+      <line x1="630" y1="50" x2="630" y2="401" stroke="#1e3a5f" stroke-width="2" stroke-dasharray="6,4"/>
+      <rect x="490" y="180" width="130" height="84" rx="8" fill="rgba(139,92,246,.1)" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="555" y="172" text-anchor="middle" fill="#8b5cf6" font-size="10" font-weight="bold">Receive Buffer</text>
+      <text id="hbuf" x="555" y="218" text-anchor="middle" fill="#8b5cf6" font-size="10">(empty)</text>
+      <g id="r1" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="75" x2="622" y2="87" stroke="#f59e0b" stroke-width="2" marker-end="url(#my)"/>
+        <rect x="250" y="70" width="200" height="22" rx="11" fill="rgba(245,158,11,.18)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="350" y="85" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="bold">PKT 1 ✓ delivered to app</text>
+      </g>
+      <g id="r2" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="105" x2="622" y2="117" stroke="#f59e0b" stroke-width="2" marker-end="url(#my)"/>
+        <rect x="250" y="100" width="200" height="22" rx="11" fill="rgba(245,158,11,.18)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="350" y="115" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="bold">PKT 2 ✓ delivered to app</text>
+      </g>
+      <g id="r3" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="135" x2="372" y2="147" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#mr)"/>
+        <rect x="138" y="130" width="122" height="22" rx="11" fill="rgba(239,68,68,.18)" stroke="#ef4444" stroke-width="1"/>
+        <text x="199" y="145" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="bold">PKT 3</text>
+        <text x="389" y="137" text-anchor="middle" fill="#ef4444" font-size="18">💥</text>
+        <text x="410" y="155" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="bold">DROPPED!</text>
+      </g>
+      <g id="r4" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="190" x2="488" y2="202" stroke="#8b5cf6" stroke-width="2" marker-end="url(#mv)"/>
+        <rect x="188" y="185" width="188" height="22" rx="11" fill="rgba(139,92,246,.18)" stroke="#8b5cf6" stroke-width="1"/>
+        <text x="282" y="200" text-anchor="middle" fill="#8b5cf6" font-size="11" font-weight="bold">PKT 4 → buffered</text>
+      </g>
+      <g id="r5" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="220" x2="488" y2="232" stroke="#8b5cf6" stroke-width="2" marker-end="url(#mv)"/>
+        <rect x="188" y="215" width="188" height="22" rx="11" fill="rgba(139,92,246,.18)" stroke="#8b5cf6" stroke-width="1"/>
+        <text x="282" y="230" text-anchor="middle" fill="#8b5cf6" font-size="11" font-weight="bold">PKT 5 → buffered</text>
+      </g>
+      <g id="r6" opacity="0" style="transition:opacity .4s">
+        <rect x="26" y="252" width="648" height="26" rx="8" fill="rgba(239,68,68,.12)" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="350" y="269" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="bold">⛔ HEAD-OF-LINE BLOCK — App sees NOTHING. PKT 4 &amp; 5 stuck in kernel buffer.</text>
+      </g>
+      <g id="r7" opacity="0" style="transition:opacity .4s">
+        <rect x="20" y="296" width="90" height="26" rx="8" fill="rgba(239,68,68,.14)" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="65" y="313" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="bold">⏰ RTO fires</text>
+      </g>
+      <g id="r8" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="336" x2="622" y2="350" stroke="#10b981" stroke-width="2.5" marker-end="url(#mg)"/>
+        <rect x="178" y="331" width="344" height="22" rx="11" fill="rgba(16,185,129,.18)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="350" y="346" text-anchor="middle" fill="#10b981" font-size="11" font-weight="bold">PKT 3 retransmit ✓ — buffer flushes 3,4,5 in-order!</text>
+      </g>
+      <g id="r9" opacity="0" style="transition:opacity .4s">
+        <line x1="625" y1="364" x2="78" y2="378" stroke="#10b981" stroke-width="2" marker-end="url(#mg)"/>
+        <rect x="236" y="359" width="228" height="22" rx="11" fill="rgba(16,185,129,.14)" stroke="#10b981" stroke-width="1"/>
+        <text x="350" y="374" text-anchor="middle" fill="#10b981" font-size="11">Cumulative ACK 5 — stream unblocked ✓</text>
+      </g>
+    </svg>
+  </div>
+  <div class="ct">
+    <button class="btn" onclick="playHOL()">▶ Play</button>
+    <button class="btn sc" onclick="resetHOL()">↺ Reset</button>
+    <span class="lbl" id="hollbl">Ready — click Play</span>
+  </div>
+  <div class="lg" id="hollog"><div style="color:var(--mt)">Steps appear here…</div></div>
+  <div class="tw"><strong>Key insight:</strong> HOL block duration = 1–3× RTO (200ms–3s on lossy links). HTTP/2 multiplexing over a single TCP still suffers this — one lost packet stalls ALL streams at the OS level. QUIC solves it with per-stream userspace retransmission.</div>
+</div>
+
+<!-- ══ PANEL 3: UDP ══ -->
+<div id="pn-udp" class="pn">
+  <h2>🔥 UDP — Fire &amp; Forget</h2>
+  <p class="sb">UDP sends packets with zero setup overhead, no ACKs, no retransmission. Lost packets stay lost. Later packets never wait.</p>
+  <div class="stg" style="min-height:306px">
+    <svg class="sv" viewBox="0 0 700 306" preserveAspectRatio="xMidYMid meet">
+      <rect x="20" y="8" width="100" height="42" rx="10" fill="#0f3460" stroke="#f97316" stroke-width="2"/>
+      <text x="70" y="33" text-anchor="middle" fill="#e0e0e0" font-family="Segoe UI,system-ui" font-size="13" font-weight="bold">📡 Sender</text>
+      <rect x="580" y="8" width="100" height="42" rx="10" fill="#0f3460" stroke="#f97316" stroke-width="2"/>
+      <text x="630" y="33" text-anchor="middle" fill="#e0e0e0" font-family="Segoe UI,system-ui" font-size="13" font-weight="bold">📺 Receiver</text>
+      <rect x="210" y="52" width="280" height="20" rx="10" fill="rgba(249,115,22,.12)" stroke="rgba(249,115,22,.4)" stroke-width="1"/>
+      <text x="350" y="66" text-anchor="middle" fill="#f97316" font-size="10" font-weight="bold">NO HANDSHAKE — zero RTT overhead — just send!</text>
+      <line x1="70" y1="76" x2="70" y2="302" stroke="#1e3a5f" stroke-width="2" stroke-dasharray="6,4"/>
+      <line x1="630" y1="76" x2="630" y2="302" stroke="#1e3a5f" stroke-width="2" stroke-dasharray="6,4"/>
+      <g id="u1" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="94" x2="622" y2="106" stroke="#f97316" stroke-width="2" marker-end="url(#mo)"/>
+        <rect x="274" y="89" width="152" height="22" rx="11" fill="rgba(249,115,22,.18)" stroke="#f97316" stroke-width="1"/>
+        <text x="350" y="104" text-anchor="middle" fill="#f97316" font-size="11" font-weight="bold">Frame 1 ✓</text>
+      </g>
+      <g id="u2" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="122" x2="622" y2="134" stroke="#f97316" stroke-width="2" marker-end="url(#mo)"/>
+        <rect x="274" y="117" width="152" height="22" rx="11" fill="rgba(249,115,22,.18)" stroke="#f97316" stroke-width="1"/>
+        <text x="350" y="132" text-anchor="middle" fill="#f97316" font-size="11" font-weight="bold">Frame 2 ✓</text>
+      </g>
+      <g id="u3" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="152" x2="380" y2="163" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#mr)"/>
+        <rect x="138" y="147" width="122" height="22" rx="11" fill="rgba(239,68,68,.18)" stroke="#ef4444" stroke-width="1"/>
+        <text x="199" y="162" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="bold">Frame 3</text>
+        <text x="396" y="154" text-anchor="middle" fill="#ef4444" font-size="18">💥</text>
+        <text x="406" y="171" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="bold">GONE FOREVER</text>
+      </g>
+      <g id="u4" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="196" x2="622" y2="208" stroke="#f97316" stroke-width="2" marker-end="url(#mo)"/>
+        <rect x="236" y="191" width="228" height="22" rx="11" fill="rgba(249,115,22,.18)" stroke="#f97316" stroke-width="1"/>
+        <text x="350" y="206" text-anchor="middle" fill="#f97316" font-size="11" font-weight="bold">Frame 4 ✓  (no buffer, no wait)</text>
+      </g>
+      <g id="u5" opacity="0" style="transition:opacity .4s">
+        <line x1="75" y1="224" x2="622" y2="236" stroke="#f97316" stroke-width="2" marker-end="url(#mo)"/>
+        <rect x="236" y="219" width="228" height="22" rx="11" fill="rgba(249,115,22,.18)" stroke="#f97316" stroke-width="1"/>
+        <text x="350" y="234" text-anchor="middle" fill="#f97316" font-size="11" font-weight="bold">Frame 5 ✓  (no buffer, no wait)</text>
+      </g>
+      <g id="u6" opacity="0" style="transition:opacity .4s">
+        <rect x="444" y="258" width="236" height="26" rx="8" fill="rgba(249,115,22,.1)" stroke="#f97316" stroke-width="1.5"/>
+        <text x="562" y="275" text-anchor="middle" fill="#f97316" font-size="11" font-weight="bold">No ACKs. No retransmit. 🚀</text>
+      </g>
+    </svg>
+  </div>
+  <div class="ct">
+    <button class="btn" style="background:var(--og)" onclick="playUDP()">▶ Play</button>
+    <button class="btn sc" onclick="resetUDP()">↺ Reset</button>
+    <span class="lbl" id="udplbl">Ready — click Play</span>
+  </div>
+  <div class="lg" id="udplog"><div style="color:var(--mt)">Steps appear here…</div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:13px">
+    <div style="background:var(--bg);border-radius:8px;padding:13px;border:1px solid rgba(16,185,129,.3)">
+      <div style="font-weight:700;color:var(--gn);margin-bottom:7px">✅ UDP Strengths</div>
+      <div style="font-size:.79rem;color:var(--mt);line-height:2.1">• Zero connection overhead (0 RTT)<br>• No HOL blocking ever<br>• Works with multicast / broadcast<br>• App controls retry strategy<br>• 8-byte header vs 20+ bytes</div>
+    </div>
+    <div style="background:var(--bg);border-radius:8px;padding:13px;border:1px solid rgba(239,68,68,.3)">
+      <div style="font-weight:700;color:var(--rd);margin-bottom:7px">⚠️ UDP Tradeoffs</div>
+      <div style="font-size:.79rem;color:var(--mt);line-height:2.1">• No delivery guarantee<br>• Out-of-order packets possible<br>• No built-in congestion control<br>• App must handle errors / gaps<br>• Duplicate packets possible</div>
+    </div>
+  </div>
+  <div class="tw"><strong>Key insight:</strong> A dropped video frame causes a 30ms visual glitch nobody notices. A dropped byte in a DB query silently corrupts data. Protocol choice = <strong>data criticality × latency tolerance</strong>.</div>
+</div>
+
+<!-- ══ PANEL 4: HEADERS ══ -->
+<div id="pn-hdr" class="pn">
+  <h2>📐 TCP vs UDP Header Anatomy</h2>
+  <p class="sb">Every packet carries a header. TCP's 20-byte header buys reliability; UDP's 8-byte header buys speed.</p>
+  <div class="hg">
+    <div class="hc tc2">
+      <h3 style="color:var(--ac)">🔵 TCP Header</h3>
+      <span class="bg2">20 bytes minimum (up to 60 with options)</span>
+      <div class="fr"><span class="fn">Source Port</span><span class="fb">16 bits</span><span class="fd">Origin process</span></div>
+      <div class="fr"><span class="fn">Dest Port</span><span class="fb">16 bits</span><span class="fd">Target process</span></div>
+      <div class="fr" style="background:rgba(59,130,246,.1)"><span class="fn" style="color:var(--ac)">Sequence Number</span><span class="fb">32 bits</span><span class="fd">In-order delivery</span></div>
+      <div class="fr" style="background:rgba(59,130,246,.1)"><span class="fn" style="color:var(--ac)">Ack Number</span><span class="fb">32 bits</span><span class="fd">Next byte expected</span></div>
+      <div class="fr"><span class="fn">Data Offset</span><span class="fb">4 bits</span><span class="fd">Header length</span></div>
+      <div class="fr" style="background:rgba(59,130,246,.08)"><span class="fn" style="color:var(--ac)">Control Flags</span><span class="fb">9 bits</span><span class="fd">SYN/ACK/FIN/RST/PSH…</span></div>
+      <div class="fr" style="background:rgba(59,130,246,.08)"><span class="fn" style="color:var(--ac)">Window Size</span><span class="fb">16 bits</span><span class="fd">Receive buffer / flow control</span></div>
+      <div class="fr"><span class="fn">Checksum</span><span class="fb">16 bits</span><span class="fd">Error detection</span></div>
+      <div class="fr"><span class="fn">Urgent Pointer</span><span class="fb">16 bits</span><span class="fd">Priority data offset</span></div>
+      <div class="fr" style="background:rgba(59,130,246,.06)"><span class="fn" style="color:var(--ac)">Options</span><span class="fb">0–320 bits</span><span class="fd">MSS, SACK, timestamps…</span></div>
+      <div style="margin-top:10px;padding:9px;background:rgba(59,130,246,.08);border-radius:8px;font-size:.75rem;color:var(--mt)">Fields in <span style="color:var(--ac);font-weight:700">blue</span> enable reliability, ordering &amp; flow control — absent entirely in UDP.</div>
+    </div>
+    <div class="hc uc2">
+      <h3 style="color:var(--og)">🟠 UDP Header</h3>
+      <span class="bg2">8 bytes — always, no exceptions</span>
+      <div class="fr"><span class="fn">Source Port</span><span class="fb">16 bits</span><span class="fd">Origin process</span></div>
+      <div class="fr"><span class="fn">Dest Port</span><span class="fb">16 bits</span><span class="fd">Target process</span></div>
+      <div class="fr"><span class="fn">Length</span><span class="fb">16 bits</span><span class="fd">Header + data in bytes</span></div>
+      <div class="fr"><span class="fn">Checksum</span><span class="fb">16 bits</span><span class="fd">Error detection (optional IPv4)</span></div>
+      <div style="margin-top:10px;padding:9px;background:rgba(249,115,22,.08);border-radius:8px;font-size:.75rem;color:var(--mt)">That's it. 4 fields, 8 bytes. No seq, no ACK, no window, no flags. Pure simplicity.</div>
+      <div style="margin-top:16px">
+        <div style="font-size:.72rem;color:var(--mt);margin-bottom:7px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Header Size Comparison</div>
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
+          <span style="font-size:.7rem;width:26px;color:var(--mt)">TCP</span>
+          <div style="height:21px;flex:1;background:var(--bg);border-radius:4px;overflow:hidden"><div id="tcpbar" style="height:100%;width:0;background:linear-gradient(90deg,#3b82f6,#6366f1);border-radius:4px;transition:width 1s ease;display:flex;align-items:center;padding-left:7px"><span style="font-size:.67rem;font-weight:700;color:white;white-space:nowrap">20 bytes min</span></div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px">
+          <span style="font-size:.7rem;width:26px;color:var(--mt)">UDP</span>
+          <div style="height:21px;flex:1;background:var(--bg);border-radius:4px;overflow:hidden"><div id="udpbar" style="height:100%;width:0;background:linear-gradient(90deg,#f97316,#fbbf24);border-radius:4px;transition:width 1s ease .4s;display:flex;align-items:center;padding-left:7px"><span style="font-size:.67rem;font-weight:700;color:white;white-space:nowrap">8 bytes</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:16px;background:var(--bg);border-radius:10px;border:1px solid var(--br);padding:15px">
+    <div style="font-weight:700;margin-bottom:9px;font-size:.91rem">📦 Header overhead on a 1-byte payload</div>
+    <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px">
+      <div style="background:#3b82f6;border-radius:4px;height:26px;width:210px;display:flex;align-items:center;justify-content:center;font-size:.74rem;font-weight:700;color:white;flex-shrink:0">TCP header: 20 bytes</div>
+      <div style="background:#6366f1;border-radius:4px;height:26px;width:10px;flex-shrink:0"></div>
+      <span style="font-size:.74rem;color:var(--mt);margin-left:7px">→ <strong style="color:var(--rd)">95.2% overhead</strong></span>
+    </div>
+    <div style="display:flex;gap:4px;align-items:center">
+      <div style="background:#f97316;border-radius:4px;height:26px;width:84px;display:flex;align-items:center;justify-content:center;font-size:.74rem;font-weight:700;color:white;flex-shrink:0">UDP: 8 bytes</div>
+      <div style="background:#fbbf24;border-radius:4px;height:26px;width:10px;flex-shrink:0"></div>
+      <span style="font-size:.74rem;color:var(--mt);margin-left:7px">→ <strong style="color:var(--yl)">88.9% overhead</strong> — 2.5× less than TCP</span>
+    </div>
+    <div style="font-size:.72rem;color:var(--mt);margin-top:7px;border-top:1px solid var(--br);padding-top:7px">Both are further wrapped by IP (20B) + Ethernet (14B+4B CRC) per frame — unavoidable regardless of transport.</div>
+  </div>
+  <div class="tw"><strong>Key insight:</strong> TCP's 12 extra bytes encode an entire reliability mechanism — seq/ack numbers track ordering, window size prevents buffer overflow, flags drive the state machine. Remarkably compact for what it delivers.</div>
+</div>
+
+<!-- ══ PANEL 5: QUIC ══ -->
+<div id="pn-quic" class="pn">
+  <h2>⚡ QUIC — UDP with Superpowers</h2>
+  <p class="sb">QUIC (HTTP/3) runs on UDP but re-implements reliability <em>per-stream in userspace</em>, eliminating TCP HOL blocking while adding 0-RTT connection establishment and built-in TLS 1.3.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+    <div>
+      <div style="font-weight:700;font-size:.79rem;color:var(--mt);text-transform:uppercase;letter-spacing:.8px;margin-bottom:9px;text-align:center">Traditional HTTP/2 Stack</div>
+      <div class="ql">
+        <div class="ql-l" style="background:rgba(236,72,153,.15);border:1px solid #ec4899;color:#ec4899">HTTP/2<div style="font-size:.68rem;color:var(--mt);font-weight:normal">Application streams</div></div>
+        <div class="ql-a">▼</div>
+        <div class="ql-l" style="background:rgba(139,92,246,.15);border:1px solid #8b5cf6;color:#8b5cf6">TLS 1.3<div style="font-size:.68rem;color:var(--mt);font-weight:normal">Encryption layer</div></div>
+        <div class="ql-a">▼</div>
+        <div class="ql-l" style="background:rgba(59,130,246,.2);border:2px solid #3b82f6;color:#3b82f6">TCP<div style="font-size:.68rem;color:var(--mt);font-weight:normal">⚠️ HOL blocking + 1.5 RTT handshake</div></div>
+        <div class="ql-a">▼</div>
+        <div class="ql-l" style="background:rgba(30,58,95,.5);border:1px solid var(--br);color:var(--mt);font-size:.82rem">IP</div>
+      </div>
+    </div>
+    <div>
+      <div style="font-weight:700;font-size:.79rem;color:var(--mt);text-transform:uppercase;letter-spacing:.8px;margin-bottom:9px;text-align:center">HTTP/3 (QUIC) Stack</div>
+      <div class="ql">
+        <div class="ql-l" style="background:rgba(236,72,153,.15);border:1px solid #ec4899;color:#ec4899">HTTP/3<div style="font-size:.68rem;color:var(--mt);font-weight:normal">Application streams</div></div>
+        <div class="ql-a">▼</div>
+        <div class="ql-l" style="background:rgba(16,185,129,.2);border:2px solid #10b981;color:#10b981">QUIC<div style="font-size:.68rem;color:var(--mt);font-weight:normal">✅ Per-stream reliability + TLS 1.3 + 0-RTT</div></div>
+        <div class="ql-a">▼</div>
+        <div class="ql-l" style="background:rgba(249,115,22,.15);border:1px solid #f97316;color:#f97316">UDP<div style="font-size:.68rem;color:var(--mt);font-weight:normal">Kernel bypass, no HOL</div></div>
+        <div class="ql-a">▼</div>
+        <div class="ql-l" style="background:rgba(30,58,95,.5);border:1px solid var(--br);color:var(--mt);font-size:.82rem">IP</div>
+      </div>
+    </div>
+  </div>
+  <div style="background:var(--bg);border-radius:10px;border:1px solid var(--br);padding:17px;margin-bottom:14px">
+    <div style="font-weight:700;margin-bottom:3px;font-size:.91rem">QUIC Per-Stream Reliability</div>
+    <div style="color:var(--mt);font-size:.77rem;margin-bottom:12px">Stream 2 loses a packet. In TCP/HTTP2 this would freeze ALL three streams at the OS level. In QUIC, only Stream 2 waits.</div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:.73rem;color:var(--mt);margin-bottom:4px;font-weight:600">Stream 1 — HTML (unaffected ✓)</div>
+      <div style="display:flex;gap:4px">
+        <div style="background:rgba(59,130,246,.25);border:1px solid #3b82f6;color:#3b82f6;padding:5px 0;border-radius:6px;font-size:.73rem;font-weight:700;flex:1;text-align:center">S1-P1 ✓</div>
+        <div style="background:rgba(59,130,246,.25);border:1px solid #3b82f6;color:#3b82f6;padding:5px 0;border-radius:6px;font-size:.73rem;font-weight:700;flex:1;text-align:center">S1-P2 ✓</div>
+        <div style="background:rgba(59,130,246,.25);border:1px solid #3b82f6;color:#3b82f6;padding:5px 0;border-radius:6px;font-size:.73rem;font-weight:700;flex:1;text-align:center">S1-P3 ✓</div>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:.73rem;color:var(--mt);margin-bottom:4px;font-weight:600">Stream 2 — CSS (P2 lost → only this stream stalls)</div>
+      <div style="display:flex;gap:4px">
+        <div style="background:rgba(59,130,246,.25);border:1px solid #3b82f6;color:#3b82f6;padding:5px 0;border-radius:6px;font-size:.73rem;font-weight:700;flex:1;text-align:center">S2-P1 ✓</div>
+        <div style="background:rgba(239,68,68,.25);border:2px dashed #ef4444;color:#ef4444;padding:5px 0;border-radius:6px;font-size:.73rem;font-weight:700;flex:1;text-align:center">S2-P2 💥</div>
+        <div style="background:rgba(139,92,246,.25);border:1px solid #8b5cf6;color:#8b5cf6;padding:5px 0;border-radius:6px;font-size:.73rem;font-weight:700;flex:1;text-align:center">S2-P3 ⏳ wait</div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:.73rem;color:var(--mt);margin-bottom:4px;font-weight:600">Stream 3 — JS (completely unaffected ✓)</div>
+      <div style="display:flex;gap:4px">
+        <div style="background:rgba(16,185,129,.25);border:1px solid #10b981;color:#10b981;padding:5px 0;border-radius:6px;font-size:.73rem;font-weight:700;flex:1;text-align:center">S3-P1 ✓</div>
+        <div style="background:rgba(16,185,129,.25);border:1px solid #10b981;color:#10b981;padding:5px 0;border-radius:6px;font-size:.73rem;font-weight:700;flex:1;text-align:center">S3-P2 ✓</div>
+        <div style="background:rgba(16,185,129,.25);border:1px solid #10b981;color:#10b981;padding:5px 0;border-radius:6px;font-size:.73rem;font-weight:700;flex:1;text-align:center">S3-P3 ✓</div>
+      </div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+    <div style="background:var(--bg);border-radius:8px;border:1px solid rgba(16,185,129,.3);padding:12px"><div style="font-size:1.1rem;margin-bottom:4px">⚡</div><div style="font-weight:700;font-size:.8rem;color:var(--gn);margin-bottom:3px">0-RTT Resumption</div><div style="font-size:.73rem;color:var(--mt)">Known servers: data on first packet using cached crypto. Zero handshake delay.</div></div>
+    <div style="background:var(--bg);border-radius:8px;border:1px solid rgba(59,130,246,.3);padding:12px"><div style="font-size:1.1rem;margin-bottom:4px">🔒</div><div style="font-weight:700;font-size:.8rem;color:var(--ac);margin-bottom:3px">Encrypted by Default</div><div style="font-size:.73rem;color:var(--mt)">TLS 1.3 built-in, not optional. Even packet numbers are encrypted.</div></div>
+    <div style="background:var(--bg);border-radius:8px;border:1px solid rgba(245,158,11,.3);padding:12px"><div style="font-size:1.1rem;margin-bottom:4px">📱</div><div style="font-weight:700;font-size:.8rem;color:var(--yl);margin-bottom:3px">Connection Migration</div><div style="font-size:.73rem;color:var(--mt)">Survives WiFi→4G IP changes using Connection ID, not IP+port.</div></div>
+  </div>
+  <div class="tw"><strong>Key insight:</strong> QUIC takes UDP's kernel bypass and rebuilds TCP reliability <em>per-stream at the app layer</em>. ~26% of web traffic runs on HTTP/3 (2024). Beware: some enterprise firewalls block UDP 443, causing silent fallback to TCP.</div>
+</div>
+
+<!-- ══ PANEL 6: WHEN TO USE ══ -->
+<div id="pn-when" class="pn">
+  <h2>🗺️ When to Use TCP vs UDP</h2>
+  <p class="sb">The decision hinges on one question: is a <em>stale/missing</em> message better or worse than a <em>delayed</em> one?</p>
+  <table class="dt">
+    <thead><tr><th>Use Case</th><th>Protocol</th><th>Reasoning</th><th style="text-align:center">Loss OK?</th><th style="text-align:center">Order?</th></tr></thead>
+    <tbody>
+      <tr><td><strong>DNS lookup</strong> 🔍</td><td><span class="pb udp">UDP</span></td><td>Single Q&amp;A; retry on no reply in 2s</td><td style="color:var(--gn);text-align:center">Yes</td><td style="color:var(--mt);text-align:center">No</td></tr>
+      <tr><td><strong>Video streaming</strong> 📹</td><td><span class="pb udp">UDP</span></td><td>Stale frame = skip; freshness beats perfection</td><td style="color:var(--gn);text-align:center">Yes</td><td style="color:var(--mt);text-align:center">Loosely</td></tr>
+      <tr><td><strong>Online gaming</strong> 🎮</td><td><span class="pb udp">UDP</span></td><td>Position updates are stale if delayed 200ms+</td><td style="color:var(--gn);text-align:center">Yes</td><td style="color:var(--mt);text-align:center">No</td></tr>
+      <tr><td><strong>VoIP / Video calls</strong> 📞</td><td><span class="pb udp">UDP</span></td><td>Audio gaps beat delayed audio every time</td><td style="color:var(--gn);text-align:center">Yes</td><td style="color:var(--mt);text-align:center">No</td></tr>
+      <tr><td><strong>IoT sensor telemetry</strong> 📡</td><td><span class="pb udp">UDP</span></td><td>High-freq low-value readings; missing one is fine</td><td style="color:var(--gn);text-align:center">Yes</td><td style="color:var(--mt);text-align:center">No</td></tr>
+      <tr><td><strong>HTTP / HTTPS</strong> 🌐</td><td><span class="pb tcp">TCP</span></td><td>Every byte of a page must arrive correctly</td><td style="color:var(--rd);text-align:center">No</td><td style="color:var(--gn);text-align:center">Yes</td></tr>
+      <tr><td><strong>Database queries</strong> 🗄️</td><td><span class="pb tcp">TCP</span></td><td>Corrupted query result = silent data corruption</td><td style="color:var(--rd);text-align:center">No</td><td style="color:var(--gn);text-align:center">Yes</td></tr>
+      <tr><td><strong>SSH / Remote shell</strong> 💻</td><td><span class="pb tcp">TCP</span></td><td>Every keystroke must arrive in order</td><td style="color:var(--rd);text-align:center">No</td><td style="color:var(--gn);text-align:center">Yes</td></tr>
+      <tr><td><strong>File transfer (FTP/SCP)</strong> 📂</td><td><span class="pb tcp">TCP</span></td><td>Missing byte = corrupt archive, unrecoverable</td><td style="color:var(--rd);text-align:center">No</td><td style="color:var(--gn);text-align:center">Yes</td></tr>
+      <tr><td><strong>Email (SMTP/IMAP)</strong> 📧</td><td><span class="pb tcp">TCP</span></td><td>Message integrity is non-negotiable</td><td style="color:var(--rd);text-align:center">No</td><td style="color:var(--gn);text-align:center">Yes</td></tr>
+    </tbody>
+  </table>
+  <div style="background:var(--bg);border-radius:10px;border:1px solid var(--br);padding:17px;margin-top:17px">
+    <div style="font-weight:700;margin-bottom:12px;font-size:.91rem">🌳 Quick Decision Tree</div>
+    <div style="font-size:.85rem;line-height:2;font-family:monospace">
+      <div style="color:var(--ac)">Can you tolerate missing or out-of-order data?</div>
+      <div style="padding-left:16px">├── <span style="color:var(--rd)">No</span>  → Use <strong style="color:var(--ac)">TCP</strong> (or QUIC/HTTP3)</div>
+      <div style="padding-left:16px">└── <span style="color:var(--gn)">Yes</span> → Is ultra-low latency (&lt;50ms) critical?</div>
+      <div style="padding-left:48px">├── <span style="color:var(--rd)">No</span>  → TCP is still safer for correctness</div>
+      <div style="padding-left:48px">└── <span style="color:var(--gn)">Yes</span> → Need multiple logical streams?</div>
+      <div style="padding-left:80px">├── <span style="color:var(--gn)">Yes</span> → Use <strong style="color:var(--gn)">QUIC</strong> (HTTP/3)</div>
+      <div style="padding-left:80px">└── <span style="color:var(--rd)">No</span>  → Use <strong style="color:var(--og)">UDP</strong> directly</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:13px">
+    <div style="background:var(--bg);border-radius:8px;border:2px solid var(--ac);padding:12px;text-align:center"><div style="font-size:1.3rem;margin-bottom:4px">🔵</div><div style="font-weight:800;color:var(--ac);margin-bottom:5px">TCP</div><div style="font-size:.69rem;color:var(--mt);line-height:1.8">Reliable · Ordered<br>Flow + congestion control<br>20B header · 1.5 RTT setup<br>HTTP, DB, SSH, email</div></div>
+    <div style="background:var(--bg);border-radius:8px;border:2px solid var(--og);padding:12px;text-align:center"><div style="font-size:1.3rem;margin-bottom:4px">🟠</div><div style="font-weight:800;color:var(--og);margin-bottom:5px">UDP</div><div style="font-size:.69rem;color:var(--mt);line-height:1.8">Best-effort · Unordered<br>No flow control<br>8B header · 0 RTT overhead<br>DNS, video, gaming, VoIP</div></div>
+    <div style="background:var(--bg);border-radius:8px;border:2px solid var(--gn);padding:12px;text-align:center"><div style="font-size:1.3rem;margin-bottom:4px">⚡</div><div style="font-weight:800;color:var(--gn);margin-bottom:5px">QUIC</div><div style="font-size:.69rem;color:var(--mt);line-height:1.8">Per-stream reliable<br>Encrypted · 0-RTT resume<br>No HOL blocking<br>HTTP/3, modern apps</div></div>
+  </div>
+  <div class="tw"><strong>Key insight:</strong> If a re-delivered <em>old</em> message is worse than no message → UDP. If a <em>missing</em> message is worse than a delayed one → TCP. For modern apps needing speed + reliability → QUIC. But verify UDP 443 isn't blocked on your target network.</div>
+</div>
+
+</div>
+
+<script>
+const sh=(id,ms=0)=>new Promise(r=>setTimeout(()=>{const e=document.getElementById(id);if(e)e.style.opacity='1';r();},ms));
+const hi=id=>{const e=document.getElementById(id);if(e)e.style.opacity='0';};
+const wt=ms=>new Promise(r=>setTimeout(r,ms));
+const sl=(id,t)=>{const e=document.getElementById(id);if(e)e.textContent=t;};
+function cl(id){document.getElementById(id).innerHTML='';}
+function lg(id,col,html){
+  const b=document.getElementById(id),d=document.createElement('div'),dot=document.createElement('span'),tx=document.createElement('span');
+  d.className='le';dot.className='ld';dot.style.background=col;tx.innerHTML=html;
+  d.appendChild(dot);d.appendChild(tx);b.appendChild(d);b.scrollTop=b.scrollHeight;
+}
+function sw(n,btn){
+  document.querySelectorAll('.pn').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('pn-'+n).classList.add('on');btn.classList.add('on');
+  if(n==='hdr')setTimeout(()=>{document.getElementById('tcpbar').style.width='100%';document.getElementById('udpbar').style.width='40%';},200);
+}
+let hsr=false;
+async function playHS(){
+  if(hsr)return;hsr=true;cl('hslog');
+  ['h1','h2','h3','h4','h5','h6','h7','h8'].forEach(hi);
+  sl('hslbl','Step 1/7 — SYN');
+  lg('hslog','#3b82f6','<span class="pk s">SYN</span> Client→Server: "I want to connect. Starting seq=100."');
+  await sh('h1',400);await wt(900);
+  sl('hslbl','Step 2/7 — SYN-ACK');
+  lg('hslog','#10b981','<span class="pk a">SYN-ACK</span> Server→Client: "OK! seq=300, ack=101."');
+  await sh('h2',200);await wt(900);
+  sl('hslbl','Step 3/7 — ACK (handshake complete)');
+  lg('hslog','#10b981','<span class="pk a">ACK</span> Client→Server: "Got it! ack=301. Connected — 1.5 RTTs spent."');
+  await sh('h3',200);await wt(500);await sh('h4',100);await wt(700);
+  sl('hslbl','Step 4/7 — DATA sent');
+  lg('hslog','#f59e0b','<span class="pk d">DATA</span> Client sends HTTP GET /index.html');
+  await sh('h5',200);await wt(800);
+  sl('hslbl','Step 5/7 — ACK + response');
+  lg('hslog','#10b981','<span class="pk a">ACK</span> Server ACKs request, returns HTTP 200 OK response.');
+  await sh('h6',200);await wt(900);
+  sl('hslbl','Step 6/7 — FIN (active close)');
+  lg('hslog','#ec4899','<span class="pk f">FIN</span> Client: "All done, closing connection."');
+  await sh('h7',200);await wt(800);
+  sl('hslbl','Step 7/7 — FIN-ACK → TIME_WAIT');
+  lg('hslog','#ec4899','<span class="pk f">FIN-ACK</span> Server ACKs FIN, sends own FIN. Client ACKs → TIME_WAIT (2×MSL ≈ 60–120s).');
+  await sh('h8',200);await wt(500);
+  sl('hslbl','✓ Done — 1.5 RTTs to establish');hsr=false;
+}
+function resetHS(){hsr=false;['h1','h2','h3','h4','h5','h6','h7','h8'].forEach(hi);cl('hslog');sl('hslbl','Ready — click Play');}
+let holr=false;
+async function playHOL(){
+  if(holr)return;holr=true;cl('hollog');
+  ['r1','r2','r3','r4','r5','r6','r7','r8','r9'].forEach(hi);
+  document.getElementById('hbuf').textContent='(empty)';
+  sl('hollbl','Step 1/8 — PKT 1');
+  lg('hollog','#f59e0b','<span class="pk d">PKT 1</span> In-order. Delivered to app immediately. ACK sent.');
+  await sh('r1',300);await wt(700);
+  sl('hollbl','Step 2/8 — PKT 2');
+  lg('hollog','#f59e0b','<span class="pk d">PKT 2</span> In-order. Delivered to app immediately. ACK sent.');
+  await sh('r2',200);await wt(700);
+  sl('hollbl','Step 3/8 — PKT 3 DROPPED 💥');
+  lg('hollog','#ef4444','<span class="pk l">PKT 3</span> 💥 Lost in the network. Receiver never sees it.');
+  await sh('r3',200);await wt(900);
+  sl('hollbl','Step 4/8 — PKT 4 buffered');
+  document.getElementById('hbuf').textContent='PKT 4';
+  lg('hollog','#8b5cf6','<span class="pk b">PKT 4</span> Arrives. Seq gap (missing PKT 3) detected. Held in kernel buffer. App sees nothing.');
+  await sh('r4',200);await wt(700);
+  sl('hollbl','Step 5/8 — PKT 5 buffered');
+  document.getElementById('hbuf').textContent='PKT 4, PKT 5';
+  lg('hollog','#8b5cf6','<span class="pk b">PKT 5</span> Same. Buffered. PKT 4 &amp; 5 ready but undeliverable out-of-order.');
+  await sh('r5',200);await wt(700);
+  sl('hollbl','Step 6/8 — HEAD-OF-LINE BLOCK');
+  lg('hollog','#ef4444','⛔ <strong>HOL BLOCK ACTIVE.</strong> App thread blocked. Cannot read PKT 4 or 5. Duration = RTO.');
+  await sh('r6',200);await wt(1000);
+  sl('hollbl','Step 7/8 — RTO fires');
+  lg('hollog','#ef4444','⏰ <strong>RTO fires</strong> (200ms–3s). Sender retransmits PKT 3.');
+  await sh('r7',200);await wt(900);
+  sl('hollbl','Step 8/8 — Retransmit → buffer flush');
+  document.getElementById('hbuf').textContent='flushed ✓';
+  lg('hollog','#10b981','<span class="pk a">PKT 3 retransmit ✓</span> Buffer flushes 3,4,5 in-order. Cumulative ACK=5 sent.');
+  await sh('r8',200);await wt(600);await sh('r9',100);
+  sl('hollbl','✓ Recovered — stalled 1–3× RTO');holr=false;
+}
+function resetHOL(){holr=false;['r1','r2','r3','r4','r5','r6','r7','r8','r9'].forEach(hi);const b=document.getElementById('hbuf');if(b)b.textContent='(empty)';cl('hollog');sl('hollbl','Ready — click Play');}
+let udpr=false;
+async function playUDP(){
+  if(udpr)return;udpr=true;cl('udplog');
+  ['u1','u2','u3','u4','u5','u6'].forEach(hi);
+  sl('udplbl','Step 1/5 — Frame 1');
+  lg('udplog','#f97316','Frame 1 sent and delivered. No ACK, no state. Sender already moved on.');
+  await sh('u1',300);await wt(600);
+  sl('udplbl','Step 2/5 — Frame 2');
+  lg('udplog','#f97316','Frame 2 sent and delivered. Zero overhead.');
+  await sh('u2',200);await wt(600);
+  sl('udplbl','Step 3/5 — Frame 3 DROPPED 💥');
+  lg('udplog','#ef4444','Frame 3 💥 dropped. Sender never knows. Receiver never knows. Gone forever.');
+  await sh('u3',200);await wt(900);
+  sl('udplbl','Step 4/5 — Frame 4 (no waiting!)');
+  lg('udplog','#f97316','Frame 4 arrives immediately — no buffer, no HOL block, no waiting for Frame 3.');
+  await sh('u4',200);await wt(600);
+  sl('udplbl','Step 5/5 — Frame 5');
+  lg('udplog','#f97316','Frame 5 arrives. App gets 1,2,4,5 and handles gap (jitter buffer / skip frame).');
+  await sh('u5',200);await wt(500);await sh('u6',100);
+  sl('udplbl','✓ Done — no retransmit, no delay. Frame 3 silently lost.');udpr=false;
+}
+function resetUDP(){udpr=false;['u1','u2','u3','u4','u5','u6'].forEach(hi);cl('udplog');sl('udplbl','Ready — click Play');}
+</script>
+</body>
+</html>

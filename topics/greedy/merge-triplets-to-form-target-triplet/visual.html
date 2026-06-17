@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Merge Triplets — Filter &amp; Per-Axis Cover</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px 70px; gap: 26px; line-height: 1.55;
+  }
+  h1 { font-size: 1.65rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy, .takeaway {
+    background: var(--panel); border-radius: 12px; padding: 18px 26px;
+    max-width: 800px; width: 100%; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy { border: 1px solid var(--amber); border-left: 5px solid var(--amber); }
+  .takeaway { border: 1px solid #2d3a5a; }
+  .ic { font-size: 1.8rem; flex-shrink: 0; line-height: 1; }
+  .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px; }
+  .takeaway .label { color: var(--blue); }
+  .analogy-text, .takeaway p { font-size: 0.97rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+  code.inline { background: var(--panel2); padding: 2px 7px; border-radius: 5px; font-size: 0.85rem; color: #93c5fd; font-family: 'JetBrains Mono', Consolas, monospace; }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 880px; width: 100%; display: flex; flex-direction: column; gap: 24px;
+  }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+  .step-desc {
+    min-height: 66px; background: var(--panel2); border-radius: 8px; padding: 14px 20px;
+    font-size: 0.96rem; color: #c8c8e0; border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-desc.ok  { border-color: var(--green); }
+  .step-desc.bad { border-color: var(--red); }
+  .step-desc.try { border-color: var(--amber); }
+
+  /* triplet list */
+  .trip-list { display: flex; flex-direction: column; gap: 10px; }
+  .trip {
+    display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 10px;
+    border: 2px solid #2d3a5a; background: var(--panel2); transition: all 0.3s; width: max-content;
+  }
+  .trip.active { border-color: var(--blue); box-shadow: 0 0 14px rgba(59,130,246,0.4); }
+  .trip.rejected { opacity: 0.35; border-style: dashed; border-color: var(--red); }
+  .trip.valid { border-color: var(--green); }
+  .tlabel { font-size: 0.74rem; color: var(--muted); font-family: 'JetBrains Mono', Consolas, monospace; width: 22px; }
+  .comp {
+    width: 42px; height: 42px; border-radius: 8px; border: 2px solid #34405e;
+    background: #11182c; display: flex; align-items: center; justify-content: center;
+    font-size: 1.05rem; font-weight: 700; font-family: 'JetBrains Mono', Consolas, monospace; color: var(--text);
+    transition: all 0.3s; position: relative;
+  }
+  .comp.over { border-color: var(--red); background: #2a0d0d; color: #fca5a5; }
+  .comp.match { border-color: var(--green); background: #0d2a1a; color: #86efac; box-shadow: 0 0 12px rgba(16,185,129,0.5); }
+  .comp.le { border-color: #3a4a6a; }
+  .tnote { font-size: 0.78rem; margin-left: 6px; font-family: 'JetBrains Mono', Consolas, monospace; }
+  .tnote.r { color: #fca5a5; }
+  .tnote.v { color: #86efac; }
+
+  /* target + hit set */
+  .target-row { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+  .target-box { display: flex; flex-direction: column; gap: 8px; }
+  .axis-row { display: flex; gap: 8px; }
+  .axis {
+    width: 52px; height: 52px; border-radius: 9px; border: 2px solid var(--amber);
+    background: #2a1f08; color: #fcd34d; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-family: 'JetBrains Mono', Consolas, monospace;
+    font-weight: 700; transition: all 0.3s;
+  }
+  .axis small { font-size: 0.6rem; color: var(--muted); font-weight: 600; }
+  .axis.covered { border-color: var(--green); background: #0d2a1a; color: #86efac; box-shadow: 0 0 14px rgba(16,185,129,0.5); }
+  .hit-pills { display: flex; gap: 8px; }
+  .pill {
+    padding: 6px 12px; border-radius: 20px; border: 1px solid #34405e; background: #11182c;
+    font-size: 0.8rem; color: var(--muted); font-family: 'JetBrains Mono', Consolas, monospace; transition: all 0.3s;
+  }
+  .pill.on { border-color: var(--green); background: rgba(16,185,129,0.12); color: #86efac; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn { padding: 11px 26px; border-radius: 8px; border: none; font-size: 0.93rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; font-family: 'JetBrains Mono', Consolas, monospace; }
+</style>
+</head>
+<body>
+
+  <h1>Merge Triplets to Form Target &mdash; <span>Filter &amp; Per-Axis Cover</span></h1>
+
+  <div class="analogy">
+    <div class="ic">🎯</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <div class="analogy-text">
+        3 skill scores ka exact hire-bar match karna hai. Merge = team up, har skill me
+        <strong>best-of-the-two</strong>. Koi candidate kisi skill me target se
+        <strong>zyada</strong>? Wo us axis ko overshoot kara dega — <em>skip</em>. Bache
+        safe candidates me se kya har axis pe koi exactly target tak pahunchta hai?
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">What's happening</div>
+      <div class="step-desc" id="stepDesc">Press "Next". <code class="inline">target = [2,7,5]</code>. We scan each triplet: reject if any value &gt; target, else record which axes it matches exactly.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Triplets (scan one at a time)</div>
+      <div class="trip-list" id="tripList"></div>
+    </div>
+
+    <div>
+      <div class="section-label">Target &amp; per-axis cover (hit set)</div>
+      <div class="target-row">
+        <div class="target-box">
+          <div class="axis-row" id="axisRow"></div>
+        </div>
+        <div class="target-box">
+          <div style="font-size:0.74rem;color:var(--muted);margin-bottom:2px;">positions matched exactly:</div>
+          <div class="hit-pills" id="hitPills"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><span class="swatch" style="background:#3b82f6"></span> current triplet</span>
+      <span><span class="swatch" style="background:#10b981"></span> ≤ target &amp; exact match</span>
+      <span><span class="swatch" style="background:#ef4444"></span> &gt; target — rejected</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="resetViz()">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next</button>
+      <button class="btn btn-secondary" id="autoBtn" onclick="toggleAuto()">Auto-play</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="ic">💡</div>
+    <div>
+      <div class="label">Key takeaway</div>
+      <p>Max-merge never shrinks any axis, so <strong>drop every over-target triplet</strong> and ask only: does some valid triplet hit <code class="inline">target</code> on each of the 3 axes? Cover all 3 → <strong>True</strong>.</p>
+    </div>
+  </div>
+
+<script>
+const triplets = [[2,5,3],[1,8,4],[1,7,5]];
+const target = [2,7,5];
+const axisNames = ['a','b','c'];
+
+function buildSteps() {
+  const steps = [];
+  let hit = new Set();
+  steps.push({ desc:`Goal: cover all 3 axes of target [${target.join(', ')}]. Scan triplets, skip any that exceed target on any axis.`, cur:-1, hit:new Set(), status:'init' });
+
+  triplets.forEach((t,i) => {
+    const [a,b,c] = t;
+    const over = a>target[0] || b>target[1] || c>target[2];
+    if (over) {
+      steps.push({ desc:`Triplet ${i} = [${t.join(', ')}]: some value exceeds target (over-target). Merging it would overshoot forever → reject, skip.`, cur:i, hit:new Set(hit), status:'reject' });
+    } else {
+      const newHits = [];
+      if (a===target[0]) newHits.push(0);
+      if (b===target[1]) newHits.push(1);
+      if (c===target[2]) newHits.push(2);
+      newHits.forEach(p=>hit.add(p));
+      const matchTxt = newHits.length ? `matches axis ${newHits.map(p=>axisNames[p]).join(', ')} exactly` : `valid but matches no axis exactly`;
+      steps.push({ desc:`Triplet ${i} = [${t.join(', ')}]: all ≤ target ✓ — ${matchTxt}. hit = {${[...hit].sort().join(', ')}}.`, cur:i, hit:new Set(hit), status:'valid', newHits });
+    }
+  });
+
+  const ok = hit.size === 3;
+  steps.push({ desc: ok
+      ? `All 3 axes covered (hit = {0,1,2}). Merge those matching valid triplets → target is reachable. Return True ✓`
+      : `Only axes {${[...hit].sort().join(', ')}} covered — not all 3. Return False ✗`,
+    cur:-1, hit:new Set(hit), status: ok?'success':'fail' });
+  return steps;
+}
+
+const steps = buildSteps();
+let idx = 0, autoTimer = null;
+const $ = id => document.getElementById(id);
+
+function compClass(val, ti, pos, s) {
+  // for the triplet currently active, color comps
+  if (s.cur !== ti) return 'comp le';
+  if (val > target[pos]) return 'comp over';
+  if (val === target[pos]) return 'comp match';
+  return 'comp le';
+}
+
+function render() {
+  const s = steps[idx];
+  const desc = $('stepDesc');
+  desc.className = 'step-desc' + (s.status==='reject'||s.status==='fail'?' bad':(s.status==='success'||s.status==='valid'?' ok':''));
+  desc.innerHTML = s.desc;
+
+  $('tripList').innerHTML = triplets.map((t,i) => {
+    let cls = 'trip';
+    if (s.cur === i) cls += ' active';
+    // show resolved state for already-processed triplets
+    if (i < (s.cur===-1 && idx>0 ? triplets.length : s.cur) || (s.cur===-1 && s.status!=='init')) {
+      const over = t[0]>target[0]||t[1]>target[1]||t[2]>target[2];
+      if (s.cur===i) { cls += over?' rejected':' valid'; }
+      else if (s.cur===-1 || i < s.cur) { cls += over?' rejected':' valid'; }
+    }
+    const comps = t.map((v,p)=>`<div class="${compClass(v,i,p,s)}">${v}</div>`).join('');
+    let note = '';
+    if (s.cur===i) {
+      const over = t[0]>target[0]||t[1]>target[1]||t[2]>target[2];
+      note = over ? `<span class="tnote r">✗ over-target</span>` : `<span class="tnote v">✓ valid</span>`;
+    }
+    return `<div class="${cls}"><span class="tlabel">[${i}]</span>${comps}${note}</div>`;
+  }).join('');
+
+  // axes
+  $('axisRow').innerHTML = target.map((v,p) =>
+    `<div class="axis ${s.hit.has(p)?'covered':''}"><small>${axisNames[p]}</small>${v}</div>`).join('');
+
+  $('hitPills').innerHTML = [0,1,2].map(p =>
+    `<div class="pill ${s.hit.has(p)?'on':''}">${axisNames[p]} ${s.hit.has(p)?'✓':'·'}</div>`).join('');
+
+  $('stepCounter').textContent = `step ${idx+1} / ${steps.length}`;
+  $('prevBtn').disabled = idx === 0;
+  $('nextBtn').disabled = idx === steps.length - 1;
+}
+
+function next(){ if (idx < steps.length-1){ idx++; render(); } else stopAuto(); }
+function prev(){ if (idx > 0){ idx--; render(); } }
+function resetViz(){ stopAuto(); idx = 0; render(); }
+function toggleAuto(){
+  if (autoTimer){ stopAuto(); return; }
+  $('autoBtn').textContent='Pause';
+  autoTimer = setInterval(()=>{ if (idx<steps.length-1) next(); else stopAuto(); }, 1200);
+}
+function stopAuto(){ if (autoTimer){ clearInterval(autoTimer); autoTimer=null; } $('autoBtn').textContent='Auto-play'; }
+
+render();
+</script>
+</body>
+</html>

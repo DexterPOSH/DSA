@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subsets — Include / Exclude Decision Tree</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #232342;
+    --text: #e0e0e0; --muted: #9a9ac0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444; --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.85rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 20px; margin-bottom: 28px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.05rem; }
+  .analogy p { margin: 0; }
+
+  .panel {
+    background: var(--panel); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px; padding: 18px 22px; margin-bottom: 22px;
+  }
+  .panel h2 { margin: 0 0 12px; font-size: 1.1rem; }
+
+  /* input array */
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .cell {
+    min-width: 42px; height: 42px; border-radius: 8px; display: grid; place-items: center;
+    font-weight: 700; font-family: "SF Mono", Menlo, monospace;
+    background: var(--panel2); border: 2px solid rgba(255,255,255,0.08); transition: all .3s;
+  }
+  .cell.active { border-color: var(--amber); background: rgba(245,158,11,0.22); color: #ffe2ab; }
+  .cell.done { opacity: .45; }
+  .idxlabel { font-size: .72rem; color: var(--muted); text-align:center; margin-top:2px; }
+
+  /* tree svg */
+  .treewrap { overflow-x: auto; }
+  svg { display: block; margin: 0 auto; }
+  .node circle { transition: all .3s; }
+
+  /* path / stack */
+  .pathbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-height: 44px; }
+  .pchip {
+    min-width: 38px; height: 38px; padding: 0 6px; border-radius: 8px; display: grid; place-items: center;
+    font-weight: 700; font-family: "SF Mono", Menlo, monospace;
+    background: rgba(59,130,246,0.22); border: 2px solid var(--blue); color: #bcd4ff;
+  }
+  .pathbar .empty { color: var(--muted); font-style: italic; }
+
+  .caption {
+    background: var(--panel2); border-left: 4px solid var(--blue); border-radius: 8px;
+    padding: 14px 16px; margin-top: 4px; font-size: .98rem; min-height: 58px;
+  }
+  .caption.inc { border-left-color: var(--green); }
+  .caption.exc { border-left-color: var(--red); }
+  .caption.record { border-left-color: var(--amber); }
+  .caption b.g { color: var(--green); } .caption b.r { color: var(--red); }
+  .caption b.a { color: var(--amber); } .caption b.bl { color: var(--blue); }
+
+  /* results grid */
+  .results { display: flex; flex-wrap: wrap; gap: 8px; }
+  .subset {
+    font-family: "SF Mono", Menlo, monospace; font-size: .9rem; padding: 6px 10px;
+    border-radius: 8px; background: var(--panel2); border: 1px solid rgba(255,255,255,0.1);
+    color: var(--muted); transition: all .3s;
+  }
+  .subset.new {
+    background: rgba(16,185,129,0.18); border-color: var(--green); color: #b6f0d8; font-weight: 700;
+  }
+
+  .controls { display: flex; gap: 10px; align-items: center; margin: 14px 0 6px; }
+  button {
+    background: var(--blue); color: #fff; border: none; padding: 10px 22px; border-radius: 10px;
+    font-size: .98rem; font-weight: 600; cursor: pointer; transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .counter { color: var(--muted); font-size: .9rem; margin-left: auto; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4); border-radius: 12px;
+    padding: 18px 22px; margin-top: 28px; text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Subsets — the <span>include / exclude</span> decision tree</h1>
+  <p class="subtitle">Har element pe ek sawaal: "andar aaun ya na aaun?" — 2<sup>n</sup> paths, 2<sup>n</sup> subsets.</p>
+
+  <div class="analogy">
+    <h3>🍕 Real-world analogy: pizza toppings</h3>
+    <p>3 toppings, har ek ke liye haan/na. Mushroom × olive × capsicum = 8 possible pizzas — plain cheese (<code>[]</code>) bhi ek hai. Subsets = har element pe yahi <b>include/exclude</b> choice.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Input</h2>
+    <div class="row" id="inputRow"></div>
+    <div class="row" id="idxRow"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Decision tree (left = include, right = exclude)</h2>
+    <div class="treewrap">
+      <svg id="tree" width="860" height="360" viewBox="0 0 860 360"></svg>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Current path (the stack)</h2>
+    <div class="pathbar" id="pathBar"></div>
+    <div class="caption" id="caption">Press <b class="bl">Next</b> to start the walk.</div>
+    <div class="controls">
+      <button class="ghost" id="prevBtn" disabled>◀ Prev</button>
+      <button id="nextBtn">Next ▶</button>
+      <span class="counter" id="counter"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Collected subsets</h2>
+    <div class="results" id="results"></div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Power set = a binary decision tree of depth <b>n</b>. Include the element (go left), recurse, then <b>backtrack</b> and exclude it (go right). Every leaf is one subset → 2<sup>n</sup> total.</p>
+  </div>
+</div>
+
+<script>
+const nums = [1, 2, 3];
+const n = nums.length;
+
+// ---- Build the include/exclude tree AND the walkthrough steps in one DFS ----
+// At index i: first INCLUDE nums[i] (left), recurse; then EXCLUDE (right), recurse.
+// Record a subset when i == n (leaf). Nodes carry their kind for coloring.
+const nodes = [];   // {id, parent, depth, kind('root'|'inc'|'exc'), val, isLeaf, x, y}
+const steps = [];   // walkthrough steps
+const results = [];
+
+function build(i, parent, depth, kind, val, path) {
+  const id = nodes.length;
+  nodes.push({ id, parent, depth, kind, val, isLeaf: i === n, x: 0, y: 0 });
+
+  if (kind === 'inc') {
+    path.push(val);
+    steps.push({ nodeId: id, type: 'inc', path: [...path], results: [...results], i });
+  } else if (kind === 'exc') {
+    steps.push({ nodeId: id, type: 'exc', path: [...path], results: [...results], i });
+  } else {
+    steps.push({ nodeId: id, type: 'root', path: [...path], results: [...results], i });
+  }
+
+  if (i === n) {
+    results.push([...path]);
+    steps.push({ nodeId: id, type: 'record', path: [...path], results: [...results], i, recorded: [...path] });
+  } else {
+    build(i + 1, id, depth + 1, 'inc', nums[i], path);
+    build(i + 1, id, depth + 1, 'exc', null, path);
+  }
+
+  if (kind === 'inc') {
+    path.pop();
+    steps.push({ nodeId: id, type: 'backtrack', path: [...path], results: [...results], i });
+  }
+}
+build(0, -1, 0, 'root', null, []);
+
+// ---- layout: x evenly within each depth, parents centered over children ----
+(function () {
+  const W = 860, byDepth = {};
+  nodes.forEach(nd => { (byDepth[nd.depth] = byDepth[nd.depth] || []).push(nd); });
+  const maxD = Math.max(...nodes.map(nd => nd.depth));
+  const yGap = 300 / (maxD + 1);
+  Object.keys(byDepth).forEach(d => {
+    const a = byDepth[d];
+    a.forEach((nd, i) => { nd.x = W * (i + 1) / (a.length + 1) + 20; nd.y = 30 + d * yGap; });
+  });
+  for (let d = maxD - 1; d >= 0; d--) {
+    (byDepth[d] || []).forEach(nd => {
+      const kids = nodes.filter(c => c.parent === nd.id);
+      if (kids.length) nd.x = kids.reduce((s, c) => s + c.x, 0) / kids.length;
+    });
+  }
+})();
+
+const $ = id => document.getElementById(id);
+let cur = 0;
+
+function buildInput() {
+  $('inputRow').innerHTML = nums.map((v,i)=>`<div class="cell" id="c${i}">${v}</div>`).join('');
+  $('idxRow').innerHTML = nums.map((v,i)=>`<div class="idxlabel" style="min-width:42px">i=${i}</div>`).join('');
+}
+
+function drawTree(activeId, activePath) {
+  const onPath = new Set(activePath);
+  let s = '';
+  // edges
+  nodes.forEach(nd => {
+    if (nd.parent >= 0) {
+      const p = nodes[nd.parent];
+      const lit = onPath.has(nd.id) && onPath.has(p.id);
+      const col = lit ? (nd.kind==='inc' ? '#10b981' : '#ef4444') : 'rgba(255,255,255,0.12)';
+      const w = lit ? 3 : 1.5;
+      s += `<line x1="${p.x}" y1="${p.y}" x2="${nd.x}" y2="${nd.y}" stroke="${col}" stroke-width="${w}"/>`;
+    }
+  });
+  // edge labels (+ / skip) for first couple levels for clarity
+  // nodes
+  nodes.forEach(nd => {
+    const isActive = nd.id === activeId;
+    const lit = onPath.has(nd.id);
+    let fill = '#232342', stroke = 'rgba(255,255,255,0.18)';
+    if (nd.kind === 'inc') { stroke = '#10b981'; if (lit) fill = 'rgba(16,185,129,0.30)'; }
+    else if (nd.kind === 'exc') { stroke = '#ef4444'; if (lit) fill = 'rgba(239,68,68,0.25)'; }
+    else { stroke = '#3b82f6'; if (lit) fill = 'rgba(59,130,246,0.30)'; }
+    if (isActive) { stroke = '#f59e0b'; fill = 'rgba(245,158,11,0.35)'; }
+    const r = nd.isLeaf ? 13 : 16;
+    let label = nd.kind === 'root' ? '•' : (nd.kind === 'inc' ? '+'+nd.val : '–');
+    s += `<g class="node">
+      <circle cx="${nd.x}" cy="${nd.y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${isActive?3:2}"/>
+      <text x="${nd.x}" y="${nd.y+4}" text-anchor="middle" font-size="${nd.isLeaf?11:12}"
+            font-family="SF Mono, monospace" fill="${isActive?'#ffe2ab':'#e0e0e0'}" font-weight="700">${label}</text>
+    </g>`;
+  });
+  $('tree').innerHTML = s;
+}
+
+function renderPath(path) {
+  if (!path.length) { $('pathBar').innerHTML = '<span class="empty">[ ]  (empty path)</span>'; return; }
+  $('pathBar').innerHTML = path.map(v=>`<div class="pchip">${v}</div>`).join('');
+}
+
+function renderResults(results, justRecorded) {
+  $('results').innerHTML = results.map(sub => {
+    const txt = '['+sub.join(',')+']';
+    const isNew = justRecorded && sub.length === justRecorded.length &&
+                  sub.every((x,i)=>x===justRecorded[i]) && results.indexOf(sub) === results.length-1;
+    return `<div class="subset ${isNew?'new':''}">${txt}</div>`;
+  }).join('') || '<span style="color:var(--muted)">none yet</span>';
+}
+
+function render() {
+  const st = steps[cur];
+  drawTree(st.nodeId, st.path.length ? collectPathIds(st.nodeId) : [st.nodeId]);
+  renderPath(st.path);
+  renderResults(st.results, st.type==='record' ? st.recorded : null);
+
+  // active input cell
+  for (let i=0;i<n;i++){ const c=$('c'+i); c.classList.remove('active','done'); if(i<st.i)c.classList.add('done'); }
+  if (st.i < n) $('c'+st.i)?.classList.add('active');
+
+  const cap = $('caption');
+  cap.className = 'caption';
+  if (st.type === 'root') {
+    cap.innerHTML = `Start at the root with an <b class="bl">empty path</b>. We'll decide each element left→right.`;
+  } else if (st.type === 'inc') {
+    cap.classList.add('inc');
+    cap.innerHTML = `<b class="g">INCLUDE</b> <code>${nums[st.i-1]}</code> → push it onto the path. Path is now <b class="bl">[${st.path.join(',')}]</b>.`;
+  } else if (st.type === 'exc') {
+    cap.classList.add('exc');
+    cap.innerHTML = `<b class="r">EXCLUDE</b> this element → leave the path as <b class="bl">[${st.path.join(',')||' '}]</b> and recurse deeper.`;
+  } else if (st.type === 'record') {
+    cap.classList.add('record');
+    cap.innerHTML = `Reached a leaf (<code>i == n</code>) → <b class="a">record</b> a copy of the path: <b class="a">[${st.recorded.join(',')}]</b>. ✅`;
+  } else if (st.type === 'backtrack') {
+    cap.classList.add('exc');
+    cap.innerHTML = `<b class="r">BACKTRACK</b> — <code>path.pop()</code> undoes the include. Path back to <b class="bl">[${st.path.join(',')||' '}]</b>, ready to try the exclude branch.`;
+  }
+
+  $('counter').textContent = `step ${cur+1} / ${steps.length}`;
+  $('prevBtn').disabled = cur === 0;
+  $('nextBtn').disabled = cur === steps.length - 1;
+}
+
+// recover the set of node ids from root to a given node (for path highlighting)
+function collectPathIds(id) {
+  const ids = [];
+  let c = id;
+  while (c >= 0) { ids.push(c); c = nodes[c].parent; }
+  return ids;
+}
+
+buildInput();
+render();
+$('nextBtn').addEventListener('click', () => { if (cur < steps.length-1) { cur++; render(); } });
+$('prevBtn').addEventListener('click', () => { if (cur > 0) { cur--; render(); } });
+</script>
+</body>
+</html>

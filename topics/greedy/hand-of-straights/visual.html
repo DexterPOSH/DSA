@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hand of Straights — Greedy Smallest-First Grouping</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px 70px; gap: 26px; line-height: 1.55;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy, .takeaway {
+    background: var(--panel); border-radius: 12px; padding: 18px 26px;
+    max-width: 780px; width: 100%; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy { border: 1px solid var(--amber); border-left: 5px solid var(--amber); }
+  .takeaway { border: 1px solid #2d3a5a; }
+  .ic { font-size: 1.8rem; flex-shrink: 0; line-height: 1; }
+  .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px; }
+  .takeaway .label { color: var(--blue); }
+  .analogy-text, .takeaway p { font-size: 0.97rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+  code.inline { background: var(--panel2); padding: 2px 7px; border-radius: 5px; font-size: 0.85rem; color: #93c5fd; font-family: 'JetBrains Mono', Consolas, monospace; }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 880px; width: 100%; display: flex; flex-direction: column; gap: 24px;
+  }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+  .step-desc {
+    min-height: 66px; background: var(--panel2); border-radius: 8px; padding: 14px 20px;
+    font-size: 0.96rem; color: #c8c8e0; border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-desc.ok  { border-color: var(--green); }
+  .step-desc.bad { border-color: var(--red); }
+  .step-desc.try { border-color: var(--amber); }
+
+  /* card row */
+  .hand-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pcard {
+    width: 46px; height: 62px; border-radius: 8px; border: 2px solid #2d3a5a;
+    background: var(--panel2); display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem; font-weight: 700; color: #c8c8e0; font-family: 'JetBrains Mono', Consolas, monospace;
+    transition: all 0.3s; position: relative;
+  }
+  .pcard.used { opacity: 0.22; transform: scale(0.9); border-style: dashed; }
+  .pcard.start { border-color: var(--amber); background: #2a1f08; color: #fcd34d; box-shadow: 0 0 14px rgba(245,158,11,0.5); transform: translateY(-5px); }
+  .pcard.pick  { border-color: var(--green); background: #0d2a1a; color: #86efac; box-shadow: 0 0 14px rgba(16,185,129,0.5); transform: translateY(-5px); }
+  .pcard.miss  { border-color: var(--red); background: #2a0d0d; color: #fca5a5; box-shadow: 0 0 14px rgba(239,68,68,0.5); }
+
+  /* counter panel */
+  .counter-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ccell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .cval {
+    width: 44px; height: 44px; border-radius: 9px; border: 2px solid #2d3a5a;
+    background: var(--panel2); display: flex; align-items: center; justify-content: center;
+    font-size: 1.05rem; font-weight: 700; color: var(--text); font-family: 'JetBrains Mono', Consolas, monospace;
+    transition: all 0.3s;
+  }
+  .cval.zero { color: #4a5a7a; }
+  .cval.active { border-color: var(--blue); background: #1e3a6e; color: #fff; box-shadow: 0 0 12px rgba(59,130,246,0.5); }
+  .cval.minhead { border-color: var(--amber); }
+  .ckey { font-size: 0.7rem; color: var(--muted); font-family: 'JetBrains Mono', Consolas, monospace; }
+
+  /* groups formed */
+  .groups { display: flex; gap: 12px; flex-wrap: wrap; min-height: 40px; }
+  .grp {
+    display: flex; gap: 4px; padding: 6px 8px; border-radius: 8px;
+    border: 1px solid var(--green); background: rgba(16,185,129,0.1);
+  }
+  .grp .gc { width: 28px; height: 36px; border-radius: 5px; background: #0d2a1a; color: #86efac;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem;
+    font-family: 'JetBrains Mono', Consolas, monospace; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn { padding: 11px 26px; border-radius: 8px; border: none; font-size: 0.93rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; font-family: 'JetBrains Mono', Consolas, monospace; }
+</style>
+</head>
+<body>
+
+  <h1>Hand of Straights &mdash; <span>Greedy Smallest-First Grouping</span></h1>
+
+  <div class="analogy">
+    <div class="ic">🃏</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <div class="analogy-text">
+        Rummy me poore haath ko fixed-length consecutive runs me todna hai. Trick:
+        <strong>hamesha sabse chhoti card uthao</strong> — uske neeche koi card nahi,
+        to wo kisi run ka <em>head</em> banni hi padegi. Phir <code class="inline">x, x+1, x+2…</code>
+        ka poora group banana zaroori. Nahi mila? <strong>False</strong>.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">What's happening</div>
+      <div class="step-desc" id="stepDesc">Press "Next". <code class="inline">hand = [1,2,3,2,3,4]</code>, <code class="inline">groupSize = 3</code>. We greedily form straights starting from the smallest remaining card.</div>
+    </div>
+
+    <div>
+      <div class="section-label">Hand (cards remaining)</div>
+      <div class="hand-row" id="handRow"></div>
+    </div>
+
+    <div>
+      <div class="section-label">count[value] — frequency map (min-head highlighted)</div>
+      <div class="counter-row" id="counterRow"></div>
+    </div>
+
+    <div>
+      <div class="section-label">Straights formed</div>
+      <div class="groups" id="groupsRow"><span style="color:var(--muted);font-size:0.85rem">none yet</span></div>
+    </div>
+
+    <div class="legend">
+      <span><span class="swatch" style="background:#f59e0b"></span> group head (smallest)</span>
+      <span><span class="swatch" style="background:#3b82f6"></span> value being checked</span>
+      <span><span class="swatch" style="background:#10b981"></span> matched / grouped</span>
+      <span><span class="swatch" style="background:#ef4444"></span> missing — fail</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="resetViz()">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next</button>
+      <button class="btn btn-secondary" id="autoBtn" onclick="toggleAuto()">Auto-play</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="ic">💡</div>
+    <div>
+      <div class="label">Key takeaway</div>
+      <p>The <strong>smallest remaining card has no choice</strong> — it must start a straight. Pull <code class="inline">groupSize</code> consecutive values from the count map each round; any gap means it's impossible.</p>
+    </div>
+  </div>
+
+<script>
+const hand = [1,2,3,2,3,4];
+const groupSize = 3;
+
+// distinct sorted values present
+const values = [1,2,3,4,5];   // display range covering the hand
+
+// Build steps by simulating the greedy algorithm
+function buildSteps() {
+  const count = {};
+  hand.forEach(v => count[v] = (count[v]||0)+1);
+  const steps = [];
+  const snap = (extra) => ({
+    count: {...count},
+    ...extra
+  });
+
+  steps.push(snap({ desc: `Count map built. n=${hand.length}, n % groupSize = ${hand.length % groupSize} (divisible ✓). Begin greedy rounds.`, mode:'init', groups: [] }));
+
+  const groups = [];
+  // min-heap behaviour via sorted distinct keys check each round
+  const remaining = () => values.filter(v => count[v] > 0);
+
+  let guard = 0;
+  while (remaining().length && guard < 30) {
+    guard++;
+    const start = remaining()[0];
+    const grp = [];
+    let failed = false;
+    steps.push(snap({ desc: `Smallest remaining card is ${start}. It must be the head of a new straight. Need ${start}…${start+groupSize-1}.`, mode:'start', head:start, active:start, groups: groups.map(g=>[...g]) }));
+    for (let x = start; x < start + groupSize; x++) {
+      if (!count[x]) {
+        steps.push(snap({ desc: `Need value ${x} but count[${x}] = 0 — the consecutive chain breaks. Impossible → return False.`, mode:'fail', head:start, active:x, miss:x, groups: groups.map(g=>[...g]) }));
+        failed = true; break;
+      }
+      count[x]--;
+      grp.push(x);
+      steps.push(snap({ desc: `Take ${x} for this straight (count[${x}] → ${count[x]}). Partial group: [${grp.join(', ')}].`, mode:'pick', head:start, active:x, pick:x, groups: [...groups.map(g=>[...g]), [...grp]] }));
+    }
+    if (failed) return { steps, ok:false };
+    groups.push([...grp]);
+    steps.push(snap({ desc: `Completed straight [${grp.join(', ')}] ✓. Remove it and look for the next smallest card.`, mode:'done', groups: groups.map(g=>[...g]) }));
+  }
+
+  steps.push(snap({ desc: `All cards consumed — every group is a valid consecutive straight. Return True ✓`, mode:'success', groups: groups.map(g=>[...g]) }));
+  return { steps, ok:true };
+}
+
+const { steps } = buildSteps();
+let idx = 0;
+let autoTimer = null;
+
+const $ = id => document.getElementById(id);
+
+function render() {
+  const s = steps[idx];
+  // step desc
+  const desc = $('stepDesc');
+  desc.className = 'step-desc' + (s.mode==='fail'?' bad':(s.mode==='success'||s.mode==='done')?' ok':(s.mode==='start'||s.mode==='pick')?' try':'');
+  desc.innerHTML = s.desc;
+
+  // hand row: dim cards whose remaining count says they've been used
+  // recompute how many of each value still remain vs original
+  const orig = {};
+  hand.forEach(v => orig[v]=(orig[v]||0)+1);
+  const remainBudget = {...s.count};
+  $('handRow').innerHTML = hand.map(v => {
+    let cls = 'pcard';
+    if (remainBudget[v] > 0) { remainBudget[v]--; }
+    else {
+      cls += ' used';
+    }
+    if (s.mode!=='init') {
+      if (v === s.pick && cls.indexOf('used')===-1) {} // pick handled below by active value
+    }
+    // highlight active value on a still-present card
+    return `<div class="${cls}" data-v="${v}">${v}</div>`;
+  }).join('');
+  // apply head / active / miss highlight to first matching present card
+  function markFirstPresent(val, klass) {
+    if (val == null) return;
+    const cells = [...document.querySelectorAll('#handRow .pcard')];
+    for (const c of cells) {
+      if (+c.dataset.v === val && !c.classList.contains('used') && !c.classList.contains('start') && !c.classList.contains('pick') && !c.classList.contains('miss')) {
+        c.classList.add(klass); return;
+      }
+    }
+  }
+  if (s.mode==='start') markFirstPresent(s.head, 'start');
+  if (s.pick != null) markFirstPresent(s.pick, 'pick');
+  if (s.miss != null) {
+    const desc2 = $('stepDesc');
+    desc2.classList.add('bad');
+  }
+
+  // counter
+  $('counterRow').innerHTML = values.map(v => {
+    let cls = 'cval';
+    if ((s.count[v]||0) === 0) cls += ' zero';
+    if (v === s.active) cls += ' active';
+    if (v === s.head) cls += ' minhead';
+    return `<div class="ccell"><div class="${cls}">${s.count[v]||0}</div><div class="ckey">${v}</div></div>`;
+  }).join('');
+
+  // groups
+  const groups = s.groups || [];
+  if (groups.length === 0) {
+    $('groupsRow').innerHTML = '<span style="color:var(--muted);font-size:0.85rem">none yet</span>';
+  } else {
+    $('groupsRow').innerHTML = groups.map(g =>
+      `<div class="grp">${g.map(c=>`<div class="gc">${c}</div>`).join('')}</div>`).join('');
+  }
+
+  $('stepCounter').textContent = `step ${idx+1} / ${steps.length}`;
+  $('prevBtn').disabled = idx === 0;
+  $('nextBtn').disabled = idx === steps.length - 1;
+}
+
+function next(){ if (idx < steps.length-1){ idx++; render(); } else stopAuto(); }
+function prev(){ if (idx > 0){ idx--; render(); } }
+function resetViz(){ stopAuto(); idx = 0; render(); }
+function toggleAuto(){
+  if (autoTimer) { stopAuto(); return; }
+  $('autoBtn').textContent = 'Pause';
+  autoTimer = setInterval(() => {
+    if (idx < steps.length-1) next(); else stopAuto();
+  }, 1100);
+}
+function stopAuto(){ if (autoTimer){ clearInterval(autoTimer); autoTimer=null; } $('autoBtn').textContent='Auto-play'; }
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insert Interval — three-phase sweep on a timeline</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444; --purple:#a855f7;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:30px 18px 70px;}
+  .wrap{max-width:920px;margin:0 auto;}
+  h1{font-size:1.7rem;margin:0 0 6px;}
+  h1 span{color:var(--blue);}
+  .subtitle{color:var(--muted);margin:0 0 24px;}
+  .analogy{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(168,85,247,.10));
+    border:1px solid rgba(245,158,11,.4);border-left:5px solid var(--amber);border-radius:12px;padding:16px 20px;margin-bottom:24px;}
+  .analogy h3{margin:0 0 6px;color:var(--amber);font-size:1.02rem;}
+  .analogy p{margin:0;}
+  .problem{background:var(--panel);border-radius:12px;padding:14px 20px;margin-bottom:22px;border:1px solid rgba(255,255,255,.06);}
+  .problem code{background:var(--panel2);padding:2px 8px;border-radius:6px;color:#ffd479;font-family:"SF Mono",Menlo,monospace;}
+  .arrow{color:var(--green);font-weight:bold;}
+
+  .stage{background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:20px 22px 24px;margin-bottom:18px;}
+  .timeline{position:relative;height:230px;margin:10px 0 6px;}
+  .axis{position:absolute;left:0;right:0;bottom:30px;height:2px;background:rgba(255,255,255,.15);}
+  .tick{position:absolute;bottom:14px;transform:translateX(-50%);font-size:.72rem;color:var(--muted);font-family:"SF Mono",Menlo,monospace;}
+  .tick::before{content:'';position:absolute;left:50%;top:-16px;width:1px;height:10px;background:rgba(255,255,255,.18);}
+  .bar{position:absolute;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    font-family:"SF Mono",Menlo,monospace;font-weight:700;font-size:.82rem;border:2px solid;transition:all .35s ease;}
+  .bar.base{background:rgba(148,163,184,.16);border-color:#586387;color:#c3cbe6;}
+  .bar.kept{background:rgba(16,185,129,.20);border-color:var(--green);color:#b6f0d8;}
+  .bar.merging{background:rgba(245,158,11,.22);border-color:var(--amber);color:#ffe3a8;box-shadow:0 0 0 3px rgba(245,158,11,.25);}
+  .bar.skip{opacity:.3;filter:grayscale(.5);}
+  .bar.newint{background:rgba(59,130,246,.22);border-color:var(--blue);color:#bcd4ff;border-style:dashed;}
+  .bar.newint.live{box-shadow:0 0 0 3px rgba(59,130,246,.3);}
+  .barlabel{position:absolute;font-size:.62rem;color:var(--muted);transform:translateX(-50%);}
+
+  .phasebar{display:flex;gap:8px;margin:4px 0 14px;}
+  .ph{flex:1;text-align:center;padding:7px 6px;border-radius:8px;font-size:.78rem;font-weight:600;
+    background:var(--panel2);color:var(--muted);border:1px solid rgba(255,255,255,.07);transition:all .3s;}
+  .ph.on{color:#fff;}
+  .ph.on.p1{background:rgba(16,185,129,.25);border-color:var(--green);color:#b6f0d8;}
+  .ph.on.p2{background:rgba(245,158,11,.25);border-color:var(--amber);color:#ffe3a8;}
+  .ph.on.p3{background:rgba(168,85,247,.25);border-color:var(--purple);color:#e3c9ff;}
+
+  .resrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;min-height:34px;}
+  .chip{font-family:"SF Mono",Menlo,monospace;font-size:.84rem;padding:6px 11px;border-radius:8px;
+    background:rgba(16,185,129,.16);border:1px solid var(--green);color:#b6f0d8;}
+  .chip.newc{background:rgba(59,130,246,.18);border-color:var(--blue);color:#bcd4ff;}
+  .chip.pop{animation:pop .4s ease;}
+  @keyframes pop{0%{transform:scale(.4);opacity:0;}60%{transform:scale(1.12);}100%{transform:scale(1);opacity:1;}}
+
+  .caption{background:var(--panel2);border-left:4px solid var(--blue);border-radius:8px;padding:12px 16px;margin:14px 0 16px;font-size:.98rem;min-height:50px;}
+  .caption b{color:#bcd4ff;}
+  .controls{display:flex;align-items:center;gap:10px;margin:6px 0 22px;}
+  button{background:var(--blue);color:#fff;border:none;padding:10px 22px;border-radius:9px;font-size:.98rem;font-weight:600;cursor:pointer;transition:transform .12s,background .2s;}
+  button:hover{background:#2f6fd6;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  button.ghost{background:var(--panel2);}
+  button.ghost:hover{background:#33457a;}
+  .stepind{color:var(--muted);font-size:.9rem;margin-left:auto;font-family:"SF Mono",Menlo,monospace;}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:4px 0 14px;font-size:.82rem;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid rgba(255,255,255,.2);}
+  .takeaway{background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(16,185,129,.12));
+    border:1px solid rgba(59,130,246,.4);border-radius:12px;padding:18px 22px;margin-top:26px;text-align:center;}
+  .takeaway h3{margin:0 0 6px;color:var(--blue);}
+  .takeaway p{margin:0;font-size:1.05rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Insert Interval — <span>three-phase</span> linear sweep</h1>
+  <p class="subtitle">Slot a new interval into a sorted, non-overlapping list and merge where it touches — in one pass.</p>
+
+  <div class="analogy">
+    <h3>📅 The calendar analogy</h3>
+    <p>Sorted meetings me ek nayi meeting ghusao. Jo poori tarah <b>pehle</b> khatam ho gayi → waise hi rakho. Jo naye block ko <b>touch/overlap</b> kare → usme <b>merge</b> kar do (min start, max end). Jo poori tarah <b>baad</b> me ho → waise hi add. Ek pass, kyunki list already sorted hai.</p>
+  </div>
+
+  <div class="problem">
+    <b>Input.</b> <code>intervals = [[1,2],[3,5],[6,7],[8,10],[12,16]]</code>, <code>newInterval = [4,8]</code>
+    <span class="arrow">→</span> <code>[[1,2],[3,10],[12,16]]</code>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#586387"></i>existing interval</span>
+    <span><i class="dot" style="background:var(--blue);border-style:dashed"></i>new interval</span>
+    <span><i class="dot" style="background:var(--green)"></i>added to result</span>
+    <span><i class="dot" style="background:var(--amber)"></i>merging now</span>
+  </div>
+
+  <div class="stage">
+    <div class="phasebar">
+      <div class="ph p1" id="ph1">Phase 1 · ends &lt; new.start</div>
+      <div class="ph p2" id="ph2">Phase 2 · overlap → merge</div>
+      <div class="ph p3" id="ph3">Phase 3 · rest</div>
+    </div>
+    <div class="timeline" id="timeline"></div>
+    <div style="color:var(--muted);font-size:.82rem;margin:2px 0 10px;">Result so far:</div>
+    <div class="resrow" id="resrow"></div>
+  </div>
+
+  <div class="caption" id="caption">Press <b>Next</b> to start the sweep.</div>
+  <div class="controls">
+    <button id="prev" class="ghost">‹ Prev</button>
+    <button id="next">Next ›</button>
+    <button id="auto" class="ghost">▶ Auto</button>
+    <span class="stepind" id="ind"></span>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>A sorted list needs no re-sort: skip-before, merge-overlapping, append-rest. The overlap test is just <code>interval.start ≤ new.end</code> in one clean linear pass.</p>
+  </div>
+</div>
+
+<script>
+const intervals=[[1,2],[3,5],[6,7],[8,10],[12,16]];
+const orig=[4,8];
+const MIN=0, MAX=17, SPAN=MAX-MIN;
+const $=id=>document.getElementById(id);
+
+function buildSteps(){
+  const steps=[];
+  const res=[];                 // chips: {iv, isNew}
+  let newI=[orig[0],orig[1]];
+  let i=0, phase=0;
+  // snapshot: phase, i (active existing idx or -1), barState map, newI, res, caption, newLive
+  const snap=o=>({
+    phase:o.phase, active:o.active??-1, newI:[newI[0],newI[1]],
+    res:res.map(r=>({iv:[...r.iv],isNew:r.isNew})),
+    caption:o.caption, merging:o.merging??-1, newLive:o.newLive??false,
+    done:o.done??false
+  });
+
+  steps.push(snap({phase:0,caption:`Start. <b>newInterval = [${newI[0]},${newI[1]}]</b> (dashed blue). List is already sorted by start, so we sweep left→right in three phases.`}));
+
+  // Phase 1
+  steps.push(snap({phase:1,caption:`<b>Phase 1:</b> copy every interval that ends strictly before new.start (<b>${newI[0]}</b>) — these can't touch the new block.`}));
+  while(i<intervals.length && intervals[i][1] < newI[0]){
+    steps.push(snap({phase:1,active:i,caption:`<b>[${intervals[i][0]},${intervals[i][1]}]</b> ends at ${intervals[i][1]} &lt; ${newI[0]} → no overlap, keep as-is.`}));
+    res.push({iv:[...intervals[i]],isNew:false});
+    steps.push(snap({phase:1,caption:`Added <b>[${intervals[i][0]},${intervals[i][1]}]</b> to result.`}));
+    i++;
+  }
+  if(i<intervals.length)
+    steps.push(snap({phase:1,active:i,caption:`<b>[${intervals[i][0]},${intervals[i][1]}]</b> ends at ${intervals[i][1]} ≥ ${newI[0]} → Phase 1 stops here.`}));
+
+  // Phase 2
+  steps.push(snap({phase:2,newLive:true,caption:`<b>Phase 2:</b> merge every interval that overlaps the new block (its start ≤ new.end = <b>${newI[1]}</b>). Expand new by min-start / max-end.`}));
+  while(i<intervals.length && intervals[i][0] <= newI[1]){
+    const before=[newI[0],newI[1]];
+    newI[0]=Math.min(newI[0],intervals[i][0]);
+    newI[1]=Math.max(newI[1],intervals[i][1]);
+    steps.push(snap({phase:2,merging:i,newLive:true,caption:`<b>[${intervals[i][0]},${intervals[i][1]}]</b> starts at ${intervals[i][0]} ≤ ${before[1]} → overlap! Merge: new = [min(${before[0]},${intervals[i][0]}), max(${before[1]},${intervals[i][1]})] = <b>[${newI[0]},${newI[1]}]</b>.`}));
+    i++;
+  }
+  res.push({iv:[...newI],isNew:true});
+  steps.push(snap({phase:2,newLive:false,caption:`No more overlap (next start &gt; ${newI[1]}). Push the merged block <b>[${newI[0]},${newI[1]}]</b> into the result.`}));
+
+  // Phase 3
+  steps.push(snap({phase:3,caption:`<b>Phase 3:</b> append all remaining intervals — they start after new.end, so no merging needed.`}));
+  while(i<intervals.length){
+    steps.push(snap({phase:3,active:i,caption:`<b>[${intervals[i][0]},${intervals[i][1]}]</b> is fully after the merged block → add as-is.`}));
+    res.push({iv:[...intervals[i]],isNew:false});
+    steps.push(snap({phase:3,caption:`Added <b>[${intervals[i][0]},${intervals[i][1]}]</b>.`}));
+    i++;
+  }
+  steps.push(snap({phase:3,done:true,caption:`Done! Result = <b>[${res.map(r=>`[${r.iv[0]},${r.iv[1]}]`).join(', ')}]</b>. One linear pass, no re-sort. ✅`}));
+  return steps;
+}
+const steps=buildSteps();
+let cur=0, timer=null;
+
+function x(t){return ((t-MIN)/SPAN)*100;}
+function drawTimeline(s){
+  let h='';
+  for(let t=MIN;t<=MAX;t++) h+=`<div class="tick" style="left:${x(t)}%">${t}</div>`;
+  h+=`<div class="axis"></div>`;
+  intervals.forEach((iv,idx)=>{
+    let cls='bar base';
+    const inRes = s.res.some(r=>!r.isNew && r.iv[0]===iv[0] && r.iv[1]===iv[1]);
+    if(s.merging===idx) cls='bar merging';
+    else if(inRes) cls='bar kept';
+    const left=x(iv[0]), w=Math.max(x(iv[1])-x(iv[0]),3.5);
+    const extra=s.active===idx?'box-shadow:0 0 0 3px rgba(245,158,11,.35);':'';
+    h+=`<div class="${cls}" style="left:${left}%;width:${w}%;top:${10+idx*26}px;${extra}">[${iv[0]},${iv[1]}]</div>`;
+  });
+  // new interval bar (live position) below the existing band
+  const nl=x(s.newI[0]), nw=Math.max(x(s.newI[1])-x(s.newI[0]),3.5);
+  const liveCls=s.newLive?'bar newint live':'bar newint';
+  h+=`<div class="${liveCls}" style="left:${nl}%;width:${nw}%;top:${10+intervals.length*26+8}px;">new [${s.newI[0]},${s.newI[1]}]</div>`;
+  $('timeline').innerHTML=h;
+}
+function drawRes(s){
+  $('resrow').innerHTML = s.res.length
+    ? s.res.map(r=>`<div class="chip ${r.isNew?'newc':''} pop">[${r.iv[0]},${r.iv[1]}]</div>`).join('')
+    : `<span style="color:var(--muted);font-style:italic;font-size:.86rem;">empty</span>`;
+}
+function drawPhase(s){
+  [1,2,3].forEach(p=>{const el=$('ph'+p);el.classList.toggle('on',s.phase===p);});
+}
+function render(){
+  const s=steps[cur];
+  drawTimeline(s); drawRes(s); drawPhase(s);
+  $('caption').innerHTML=s.caption;
+  $('ind').textContent=`Step ${cur+1} / ${steps.length}`;
+  $('prev').disabled=cur===0; $('next').disabled=cur===steps.length-1;
+}
+$('next').onclick=()=>{if(cur<steps.length-1){cur++;render();}};
+$('prev').onclick=()=>{if(cur>0){cur--;render();}};
+$('auto').onclick=function(){
+  if(timer){clearInterval(timer);timer=null;this.textContent='▶ Auto';return;}
+  this.textContent='⏸ Pause';
+  timer=setInterval(()=>{if(cur<steps.length-1){cur++;render();}else{clearInterval(timer);timer=null;$('auto').textContent='▶ Auto';}},1100);
+};
+render();
+</script>
+</body>
+</html>

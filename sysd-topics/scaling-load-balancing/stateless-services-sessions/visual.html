@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Stateless Services &amp; Sessions — Where Does The State Live?</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0 0 8px; color: #d0d0e0; font-size: 15px; }
+  .analogy p:last-child { margin-bottom: 0; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  /* diagram SVG */
+  .diag-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+
+  .lane { fill: #1f1f3a; stroke: #3a3a5c; stroke-width: 1.5; rx: 10; }
+  .lane-label { fill: #8888aa; font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; text-transform: uppercase; letter-spacing: 1px; }
+
+  .box { transition: all .35s ease; }
+  .box rect { transition: all .35s ease; }
+  .box text { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 13px; fill: #fff; }
+  .box .sub { font-weight: 400; font-size: 9px; fill: #c5c5dd; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .client rect { fill: #334155; stroke: #64748b; stroke-width: 2; }
+  .lb rect { fill: #3b82f6; stroke: #93c5fd; stroke-width: 2; }
+  .inst rect { fill: #2d2d50; stroke: #4a4a72; stroke-width: 2; }
+  .inst.active rect { fill: #1d4ed8; stroke: #93c5fd; stroke-width: 3; }
+  .inst.holds rect { fill: #6d28d9; stroke: #c4b5fd; stroke-width: 2.5; }
+  .inst.dead rect { fill: #3a1d1d; stroke: #ef4444; stroke-width: 2.5; }
+  .inst.added rect { fill: #14321f; stroke: #10b981; stroke-width: 3; }
+  .store rect { fill: #4c1d95; stroke: #a78bfa; stroke-width: 2.5; }
+  .store.active rect { fill: #6d28d9; stroke: #ddd6fe; stroke-width: 3.5; }
+
+  .wire { stroke: #3a3a5c; stroke-width: 2; fill: none; }
+  .wire.lit { stroke: #3b82f6; stroke-width: 3; }
+
+  .deadx { stroke: #ef4444; stroke-width: 4; stroke-linecap: round; }
+
+  .pulse { animation: pulse 1.1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+
+  .packet { transition: none; }
+  .packet circle { fill: #f59e0b; stroke: #fbbf24; stroke-width: 2; }
+  .packet text { fill: #1a1a2e; font-size: 8px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .token-badge { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9px; fill: #fbbf24; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+  .var .value.violet { color: #a78bfa; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.bad { border-left-color: #ef4444; background: #2a1717; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.good { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.good h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 22px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.good .big { color: #10b981; }
+
+  /* token comparison */
+  .tokens { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .tokens { grid-template-columns: 1fr; } }
+  .tk { border-radius: 12px; padding: 18px 20px; background: #24243e; border: 1px solid #3a3a5c; }
+  .tk h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #a78bfa; }
+  .tk .code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; color: #fbbf24; background: #00000033;
+              padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; word-break: break-all; }
+  .tk ul { margin: 0; padding-left: 18px; }
+  .tk li { font-size: 13px; color: #c8c8d8; padding: 2px 0; }
+  .tk li b { color: #fff; }
+  .tk .pro { color: #6ee7b7; }
+  .tk .con { color: #fca5a5; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Stateless Services &amp; Sessions</h1>
+  <div class="subtitle">Why a stateless service lets <b>any instance serve any request at any time</b> — so a load balancer can fan out freely, autoscaling is trivial, and a dying pod loses nothing. The trick: <b>where does the state live?</b> Not in the instance's RAM — in the <code>token</code> or a shared <code>Redis</code> store.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the bank branch with two kinds of counters</h3>
+    <p><b>Stateful counter (old way):</b> you go to one specific teller who keeps your whole case file in their desk drawer. If that teller takes the day off (server crash) — or you must keep returning to the same teller (sticky session) — the system gets rigid. A new teller can't serve you without your file.</p>
+    <p><b>Stateless counter (modern way):</b> every customer carries their own passbook + ID. Walk up to <b>any free teller</b>, show the passbook, done. The teller just reads it — they never have to remember you. Grow from 5 tellers to 50 and nothing breaks; whoever is free serves you. That is a stateless service: <b>any instance, any request, anytime.</b></p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">request:</span><code>GET /cart  Authorization: Bearer &lt;token&gt;</code></div>
+    <div class="row"><span class="label">tier:</span><code>N identical instances behind a load balancer</code></div>
+    <div class="row"><span class="label">rule:</span><code>instance keeps no per-client state in RAM → LB routes anywhere</code></div>
+    <div class="row"><span class="label">state lives in:</span><code>the token (JWT)  OR  a shared store (Redis ~1-2 ms)</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="diag-holder">
+      <svg viewBox="0 0 560 420" id="diag">
+        <!-- lane guides -->
+        <text class="lane-label" x="14" y="40">client</text>
+        <text class="lane-label" x="14" y="118">load balancer</text>
+        <text class="lane-label" x="14" y="210">app instances (stateless)</text>
+        <text class="lane-label" x="14" y="372">shared session store</text>
+
+        <!-- wires layer (drawn first, behind boxes) -->
+        <g id="g-wires"></g>
+        <!-- dead X marks -->
+        <g id="g-marks"></g>
+        <!-- boxes -->
+        <g id="g-boxes"></g>
+        <!-- travelling packet -->
+        <g id="g-packet"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Instances (N)</div><div class="value" id="v-n">3</div></div>
+        <div class="var"><div class="label">Routed to</div><div class="value amber" id="v-route">—</div></div>
+        <div class="var"><div class="label">State in RAM</div><div class="value green" id="v-ram">none</div></div>
+        <div class="var"><div class="label">Session lookup</div><div class="value violet" id="v-look">—</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Load balancer (round-robin)</div>
+        <div class="legend-item"><span class="swatch" style="background:#2d2d50;border:1px solid #4a4a72"></span>Stateless instance (interchangeable)</div>
+        <div class="legend-item"><span class="swatch" style="background:#6d28d9"></span>Holds in-RAM session (stateful — bad)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#f59e0b"></span>Request + token travelling</div>
+        <div class="legend-item"><span class="swatch" style="background:#4c1d95;border:1px solid #a78bfa"></span>Shared store (Redis) — state lives here</div>
+        <div class="legend-item"><span class="swatch" style="background:#3a1d1d;border:1px solid #ef4444"></span>Crashed instance</div>
+        <div class="legend-item"><span class="swatch" style="background:#14321f;border:1px solid #10b981"></span>New autoscaled instance</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to send the first request through the load balancer.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>Sticky sessions (stateful + routing crutch)</h3>
+      <div class="formula">LB pins client → always instance&nbsp;2</div>
+      <p>Session lives in <b>instance 2's RAM</b>, so the LB must keep sending you back. Works… until instance 2 dies — then <span class="big">100%</span> of its sessions vanish and those users are logged out. Load also piles unevenly; a new pod gets no existing traffic.</p>
+    </div>
+    <div class="cx good">
+      <h3>True stateless (externalized state)</h3>
+      <div class="formula">LB → any instance → state from token / Redis</div>
+      <p>No per-client RAM, so the LB routes freely (round-robin / least-conn). Kill any pod and the user never notices — their session is safe in Redis. Add pods to go <span class="big">10K→50K QPS</span> with no warm-up.</p>
+    </div>
+  </div>
+
+  <div class="tokens">
+    <div class="tk">
+      <h3>Opaque session ID + store</h3>
+      <div class="code">Cookie: sid=8f3a…  →  Redis GET sid</div>
+      <ul>
+        <li class="pro"><b>+</b> Instant revocation — delete the key, session is dead</li>
+        <li class="con"><b>−</b> One store round-trip per request (~1-2 ms, same-AZ)</li>
+        <li class="con"><b>−</b> Store becomes a critical dependency (must replicate)</li>
+      </ul>
+    </div>
+    <div class="tk">
+      <h3>Self-contained JWT</h3>
+      <div class="code">Bearer eyJhbGci… {uid, roles, exp} signed</div>
+      <ul>
+        <li class="pro"><b>+</b> No lookup — verify signature on CPU in microseconds</li>
+        <li class="con"><b>−</b> Hard to revoke — valid until <code>exp</code> (use 5-15 min TTL + refresh token)</li>
+        <li class="con"><b>−</b> 200 B – 1 KB travels on <i>every</i> request</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>"Stateless" ≠ "no state."</b> The state still exists — it's just <b>externalized</b> (Redis, DB, or the client's token). When asked "where does the state live?" the answer is <b>"the store / the token,"</b> never "nowhere."</li>
+      <li><b>Sticky sessions are <i>not</i> stateless</b> — they're stateful with a routing crutch. They reintroduce uneven load and lose all sessions on the instance that dies. Calling them a scaling solution is a red flag.</li>
+      <li><b>JWT revocation is the gotcha</b> — you can't unilaterally kill a self-contained token. A blocklist works but re-adds a store + lookup (breaking the no-lookup win), so the real answer is <b>short TTL + a revocable refresh token</b>.</li>
+      <li><b>The store is a new single point of failure</b> — you moved state, you didn't delete it. Replicate it (Redis Sentinel/Cluster), else "store down = everyone logged out."</li>
+      <li><b>Stateless ≠ idempotent</b> — stateless = no per-client memory in the instance; idempotent = same request twice gives the same result. Different concepts; don't conflate them.</li>
+      <li><b>Where it shows up</b> — 12-Factor App Factor VI, AWS ALB + Auto Scaling Groups, Kubernetes Deployments + HPA, and serverless (Lambda) all <i>assume</i> instances are interchangeable.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Keep <b>zero per-client state in an instance's RAM</b> and push the real state into the <b>token</b> or a <b>shared store (Redis)</b>. Then every instance is interchangeable: the load balancer fans out freely, autoscaling and rolling deploys are trivial, and a crashing pod loses nothing — at the cost of a sub-millisecond store lookup (or a bit of token weight) on each request.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const SVG = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(SVG, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  // ---- geometry ----
+  const client = { x: 230, y: 18, w: 100, h: 34 };
+  const lb     = { x: 215, y: 92, w: 130, h: 38 };
+  const store  = { x: 195, y: 332, w: 170, h: 46 };
+  // three base instances along instance lane
+  const insY = 178, insH = 44, insW = 104;
+  const insX = [40, 228, 416];
+  const baseInst = [
+    { id: "i1", x: insX[0] },
+    { id: "i2", x: insX[1] },
+    { id: "i3", x: insX[2] },
+  ];
+  const newInst = { id: "i4", x: 416, y: 244 }; // autoscaled, sits lower-right
+
+  function cx(o){ return o.x + o.w/2; }
+  function instRect(id, scenario){
+    // returns {x,y,w,h}
+    if (id === "i4") return { x: newInst.x, y: newInst.y, w: insW, h: insH };
+    const b = baseInst.find(b=>b.id===id);
+    return { x: b.x, y: insY, w: insW, h: insH };
+  }
+
+  const gWires = document.getElementById("g-wires");
+  const gMarks = document.getElementById("g-marks");
+  const gBoxes = document.getElementById("g-boxes");
+  const gPacket= document.getElementById("g-packet");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vN = document.getElementById("v-n");
+  const vRoute = document.getElementById("v-route");
+  const vRam = document.getElementById("v-ram");
+  const vLook = document.getElementById("v-look");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+
+  function box(cls, r, title, sub){
+    const g = el("g", { class: "box " + cls }, gBoxes);
+    el("rect", { x:r.x, y:r.y, width:r.w, height:r.h, rx:9 }, g);
+    const t = el("text", { x:r.x+r.w/2, y:r.y + (sub? r.h/2-2 : r.h/2+4), "text-anchor":"middle" }, g);
+    t.textContent = title;
+    if (sub){
+      const s = el("text", { x:r.x+r.w/2, y:r.y + r.h/2 + 12, "text-anchor":"middle", class:"sub" }, g);
+      s.textContent = sub;
+    }
+    return g;
+  }
+  function wire(x1,y1,x2,y2,lit){
+    el("path", { class:"wire"+(lit?" lit":""), d:`M ${x1} ${y1} L ${x2} ${y2}` }, gWires);
+  }
+
+  // ---- steps ----
+  // each step is a function producing a scene via render(state)
+  // state fields:
+  //   nodes: list of instance ids present
+  //   dead: set of dead ids
+  //   active: id currently serving (highlight blue)
+  //   holds: id holding in-RAM session (violet, sticky/bad)
+  //   added: id newly autoscaled
+  //   storeActive: bool
+  //   stickyLink: id the LB is pinned to (draw thicker pinned wire)
+  //   packet: {from:'client'|'lb'|id|'store', to:..., label} or null  -> animate
+  //   route, ram, look, n
+  //   narration, narrClass
+
+  const steps = [
+    {
+      n:3, route:"—", ram:"none", look:"—",
+      nodes:["i1","i2","i3"], active:null, holds:null, storeActive:false,
+      packet:null,
+      narration:`<b>1. The setup.</b> Three identical app instances sit behind a load balancer. Each is <b>stateless</b> — it keeps no per-client data in its own RAM. The session state lives outside, in a shared <code>Redis</code> store at the bottom. Because the instances are interchangeable, the LB is free to send a request to any of them.`,
+      narrClass:""
+    },
+    {
+      n:3, route:"i2", ram:"none", look:"pending", active:"i2",
+      nodes:["i1","i2","i3"], holds:null, storeActive:false,
+      packet:{ from:"client", to:"lb", label:"req+tok" },
+      narration:`<b>2. Request arrives with its own state.</b> The client sends <code>GET /cart</code> with an <code>Authorization: Bearer &lt;token&gt;</code> header. The token <i>is</i> the passbook — the proof of who you are travels <b>with the request</b>, so no server has to "remember" this user.`,
+      narrClass:"move"
+    },
+    {
+      n:3, route:"i2", ram:"none", look:"pending", active:"i2",
+      nodes:["i1","i2","i3"], holds:null, storeActive:false,
+      packet:{ from:"lb", to:"i2", label:"req+tok" },
+      narration:`<b>3. LB fans out (round-robin).</b> The load balancer picks <b>instance 2</b> this time — purely by round-robin / least-connections, <i>not</i> because this user "belongs" there. Any instance would have worked equally well.`,
+      narrClass:"move"
+    },
+    {
+      n:3, route:"i2", ram:"none", look:"~1-2 ms", active:"i2", storeActive:true,
+      nodes:["i1","i2","i3"], holds:null,
+      packet:{ from:"i2", to:"store", label:"GET sid" },
+      narration:`<b>4. Externalized session lookup.</b> Instance 2 needs the cart, so it reads the session from the shared store: a <code>Redis GET</code> that returns in roughly <b>1-2 ms</b> (same-AZ, in-memory). The heavy state lives in this one fast store — not scattered in app RAM. <i>(With a JWT it could skip this: verify the signature on CPU in microseconds, no network call.)</i>`,
+      narrClass:"good"
+    },
+    {
+      n:3, route:"i2", ram:"none", look:"done", active:"i2", storeActive:true,
+      nodes:["i1","i2","i3"], holds:null,
+      packet:{ from:"i2", to:"client", label:"200 OK" },
+      narration:`<b>5. Response — and nothing lingers.</b> Instance 2 returns the cart and then <b>forgets everything</b> about this client. Its RAM holds no session afterward. The very next request from the same user can land on instance 1 or 3 and work identically.`,
+      narrClass:"good"
+    },
+    {
+      n:2, route:"i1", ram:"none", look:"~1-2 ms", active:"i1", storeActive:true,
+      nodes:["i1","i2","i3"], dead:["i2"],
+      packet:{ from:"lb", to:"i1", label:"req+tok" },
+      narration:`<b>6. An instance crashes — user never notices.</b> Instance 2 dies. The LB drops it from rotation and routes the next request to <b>instance 1</b>, which fetches the same session from <code>Redis</code> and serves it seamlessly. Because no session lived in instance 2's RAM, <b>zero sessions were lost</b>. This is also why rolling deploys are smooth.`,
+      narrClass:"good"
+    },
+    {
+      n:3, route:"i4", ram:"none", look:"~1-2 ms", active:"i4", storeActive:true,
+      nodes:["i1","i3","i4"], dead:["i2"], added:"i4",
+      packet:{ from:"lb", to:"i4", label:"req+tok" },
+      narration:`<b>7. Autoscale out — instantly useful.</b> Traffic jumps <code>10K → 50K QPS</code>, so HPA adds a fresh pod (<b>i4</b>). It needs <b>no warm-up</b> because it has no local state to build — it starts serving immediately, pulling any session it needs from the shared store. Interchangeable instances make scale-out trivial.`,
+      narrClass:"good"
+    },
+    {
+      // sticky / stateful contrast
+      n:3, route:"i2 (pinned)", ram:"i2 only", look:"in-RAM", active:"i2", holds:"i2", sticky:"i2",
+      nodes:["i1","i2","i3"], storeActive:false,
+      packet:{ from:"lb", to:"i2", label:"pinned" },
+      narration:`<b>8. The anti-pattern: sticky sessions.</b> Here the session lives in <b>instance 2's RAM</b>, so the LB must <i>pin</i> every request from this client back to i2 (cookie / IP hash). It works — until i2 dies: <b>all</b> of its in-memory sessions vanish at once and those users are logged out. Load also piles unevenly. Sticky = stateful with a routing crutch, not real scaling.`,
+      narrClass:"bad"
+    },
+  ];
+
+  // packet anchor points
+  function anchor(key, state){
+    if (key === "client") return { x: cx(client), y: client.y + client.h };
+    if (key === "lb")     return { x: cx(lb), y: lb.y + lb.h/2 };
+    if (key === "store")  return { x: cx(store), y: store.y };
+    // instance
+    const r = instRect(key, state);
+    return { x: r.x + r.w/2, y: r.y };
+  }
+  // for client target (response) we want top of client
+  function anchorTop(key){
+    if (key === "client") return { x: cx(client), y: client.y + client.h };
+    return null;
+  }
+
+  let cursor = 0;
+  let animTimer = null;
+
+  function clearAnim(){ if (animTimer){ cancelAnimationFrame(animTimer); animTimer = null; } }
+
+  function drawStatic(s){
+    gWires.innerHTML = ""; gMarks.innerHTML = ""; gBoxes.innerHTML = ""; gPacket.innerHTML = "";
+
+    const nodes = s.nodes || ["i1","i2","i3"];
+    const dead = new Set(s.dead || []);
+
+    // wires: client->lb
+    wire(cx(client), client.y+client.h, cx(lb), lb.y, false);
+    // lb -> each present instance
+    nodes.forEach(id => {
+      const r = instRect(id, s);
+      const lit = s.active === id;
+      const pinned = s.sticky === id;
+      const p = el("path", {
+        class:"wire" + (lit?" lit":"") ,
+        d:`M ${cx(lb)} ${lb.y+lb.h} L ${r.x+r.w/2} ${r.y}`,
+        "stroke-dasharray": pinned ? "2 0" : "none"
+      }, gWires);
+      if (pinned){ p.setAttribute("stroke", "#6d28d9"); p.setAttribute("stroke-width","4"); }
+    });
+    // instances -> store (only present, non-dead)
+    nodes.forEach(id => {
+      if (dead.has(id)) return;
+      const r = instRect(id, s);
+      const lit = s.storeActive && s.active === id;
+      el("path", { class:"wire"+(lit?" lit":""), "stroke":lit?"#a78bfa":"#3a3a5c",
+        d:`M ${r.x+r.w/2} ${r.y+r.h} L ${cx(store)} ${store.y}` }, gWires);
+    });
+
+    // boxes
+    box("client", client, "Client", "GET /cart  +token");
+    box("lb", lb, "Load Balancer", "round-robin");
+
+    // instances (always show the 3 base slots; dead ones styled dead)
+    const allIds = new Set([...nodes, ...(s.dead||[])]);
+    ["i1","i2","i3"].forEach(id => {
+      if (!allIds.has(id) && !(s.nodes||[]).includes(id)) { /* still draw slot */ }
+      const r = instRect(id, s);
+      let cls = "inst";
+      if (dead.has(id)) cls += " dead";
+      else if (s.holds === id) cls += " holds";
+      else if (s.active === id) cls += " active";
+      const sub = dead.has(id) ? "crashed" : (s.holds===id ? "session in RAM!" : "no state");
+      box(cls, r, "Instance " + id.slice(1), sub);
+      if (dead.has(id)){
+        const m = gMarks;
+        el("line", { class:"deadx", x1:r.x+8, y1:r.y+8, x2:r.x+r.w-8, y2:r.y+r.h-8 }, m);
+        el("line", { class:"deadx", x1:r.x+r.w-8, y1:r.y+8, x2:r.x+8, y2:r.y+r.h-8 }, m);
+      }
+    });
+    // new autoscaled instance
+    if ((s.nodes||[]).includes("i4")){
+      const r = instRect("i4", s);
+      let cls = "inst added";
+      if (s.active === "i4") cls = "inst active";
+      box(cls, r, "Instance i4", "new · no warm-up");
+    }
+
+    // store
+    const storeCls = "store" + (s.storeActive ? " active" : "");
+    const g = box(storeCls, store, "Redis (session store)", "state lives here · ~1-2 ms");
+    if (s.storeActive) g.classList.add("pulse");
+  }
+
+  function placePacketStatic(s){
+    gPacket.innerHTML = "";
+    if (!s.packet) return;
+    const from = anchor(s.packet.from, s);
+    const g = el("g", { class:"packet" }, gPacket);
+    const c = el("circle", { cx:from.x, cy:from.y, r:14 }, g);
+    const t = el("text", { x:from.x, y:from.y+3, "text-anchor":"middle" }, g);
+    t.textContent = s.packet.label;
+    return { g, c, t };
+  }
+
+  function animatePacket(s){
+    clearAnim();
+    if (!s.packet) return;
+    const p = placePacketStatic(s);
+    if (!p) return;
+    let from = anchor(s.packet.from, s);
+    let to;
+    if (s.packet.to === "client") to = anchor("client", s);
+    else to = anchor(s.packet.to, s);
+    const dur = 950;
+    const start = performance.now();
+    function frame(now){
+      let k = Math.min(1, (now - start) / dur);
+      const ease = k<0.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2;
+      const x = from.x + (to.x - from.x) * ease;
+      const y = from.y + (to.y - from.y) * ease;
+      p.c.setAttribute("cx", x); p.c.setAttribute("cy", y);
+      p.t.setAttribute("x", x); p.t.setAttribute("y", y+3);
+      if (k < 1) animTimer = requestAnimationFrame(frame);
+      else animTimer = null;
+    }
+    animTimer = requestAnimationFrame(frame);
+  }
+
+  function render(){
+    const s = steps[cursor];
+    drawStatic(s);
+    animatePacket(s);
+
+    vN.textContent = s.n;
+    vRoute.textContent = s.route;
+    // ram coloring
+    vRam.textContent = s.ram;
+    vRam.className = "value " + (s.holds ? "red" : "green");
+    vLook.textContent = s.look;
+
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next(){ if (cursor < steps.length-1){ cursor++; render(); } }
+  function prev(){ if (cursor > 0){ cursor--; render(); } }
+  function reset(){ cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

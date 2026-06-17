@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add &amp; Search Words — Wildcard DFS over a Trie</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.85rem; margin: 0 0 6px; }
+  h1 span { color: var(--amber); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+  code {
+    background: var(--panel2); padding: 2px 7px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace; font-size:.92em;
+  }
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; font-size: .98rem; }
+  .panel {
+    background: var(--panel); border-radius: 12px; padding: 20px 22px;
+    border: 1px solid rgba(255,255,255,0.06); margin-bottom: 22px;
+  }
+  .query {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;
+  }
+  .query .lbl { color: var(--muted); font-size:.92rem; }
+  .qcell {
+    width: 42px; height: 42px; border-radius: 9px;
+    display: grid; place-items: center; font-weight: 700; font-size: 1.2rem;
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--panel2); border: 2px solid rgba(255,255,255,0.1);
+    transition: all .3s;
+  }
+  .qcell.dot { color: var(--amber); }
+  .qcell.active { border-color: var(--blue); background: rgba(59,130,246,0.25); transform: translateY(-3px); }
+  .qcell.active.dot { border-color: var(--amber); background: rgba(245,158,11,0.25); }
+  .qcell.done { border-color: var(--green); background: rgba(16,185,129,0.18); }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 16px 0 16px; }
+  button {
+    background: var(--blue); color: #fff; border: none; padding: 10px 20px;
+    border-radius: 10px; font-size: .96rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .opbtns { display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 4px; }
+  .opbtn { background: var(--panel2); border:1px solid rgba(255,255,255,0.1); padding:8px 14px; font-size:.9rem; }
+  .opbtn.active { background: var(--purple); border-color: var(--purple); }
+  .stepcount { color: var(--muted); font-size:.9rem; margin-left:auto; }
+
+  svg { width: 100%; height: auto; display:block; }
+  .edge { stroke:#3a3a66; stroke-width:2.5; transition: stroke .3s, stroke-width .3s; }
+  .edge.lit { stroke: var(--blue); stroke-width:4; }
+  .edge.amber { stroke: var(--amber); stroke-width:4; }
+  .edge.green { stroke: var(--green); stroke-width:4; }
+  .edge.dead { stroke: var(--red); stroke-width:3; stroke-dasharray:5 4; }
+  .node circle {
+    fill: var(--panel2); stroke:#4a4a7a; stroke-width:2.5;
+    transition: fill .3s, stroke .3s, stroke-width .3s;
+  }
+  .node.lit circle { fill: rgba(59,130,246,0.32); stroke: var(--blue); stroke-width:4; }
+  .node.amber circle { fill: rgba(245,158,11,0.30); stroke: var(--amber); stroke-width:4; }
+  .node.green circle { fill: rgba(16,185,129,0.34); stroke: var(--green); stroke-width:4.5; }
+  .node.dead circle { fill: rgba(239,68,68,0.22); stroke: var(--red); stroke-width:3; }
+  .node text { fill: var(--text); font-family:"SF Mono",Menlo,monospace; font-weight:700; font-size:16px; text-anchor:middle; dominant-baseline:central; }
+  .node text.rootlbl { fill: var(--muted); font-size:11px; }
+  .endmark { fill: var(--green); stroke:#0c3d2c; stroke-width:1.5; opacity:0; transition:opacity .3s; }
+  .endmark.show { opacity:1; }
+
+  .caption {
+    background: var(--panel2); border-left:4px solid var(--blue); border-radius:10px;
+    padding:14px 18px; margin-top:10px; font-size:.98rem; min-height:26px;
+  }
+  .caption.amber { border-left-color: var(--amber); }
+  .caption.green { border-left-color: var(--green); }
+  .caption.red { border-left-color: var(--red); }
+  .caption b.k { color:#ffd479; font-family:"SF Mono",Menlo,monospace; }
+  .verdict { font-weight:700; }
+  .verdict.t { color: var(--green); }
+  .verdict.f { color: var(--red); }
+  .legend { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; font-size:.85rem; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:7px; }
+  .dot2 { width:14px; height:14px; border-radius:50%; border:2px solid; }
+  .dot2.blue { border-color:var(--blue); background:rgba(59,130,246,0.32); }
+  .dot2.amber { border-color:var(--amber); background:rgba(245,158,11,0.30); }
+  .dot2.green { border-color:var(--green); background:rgba(16,185,129,0.34); }
+  .dot2.red { border-color:var(--red); background:rgba(239,68,68,0.22); }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(16,185,129,0.12));
+    border:1px solid rgba(245,158,11,0.4); border-radius:12px;
+    padding:18px 24px; margin-top:28px; text-align:center;
+  }
+  .takeaway h3 { margin:0 0 6px; color: var(--amber); }
+  .takeaway p { margin:0; font-size:1.04rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Add &amp; Search Words — the <span>wildcard</span> DFS</h1>
+  <p class="subtitle">Stored: <code>bad</code>, <code>dad</code>, <code>mad</code>, <code>bat</code>. Watch how <code>.</code> branches into every child.</p>
+
+  <div class="analogy">
+    <h3>🧩 Analogy: a crossword clue with blanks</h3>
+    <p>Fixed letter? <b>Ek hi raasta</b> lo. Blank <code>.</code>? <b style="color:var(--amber)">Saari branches</b> try karo — jis se aage poora pattern match ho jaaye. Ek branch successful → turant <span style="color:var(--green)">True</span>, baaki dekhna band.</p>
+  </div>
+
+  <div class="panel">
+    <div class="opbtns" id="opbtns"></div>
+    <div class="query"><span class="lbl">query:</span><span id="queryRow"></span></div>
+    <div class="controls">
+      <button class="ghost" id="prevBtn">‹ Prev</button>
+      <button id="nextBtn">Next ›</button>
+      <button class="ghost" id="resetBtn">↺ Reset</button>
+      <span class="stepcount" id="stepcount"></span>
+    </div>
+
+    <svg id="svg" viewBox="0 0 880 360" role="img" aria-label="Trie with wildcard search"></svg>
+
+    <div class="caption" id="caption">Pick a search query above, then step through with Next.</div>
+
+    <div class="legend">
+      <span><span class="dot2 blue"></span> following fixed char</span>
+      <span><span class="dot2 amber"></span> wildcard branch</span>
+      <span><span class="dot2 green"></span> match found</span>
+      <span><span class="dot2 red"></span> dead end (backtrack)</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>A fixed char follows <b>one</b> path; a <code>.</code> recurses into <b>every</b> child. The first branch that reaches the end with <b>is_end = True</b> returns True — that branching DFS is the whole trick.</p>
+  </div>
+</div>
+
+<script>
+// Trie storing: bad, dad, mad, bat
+// Layout: root -> {b,d,m} ; b->a->{d(end),t(end)} ; d->a->d(end) ; m->a->d(end)
+const NODES = {
+  root: {x:440,y:40,label:'•',root:true},
+  b:{x:230,y:130,label:'b'}, d:{x:440,y:130,label:'d'}, m:{x:650,y:130,label:'m'},
+  ba:{x:230,y:220,label:'a'}, da:{x:440,y:220,label:'a'}, ma:{x:650,y:220,label:'a'},
+  bad:{x:160,y:310,label:'d',end:true}, bat:{x:300,y:310,label:'t',end:true},
+  dad:{x:440,y:310,label:'d',end:true}, mad:{x:650,y:310,label:'d',end:true},
+};
+const EDGES = [
+  ['root','b'],['root','d'],['root','m'],
+  ['b','ba'],['d','da'],['m','ma'],
+  ['ba','bad'],['ba','bat'],['da','dad'],['ma','mad'],
+];
+const ENDS = ['bad','bat','dad','mad'];
+
+const $ = id => document.getElementById(id);
+const svg = $('svg');
+const NS='http://www.w3.org/2000/svg';
+
+function buildSVG() {
+  svg.innerHTML='';
+  for (const [u,v] of EDGES) {
+    const a=NODES[u], b=NODES[v];
+    const l=document.createElementNS(NS,'line');
+    l.setAttribute('x1',a.x); l.setAttribute('y1',a.y+20);
+    l.setAttribute('x2',b.x); l.setAttribute('y2',b.y-20);
+    l.setAttribute('class','edge'); l.id='e-'+u+'-'+v;
+    svg.appendChild(l);
+  }
+  for (const id in NODES) {
+    const n=NODES[id];
+    const g=document.createElementNS(NS,'g'); g.setAttribute('class','node'); g.id='n-'+id;
+    const c=document.createElementNS(NS,'circle');
+    c.setAttribute('cx',n.x); c.setAttribute('cy',n.y); c.setAttribute('r',20);
+    g.appendChild(c);
+    const t=document.createElementNS(NS,'text');
+    t.setAttribute('x',n.x); t.setAttribute('y',n.y);
+    if(n.root) t.setAttribute('class','rootlbl');
+    t.textContent = n.root?'root':n.label; g.appendChild(t);
+    const e=document.createElementNS(NS,'circle');
+    e.setAttribute('cx',n.x+16); e.setAttribute('cy',n.y+16); e.setAttribute('r',6);
+    e.setAttribute('class','endmark'+(n.end?'':'')); e.id='end-'+id;
+    g.appendChild(e);
+    svg.appendChild(g);
+  }
+  // always show end flags (these are stored words)
+  ENDS.forEach(id => $('end-'+id).classList.add('show'));
+}
+
+function clearHL() {
+  document.querySelectorAll('.node').forEach(n=>n.className.baseVal='node');
+  document.querySelectorAll('.edge').forEach(e=>e.setAttribute('class','edge'));
+}
+
+// path helper: id sequence for a real stored prefix
+function childOf(id, ch) {
+  // returns child node id whose label==ch, given parent id
+  for (const [u,v] of EDGES) if (u===id && NODES[v].label===ch) return v;
+  // root special: children are b/d/m
+  if (id==='root') { for (const k of ['b','d','m']) if (NODES[k].label===ch) return k; }
+  return null;
+}
+function childrenOf(id) {
+  return EDGES.filter(([u])=>u===id).map(([,v])=>v);
+}
+
+// ---- step builders. Steps mutate visualization for a query string. ----
+function caption(kind, html, vis) {
+  $('caption').className='caption '+(kind==='blue'?'':kind);
+  $('caption').innerHTML=html;
+  render(vis||{});
+}
+function render(v) {
+  clearHL();
+  (v.litE||[]).forEach(e=>{const x=$(e); if(x) x.setAttribute('class','edge '+(v.litECls||'lit'));});
+  (v.amberE||[]).forEach(e=>{const x=$(e); if(x) x.setAttribute('class','edge amber');});
+  (v.greenE||[]).forEach(e=>{const x=$(e); if(x) x.setAttribute('class','edge green');});
+  (v.deadE||[]).forEach(e=>{const x=$(e); if(x) x.setAttribute('class','edge dead');});
+  (v.lit||[]).forEach(id=>mk(id,'lit'));
+  (v.amber||[]).forEach(id=>mk(id,'amber'));
+  (v.green||[]).forEach(id=>mk(id,'green'));
+  (v.dead||[]).forEach(id=>mk(id,'dead'));
+  // highlight active query cell
+  document.querySelectorAll('.qcell').forEach((c,i)=>{
+    c.classList.remove('active');
+    if (i===v.qi) c.classList.add('active');
+    if (typeof v.qdone==='number' && i<v.qdone) c.classList.add('done');
+    else c.classList.remove('done');
+  });
+}
+function mk(id,cls){const n=$('n-'+id); if(n) n.setAttribute('class','node '+cls);}
+function edgePath(ids){const out=[];for(let i=0;i<ids.length-1;i++)out.push('e-'+ids[i]+'-'+ids[i+1]);return out;}
+
+// search "bad" — all fixed, single path, ends at is_end
+function makeBad() {
+  const s=[];
+  s.push(()=>caption('blue',`<b>search("bad")</b> — no dots, so it's a plain trie walk from <b class="k">root</b>.`,{lit:['root'],qi:0,qdone:0}));
+  s.push(()=>caption('blue',`Char <b class="k">'b'</b> → follow child <b class="k">b</b>.`,{lit:['root','b'],litE:['e-root-b'],qi:1,qdone:1}));
+  s.push(()=>caption('blue',`Char <b class="k">'a'</b> → follow child <b class="k">a</b>.`,{lit:['root','b','ba'],litE:['e-root-b','e-b-ba'],qi:2,qdone:2}));
+  s.push(()=>caption('blue',`Char <b class="k">'d'</b> → follow child <b class="k">d</b> (the "bad" node).`,{lit:['root','b','ba','bad'],litE:['e-root-b','e-b-ba','e-ba-bad'],qi:3,qdone:3}));
+  s.push(()=>caption('green',`End of query, and node <b class="k">bad</b> has <b class="k">is_end = True</b>. → <span class="verdict t">search("bad") = True</span>`,{green:['root','b','ba','bad'],greenE:['e-root-b','e-b-ba','e-ba-bad'],qdone:3}));
+  return s;
+}
+
+// search ".ad" — wildcard at pos 0 -> branch into b,d,m
+function makeDotAd() {
+  const s=[];
+  s.push(()=>caption('amber',`<b>search(".ad")</b> — first char is <b class="k">'.'</b> (wildcard) → must try <b>every</b> child of root: b, d, m.`,
+    {amber:['root','b','d','m'],amberE:['e-root-b','e-root-d','e-root-m'],qi:0,qdone:0}));
+  // try branch 'b'
+  s.push(()=>caption('amber',`Branch <b class="k">b</b>: now match remaining <b class="k">"ad"</b>. Char <b class="k">'a'</b> → child a exists.`,
+    {amber:['b','ba'],amberE:['e-root-b'],litE:['e-b-ba'],qi:1,qdone:1}));
+  s.push(()=>caption('amber',`Char <b class="k">'d'</b> under <b class="k">b→a</b> → node <b class="k">bad</b>, and <b class="k">is_end = True</b>.`,
+    {amber:['b','ba'],lit:['bad'],amberE:['e-root-b'],litE:['e-b-ba','e-ba-bad'],qi:2,qdone:2}));
+  s.push(()=>caption('green',`Match found on the very first wildcard branch! → <span class="verdict t">search(".ad") = True</span> ` +
+    `<span style="color:var(--muted)">(matches "bad"; we can stop — d and m branches not needed)</span>`,
+    {green:['root','b','ba','bad'],greenE:['e-root-b','e-b-ba','e-ba-bad'],qdone:3}));
+  return s;
+}
+
+// search "b.." — fixed b, then two wildcards
+function makeBDotDot() {
+  const s=[];
+  s.push(()=>caption('blue',`<b>search("b..")</b> — char <b class="k">'b'</b> is fixed → one path into <b class="k">b</b>.`,
+    {lit:['root','b'],litE:['e-root-b'],qi:0,qdone:0}));
+  s.push(()=>caption('amber',`Char <b class="k">'.'</b> at node <b class="k">b</b> → try every child of b. Only child is <b class="k">a</b>.`,
+    {lit:['b'],amber:['ba'],litE:['e-root-b'],amberE:['e-b-ba'],qi:1,qdone:1}));
+  s.push(()=>caption('amber',`Char <b class="k">'.'</b> at node <b class="k">b→a</b> → try every child: <b class="k">d</b> (bad) and <b class="k">t</b> (bat).`,
+    {lit:['b','ba'],amber:['bad','bat'],litE:['e-root-b','e-b-ba'],amberE:['e-ba-bad','e-ba-bat'],qi:2,qdone:2}));
+  s.push(()=>caption('green',`Try child <b class="k">d</b> first → node <b class="k">bad</b>, <b class="k">is_end = True</b>, query consumed. → <span class="verdict t">search("b..") = True</span> ` +
+    `<span style="color:var(--muted)">(matches "bad"; "bat" would also work)</span>`,
+    {green:['root','b','ba','bad'],greenE:['e-root-b','e-b-ba','e-ba-bad'],qdone:3}));
+  return s;
+}
+
+// search "pad" -> miss at first char
+function makeMiss() {
+  const s=[];
+  s.push(()=>caption('blue',`<b>search("pad")</b> — char <b class="k">'p'</b> is fixed → look for child <b class="k">p</b> under root.`,
+    {lit:['root'],qi:0,qdone:0}));
+  s.push(()=>caption('red',`Root has children <b class="k">b, d, m</b> — no <b class="k">p</b>. Path breaks immediately. → <span class="verdict f">search("pad") = False</span>`,
+    {dead:['root'],qi:0,qdone:0}));
+  return s;
+}
+
+const OPS=[
+  {key:'bad', label:'search("bad")', build:makeBad},
+  {key:'dotad', label:'search(".ad")', build:makeDotAd},
+  {key:'bdd', label:'search("b..")', build:makeBDotDot},
+  {key:'miss', label:'search("pad")', build:makeMiss},
+];
+const QSTR={bad:'bad', dotad:'.ad', bdd:'b..', miss:'pad'};
+
+function buildOps() {
+  $('opbtns').innerHTML=OPS.map(o=>`<button class="opbtn" data-k="${o.key}">${o.label}</button>`).join('');
+  document.querySelectorAll('.opbtn').forEach(b=>b.addEventListener('click',()=>selectOp(b.dataset.k)));
+}
+function buildQuery(str) {
+  $('queryRow').innerHTML = [...str].map(c=>`<span class="qcell ${c==='.'?'dot':''}">${c}</span>`).join('');
+}
+
+let current=null, steps=[], idx=0;
+function selectOp(key) {
+  current=OPS.find(o=>o.key===key);
+  document.querySelectorAll('.opbtn').forEach(b=>b.classList.toggle('active',b.dataset.k===key));
+  buildQuery(QSTR[key]);
+  steps=current.build(); idx=0; apply();
+}
+function apply() {
+  steps[idx]();
+  $('stepcount').textContent=`step ${idx+1} / ${steps.length}`;
+  $('prevBtn').disabled=idx===0; $('nextBtn').disabled=idx===steps.length-1;
+}
+$('nextBtn').addEventListener('click',()=>{if(idx<steps.length-1){idx++;apply();}});
+$('prevBtn').addEventListener('click',()=>{if(idx>0){idx--;apply();}});
+$('resetBtn').addEventListener('click',()=>{if(current)selectOp(current.key);});
+
+buildSVG(); buildOps(); render({});
+$('prevBtn').disabled=true; $('nextBtn').disabled=true;
+</script>
+</body>
+</html>

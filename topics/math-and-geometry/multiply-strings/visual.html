@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multiply Strings — Grid Long Multiplication Visualized</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2); padding: 2px 7px; border-radius: 6px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .stage {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 24px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+
+  .gridwrap { display: flex; gap: 30px; flex-wrap: wrap; align-items: flex-start; }
+  .gridbox { flex: 0 0 auto; }
+  .gtitle { color: var(--muted); font-size: .88rem; margin-bottom: 8px; }
+
+  table.mul { border-collapse: collapse; }
+  table.mul td, table.mul th {
+    width: 46px; height: 46px; text-align: center;
+    font-family: "SF Mono", Menlo, monospace; font-weight: 700; font-size: 1.05rem;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all .3s ease;
+  }
+  table.mul th { color: var(--blue); background: rgba(59,130,246,0.10); }
+  table.mul th.row { color: var(--purple); background: rgba(168,85,247,0.10); }
+  table.mul td.corner { border: none; background: transparent; }
+  table.mul td.prod { color: var(--muted); background: var(--panel2); }
+  table.mul td.prod.cur {
+    background: rgba(245,158,11,0.20); border-color: var(--amber);
+    color: #ffd479; box-shadow: inset 0 0 0 2px var(--amber);
+  }
+  table.mul td.prod.done { color: #cfd6ff; }
+  table.mul th.cur { box-shadow: inset 0 0 0 2px var(--amber); }
+
+  /* result array */
+  .resrow { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rcell {
+    width: 44px;
+    border-radius: 8px; padding: 6px 0;
+    text-align: center;
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--panel2);
+    border: 1px solid rgba(255,255,255,0.10);
+    transition: all .3s ease;
+    position: relative;
+  }
+  .rcell .v { font-size: 1.2rem; font-weight: 700; }
+  .rcell .idx { font-size: .62rem; color: var(--muted); }
+  .rcell.low { border-color: var(--green); background: rgba(16,185,129,0.16); color: #b6f0d8; }
+  .rcell.carry { border-color: var(--red); background: rgba(239,68,68,0.14); color: #ffb3b3; }
+  .rcell.touched { color: #cfd6ff; }
+
+  .caption {
+    margin: 26px 0 6px;
+    background: var(--panel2);
+    border-left: 4px solid var(--blue);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 1rem;
+    min-height: 70px;
+  }
+  .caption.win { border-left-color: var(--green); background: rgba(16,185,129,0.10); }
+  .caption b.amb { color: var(--amber); }
+  .caption b.grn { color: var(--green); }
+  .caption b.red { color: var(--red); }
+  .caption b.blu { color: var(--blue); }
+
+  .controls { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  button.nav {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button.nav:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button.nav:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); }
+  button.ghost:hover:not(:disabled) { background: #34345e; }
+  .counter { margin-left: auto; color: var(--muted); font-family: "SF Mono", Menlo, monospace; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-top: 30px;
+    text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Multiply Strings — <span>position = i + j</span></h1>
+  <p class="subtitle">Grade-school long multiplication on digit arrays, where every product lands at index <code>i+j+1</code>.</p>
+
+  <div class="analogy">
+    <h3>✖️ Multiplication-grid analogy</h3>
+    <p>Har digit pair <code>num1[i] × num2[j]</code> ka product result array me <b>position <code>i+j+1</code></b> (low digit) pe girta hai, carry <code>i+j</code> pe. Koi manual shifting nahi — har product apni sahi jagah khud dhoondh leta hai.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> Multiply <code>"25" × "13"</code> as strings (no int conversion).
+    <span class="arrow">→</span> <code>"325"</code>. Result array size = <code>len(a)+len(b) = 4</code>.
+  </div>
+
+  <div class="stage">
+    <div class="gridwrap">
+      <div class="gridbox">
+        <div class="gtitle">Digit-pair grid (cell = num1[i] × num2[j])</div>
+        <table class="mul" id="grid"></table>
+      </div>
+    </div>
+
+    <div style="margin:24px 0 8px; color:var(--muted); font-size:.88rem;">Result accumulator (index shown below each cell):</div>
+    <div class="resrow" id="resrow"></div>
+
+    <div class="caption" id="caption">Press <b>Next ▸</b> to fill the grid pair by pair.</div>
+    <div class="controls">
+      <button class="nav ghost" id="prevBtn" onclick="prev()">◂ Prev</button>
+      <button class="nav" id="nextBtn" onclick="next()">Next ▸</button>
+      <button class="nav ghost" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="counter" id="counter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Because digit <code>i</code> times digit <code>j</code> always belongs at result position <code>i+j+1</code>, all partial products accumulate into one flat array in O(n·m) — no padded-string addition needed.</p>
+  </div>
+</div>
+
+<script>
+const A = "25", B = "13";
+const n = A.length, m = B.length;
+const da = [...A].map(Number);   // [2,5]
+const db = [...B].map(Number);   // [1,3]
+
+// Simulate algorithm, recording a step per (i,j) pair plus a final step.
+function buildSteps() {
+  const s = [];
+  const res = new Array(n + m).fill(0);
+  s.push({ res: res.slice(), i: -1, j: -1, action: 'init', low: -1, carry: -1,
+    cap: `Initialize a result array of size <code>${n+m}</code> (= len("${A}") + len("${B}")), all zeros. We'll process digit pairs from right to left.` });
+
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      const mul = da[i] * db[j];
+      const low = i + j + 1;
+      const carryPos = i + j;
+      const total = mul + res[low];
+      const newLow = total % 10;
+      const carry = Math.floor(total / 10);
+      res[low] = newLow;
+      res[carryPos] += carry;
+      s.push({
+        res: res.slice(), i, j, action: 'pair', low, carry: carryPos,
+        mul, newLow, carryVal: carry, prevLow: total - mul,
+        cap: `<b class="blu">num1[${i}]=${da[i]}</b> × <b class="blu">num2[${j}]=${db[j]}</b> = <b class="amb">${mul}</b>. ` +
+             `Add to res[<b class="grn">${low}</b>] (now had ${total - mul}) → total ${total}: keep <b class="grn">${newLow}</b> there, ` +
+             `carry <b class="red">${carry}</b> into res[${carryPos}].`
+      });
+    }
+  }
+
+  const str = res.join('').replace(/^0+/, '') || '0';
+  s.push({ res: res.slice(), i: -1, j: -1, action: 'done', low: -1, carry: -1, done: true,
+    cap: `All pairs processed. Read the array left-to-right and strip leading zeros: <code>${res.join('')}</code> → <b class="grn">"${str}"</b>. ✅` });
+  return s;
+}
+
+const steps = buildSteps();
+let cur = 0;
+
+function processedPairs(upTo) {
+  const set = new Set();
+  for (let k = 1; k <= upTo; k++) {
+    const st = steps[k];
+    if (st.action === 'pair') set.add(st.i + ',' + st.j);
+  }
+  return set;
+}
+
+function render() {
+  const step = steps[cur];
+  const done = processedPairs(cur);
+
+  // grid
+  const g = document.getElementById('grid');
+  let html = '<tr><td class="corner"></td>';
+  for (let j = 0; j < m; j++) {
+    const cls = (step.j === j && step.action === 'pair') ? 'cur' : '';
+    html += `<th class="${cls}">${db[j]}<div style="font-size:.6rem;color:var(--muted)">j=${j}</div></th>`;
+  }
+  html += '</tr>';
+  for (let i = 0; i < n; i++) {
+    const rowCur = (step.i === i && step.action === 'pair') ? 'cur' : '';
+    html += `<tr><th class="row ${rowCur}">${da[i]}<div style="font-size:.6rem;color:var(--muted)">i=${i}</div></th>`;
+    for (let j = 0; j < m; j++) {
+      const isCur = step.i === i && step.j === j && step.action === 'pair';
+      const isDone = done.has(i + ',' + j);
+      const cls = 'prod' + (isCur ? ' cur' : isDone ? ' done' : '');
+      html += `<td class="${cls}">${da[i] * db[j]}</td>`;
+    }
+    html += '</tr>';
+  }
+  g.innerHTML = html;
+
+  // result row
+  const r = document.getElementById('resrow');
+  r.innerHTML = step.res.map((v, idx) => {
+    let cls = '';
+    if (idx === step.low) cls = 'low';
+    else if (idx === step.carry && step.action === 'pair') cls = 'carry';
+    else if (v !== 0) cls = 'touched';
+    return `<div class="rcell ${cls}"><div class="v">${v}</div><div class="idx">[${idx}]</div></div>`;
+  }).join('');
+
+  const cap = document.getElementById('caption');
+  cap.innerHTML = step.cap;
+  cap.className = 'caption' + (step.done ? ' win' : '');
+
+  document.getElementById('counter').textContent = `Step ${cur} / ${steps.length - 1}`;
+  document.getElementById('prevBtn').disabled = cur === 0;
+  document.getElementById('nextBtn').disabled = cur === steps.length - 1;
+}
+
+function next() { if (cur < steps.length - 1) { cur++; render(); } }
+function prev() { if (cur > 0) { cur--; render(); } }
+function reset() { cur = 0; render(); }
+
+render();
+</script>
+</body>
+</html>

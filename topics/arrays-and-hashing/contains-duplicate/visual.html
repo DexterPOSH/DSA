@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contains Duplicate — Hash Set Walkthrough</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 60px;
+      gap: 32px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #e0e0e0;
+      text-align: center;
+      letter-spacing: -0.02em;
+    }
+
+    h1 span {
+      color: #3b82f6;
+    }
+
+    /* ── Analogy box ─────────────────────────────────────────── */
+    .analogy {
+      background: #16213e;
+      border: 1px solid #3b82f6;
+      border-radius: 12px;
+      padding: 20px 28px;
+      max-width: 640px;
+      width: 100%;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .analogy-icon {
+      font-size: 2rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .analogy-body {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .analogy-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #3b82f6;
+    }
+
+    .analogy-text {
+      font-size: 1rem;
+      line-height: 1.5;
+      color: #c0c0d0;
+    }
+
+    /* ── Main walkthrough card ───────────────────────────────── */
+    .card {
+      background: #16213e;
+      border: 1px solid #2d3a5a;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 700px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* ── Step description ────────────────────────────────────── */
+    .step-description {
+      min-height: 52px;
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 14px 20px;
+      font-size: 0.95rem;
+      line-height: 1.55;
+      color: #c8c8e0;
+      border-left: 3px solid #3b82f6;
+      transition: border-color 0.3s;
+    }
+
+    .step-description.found {
+      border-color: #ef4444;
+    }
+
+    /* ── Array row ───────────────────────────────────────────── */
+    .section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #7a8ab0;
+      margin-bottom: 10px;
+    }
+
+    .array-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .array-cell {
+      width: 64px;
+      height: 64px;
+      border-radius: 10px;
+      border: 2px solid #2d3a5a;
+      background: #0f172a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #e0e0e0;
+      position: relative;
+      transition: border-color 0.35s, background 0.35s, transform 0.35s, box-shadow 0.35s;
+    }
+
+    .array-cell .cell-index {
+      position: absolute;
+      bottom: 4px;
+      font-size: 0.6rem;
+      font-weight: 400;
+      color: #5a6a90;
+    }
+
+    /* States */
+    .array-cell.current {
+      border-color: #3b82f6;
+      background: #1e3a6e;
+      box-shadow: 0 0 18px rgba(59, 130, 246, 0.45);
+      transform: translateY(-4px);
+    }
+
+    .array-cell.seen-ok {
+      border-color: #22c55e;
+      background: #0d2a1a;
+      color: #86efac;
+    }
+
+    .array-cell.duplicate {
+      border-color: #ef4444;
+      background: #2a0d0d;
+      color: #fca5a5;
+      box-shadow: 0 0 18px rgba(239, 68, 68, 0.5);
+      animation: shake 0.4s ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateY(-4px) translateX(0); }
+      20%       { transform: translateY(-4px) translateX(-5px); }
+      40%       { transform: translateY(-4px) translateX(5px); }
+      60%       { transform: translateY(-4px) translateX(-3px); }
+      80%       { transform: translateY(-4px) translateX(3px); }
+    }
+
+    /* ── Hash set area ───────────────────────────────────────── */
+    .set-area {
+      min-height: 80px;
+      background: #0f172a;
+      border: 1px dashed #2d3a5a;
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .set-empty-hint {
+      font-size: 0.85rem;
+      color: #3a4a6a;
+      font-style: italic;
+    }
+
+    .set-chip {
+      height: 42px;
+      min-width: 42px;
+      padding: 0 14px;
+      border-radius: 8px;
+      background: #1e3a6e;
+      border: 1.5px solid #3b82f6;
+      color: #93c5fd;
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pop-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .set-chip.highlight {
+      background: #2a0d0d;
+      border-color: #ef4444;
+      color: #fca5a5;
+      animation: pop-in-red 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes pop-in {
+      0%   { transform: scale(0.4); opacity: 0; }
+      100% { transform: scale(1);   opacity: 1; }
+    }
+
+    @keyframes pop-in-red {
+      0%   { transform: scale(0.4); opacity: 0; }
+      60%  { transform: scale(1.15); }
+      100% { transform: scale(1);   opacity: 1; }
+    }
+
+    /* ── Result badge ────────────────────────────────────────── */
+    .result-badge {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 22px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .result-badge.show { display: flex; }
+
+    .result-badge.found-result {
+      background: #2a0d0d;
+      border: 1.5px solid #ef4444;
+      color: #fca5a5;
+    }
+
+    .result-badge.not-found-result {
+      background: #0d2a1a;
+      border: 1.5px solid #22c55e;
+      color: #86efac;
+    }
+
+    .result-icon { font-size: 1.4rem; }
+
+    /* ── Controls ────────────────────────────────────────────── */
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 12px 28px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s, opacity 0.2s;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #2d3a5a;
+    }
+
+    .btn-secondary:hover { background: #263248; }
+
+    .step-counter {
+      font-size: 0.85rem;
+      color: #5a6a90;
+      margin-left: auto;
+    }
+
+    /* ── Key takeaway ────────────────────────────────────────── */
+    .takeaway {
+      background: #16213e;
+      border: 1px solid #2d3a5a;
+      border-radius: 12px;
+      padding: 20px 28px;
+      max-width: 640px;
+      width: 100%;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .takeaway-icon {
+      font-size: 1.6rem;
+      flex-shrink: 0;
+      line-height: 1.2;
+    }
+
+    .takeaway-body .takeaway-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #3b82f6;
+      margin-bottom: 4px;
+    }
+
+    .takeaway-body p {
+      font-size: 0.95rem;
+      line-height: 1.55;
+      color: #c0c0d0;
+    }
+
+    .takeaway-body strong { color: #e0e0e0; }
+
+    /* ── Code snippet ────────────────────────────────────────── */
+    .code-block {
+      background: #0f172a;
+      border: 1px solid #2d3a5a;
+      border-radius: 10px;
+      padding: 20px 24px;
+      max-width: 640px;
+      width: 100%;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      color: #94a3b8;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .code-block .kw  { color: #818cf8; }
+    .code-block .fn  { color: #38bdf8; }
+    .code-block .str { color: #34d399; }
+    .code-block .cm  { color: #475569; font-style: italic; }
+    .code-block .num { color: #fb923c; }
+  </style>
+</head>
+<body>
+
+  <h1>Contains Duplicate &mdash; <span>Hash Set Walkthrough</span></h1>
+
+  <!-- Analogy -->
+  <div class="analogy">
+    <div class="analogy-icon">🚪</div>
+    <div class="analogy-body">
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        A <strong>bouncer at a club</strong> checks each arriving guest's name against a list.
+        The first time a name appears, they let the person in and note it down.
+        The moment they see a name that's <em>already on the list</em>, they know
+        there's a duplicate — no need to read the rest of the queue.
+      </div>
+    </div>
+  </div>
+
+  <!-- Walkthrough card -->
+  <div class="card">
+
+    <!-- Step description -->
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-description" id="stepDesc">Press "Next Step" to begin the walkthrough.</div>
+    </div>
+
+    <!-- Array -->
+    <div>
+      <div class="section-label">Input array &nbsp;<code style="color:#5a6a90;font-size:0.75rem">[1, 2, 3, 1]</code></div>
+      <div class="array-row" id="arrayRow">
+        <div class="array-cell" id="cell-0">1<span class="cell-index">i=0</span></div>
+        <div class="array-cell" id="cell-1">2<span class="cell-index">i=1</span></div>
+        <div class="array-cell" id="cell-2">3<span class="cell-index">i=2</span></div>
+        <div class="array-cell" id="cell-3">1<span class="cell-index">i=3</span></div>
+      </div>
+    </div>
+
+    <!-- Hash set -->
+    <div>
+      <div class="section-label">seen &nbsp;<code style="color:#5a6a90;font-size:0.75rem">{ }</code>&nbsp;&mdash; Hash Set</div>
+      <div class="set-area" id="setArea">
+        <span class="set-empty-hint" id="setEmpty">empty</span>
+      </div>
+    </div>
+
+    <!-- Result badge -->
+    <div class="result-badge" id="resultBadge">
+      <span class="result-icon" id="resultIcon"></span>
+      <span id="resultText"></span>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next Step</button>
+      <span class="step-counter" id="stepCounter">Step 0 / 5</span>
+    </div>
+
+  </div>
+
+  <!-- Key takeaway -->
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div class="takeaway-body">
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        <strong>Hash sets give O(1) lookups</strong> — one pass through the array is all you need.
+        Overall complexity: <strong>O(n) time</strong>, <strong>O(n) space</strong>.
+        A sort-based approach achieves O(1) space but costs O(n log n) time.
+      </p>
+    </div>
+  </div>
+
+  <!-- Code snippet -->
+  <div class="code-block"><span class="kw">class</span> <span class="fn">Solution</span>:
+    <span class="kw">def</span> <span class="fn">containsDuplicate</span>(<span class="kw">self</span>, nums: list[<span class="fn">int</span>]) -&gt; <span class="fn">bool</span>:
+        seen = <span class="fn">set</span>()          <span class="cm"># O(n) space</span>
+        <span class="kw">for</span> n <span class="kw">in</span> nums:     <span class="cm"># O(n) time</span>
+            <span class="kw">if</span> n <span class="kw">in</span> seen:
+                <span class="kw">return</span> <span class="fn">True</span>   <span class="cm"># duplicate found!</span>
+            seen.<span class="fn">add</span>(n)
+        <span class="kw">return</span> <span class="fn">False</span></div>
+
+  <script>
+    // ── Steps definition ──────────────────────────────────────────────────────
+    // Each step: { cellIndex, action, desc }
+    // action: 'check' (highlight cell as current), 'add' (mark seen-ok + add chip),
+    //         'duplicate' (mark as duplicate + show result)
+    const arr = [1, 2, 3, 1];
+
+    const steps = [
+      {
+        cellIndex: 0,
+        action: 'add',
+        desc: 'Check <strong>arr[0] = 1</strong>. The seen set is empty, so 1 is not a duplicate. Add 1 to the seen set and move on.',
+      },
+      {
+        cellIndex: 1,
+        action: 'add',
+        desc: 'Check <strong>arr[1] = 2</strong>. The seen set contains {1}. 2 is not in the set — not a duplicate. Add 2 to the seen set.',
+      },
+      {
+        cellIndex: 2,
+        action: 'add',
+        desc: 'Check <strong>arr[2] = 3</strong>. The seen set contains {1, 2}. 3 is not in the set — not a duplicate. Add 3 to the seen set.',
+      },
+      {
+        cellIndex: 3,
+        action: 'duplicate',
+        desc: 'Check <strong>arr[3] = 1</strong>. The seen set contains {1, 2, 3}. <strong style="color:#ef4444">1 is already in the set!</strong> Duplicate found — return <strong style="color:#ef4444">True</strong> immediately.',
+      },
+    ];
+
+    const TOTAL_STEPS = steps.length + 1; // +1 for the final "done" state
+
+    let currentStep = 0;
+    const seenValues = new Set();
+    const chips = {}; // value -> chip element
+
+    function getCellEl(i) { return document.getElementById('cell-' + i); }
+    const setArea   = document.getElementById('setArea');
+    const setEmpty  = document.getElementById('setEmpty');
+    const stepDesc  = document.getElementById('stepDesc');
+    const stepCtr   = document.getElementById('stepCounter');
+    const nextBtn   = document.getElementById('nextBtn');
+    const resultBadge = document.getElementById('resultBadge');
+    const resultIcon  = document.getElementById('resultIcon');
+    const resultText  = document.getElementById('resultText');
+
+    function updateCounter() {
+      stepCtr.textContent = `Step ${currentStep} / ${TOTAL_STEPS}`;
+    }
+
+    function addChip(value, isDuplicate) {
+      if (setEmpty) setEmpty.style.display = 'none';
+      const chip = document.createElement('div');
+      chip.className = 'set-chip' + (isDuplicate ? ' highlight' : '');
+      chip.textContent = value;
+      chip.id = 'chip-' + value + '-' + Date.now();
+      setArea.appendChild(chip);
+      if (isDuplicate) chips['dup-' + value] = chip;
+      else chips[value] = chip;
+    }
+
+    function showResult(found) {
+      resultBadge.className = 'result-badge show ' + (found ? 'found-result' : 'not-found-result');
+      resultIcon.textContent = found ? '🔴' : '🟢';
+      resultText.textContent = found
+        ? 'return True — a duplicate exists in the array.'
+        : 'return False — all elements are unique.';
+    }
+
+    function advance() {
+      if (currentStep >= TOTAL_STEPS) return;
+
+      if (currentStep < steps.length) {
+        const step = steps[currentStep];
+        const cell = getCellEl(step.cellIndex);
+
+        // Remove 'current' from all cells
+        arr.forEach((_, i) => {
+          const c = getCellEl(i);
+          if (!c.classList.contains('seen-ok') && !c.classList.contains('duplicate')) {
+            c.classList.remove('current');
+          }
+        });
+
+        // Apply action
+        if (step.action === 'add') {
+          cell.classList.add('current');
+          stepDesc.innerHTML = step.desc;
+          stepDesc.className = 'step-description';
+
+          // After a brief moment add to set visually
+          setTimeout(() => {
+            cell.classList.remove('current');
+            cell.classList.add('seen-ok');
+            seenValues.add(arr[step.cellIndex]);
+            addChip(arr[step.cellIndex], false);
+          }, 600);
+
+        } else if (step.action === 'duplicate') {
+          cell.classList.add('current');
+          stepDesc.innerHTML = step.desc;
+          stepDesc.className = 'step-description found';
+
+          setTimeout(() => {
+            cell.classList.remove('current');
+            cell.classList.add('duplicate');
+            addChip(arr[step.cellIndex], true);
+            showResult(true);
+            nextBtn.disabled = true;
+          }, 600);
+        }
+
+        currentStep++;
+        updateCounter();
+
+      } else {
+        // Final state already reached (shouldn't normally be called)
+        nextBtn.disabled = true;
+      }
+
+      if (currentStep >= TOTAL_STEPS) {
+        nextBtn.disabled = true;
+      }
+    }
+
+    function reset() {
+      currentStep = 0;
+      seenValues.clear();
+
+      // Reset cells
+      arr.forEach((_, i) => {
+        const c = getCellEl(i);
+        c.className = 'array-cell';
+      });
+
+      // Clear chips
+      const existingChips = setArea.querySelectorAll('.set-chip');
+      existingChips.forEach(c => c.remove());
+
+      // Show empty hint
+      setEmpty.style.display = '';
+
+      // Reset description
+      stepDesc.innerHTML = 'Press "Next Step" to begin the walkthrough.';
+      stepDesc.className = 'step-description';
+
+      // Hide result
+      resultBadge.className = 'result-badge';
+      resultIcon.textContent = '';
+      resultText.textContent = '';
+
+      // Re-enable button
+      nextBtn.disabled = false;
+
+      updateCounter();
+    }
+
+    // Init counter
+    updateCounter();
+  </script>
+</body>
+</html>

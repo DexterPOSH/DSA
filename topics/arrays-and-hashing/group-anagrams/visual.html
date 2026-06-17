@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Group Anagrams — Visual Walkthrough</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 32px 16px 64px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #c7d2fe;
+      margin-bottom: 8px;
+      letter-spacing: 0.01em;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #94a3b8;
+      margin-bottom: 28px;
+    }
+
+    /* Analogy box */
+    .analogy {
+      max-width: 720px;
+      margin: 0 auto 36px;
+      background: #1e2a45;
+      border-left: 4px solid #3b82f6;
+      border-radius: 8px;
+      padding: 18px 22px;
+      line-height: 1.6;
+      font-size: 0.97rem;
+      color: #bfdbfe;
+    }
+    .analogy strong { color: #60a5fa; }
+
+    /* Main layout */
+    .stage {
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* Step indicator */
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .step-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #334155;
+      transition: background 0.3s;
+    }
+    .step-dot.active { background: #3b82f6; }
+    .step-dot.done   { background: #475569; }
+
+    /* Current step description */
+    .step-desc {
+      background: #16213e;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px 22px;
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .step-number {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #3b82f6;
+      min-width: 36px;
+    }
+    .step-text {
+      font-size: 1rem;
+      line-height: 1.55;
+      color: #e0e0e0;
+    }
+    .step-text .word   { font-weight: 700; color: #f0f0f0; font-family: monospace; font-size: 1.05em; }
+    .step-text .sorted { font-weight: 700; font-family: monospace; font-size: 1.05em; }
+    .step-text .key-aet  { color: #60a5fa; }
+    .step-text .key-ant  { color: #34d399; }
+    .step-text .key-abt  { color: #fb923c; }
+
+    /* Word transformation panel */
+    .transform-panel {
+      background: #16213e;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 20px 24px;
+    }
+    .transform-panel h3 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #64748b;
+      margin-bottom: 16px;
+    }
+    .transform-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .letter-box {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px; height: 44px;
+      border-radius: 8px;
+      font-size: 1.25rem;
+      font-weight: 700;
+      font-family: monospace;
+      border: 2px solid transparent;
+      transition: all 0.35s ease;
+    }
+    .letter-box.unsorted {
+      background: #1e293b;
+      border-color: #475569;
+      color: #cbd5e1;
+    }
+    .letter-box.sorting {
+      background: #312e81;
+      border-color: #818cf8;
+      color: #c7d2fe;
+      transform: translateY(-4px);
+    }
+    .letter-box.sorted-aet {
+      background: #1e3a5f;
+      border-color: #3b82f6;
+      color: #93c5fd;
+    }
+    .letter-box.sorted-ant {
+      background: #064e3b;
+      border-color: #10b981;
+      color: #6ee7b7;
+    }
+    .letter-box.sorted-abt {
+      background: #431407;
+      border-color: #f97316;
+      color: #fdba74;
+    }
+    .arrow-label {
+      font-size: 1.5rem;
+      color: #475569;
+    }
+    .key-label {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #64748b;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    /* Hash map panel */
+    .hashmap-panel {
+      background: #16213e;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 20px 24px;
+    }
+    .hashmap-panel h3 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #64748b;
+      margin-bottom: 16px;
+    }
+    .hashmap-rows { display: flex; flex-direction: column; gap: 10px; }
+
+    .hm-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border-radius: 8px;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .hm-row.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .hm-key {
+      font-family: monospace;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 10px 18px;
+      min-width: 80px;
+      text-align: center;
+      letter-spacing: 0.05em;
+    }
+    .hm-key.aet { background: #1e3a5f; color: #60a5fa; }
+    .hm-key.ant { background: #064e3b; color: #34d399; }
+    .hm-key.abt { background: #431407; color: #fb923c; }
+
+    .hm-arrow {
+      font-size: 1rem;
+      color: #f59e0b;
+      padding: 10px 8px;
+      background: #1e293b;
+    }
+    .hm-words {
+      display: flex;
+      gap: 8px;
+      padding: 8px 14px;
+      background: #1e293b;
+      flex: 1;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .hm-word {
+      font-family: monospace;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 5px;
+      opacity: 0;
+      transform: scale(0.85);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .hm-word.show { opacity: 1; transform: scale(1); }
+    .hm-word.aet { background: #1e3a5f; color: #93c5fd; border: 1px solid #3b82f6; }
+    .hm-word.ant { background: #064e3b; color: #6ee7b7; border: 1px solid #10b981; }
+    .hm-word.abt { background: #431407; color: #fdba74; border: 1px solid #f97316; }
+
+    /* Result panel */
+    .result-panel {
+      background: #16213e;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 20px 24px;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    .result-panel.visible { opacity: 1; }
+    .result-panel h3 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #64748b;
+      margin-bottom: 14px;
+    }
+    .result-groups {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .result-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      border-radius: 8px;
+      padding: 10px 14px;
+      border: 1px solid;
+    }
+    .result-group.aet { border-color: #3b82f6; background: #0f2040; }
+    .result-group.ant { border-color: #10b981; background: #022c22; }
+    .result-group.abt { border-color: #f97316; background: #2c1202; }
+    .result-group span {
+      font-family: monospace;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .result-group.aet span { color: #93c5fd; }
+    .result-group.ant span { color: #6ee7b7; }
+    .result-group.abt span { color: #fdba74; }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+    .btn {
+      background: #1e3a5f;
+      color: #93c5fd;
+      border: 1.5px solid #3b82f6;
+      border-radius: 8px;
+      padding: 10px 24px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      letter-spacing: 0.02em;
+    }
+    .btn:hover  { background: #2b4f7a; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.35; cursor: default; }
+    .btn.reset {
+      background: #1e293b;
+      color: #94a3b8;
+      border-color: #475569;
+    }
+    .btn.reset:hover { background: #263347; }
+
+    .step-counter {
+      font-size: 0.85rem;
+      color: #64748b;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    /* Takeaway */
+    .takeaway {
+      max-width: 720px;
+      margin: 0 auto;
+      background: #0f2040;
+      border: 1px solid #3b82f6;
+      border-radius: 10px;
+      padding: 16px 22px;
+      text-align: center;
+      color: #bfdbfe;
+      font-size: 0.97rem;
+      line-height: 1.6;
+    }
+    .takeaway strong { color: #60a5fa; }
+  </style>
+</head>
+<body>
+
+<h1>Group Anagrams</h1>
+<p class="subtitle">LeetCode — Arrays &amp; Hashing</p>
+
+<div class="analogy">
+  <strong>Real-world analogy:</strong> Imagine sorting all letters on a library card — any book whose letters sort to the same sequence goes on the same shelf. "silent" and "listen" both sort to "eilnst", so they land together. The sorted spelling is your shelf address.
+</div>
+
+<div class="stage">
+
+  <!-- Step dots -->
+  <div class="step-indicator" id="stepDots"></div>
+
+  <!-- Step description -->
+  <div class="step-desc">
+    <div class="step-number" id="stepNum">1</div>
+    <div class="step-text" id="stepText"></div>
+  </div>
+
+  <!-- Letter transform panel -->
+  <div class="transform-panel">
+    <h3>Current word  →  sorted key</h3>
+    <div class="transform-row" id="transformRow"></div>
+  </div>
+
+  <!-- Hash map panel -->
+  <div class="hashmap-panel">
+    <h3>Hash map (key → anagram group)</h3>
+    <div class="hashmap-rows" id="hashmapRows">
+      <!-- rows injected by JS -->
+      <div class="hm-row" id="row-aet">
+        <div class="hm-key aet">"aet"</div>
+        <div class="hm-arrow">→</div>
+        <div class="hm-words" id="words-aet"></div>
+      </div>
+      <div class="hm-row" id="row-ant">
+        <div class="hm-key ant">"ant"</div>
+        <div class="hm-arrow">→</div>
+        <div class="hm-words" id="words-ant"></div>
+      </div>
+      <div class="hm-row" id="row-abt">
+        <div class="hm-key abt">"abt"</div>
+        <div class="hm-arrow">→</div>
+        <div class="hm-words" id="words-abt"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result panel (shown at final step) -->
+  <div class="result-panel" id="resultPanel">
+    <h3>Return  —  hash map values</h3>
+    <div class="result-groups">
+      <div class="result-group aet">
+        <span>"eat"</span><span>"tea"</span><span>"ate"</span>
+      </div>
+      <div class="result-group ant">
+        <span>"tan"</span><span>"nat"</span>
+      </div>
+      <div class="result-group abt">
+        <span>"bat"</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn" id="btnBack">&#8592; Back</button>
+    <span class="step-counter" id="stepCounter">Step 1 / 8</span>
+    <button class="btn" id="btnNext">Next &#8594;</button>
+    <button class="btn reset" id="btnReset">Reset</button>
+  </div>
+
+</div>
+
+<div style="margin: 36px auto 0; max-width: 720px;">
+  <div class="takeaway">
+    <strong>Key takeaway:</strong> Sorting each word to a canonical key costs O(k log k) per word (k = word length), giving an overall O(n · k log k) solution — simple, clean, and perfect for interview settings.
+  </div>
+</div>
+
+<script>
+  // ------------- data model ----------------
+  const words = ["eat", "tea", "tan", "ate", "nat", "bat"];
+
+  function sortWord(w) { return w.split('').sort().join(''); }
+
+  const keyOf = { eat:'aet', tea:'aet', tan:'ant', ate:'aet', nat:'ant', bat:'abt' };
+  const groupOf = { eat:'aet', tea:'aet', tan:'ant', ate:'aet', nat:'ant', bat:'abt' };
+
+  // Steps: 0..5 = process each word, 6 = return step
+  const TOTAL_STEPS = words.length + 1; // 0-indexed 0..6
+
+  // For each step index, which words have been committed to the map
+  function committedWords(stepIdx) {
+    // stepIdx 0 = about to process words[0], nothing committed yet
+    // stepIdx k (1-based word k) = words[0..k-1] committed
+    // Actually we show the word being inserted at step k, committed at step k+1
+    // Let's define: at display step k (0-indexed), we are processing words[k]
+    // The map shows words[0..k-1] already there, plus words[k] being added
+    // Final step (k = words.length): show all committed, show result
+    if (stepIdx >= words.length) return [...words];
+    return words.slice(0, stepIdx); // committed = all before current
+  }
+
+  // ------------- state ----------------
+  let currentStep = 0;
+
+  // ------------- DOM refs ----------------
+  const stepNum      = document.getElementById('stepNum');
+  const stepText     = document.getElementById('stepText');
+  const stepCounter  = document.getElementById('stepCounter');
+  const transformRow = document.getElementById('transformRow');
+  const resultPanel  = document.getElementById('resultPanel');
+  const btnBack      = document.getElementById('btnBack');
+  const btnNext      = document.getElementById('btnNext');
+  const dotContainer = document.getElementById('stepDots');
+
+  // Build step dots
+  for (let i = 0; i < TOTAL_STEPS; i++) {
+    const d = document.createElement('div');
+    d.className = 'step-dot';
+    d.id = 'dot-' + i;
+    dotContainer.appendChild(d);
+  }
+
+  // ------------- render ----------------
+  function render(step) {
+    // --- dots ---
+    for (let i = 0; i < TOTAL_STEPS; i++) {
+      const d = document.getElementById('dot-' + i);
+      d.className = 'step-dot' + (i === step ? ' active' : (i < step ? ' done' : ''));
+    }
+
+    stepCounter.textContent = `Step ${step + 1} / ${TOTAL_STEPS}`;
+    btnBack.disabled = step === 0;
+    btnNext.disabled = step === TOTAL_STEPS - 1;
+
+    const isFinal = step === words.length;
+
+    if (isFinal) {
+      // Final step
+      stepNum.textContent = words.length + 1;
+      stepText.innerHTML = `Return the <strong>values</strong> of the hash map — each value is one anagram group.`;
+      renderTransformFinal();
+      renderResultPanel(true);
+    } else {
+      const word = words[step];
+      const key  = keyOf[word];
+      const grp  = groupOf[word];
+      stepNum.textContent = step + 1;
+      stepText.innerHTML = buildStepHTML(step, word, key, grp);
+      renderTransform(word, key, grp, step);
+      renderResultPanel(false);
+    }
+
+    renderHashmap(step);
+  }
+
+  function buildStepHTML(step, word, key, grp) {
+    const keyClass = 'sorted key-' + grp;
+    const arrow = '→';
+    return `Sort <span class="word">"${word}"</span>  ${arrow}  <span class="${keyClass}">"${sortWord(word)}"</span>. Use this as the hash map key and append <span class="word">"${word}"</span> to its bucket.`;
+  }
+
+  // Transform panel: show original letters then sorted letters
+  function renderTransform(word, key, grp, step) {
+    const sorted = sortWord(word);
+    transformRow.innerHTML = '';
+
+    // Original letters (unsorted)
+    word.split('').forEach(ch => {
+      const b = document.createElement('div');
+      b.className = 'letter-box unsorted';
+      b.textContent = ch;
+      transformRow.appendChild(b);
+    });
+
+    // Arrow
+    const arr = document.createElement('div');
+    arr.className = 'arrow-label';
+    arr.textContent = 'sort →';
+    transformRow.appendChild(arr);
+
+    // Sorted letters
+    sorted.split('').forEach(ch => {
+      const b = document.createElement('div');
+      b.className = `letter-box sorted-${grp}`;
+      b.textContent = ch;
+      transformRow.appendChild(b);
+    });
+
+    // Key label
+    const kl = document.createElement('div');
+    kl.innerHTML = `<div class="key-label">key = "${key}"</div>`;
+    transformRow.appendChild(kl);
+  }
+
+  function renderTransformFinal() {
+    transformRow.innerHTML = '';
+    const msg = document.createElement('div');
+    msg.style.cssText = 'color:#64748b;font-size:0.95rem;';
+    msg.textContent = 'All words processed. Hash map is complete.';
+    transformRow.appendChild(msg);
+  }
+
+  function renderHashmap(step) {
+    const isFinal = step === words.length;
+    // Committed words: all words processed so far (including current step's word)
+    // At step k (0-indexed word), word k is being inserted
+    const insertCount = isFinal ? words.length : step + 1; // words[0..step] inserted
+
+    // Determine which bucket rows are visible
+    const visibleBuckets = new Set();
+    const wordsByBucket = { aet: [], ant: [], abt: [] };
+
+    for (let i = 0; i < insertCount; i++) {
+      const w = words[i];
+      const g = groupOf[w];
+      wordsByBucket[g].push(w);
+      visibleBuckets.add(g);
+    }
+
+    const groups = ['aet', 'ant', 'abt'];
+    groups.forEach(g => {
+      const row = document.getElementById('row-' + g);
+      row.className = 'hm-row' + (visibleBuckets.has(g) ? ' visible' : '');
+
+      const container = document.getElementById('words-' + g);
+      container.innerHTML = '';
+      wordsByBucket[g].forEach((w, idx) => {
+        const chip = document.createElement('div');
+        chip.className = `hm-word ${g}`;
+        chip.textContent = `"${w}"`;
+        container.appendChild(chip);
+        // Force reflow then show (slight stagger for the latest word)
+        const delay = (g === groupOf[words[Math.min(step, words.length - 1)]] && idx === wordsByBucket[g].length - 1 && !isFinal) ? 180 : 0;
+        setTimeout(() => { chip.classList.add('show'); }, delay);
+      });
+    });
+  }
+
+  function renderResultPanel(show) {
+    resultPanel.className = 'result-panel' + (show ? ' visible' : '');
+  }
+
+  // ------------- controls ----------------
+  document.getElementById('btnNext').addEventListener('click', () => {
+    if (currentStep < TOTAL_STEPS - 1) { currentStep++; render(currentStep); }
+  });
+  document.getElementById('btnBack').addEventListener('click', () => {
+    if (currentStep > 0) { currentStep--; render(currentStep); }
+  });
+  document.getElementById('btnReset').addEventListener('click', () => {
+    currentStep = 0; render(currentStep);
+  });
+
+  // Initial render
+  render(0);
+</script>
+</body>
+</html>

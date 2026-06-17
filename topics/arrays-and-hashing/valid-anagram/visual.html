@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Valid Anagram — Frequency Counter Walkthrough</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 32px 16px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #93c5fd;
+    margin-bottom: 28px;
+    letter-spacing: 0.02em;
+  }
+
+  .analogy-box {
+    background: #16213e;
+    border: 1px solid #3b82f6;
+    border-left: 4px solid #3b82f6;
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin: 0 auto 28px;
+    max-width: 720px;
+    font-size: 0.95rem;
+    color: #bfdbfe;
+    line-height: 1.5;
+  }
+  .analogy-box strong { color: #93c5fd; }
+
+  .strings-row {
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .string-group { text-align: center; }
+  .string-label {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin-bottom: 8px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .letter-boxes {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .letter-box {
+    width: 38px;
+    height: 38px;
+    border: 2px solid #334155;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    font-weight: 700;
+    background: #0f172a;
+    color: #cbd5e1;
+    transition: background 0.3s, border-color 0.3s, color 0.3s;
+    position: relative;
+  }
+
+  .letter-box.active {
+    border-color: #f59e0b;
+    background: #1c1200;
+    color: #fef08a;
+    box-shadow: 0 0 8px #f59e0b88;
+  }
+  .letter-box.done-phase1 {
+    border-color: #22c55e;
+    background: #052e16;
+    color: #86efac;
+  }
+  .letter-box.done-phase2 {
+    border-color: #60a5fa;
+    background: #0c1a3a;
+    color: #93c5fd;
+  }
+
+  .phase-badge {
+    text-align: center;
+    margin-bottom: 16px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+  .phase-badge span {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 20px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #94a3b8;
+  }
+  .phase-badge span.phase1 { border-color: #22c55e; color: #86efac; background: #052e16; }
+  .phase-badge span.phase2 { border-color: #60a5fa; color: #93c5fd; background: #0c1a3a; }
+  .phase-badge span.done   { border-color: #a855f7; color: #d8b4fe; background: #2e1065; }
+
+  .freq-section {
+    max-width: 720px;
+    margin: 0 auto 24px;
+  }
+  .freq-title {
+    text-align: center;
+    font-size: 0.78rem;
+    color: #94a3b8;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .freq-table {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .freq-cell {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: center;
+    min-width: 50px;
+    transition: border-color 0.3s, background 0.3s;
+  }
+  .freq-cell .freq-letter {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+  }
+  .freq-cell .freq-count {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #3b82f6;
+    transition: color 0.3s;
+  }
+  .freq-cell.zero {
+    border-color: #22c55e;
+    background: #052e16;
+  }
+  .freq-cell.zero .freq-count { color: #4ade80; }
+  .freq-cell.positive { border-color: #f59e0b; }
+  .freq-cell.positive .freq-count { color: #fbbf24; }
+  .freq-cell.negative { border-color: #ef4444; }
+  .freq-cell.negative .freq-count { color: #f87171; }
+  .freq-cell.highlight-active {
+    border-color: #f59e0b;
+    box-shadow: 0 0 8px #f59e0b55;
+  }
+
+  .step-msg {
+    max-width: 720px;
+    margin: 0 auto 20px;
+    text-align: center;
+    min-height: 28px;
+    font-size: 0.93rem;
+    color: #cbd5e1;
+    background: #16213e;
+    border-radius: 6px;
+    padding: 8px 16px;
+    border: 1px solid #1e3a5f;
+  }
+
+  .controls {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .btn {
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 28px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
+    margin: 0 6px;
+  }
+  .btn:hover:not(:disabled) { background: #2563eb; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #94a3b8;
+  }
+  .btn-secondary:hover:not(:disabled) { background: #0f172a; }
+
+  .result-box {
+    max-width: 720px;
+    margin: 0 auto 28px;
+    border-radius: 8px;
+    padding: 14px 20px;
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 600;
+    display: none;
+    border: 2px solid transparent;
+  }
+  .result-box.show { display: block; }
+  .result-box.anagram {
+    background: #052e16;
+    border-color: #22c55e;
+    color: #86efac;
+  }
+
+  .takeaway {
+    max-width: 720px;
+    margin: 0 auto 32px;
+    background: #16213e;
+    border: 1px solid #4f46e5;
+    border-left: 4px solid #818cf8;
+    border-radius: 8px;
+    padding: 14px 20px;
+    font-size: 0.93rem;
+    color: #c7d2fe;
+    line-height: 1.5;
+  }
+  .takeaway strong { color: #a5b4fc; }
+
+  .code-section {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .code-title {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .code-block {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 20px 22px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    white-space: pre;
+    color: #e6edf3;
+  }
+  .kw  { color: #ff7b72; }
+  .fn  { color: #79c0ff; }
+  .str { color: #a5d6ff; }
+  .cm  { color: #8b949e; font-style: italic; }
+  .num { color: #f2cc60; }
+
+  .progress-bar-wrap {
+    max-width: 720px;
+    margin: 0 auto 20px;
+    background: #0f172a;
+    border-radius: 6px;
+    height: 6px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #a855f7);
+    border-radius: 6px;
+    transition: width 0.3s;
+    width: 0%;
+  }
+
+  hr.divider {
+    border: none;
+    border-top: 1px solid #1e293b;
+    max-width: 720px;
+    margin: 28px auto;
+  }
+</style>
+</head>
+<body>
+
+<h1>Valid Anagram &mdash; Frequency Counter Walkthrough</h1>
+
+<div class="analogy-box">
+  <strong>Real-world analogy:</strong> Two bags of Scrabble tiles &mdash; dump them out and count each letter.
+  <strong>Same inventory = anagram.</strong> One bag has extra tiles or different letters? Not an anagram.
+</div>
+
+<!-- String displays -->
+<div class="strings-row">
+  <div class="string-group">
+    <div class="string-label">s (source)</div>
+    <div class="letter-boxes" id="boxes-s"></div>
+  </div>
+  <div class="string-group">
+    <div class="string-label">t (target)</div>
+    <div class="letter-boxes" id="boxes-t"></div>
+  </div>
+</div>
+
+<!-- Phase badge -->
+<div class="phase-badge"><span id="phase-badge">Ready</span></div>
+
+<!-- Progress bar -->
+<div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+
+<!-- Step message -->
+<div class="step-msg" id="step-msg">Press "Next Step" to begin the walkthrough.</div>
+
+<!-- Frequency map -->
+<div class="freq-section">
+  <div class="freq-title">Frequency Map (count[letter])</div>
+  <div class="freq-table" id="freq-table"></div>
+</div>
+
+<!-- Result -->
+<div class="result-box" id="result-box"></div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="btn btn-secondary" id="btn-reset" onclick="reset()">Reset</button>
+  <button class="btn" id="btn-next" onclick="nextStep()">Next Step &rarr;</button>
+</div>
+
+<hr class="divider">
+
+<!-- Key takeaway -->
+<div class="takeaway">
+  <strong>Key Takeaway:</strong> Frequency maps let you compare unordered collections in
+  <strong>O(n) time</strong>. Walk string <em>s</em> once to build counts, walk string <em>t</em>
+  once to decrement. If all counts reach zero, the strings are anagrams. No sorting required.
+</div>
+
+<hr class="divider">
+
+<!-- Code -->
+<div class="code-section">
+  <div class="code-title">Python Implementation</div>
+  <div class="code-block"><span class="kw">def</span> <span class="fn">isAnagram</span>(s: <span class="fn">str</span>, t: <span class="fn">str</span>) -&gt; <span class="fn">bool</span>:
+    <span class="cm"># Early exit: different lengths can't be anagrams</span>
+    <span class="kw">if</span> <span class="fn">len</span>(s) != <span class="fn">len</span>(t):
+        <span class="kw">return</span> <span class="fn">False</span>
+
+    count = {}  <span class="cm"># or: defaultdict(int)</span>
+
+    <span class="cm"># Phase 1: build frequency map from s</span>
+    <span class="kw">for</span> ch <span class="kw">in</span> s:
+        count[ch] = count.get(ch, <span class="num">0</span>) + <span class="num">1</span>
+
+    <span class="cm"># Phase 2: decrement using t</span>
+    <span class="kw">for</span> ch <span class="kw">in</span> t:
+        count[ch] = count.get(ch, <span class="num">0</span>) - <span class="num">1</span>
+        <span class="kw">if</span> count[ch] &lt; <span class="num">0</span>:
+            <span class="kw">return</span> <span class="fn">False</span>  <span class="cm"># t has a char not in s</span>
+
+    <span class="kw">return</span> <span class="fn">True</span>  <span class="cm"># all counts balanced to zero</span>
+
+
+<span class="cm"># Complexity: Time O(n), Space O(1) — alphabet is bounded to 26 letters</span></div>
+</div>
+
+<script>
+  const S = "anagram";
+  const T = "nagaram";
+  const TOTAL_STEPS = S.length + T.length + 1; // +1 for final result step
+
+  let stepIndex = 0;
+  let counts = {};
+
+  // --- Build letter boxes ---
+  function buildBoxes(str, containerId) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = "";
+    for (let i = 0; i < str.length; i++) {
+      const box = document.createElement("div");
+      box.className = "letter-box";
+      box.id = containerId + "-" + i;
+      box.textContent = str[i];
+      el.appendChild(box);
+    }
+  }
+
+  function buildFreqTable() {
+    const el = document.getElementById("freq-table");
+    el.innerHTML = "";
+    // Show all letters that will appear
+    const letters = [...new Set((S + T).split(""))].sort();
+    for (const ch of letters) {
+      const cell = document.createElement("div");
+      cell.className = "freq-cell";
+      cell.id = "freq-" + ch;
+      cell.innerHTML = `<div class="freq-letter">${ch}</div><div class="freq-count" id="freq-count-${ch}">0</div>`;
+      el.appendChild(cell);
+    }
+  }
+
+  function updateFreqCell(ch) {
+    const countEl = document.getElementById("freq-count-" + ch);
+    const cellEl = document.getElementById("freq-" + ch);
+    if (!countEl || !cellEl) return;
+    const val = counts[ch] || 0;
+    countEl.textContent = val;
+    cellEl.classList.remove("zero", "positive", "negative", "highlight-active");
+    if (val === 0) cellEl.classList.add("zero");
+    else if (val > 0) cellEl.classList.add("positive");
+    else cellEl.classList.add("negative");
+  }
+
+  function highlightFreqCell(ch) {
+    const cellEl = document.getElementById("freq-" + ch);
+    if (!cellEl) return;
+    cellEl.classList.add("highlight-active");
+  }
+
+  function setMsg(text) {
+    document.getElementById("step-msg").innerHTML = text;
+  }
+
+  function setPhaseBadge(text, cls) {
+    const badge = document.getElementById("phase-badge");
+    badge.textContent = text;
+    badge.className = cls || "";
+  }
+
+  function setProgress(done, total) {
+    const pct = Math.round((done / total) * 100);
+    document.getElementById("progress-bar").style.width = pct + "%";
+  }
+
+  function reset() {
+    stepIndex = 0;
+    counts = {};
+    buildBoxes(S, "boxes-s");
+    buildBoxes(T, "boxes-t");
+    buildFreqTable();
+    setMsg('Press "Next Step" to begin the walkthrough.');
+    setPhaseBadge("Ready", "");
+    setProgress(0, TOTAL_STEPS);
+    document.getElementById("result-box").className = "result-box";
+    document.getElementById("btn-next").disabled = false;
+  }
+
+  function nextStep() {
+    const phase1End = S.length;
+    const phase2End = S.length + T.length;
+
+    if (stepIndex < phase1End) {
+      // --- Phase 1: walk s ---
+      const i = stepIndex;
+      const ch = S[i];
+
+      // Mark previous active as done
+      if (i > 0) {
+        const prevBox = document.getElementById("boxes-s-" + (i - 1));
+        if (prevBox) { prevBox.classList.remove("active"); prevBox.classList.add("done-phase1"); }
+      }
+
+      // Activate current
+      const box = document.getElementById("boxes-s-" + i);
+      if (box) box.classList.add("active");
+
+      // Update count
+      counts[ch] = (counts[ch] || 0) + 1;
+      updateFreqCell(ch);
+      highlightFreqCell(ch);
+
+      setPhaseBadge("Phase 1: Building frequency map from s", "phase1");
+      setMsg(`s[${i}] = '<strong>${ch}</strong>' &rarr; count['${ch}'] = ${counts[ch]}`);
+      setProgress(i + 1, TOTAL_STEPS);
+      stepIndex++;
+
+    } else if (stepIndex < phase2End) {
+      // --- Phase 2: walk t ---
+      const i = stepIndex - phase1End;
+      const ch = T[i];
+
+      // Finish phase 1 cleanup on first phase2 step
+      if (i === 0) {
+        const lastS = document.getElementById("boxes-s-" + (S.length - 1));
+        if (lastS) { lastS.classList.remove("active"); lastS.classList.add("done-phase1"); }
+      }
+
+      // Mark previous phase2 active as done
+      if (i > 0) {
+        const prevBox = document.getElementById("boxes-t-" + (i - 1));
+        if (prevBox) { prevBox.classList.remove("active"); prevBox.classList.add("done-phase2"); }
+      }
+
+      // Activate current
+      const box = document.getElementById("boxes-t-" + i);
+      if (box) box.classList.add("active");
+
+      // Update count
+      counts[ch] = (counts[ch] || 0) - 1;
+      updateFreqCell(ch);
+      highlightFreqCell(ch);
+
+      const verb = counts[ch] >= 0 ? "balanced" : "over-decremented";
+      setPhaseBadge("Phase 2: Decrementing counts using t", "phase2");
+      setMsg(`t[${i}] = '<strong>${ch}</strong>' &rarr; count['${ch}'] = ${counts[ch]}${counts[ch] === 0 ? " &#10003; (zero!)" : ""}`);
+      setProgress(stepIndex + 1, TOTAL_STEPS);
+      stepIndex++;
+
+    } else {
+      // --- Final step ---
+      const lastT = document.getElementById("boxes-t-" + (T.length - 1));
+      if (lastT) { lastT.classList.remove("active"); lastT.classList.add("done-phase2"); }
+
+      const allZero = Object.values(counts).every(v => v === 0);
+      setPhaseBadge("Done!", "done");
+      setMsg("All counts checked &mdash; result below.");
+      setProgress(TOTAL_STEPS, TOTAL_STEPS);
+
+      const resultBox = document.getElementById("result-box");
+      if (allZero) {
+        resultBox.className = "result-box anagram show";
+        resultBox.innerHTML = `&#10003; All counts are zero &mdash; <strong>"${S}"</strong> and <strong>"${T}"</strong> ARE anagrams!`;
+      }
+
+      document.getElementById("btn-next").disabled = true;
+      stepIndex++;
+    }
+  }
+
+  // Initialize on load
+  reset();
+</script>
+</body>
+</html>

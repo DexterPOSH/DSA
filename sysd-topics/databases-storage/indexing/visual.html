@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Indexing — B+ Tree Lookup vs Full-Table Scan</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  /* tree SVG */
+  .tree-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+
+  .nodebox rect { transition: all .4s ease; }
+  .nodebox text { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px; fill: #cdd2e8; }
+  .nodebox .nlabel { fill: #666680; font-size: 9px; }
+
+  .edge { stroke: #3a3a5c; stroke-width: 2; fill: none; transition: stroke .4s ease, stroke-width .4s ease; }
+  .edge.lit { stroke: #f59e0b; stroke-width: 3.5; }
+  .leaflink { stroke: #475569; stroke-width: 2; stroke-dasharray: 4 3; fill: none; }
+  .leaflink.lit { stroke: #10b981; stroke-width: 3; stroke-dasharray: none; }
+
+  .visit rect { stroke: #f59e0b !important; stroke-width: 3 !important; }
+  .found rect { stroke: #10b981 !important; stroke-width: 3.5 !important; }
+  .scanrow rect { stroke: #f59e0b !important; stroke-width: 2.5 !important; }
+
+  .pointer { fill: #f59e0b; }
+  .seektxt { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10px; fill: #f59e0b; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.consistent { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.consistent h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 22px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.consistent .big { color: #10b981; }
+  /* mini scan bars */
+  .scanviz { display: flex; gap: 2px; margin: 12px 0 4px; flex-wrap: wrap; }
+  .cell { width: 9px; height: 9px; border-radius: 2px; }
+
+  .edgebox { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edgebox h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edgebox ul { margin: 0; padding: 0; list-style: none; }
+  .edgebox li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edgebox li:last-child { border-bottom: none; }
+  .edgebox li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edgebox li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Indexing — B+ Tree Lookup vs Full-Table Scan</h1>
+  <div class="subtitle">How a database serves <code>WHERE email = 'a@b.com'</code> on a <b>10-million-row</b> table in a few milliseconds instead of seconds — by walking a shallow, sorted <b>B+ tree</b> instead of reading every row. Plus the price you pay: extra storage and slower writes.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the textbook index</h3>
+    <p>You need to find "consistent hashing" in a <b>1000-page textbook</b>. Option A: start at page 1 and read every page until you hit it — that's a <b>full-table scan</b>, <code>O(n)</code>, worst case the whole book. Option B: flip to the <b>index</b> at the back, where important words are <b>alphabetically sorted</b> with page numbers beside them. You binary-search the sorted list, jump straight to page 814 — that's an <b>index lookup</b>. Two catches: the index itself eats extra paper (<b>storage</b>), and every time the publisher adds a paragraph they must <b>re-update the index too</b> (<b>slower writes</b>). Exactly the database tradeoff: fast reads, more space, costlier writes.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">table:</span><code>users</code> &nbsp;— 10,000,000 rows on disk</div>
+    <div class="row"><span class="label">query:</span><code>SELECT * FROM users WHERE email = 'a@b.com'</code></div>
+    <div class="row"><span class="label">index:</span><code>B+ tree on (email)</code> &nbsp;— sorted keys, high fan-out, ~3–4 levels deep</div>
+  </div>
+
+  <div class="stage">
+    <div class="tree-holder">
+      <svg viewBox="0 0 560 380" id="tree">
+        <g id="g-edges"></g>
+        <g id="g-leaflinks"></g>
+        <g id="g-nodes"></g>
+        <g id="g-overlay"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Rows in table</div><div class="value" id="v-rows">10M</div></div>
+        <div class="var"><div class="label">Tree depth</div><div class="value" id="v-depth">—</div></div>
+        <div class="var"><div class="label">Node reads</div><div class="value amber" id="v-reads">0</div></div>
+        <div class="var"><div class="label">Lookup</div><div class="value green" id="v-cost">—</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#334155;border:1px solid #475569"></span>B+ tree node (sorted keys)</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Node visited on the walk down</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Target found / leaf chain</div>
+        <div class="legend-item"><span class="swatch" style="background:#1e3a5f;border:1px solid #3b82f6"></span>Leaf node (key → row pointer)</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Full-table scan (read every row)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to start. First we'll see what life looks like <i>without</i> an index.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>No index&nbsp;&nbsp;full-table scan</h3>
+      <div class="formula">read row 1, 2, 3 … n</div>
+      <p>No structure to exploit, so the DB checks <b>every row</b>. Across <b>10M rows</b> that's a huge chunk of sequential disk reads — easily <span class="big">100s of ms → seconds</span>.</p>
+      <div class="scanviz" id="naive-scan"></div>
+      <p>Cost grows linearly: <code>O(n)</code>. Double the table, double the wait.</p>
+    </div>
+    <div class="cx consistent">
+      <h3>B+ tree index lookup</h3>
+      <div class="formula">root → branch → leaf</div>
+      <p>High fan-out (100s of keys per node) keeps the tree <b>shallow</b> — even 10M rows fit in <b>~3–4 levels</b>. Each level is one page-cache hit or disk seek, so the whole lookup is <span class="big">just a few ms</span>.</p>
+      <div class="scanviz" id="consistent-scan"></div>
+      <p>Cost grows logarithmically: <code>O(log n)</code>. 10× the table adds barely one level.</p>
+    </div>
+  </div>
+
+  <div class="edgebox">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Leaves are a linked list</b> — leaf nodes are chained in sorted order, so <code>WHERE age BETWEEN 25 AND 30</code> finds the start key then <b>walks leaves sequentially</b>. Sorted order gives <code>ORDER BY</code> and range scans for free.</li>
+      <li><b>Hash index</b> — maps a key to a bucket: <code>O(1)</code> equality, even faster than B-tree. But hashing destroys order, so it's <b>useless for</b> <code>BETWEEN</code>, <code>&lt;</code>, or <code>ORDER BY</code>.</li>
+      <li><b>Clustered vs secondary</b> — a <b>clustered</b> index stores the rows themselves in the leaf (one per table). A <b>secondary</b> index's leaf holds key + a pointer, so it needs an <b>extra lookup</b> back to the clustered index — unless it's covering.</li>
+      <li><b>Covering / composite</b> — if the index has every column the query needs (<code>SELECT email … WHERE id=5</code> on index <code>(id, email)</code>), the DB never touches the table: an <b>index-only scan</b>, the fastest path. Composite indexes obey the <b>leftmost-prefix</b> rule — <code>(a,b)</code> helps <code>WHERE a=?</code> but not <code>WHERE b=?</code> alone.</li>
+      <li><b>Write cost</b> — every <code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code> must maintain <b>every affected index</b> (possible node splits). A table with 5 indexes writes far slower than one with 1. Don't over-index write-heavy tables.</li>
+      <li><b>B-tree vs LSM-tree</b> — B-tree is <b>read-optimized</b> (in-place updates). <b>LSM-tree</b> (Cassandra, RocksDB) is <b>write-optimized</b>: batches writes into a memtable + append-only SSTables, compacted in the background. Reads may scan several SSTables, mitigated by Bloom filters.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>An index is an <b>auxiliary sorted structure</b> (usually a B+ tree) that turns a <code>WHERE</code>/<code>JOIN</code>/<code>ORDER BY</code> lookup from <code>O(n)</code> full scan into an <code>O(log n)</code> walk of a <b>shallow, sorted tree whose leaves are linked for range scans</b> — paid for with <b>extra storage and slower writes</b>, so you index high-selectivity columns, not every column.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- layout ----------
+  // 3-level B+ tree: 1 root -> 3 branches -> 6 leaves, leaves chained.
+  // We animate a lookup for email 'a@b.com' that lives in the 2nd leaf group.
+  const NW = 92, NH = 34;       // node width/height
+  const overlay = document.getElementById("g-overlay");
+  const gEdges = document.getElementById("g-edges");
+  const gLeaf  = document.getElementById("g-leaflinks");
+  const gNodes = document.getElementById("g-nodes");
+
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // node positions (top-left x given as center; we offset)
+  // y rows: root=40, branch=160, leaf=300
+  const root   = { id:"root",  cx:280, cy:40,  label:"root",   keys:"M | T" };
+  const branch = [
+    { id:"b0", cx:140, cy:160, label:"branch", keys:"D | H" },
+    { id:"b1", cx:280, cy:160, label:"branch", keys:"P | R" },
+    { id:"b2", cx:420, cy:160, label:"branch", keys:"V | X" },
+  ];
+  // leaves carry sample email-ish keys; our target 'a@b.com' sits in leaf l0 (A-range)
+  const leaves = [
+    { id:"l0", cx:70,  cy:300, keys:"a… b…", target:true },
+    { id:"l1", cx:170, cy:300, keys:"e… g…" },
+    { id:"l2", cx:270, cy:300, keys:"k… n…" },
+    { id:"l3", cx:370, cy:300, keys:"p… s…" },
+    { id:"l4", cx:470, cy:300, keys:"u… w…" },
+    { id:"l5", cx:540, cy:300, keys:"y… z…" },
+  ];
+  // parent->child edges (which we light up on the walk)
+  // walk goes root -> b0 -> l0 for 'a@b.com' (a sorts before D)
+  const edges = [
+    { id:"e_root_b0", from:root, to:branch[0] },
+    { id:"e_root_b1", from:root, to:branch[1] },
+    { id:"e_root_b2", from:root, to:branch[2] },
+    { id:"e_b0_l0", from:branch[0], to:leaves[0] },
+    { id:"e_b0_l1", from:branch[0], to:leaves[1] },
+    { id:"e_b1_l2", from:branch[1], to:leaves[2] },
+    { id:"e_b1_l3", from:branch[1], to:leaves[3] },
+    { id:"e_b2_l4", from:branch[2], to:leaves[4] },
+    { id:"e_b2_l5", from:branch[2], to:leaves[5] },
+  ];
+  const litPath = ["e_root_b0", "e_b0_l0"]; // edges on the way to target
+
+  function drawTree(opts) {
+    opts = opts || {};
+    gEdges.innerHTML = ""; gLeaf.innerHTML = ""; gNodes.innerHTML = "";
+    const visit = new Set(opts.visit || []);   // node ids highlighted amber
+    const found = new Set(opts.found || []);    // node ids highlighted green
+    const litEdges = new Set(opts.edges || []);
+    const scanRows = new Set(opts.scan || []);  // leaf ids being range-scanned green
+    const showLeafLink = opts.leaflink;
+
+    // edges
+    for (const e of edges) {
+      const x1 = e.from.cx, y1 = e.from.cy + NH/2;
+      const x2 = e.to.cx,   y2 = e.to.cy - NH/2;
+      const p = svgEl("path", {
+        class: "edge" + (litEdges.has(e.id) ? " lit" : ""),
+        d: `M ${x1} ${y1} C ${x1} ${y1+40}, ${x2} ${y2-40}, ${x2} ${y2}`
+      });
+      gEdges.appendChild(p);
+    }
+
+    // leaf linked-list chain
+    if (showLeafLink) {
+      for (let i = 0; i < leaves.length - 1; i++) {
+        const a = leaves[i], b = leaves[i+1];
+        const lit = scanRows.has(a.id) && scanRows.has(b.id);
+        const p = svgEl("path", {
+          class: "leaflink" + (lit ? " lit" : ""),
+          d: `M ${a.cx + NW/2} ${a.cy} L ${b.cx - NW/2} ${b.cy}`
+        });
+        gLeaf.appendChild(p);
+      }
+    }
+
+    // node renderer
+    function node(n, kind) {
+      const cls = "nodebox" +
+        (found.has(n.id) ? " found" : (visit.has(n.id) ? " visit" : (scanRows.has(n.id) ? " visit" : "")));
+      const g = svgEl("g", { class: cls });
+      const fill = kind === "leaf" ? "#1e3a5f" : "#334155";
+      const stroke = kind === "leaf" ? "#3b82f6" : "#475569";
+      const r = svgEl("rect", {
+        x: n.cx - NW/2, y: n.cy - NH/2, width: NW, height: NH, rx: 6,
+        fill, stroke, "stroke-width": 1.5
+      });
+      g.appendChild(r);
+      if (n.label) {
+        const lt = svgEl("text", { x: n.cx, y: n.cy - 14, "text-anchor": "middle", class: "nlabel" });
+        lt.textContent = n.label;
+        g.appendChild(lt);
+      }
+      const t = svgEl("text", { x: n.cx, y: n.cy + 4, "text-anchor": "middle" });
+      t.textContent = n.keys;
+      g.appendChild(t);
+      gNodes.appendChild(g);
+    }
+
+    node(root, "branch");
+    branch.forEach(b => node(b, "branch"));
+    leaves.forEach(l => node(l, "leaf"));
+  }
+
+  // ---------- overlay (full scan red bar + seek labels) ----------
+  function clearOverlay(){ overlay.innerHTML = ""; }
+  function fullScanOverlay() {
+    clearOverlay();
+    // a red sweeping bar across the leaf row implying "read everything"
+    const bar = svgEl("rect", { x: 24, y: 332, width: 512, height: 12, rx: 3, fill: "#ef4444", opacity: 0.85 });
+    overlay.appendChild(bar);
+    const t = svgEl("text", { x: 280, y: 366, "text-anchor": "middle", class: "seektxt", fill:"#fca5a5" });
+    t.textContent = "scan all 10,000,000 rows  →  O(n)";
+    overlay.appendChild(t);
+  }
+  function targetRowOverlay() {
+    // a small green pointer under target leaf pointing to "row on disk"
+    const l = leaves[0];
+    const t = svgEl("text", { x: l.cx, y: l.cy + 42, "text-anchor": "middle", class: "seektxt", fill:"#6ee7b7" });
+    t.textContent = "→ row pointer";
+    overlay.appendChild(t);
+  }
+
+  // ---------- steps ----------
+  const steps = [
+    {
+      narration: `<b>1. The naive baseline.</b> No index on <code>email</code>. To answer <code>WHERE email = 'a@b.com'</code> the DB has no shortcut — it must do a <b>full-table scan</b>, reading <b>all 10,000,000 rows</b> and checking each one. That's <code>O(n)</code>: 100s of ms to seconds.`,
+      narrClass: "bad",
+      render() { drawTree({ scan: leaves.map(l=>l.id) }); fullScanOverlay(); },
+      stats: { rows:"10M", depth:"—", reads:"10M", cost:"O(n)", costCls:"red", readsCls:"red" }
+    },
+    {
+      narration: `<b>2. Build a B+ tree index.</b> Now we add an index on <code>(email)</code>. It's a <b>balanced tree of sorted keys</b>. Crucially, each node holds <b>hundreds of keys</b> (high fan-out), so the tree stays <b>shallow</b> — 10M rows fit in just <b>~3–4 levels</b>. The bottom row is the <b>leaf</b> level.`,
+      narrClass: "",
+      render() { clearOverlay(); drawTree({}); },
+      stats: { rows:"10M", depth:"~3–4", reads:"0", cost:"—", costCls:"green", readsCls:"amber" }
+    },
+    {
+      narration: `<b>3. Start at the root.</b> Lookup begins at the single <b>root node</b>. We compare the target <code>'a@b.com'</code> against the root's separator keys (<code>M | T</code>). Since <code>a &lt; M</code>, we follow the <b>leftmost child pointer</b> down. That's <b>1 node read</b>.`,
+      narrClass: "move",
+      render() { clearOverlay(); drawTree({ visit:["root"], edges:["e_root_b0"] }); },
+      stats: { rows:"10M", depth:"~3–4", reads:"1", cost:"O(log n)", costCls:"green", readsCls:"amber" }
+    },
+    {
+      narration: `<b>4. Descend to the branch.</b> In the branch node (<code>D | H</code>), again <code>a &lt; D</code>, so we follow its leftmost pointer toward the leaf holding the A-range keys. <b>2 node reads</b> so far — we're already most of the way down a tree that covers 10M rows.`,
+      narrClass: "move",
+      render() { clearOverlay(); drawTree({ visit:["root","b0"], edges:["e_root_b0","e_b0_l0"] }); },
+      stats: { rows:"10M", depth:"~3–4", reads:"2", cost:"O(log n)", costCls:"green", readsCls:"amber" }
+    },
+    {
+      narration: `<b>5. Reach the leaf — found.</b> The leaf node (<code>a… b…</code>) holds the actual key <code>'a@b.com'</code> plus a <b>pointer to the row on disk</b> (or the row itself in a clustered index). <b>3 node reads total</b> — each a page-cache hit or one disk seek — so the whole lookup is just a few <b>ms</b>, versus seconds for the scan.`,
+      narrClass: "good",
+      render() { clearOverlay(); drawTree({ visit:["root","b0"], found:["l0"], edges:["e_root_b0","e_b0_l0"] }); targetRowOverlay(); },
+      stats: { rows:"10M", depth:"~3–4", reads:"3", cost:"O(log n)", costCls:"green", readsCls:"green" }
+    },
+    {
+      narration: `<b>6. Range scans ride the leaf chain.</b> The leaves are linked in <b>sorted order</b> (a linked list). So <code>WHERE email BETWEEN 'a…' AND 'g…'</code> finds the start leaf, then <b>walks right along the chain</b> — no re-traversal from the root. This is why B+ trees give <code>ORDER BY</code> and range queries for free; a hash index can't.`,
+      narrClass: "good",
+      render() { clearOverlay(); drawTree({ found:["l0"], scan:["l0","l1"], leaflink:true, edges:[] }); },
+      stats: { rows:"10M", depth:"~3–4", reads:"3+", cost:"range", costCls:"green", readsCls:"green" }
+    },
+    {
+      narration: `<b>7. The price: writes touch every index.</b> Reads got cheap, but each <code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code> must now also insert into the <b>right sorted spot of every affected index</b> (possibly splitting a full node), plus the index costs extra <b>storage</b>. 5 indexes ⇒ writes far slower than 1. So index <b>high-selectivity</b> columns you actually filter on — not every column.`,
+      narrClass: "move",
+      render() { clearOverlay(); drawTree({ visit:["b1"], found:["l3"], edges:["e_root_b1","e_b1_l3"] }); },
+      stats: { rows:"10M+1", depth:"~3–4", reads:"write", cost:"+space", costCls:"amber", readsCls:"amber" }
+    }
+  ];
+
+  // ---------- DOM ----------
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vRows = document.getElementById("v-rows");
+  const vDepth = document.getElementById("v-depth");
+  const vReads = document.getElementById("v-reads");
+  const vCost = document.getElementById("v-cost");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  let cursor = 0;
+  function render() {
+    const s = steps[cursor];
+    s.render();
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+    vRows.textContent = s.stats.rows;
+    vDepth.textContent = s.stats.depth;
+    vReads.textContent = s.stats.reads;
+    vReads.className = "value " + (s.stats.readsCls || "amber");
+    vCost.textContent = s.stats.cost;
+    vCost.className = "value " + (s.stats.costCls || "green");
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+  function next(){ if (cursor < steps.length-1){ cursor++; render(); } }
+  function prev(){ if (cursor > 0){ cursor--; render(); } }
+  function reset(){ cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  // ---------- contrast mini-scan viz ----------
+  // naive: a long block of red cells (read everything). index: a tiny green dotted path.
+  const naiveEl = document.getElementById("naive-scan");
+  const consEl = document.getElementById("consistent-scan");
+  for (let i = 0; i < 60; i++) {
+    const c = document.createElement("div");
+    c.className = "cell";
+    c.style.background = "#ef4444";
+    naiveEl.appendChild(c);
+  }
+  // index: 3 highlighted cells (root, branch, leaf) among faint ones
+  for (let i = 0; i < 60; i++) {
+    const c = document.createElement("div");
+    c.className = "cell";
+    c.style.background = (i === 0 || i === 1 || i === 2) ? "#10b981" : "#1f3a2a";
+    consEl.appendChild(c);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

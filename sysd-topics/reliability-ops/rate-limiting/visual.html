@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rate Limiting — Token Bucket & the Allow/Reject Decision</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  /* SVG */
+  .svg-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 520px; height: auto; }
+  .lbl { fill: #8888aa; font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .lbl-w { fill: #cdd5e8; font-size: 12px; font-family: -apple-system, sans-serif; font-weight:600; }
+  .pipe { fill: none; stroke: #3a3a5c; stroke-width: 2; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; transition: color .3s; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast / boundary-burst panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.bad { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.good { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.bad h3 { color: #fca5a5; }
+  .cx.good h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 22px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.bad .big { color: #ef4444; }
+  .cx.good .big { color: #10b981; }
+
+  /* algorithm comparison table */
+  .algos { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; overflow-x:auto; }
+  .algos h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid #2d2d50; vertical-align: top; }
+  th { color: #8888aa; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; }
+  td b { color: #fff; }
+  td code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+  .tag { display:inline-block; padding:1px 7px; border-radius: 10px; font-size:11px; font-weight:600; }
+  .tag.cheap { background:#14321f; color:#6ee7b7; }
+  .tag.mid { background:#332611; color:#fbbf24; }
+  .tag.heavy { background:#2a1717; color:#fca5a5; }
+
+  .edge { margin-top: 20px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Rate Limiting — The Token Bucket</h1>
+  <div class="subtitle">How a service caps each client to a fixed rate, deciding in microseconds whether to <b>allow</b> a request or reject it with <code>429 Too Many Requests</code> — while still absorbing a <b>controlled burst</b>.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the nightclub bouncer</h3>
+    <p>A popular club has a bouncer whose rule is: <b>"Max 60 people in per minute"</b> — on average one per second. If 200 people rush the gate in a single second, the bouncer won't let them all in: some wait, some get turned away (<b>rejected</b>), even if there's room inside. That's rate limiting — we deliberately cap the flow so the backend (DB, downstream services) gets a predictable, controlled stream and no single aggressive client ruins it for everyone. The <b>token bucket</b> bouncer is a bit flexible: if the last few minutes were quiet, he's let "saved-up" capacity build, so he can wave a small burst through at once.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">bucket:</span><code>capacity B = 100 tokens</code></div>
+    <div class="row"><span class="label">refill:</span><code>r = 10 tokens / sec</code> &nbsp;(steady drip)</div>
+    <div class="row"><span class="label">rule:</span><code>request costs 1 token → token available ? ALLOW : REJECT (429)</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="svg-holder">
+      <svg viewBox="0 0 520 360" id="scene">
+        <!-- incoming arrow -->
+        <text class="lbl-w" x="60" y="40" text-anchor="middle">incoming</text>
+        <text class="lbl-w" x="60" y="56" text-anchor="middle">request</text>
+        <path class="pipe" d="M40 110 H 175" marker-end="url(#ah)"/>
+        <defs>
+          <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+            <path d="M0 0 L7 3 L0 6 z" fill="#3a3a5c"/>
+          </marker>
+        </defs>
+
+        <!-- limiter / bucket box -->
+        <rect x="180" y="40" width="160" height="240" rx="12" fill="#1f1f3a" stroke="#3a3a5c" stroke-width="2"/>
+        <text class="lbl" x="260" y="62" text-anchor="middle">TOKEN BUCKET</text>
+
+        <!-- refill drip -->
+        <path class="pipe" d="M260 18 V 78" stroke="#10b981" stroke-dasharray="4 4"/>
+        <text class="lbl" x="300" y="26" text-anchor="middle" fill="#6ee7b7">+r/sec</text>
+        <circle id="drip" cx="260" cy="30" r="4" fill="#10b981" opacity="0"/>
+
+        <!-- bucket vessel -->
+        <path d="M205 90 H315 L305 250 H215 Z" fill="#15152b" stroke="#3a3a5c" stroke-width="2"/>
+        <!-- token fill (height animated) -->
+        <clipPath id="vessel"><path d="M205 90 H315 L305 250 H215 Z"/></clipPath>
+        <rect id="fill" x="205" y="90" width="110" height="160" fill="#3b82f6" opacity="0.85" clip-path="url(#vessel)"/>
+        <text id="tok-count" class="lbl-w" x="260" y="175" text-anchor="middle" font-size="22" fill="#fff">100</text>
+        <text class="lbl" x="260" y="195" text-anchor="middle" fill="#cdd5e8">tokens</text>
+
+        <!-- traveling request packet -->
+        <g id="packet" opacity="0">
+          <rect x="-13" y="-11" width="26" height="22" rx="5" fill="#f59e0b" stroke="#fbbf24" stroke-width="2"/>
+          <text x="0" y="4" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1a2e">req</text>
+        </g>
+
+        <!-- ALLOW path -->
+        <path class="pipe" d="M340 130 H 470" marker-end="url(#ah)"/>
+        <rect x="400" y="108" width="100" height="44" rx="8" fill="#14321f" stroke="#10b981" stroke-width="2"/>
+        <text class="lbl-w" x="450" y="127" text-anchor="middle" fill="#6ee7b7">ALLOW</text>
+        <text class="lbl" x="450" y="143" text-anchor="middle" fill="#6ee7b7">200 OK → backend</text>
+
+        <!-- REJECT path -->
+        <path class="pipe" d="M340 220 H 470" marker-end="url(#ah)"/>
+        <rect x="400" y="198" width="100" height="44" rx="8" fill="#2a1717" stroke="#ef4444" stroke-width="2"/>
+        <text class="lbl-w" x="450" y="217" text-anchor="middle" fill="#fca5a5">REJECT</text>
+        <text class="lbl" x="450" y="233" text-anchor="middle" fill="#fca5a5">429 + Retry-After</text>
+
+        <!-- decision label -->
+        <text id="decision" class="lbl-w" x="260" y="312" text-anchor="middle" font-size="15" fill="#8888aa">idle</text>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Tokens left</div><div class="value" id="v-tok">100</div></div>
+        <div class="var"><div class="label">Capacity B</div><div class="value" id="v-cap">100</div></div>
+        <div class="var"><div class="label">Allowed</div><div class="value green" id="v-ok">0</div></div>
+        <div class="var"><div class="label">Rejected (429)</div><div class="value red" id="v-rej">0</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Available tokens (budget)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#10b981"></span>Refill drip (+r/sec)</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Request consuming a token</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Allowed → 200 OK</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Rejected → 429</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to start: a full bucket of 100 tokens, refilling at 10/sec.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx bad">
+      <h3>Fixed Window — boundary burst</h3>
+      <div class="formula">limit = 100 / min, counter resets each window</div>
+      <p>Counter is fine <i>inside</i> a window, but it resets at the edge. A client fires <b>100 requests at 10:00:59</b> and <b>100 more at 10:01:00</b> — straddling the reset. Result: <span class="big">200</span> requests pass in ~1 second — effectively <b>2× the limit</b>.</p>
+      <p>Cheap (one integer per key) but gives no real per-second guarantee. The classic interview gotcha.</p>
+    </div>
+    <div class="cx good">
+      <h3>Sliding Window Counter — the fix</h3>
+      <div class="formula">est = prev × (1 − elapsed%) + curr</div>
+      <p>Blends the previous and current window by how far into the current one you are. Limit 100/min, <b>40% into</b> the window, prev = 90, curr = 20 → est = <code>90 × 0.6 + 20 = </code><span class="big">74</span>. 74 &lt; 100 → allow. Smooths the boundary with just <b>two counters</b> per key.</p>
+      <p>Approximate, but production-grade (Cloudflare-style) accuracy at tiny memory cost.</p>
+    </div>
+  </div>
+
+  <div class="algos">
+    <h3>The four algorithms at a glance</h3>
+    <table>
+      <thead><tr><th>Algorithm</th><th>How it decides</th><th>Memory / key</th><th>Bursts?</th><th>Accuracy</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Fixed Window</b></td>
+          <td>One counter per fixed window (e.g. per minute); reset at boundary.</td>
+          <td><span class="tag cheap">1 integer</span></td>
+          <td>Boundary burst (bad)</td>
+          <td>Loose — allows up to <b>2×</b> at edges.</td>
+        </tr>
+        <tr>
+          <td><b>Sliding Window Log</b></td>
+          <td>Store every request timestamp; drop ones older than the window, then count.</td>
+          <td><span class="tag heavy">up to 100 timestamps</span></td>
+          <td>None (exact)</td>
+          <td><b>Perfectly accurate</b> — but RAM-heavy at scale.</td>
+        </tr>
+        <tr>
+          <td><b>Sliding Window Counter</b></td>
+          <td>Weighted blend of previous + current window counts.</td>
+          <td><span class="tag mid">2 counters</span></td>
+          <td>None (smoothed)</td>
+          <td>Approximate but very good — the sweet spot.</td>
+        </tr>
+        <tr>
+          <td><b>Token Bucket</b></td>
+          <td><code>B</code> tokens, refill <code>r</code>/sec; each request spends one token.</td>
+          <td><span class="tag cheap">token count + ts</span></td>
+          <td><b>Controlled burst</b> (its USP)</td>
+          <td>Smooth average rate, absorbs spikes.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Token Bucket ≠ Leaky Bucket.</b> Token bucket <b>allows bursts</b> (tokens accumulate up to <code>B</code>). Leaky bucket smooths output to a <b>constant rate</b> — no burst. Interviewers probe this distinction directly.</li>
+      <li><b>Distributed = shared, atomic state.</b> With 100s of gateway nodes, counters live in a central fast store — typically <b>Redis</b> (sub-ms). Use atomic <code>INCR</code> or a <b>Lua script</b> so a concurrent <code>read → check → write</code> can't let two requests both see "99 &lt; 100" and slip through (lost update).</li>
+      <li><b>Local vs centralized.</b> Local in-memory counters are fast (zero hops) but each node tracks its own limit → effective global cap becomes <code>N_nodes × limit</code> (too permissive). Centralized Redis is accurate but a round-trip per request and a potential bottleneck. Hybrid = local cache + async sync.</li>
+      <li><b>Fail-open vs fail-closed.</b> If the limiter/Redis dies, do you <b>allow</b> (fail-open, availability-first — most public APIs) or <b>block</b> (fail-closed, protection-first — login/security endpoints)?</li>
+      <li><b>Always return <code>Retry-After</code>.</b> A bare <code>429</code> is incomplete — tell well-behaved clients when to retry (<code>Retry-After</code>) and how much budget is left (<code>X-RateLimit-Remaining</code>), or they hammer you in tight retry loops.</li>
+      <li><b>Used by</b> — GitHub (<code>5000 req/hr</code>), Stripe, Twitter/X for API quotas; login/OTP endpoints for brute-force defense; Cloudflare/Akamai at the edge for DDoS mitigation.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Rate limiting makes a <b>per-request allow/reject decision in microseconds</b> to cap each client. The <b>token bucket</b> — capacity <code>B</code>, refill <code>r</code>/sec — sustains an average rate while absorbing a <b>controlled burst</b>, and returns <code>429 + Retry-After</code> when the budget runs out. At scale, keep the counter in an <b>atomic, shared store like Redis</b> so concurrent nodes can't overshoot the limit.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- bucket vessel geometry (for fill height) ----------
+  const TOP = 90, BOT = 250, FULL_H = BOT - TOP; // 160px tall fill region
+
+  const fillEl   = document.getElementById("fill");
+  const tokCount = document.getElementById("tok-count");
+  const drip     = document.getElementById("drip");
+  const packet   = document.getElementById("packet");
+  const decision = document.getElementById("decision");
+
+  const vTok = document.getElementById("v-tok");
+  const vCap = document.getElementById("v-cap");
+  const vOk  = document.getElementById("v-ok");
+  const vRej = document.getElementById("v-rej");
+
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+
+  const B = 100;
+
+  // each step describes the bucket state AFTER the step's event.
+  // tok: tokens left, ok: cumulative allowed, rej: cumulative rejected
+  // drip: show refill, packet: 'allow' | 'reject' | null
+  const steps = [
+    {
+      tok: 100, ok: 0, rej: 0, drip: false, packet: null,
+      decision: "FULL", decisionColor: "#3b82f6",
+      cls: "",
+      n: `<b>1. A full bucket.</b> The limiter starts with <code>B = 100</code> tokens. Tokens are a <b>budget</b>: each allowed request spends exactly one. A steady drip refills the bucket at <code>r = 10 tokens/sec</code>, capped at <code>B</code> (it never overflows past 100).`
+    },
+    {
+      tok: 99, ok: 1, rej: 0, drip: false, packet: "allow",
+      decision: "ALLOW", decisionColor: "#10b981",
+      cls: "good",
+      n: `<b>2. A request arrives.</b> It needs <b>1 token</b>. The bucket has 99 available, so the limiter <b>spends one</b> and lets the request through: <code>200 OK</code> to the backend. Tokens left: <b>99</b>. This decision must take microseconds — otherwise the limiter itself becomes the bottleneck.`
+    },
+    {
+      tok: 0, ok: 100, rej: 0, drip: false, packet: "allow",
+      decision: "BURST → 0", decisionColor: "#f59e0b",
+      cls: "move",
+      n: `<b>3. A burst drains it.</b> Because the bucket was <b>full</b>, a sudden spike of 100 requests in one instant is <b>all allowed at once</b> — the bucket absorbs the burst and empties to <b>0 tokens</b>. This controlled-burst behavior is the token bucket's signature: average rate stays <code>~r</code>, but saved-up budget cushions spikes.`
+    },
+    {
+      tok: 0, ok: 100, rej: 1, drip: false, packet: "reject",
+      decision: "REJECT", decisionColor: "#ef4444",
+      cls: "bad",
+      n: `<b>4. Empty bucket → reject.</b> The next request finds <b>0 tokens</b>. No budget, no entry: the limiter returns <code>429 Too Many Requests</code> with a <code>Retry-After</code> header so the client knows when to come back — instead of hammering in a tight retry loop.`
+    },
+    {
+      tok: 10, ok: 100, rej: 1, drip: true, packet: null,
+      decision: "+10 refill", decisionColor: "#10b981",
+      cls: "good",
+      n: `<b>5. Refill drips back.</b> One second passes; the refill adds <code>r = 10</code> tokens, so the bucket holds <b>10</b> again. Budget regenerates over time — sustain ~10 req/sec indefinitely, and quiet periods let tokens build back toward <code>B</code> for the next burst.`
+    },
+    {
+      tok: 5, ok: 105, rej: 1, drip: false, packet: "allow",
+      decision: "ALLOW", decisionColor: "#10b981",
+      cls: "good",
+      n: `<b>6. Steady state.</b> With ~10 tokens/sec arriving and being spent, the system settles into its <b>average rate</b>. Requests pass as long as tokens exist and are throttled the moment the budget hits zero — exactly the bouncer's "60 per minute" rhythm, with a little saved-up slack for bursts.`
+    }
+  ];
+
+  let cursor = 0;
+
+  function setBucket(tokens) {
+    const frac = tokens / B;            // 0..1
+    const h = FULL_H * frac;
+    fillEl.setAttribute("y", BOT - h);
+    fillEl.setAttribute("height", h);
+    // color shifts with how empty it is
+    let col = "#3b82f6";
+    if (tokens === 0) col = "#ef4444";
+    else if (tokens <= B * 0.15) col = "#f59e0b";
+    fillEl.setAttribute("fill", col);
+    tokCount.textContent = tokens;
+  }
+
+  function render() {
+    const s = steps[cursor];
+
+    setBucket(s.tok);
+    vTok.textContent = s.tok;
+    vCap.textContent = B;
+    vOk.textContent  = s.ok;
+    vRej.textContent = s.rej;
+
+    // token-left value color
+    vTok.className = "value" + (s.tok === 0 ? " red" : s.tok <= B * 0.15 ? " amber" : "");
+
+    // drip visibility
+    drip.setAttribute("opacity", s.drip ? "1" : "0");
+
+    // decision label
+    decision.textContent = s.decision;
+    decision.setAttribute("fill", s.decisionColor);
+
+    // traveling packet: position it on allow (upper) or reject (lower) exit
+    if (s.packet === "allow") {
+      packet.setAttribute("opacity", "1");
+      packet.setAttribute("transform", "translate(370,130)");
+      packet.querySelector("rect").setAttribute("fill", "#10b981");
+      packet.querySelector("rect").setAttribute("stroke", "#6ee7b7");
+    } else if (s.packet === "reject") {
+      packet.setAttribute("opacity", "1");
+      packet.setAttribute("transform", "translate(370,220)");
+      packet.querySelector("rect").setAttribute("fill", "#ef4444");
+      packet.querySelector("rect").setAttribute("stroke", "#fca5a5");
+    } else {
+      packet.setAttribute("opacity", "0");
+    }
+
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.n;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

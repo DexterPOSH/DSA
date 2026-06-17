@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graph Valid Tree — connected + acyclic via Union-Find</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.05rem; }
+  .analogy p { margin: 0; }
+
+  .panel {
+    background: var(--panel); border-radius: 14px;
+    padding: 20px 24px 26px; margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  code {
+    background: var(--panel2); padding: 2px 7px; border-radius: 5px;
+    color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .tabs { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab {
+    background: var(--panel2); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px; padding: 9px 16px; cursor: pointer; font-size: .92rem;
+    transition: all .2s ease; color: var(--text);
+  }
+  .tab small { display: block; color: var(--muted); font-size: .76rem; }
+  .tab.sel { border-color: var(--blue); background: rgba(59,130,246,0.14); }
+
+  .checks { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  .check {
+    flex: 1; min-width: 200px;
+    background: var(--panel2); border-radius: 10px; padding: 10px 14px;
+    border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 10px;
+    transition: all .35s ease;
+  }
+  .check .mark { font-size: 1.3rem; }
+  .check .txt { font-size: .9rem; }
+  .check .txt b { display: block; }
+  .check.pass { border-color: var(--green); background: rgba(16,185,129,0.10); }
+  .check.fail { border-color: var(--red); background: rgba(239,68,68,0.12); }
+
+  .edgelist { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 14px; }
+  .ept {
+    background: var(--panel2); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 6px 12px; font-family: "SF Mono", Menlo, monospace;
+    font-size: .95rem; transition: all .3s ease;
+  }
+  .ept.done { border-color: var(--green); color: var(--green); opacity: .6; }
+  .ept.active { border-color: var(--amber); background: rgba(245,158,11,0.16); color: #ffd479; transform: scale(1.08); }
+  .ept.bad { border-color: var(--red); background: rgba(239,68,68,0.18); color: #ffb4b4; }
+  .ept.skip { opacity: .35; }
+
+  svg { width: 100%; height: 330px; background: var(--panel2); border-radius: 12px; }
+  .gnode circle { transition: all .45s ease; }
+  .edge-line { transition: all .4s ease; }
+
+  .caption {
+    margin-top: 18px; background: var(--panel2); border-radius: 10px;
+    padding: 14px 18px; border-left: 4px solid var(--blue);
+    font-size: .98rem; min-height: 58px;
+  }
+  .caption.merge { border-left-color: var(--green); background: rgba(16,185,129,0.08); }
+  .caption.cycle { border-left-color: var(--red); background: rgba(239,68,68,0.10); }
+  .caption b.u { color: var(--amber); }
+  .caption b.g { color: var(--green); }
+  .caption b.r { color: var(--red); }
+
+  .controls { text-align: center; margin: 4px 0 6px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 10px 24px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); margin: 0 6px; }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .stepcount { color: var(--muted); font-size: .9rem; margin-top: 10px; }
+
+  .verdict {
+    margin-top: 16px; text-align: center; font-weight: 800; font-size: 1.3rem;
+    padding: 12px; border-radius: 10px; display: none;
+  }
+  .verdict.show { display: block; }
+  .verdict.tree { color: var(--green); background: rgba(16,185,129,0.12); border: 1px solid var(--green); }
+  .verdict.notree { color: var(--red); background: rgba(239,68,68,0.12); border: 1px solid var(--red); }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px; padding: 18px 24px; margin-top: 30px; text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Graph Valid Tree — <span>connected</span> + <span>acyclic</span></h1>
+  <p class="subtitle">A tree needs <b>exactly n-1 edges</b>, <b>no cycle</b>, and <b>one component</b>. Union-Find checks all three in one pass.</p>
+
+  <div class="analogy">
+    <h3>🏢 Real-world analogy: a clean org chart</h3>
+    <p>Har employee CEO tak ek hi chain se jude (<b>connected</b>), aur koi circular reporting na ho (<b>no cycle</b>). Shortcut: a tree always has <b>n-1 edges</b> — warna seedha reject.</p>
+  </div>
+
+  <div class="panel">
+    <div class="tabs" id="tabs">
+      <div class="tab sel" data-case="0">Case A: valid tree<small>n=5, 4 edges</small></div>
+      <div class="tab" data-case="1">Case B: has a cycle<small>n=5, 5 edges</small></div>
+      <div class="tab" data-case="2">Case C: disconnected<small>n=4, 2 edges</small></div>
+    </div>
+
+    <div class="checks">
+      <div class="check" id="chkCount">
+        <span class="mark" id="chkCountMark">○</span>
+        <span class="txt"><b>Edge count = n-1 ?</b><span id="chkCountTxt">—</span></span>
+      </div>
+      <div class="check" id="chkCycle">
+        <span class="mark" id="chkCycleMark">○</span>
+        <span class="txt"><b>No cycle ?</b><span id="chkCycleTxt">—</span></span>
+      </div>
+    </div>
+
+    <div class="edgelist" id="edgelist"></div>
+
+    <svg id="graph" viewBox="0 0 640 330" preserveAspectRatio="xMidYMid meet"></svg>
+
+    <div class="caption" id="caption">Pick a case above, then press <b>Next</b> to walk Union-Find over the edges.</div>
+    <div class="verdict" id="verdict"></div>
+
+    <div class="controls">
+      <button class="ghost" id="prevBtn">‹ Prev</button>
+      <button id="nextBtn">Next ›</button>
+      <button class="ghost" id="resetBtn">↺ Reset</button>
+      <div class="stepcount" id="stepcount"></div>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>If <code>len(edges) == n-1</code> and no union ever joins two already-connected nodes, the graph is forced to be connected and acyclic — a valid tree.</p>
+  </div>
+</div>
+
+<script>
+const CASES = [
+  { n: 5, edges: [[0,1],[0,2],[0,3],[1,4]],
+    pos: {0:{x:320,y:60}, 1:{x:170,y:170}, 2:{x:320,y:180}, 3:{x:470,y:170}, 4:{x:120,y:290}} },
+  { n: 5, edges: [[0,1],[1,2],[2,3],[1,3],[1,4]],
+    pos: {0:{x:120,y:80}, 1:{x:300,y:90}, 2:{x:470,y:170}, 3:{x:330,y:260}, 4:{x:140,y:260}} },
+  { n: 4, edges: [[0,1],[2,3]],
+    pos: {0:{x:150,y:120}, 1:{x:150,y:250}, 2:{x:470,y:120}, 3:{x:470,y:250}} },
+];
+const palette = ['#3b82f6','#10b981','#a855f7','#f59e0b','#ec4899'];
+
+let caseIdx = 0;
+let steps = [];
+let cur = 0;
+const $ = id => document.getElementById(id);
+function rootOf(parent, x) { while (parent[x] !== x) x = parent[x]; return x; }
+
+function buildSteps(c) {
+  const { n, edges } = c;
+  const out = [];
+  const countOk = edges.length === (n - 1);
+  // step 0: edge-count check
+  out.push({
+    kind: 'count', parent: Array.from({length:n},(_,i)=>i), processed: [], n, edges,
+    countOk, cycle: false,
+    cap: countOk
+      ? `<b class="g">Edge count check:</b> <code>${edges.length} edges == n-1 = ${n-1}</code> ✓ — could still be a tree. Now run Union-Find.`
+      : `<b class="r">Edge count check:</b> <code>${edges.length} edges ≠ n-1 = ${n-1}</code> ✗ — ${edges.length > n-1 ? 'too many (must contain a cycle)' : 'too few (must be disconnected)'}. <b class="r">Not a tree</b>.`
+  });
+  if (!countOk) {
+    out[0].terminal = true; out[0].verdict = false;
+    return out;
+  }
+  const parent = Array.from({length:n},(_,i)=>i);
+  const find = x => { while (parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+  let processed = [];
+  for (let i=0;i<edges.length;i++){
+    const [u,v]=edges[i];
+    const ru=find(u), rv=find(v);
+    if (ru===rv){
+      out.push({ kind:'cycle', parent:[...parent], processed:processed.slice(), curEdge:i, u, v, n, edges,
+        countOk:true, cycle:true, terminal:true, verdict:false,
+        cap:`Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=find(${v})=${ru}</code> — already connected! <b class="r">Cycle detected → Not a tree</b>.` });
+      return out;
+    } else {
+      parent[ru]=rv; processed=processed.concat(i);
+      out.push({ kind:'union', parent:[...parent], processed:processed.slice(), curEdge:i, u, v, n, edges,
+        countOk:true, cycle:false,
+        cap:`Edge <b class="u">[${u},${v}]</b>: roots ${ru} ≠ ${rv} — <b class="g">union</b>. No cycle so far.` });
+    }
+  }
+  // all good
+  out.push({ kind:'done', parent:[...parent], processed:processed.slice(), curEdge:-1, n, edges,
+    countOk:true, cycle:false, terminal:true, verdict:true,
+    cap:`All <code>${edges.length}</code> edges processed with no cycle, and <code>n-1</code> unions joined everything into <b class="g">one component</b>. <b class="g">Valid tree ✓</b>.` });
+  return out;
+}
+
+function loadCase(i){
+  caseIdx = i; cur = 0;
+  steps = buildSteps(CASES[i]);
+  [...$('tabs').children].forEach((t,ti)=>t.classList.toggle('sel', ti===i));
+  renderEdgeList();
+  render();
+}
+
+function renderEdgeList(){
+  const { edges } = CASES[caseIdx];
+  $('edgelist').innerHTML = edges.map((e,i)=>`<div class="ept" id="ept${i}">[${e[0]},${e[1]}]</div>`).join('');
+}
+
+function render(){
+  const s = steps[cur];
+  const c = CASES[caseIdx];
+  const { n, pos } = c;
+  const parent = s.parent;
+
+  // color by current root
+  const roots=[]; for(let node=0;node<n;node++){const r=rootOf(parent,node); if(!roots.includes(r)) roots.push(r);}
+  const colorOf={}; roots.forEach((r,i)=>colorOf[r]=palette[i%palette.length]);
+
+  let svg='';
+  // edges drawn = processed + (cycle edge if this is the cycle step)
+  const drawn = s.processed.slice();
+  let cycleEdge = (s.kind==='cycle') ? s.curEdge : null;
+  drawn.forEach(ei=>{
+    const [u,v]=c.edges[ei];
+    const cu = ei===s.curEdge && s.kind==='union';
+    svg += `<line class="edge-line" x1="${pos[u].x}" y1="${pos[u].y}" x2="${pos[v].x}" y2="${pos[v].y}" stroke="${cu?'#10b981':'#5b6b9e'}" stroke-width="${cu?4:3}"/>`;
+  });
+  if (cycleEdge!==null){
+    const [u,v]=c.edges[cycleEdge];
+    svg += `<line class="edge-line" x1="${pos[u].x}" y1="${pos[u].y}" x2="${pos[v].x}" y2="${pos[v].y}" stroke="#ef4444" stroke-width="4" stroke-dasharray="7 5"/>`;
+  }
+  for(let node=0;node<n;node++){
+    const r=rootOf(parent,node); const fill=colorOf[r];
+    let stroke=fill, sw=2;
+    if ((s.u===node||s.v===node) && s.kind!=='count' && s.kind!=='done'){ stroke = s.kind==='cycle'?'#ef4444':'#f59e0b'; sw=4; }
+    const p=pos[node];
+    svg += `<g class="gnode">
+      <circle cx="${p.x}" cy="${p.y}" r="26" fill="${fill}" fill-opacity="0.22" stroke="${stroke}" stroke-width="${sw}"/>
+      <text x="${p.x}" y="${p.y+6}" text-anchor="middle" font-size="20" font-weight="700" fill="#e0e0e0" font-family="SF Mono, monospace">${node}</text>
+    </g>`;
+  }
+  $('graph').innerHTML = svg;
+
+  // checks
+  const cm = $('chkCountMark'), ct = $('chkCountTxt'), cc = $('chkCount');
+  cc.className='check';
+  if (s.kind==='count'){
+    cm.textContent = s.countOk?'✓':'✗'; cc.classList.add(s.countOk?'pass':'fail');
+    ct.textContent = `${c.edges.length} edges, need ${n-1}`;
+  } else {
+    cm.textContent='✓'; cc.classList.add('pass'); ct.textContent=`${c.edges.length} = ${n-1} ✓`;
+  }
+  const ycm=$('chkCycleMark'), yct=$('chkCycleTxt'), ycc=$('chkCycle');
+  ycc.className='check';
+  if (s.kind==='cycle'){ ycm.textContent='✗'; ycc.classList.add('fail'); yct.textContent='cycle found!'; }
+  else if (s.kind==='done'){ ycm.textContent='✓'; ycc.classList.add('pass'); yct.textContent='no cycle, all merged'; }
+  else if (s.kind==='count' && !s.countOk){ ycm.textContent='○'; yct.textContent='—'; }
+  else { ycm.textContent='…'; yct.textContent='checking…'; }
+
+  // edge list
+  c.edges.forEach((e,i)=>{
+    const el=$('ept'+i); el.className='ept';
+    if (s.processed.includes(i) && i!==s.curEdge) el.classList.add('done');
+    if (i===s.curEdge && s.kind==='union') el.classList.add('active');
+    if (i===s.curEdge && s.kind==='cycle') el.classList.add('bad');
+  });
+
+  // caption + verdict
+  const cap=$('caption');
+  cap.className='caption' + (s.kind==='union'?' merge':(s.kind==='cycle'?' cycle':(s.kind==='count'&&!s.countOk?' cycle':(s.kind==='done'?' merge':''))));
+  cap.innerHTML = s.cap;
+
+  const verdict=$('verdict');
+  if (s.terminal){
+    verdict.className='verdict show ' + (s.verdict?'tree':'notree');
+    verdict.textContent = s.verdict ? '✓ Valid tree' : '✗ Not a valid tree';
+  } else verdict.className='verdict';
+
+  $('prevBtn').disabled = cur===0;
+  $('nextBtn').disabled = cur===steps.length-1;
+  $('stepcount').textContent = `Step ${cur} / ${steps.length-1}`;
+}
+
+$('nextBtn').onclick=()=>{ if(cur<steps.length-1){cur++;render();} };
+$('prevBtn').onclick=()=>{ if(cur>0){cur--;render();} };
+$('resetBtn').onclick=()=>{ cur=0; render(); };
+[...$('tabs').children].forEach(t=>t.onclick=()=>loadCase(+t.dataset.case));
+
+loadCase(0);
+</script>
+</body>
+</html>

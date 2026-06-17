@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>N Queens — Place, Check, Backtrack</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #1e293b;
+    --text: #e0e0e0; --muted: #94a3b8;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; padding: 36px 20px 70px; }
+  .wrap { max-width: 840px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+  h1 { font-size: 1.7rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy, .takeaway { background: var(--panel); border-radius: 12px; padding: 18px 22px; display: flex; gap: 14px; align-items: flex-start; }
+  .analogy { border: 1px solid var(--amber); border-left: 5px solid var(--amber); }
+  .takeaway { border: 1px solid var(--blue); border-left: 5px solid var(--blue); }
+  .icon { font-size: 1.7rem; flex-shrink: 0; }
+  .label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+  .analogy .label { color: var(--amber); } .takeaway .label { color: var(--blue); }
+  .analogy p, .takeaway p { font-size: 0.95rem; color: #d8d8e8; }
+  .analogy strong, .takeaway strong { color: #fff; }
+  code { background: #0f172a; padding: 1px 6px; border-radius: 5px; color: #ffd479; font-family: 'Consolas', monospace; }
+
+  .card { background: var(--panel); border: 1px solid #2d3a5a; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 22px; }
+  .section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 10px; }
+
+  .step-desc { background: var(--panel2); border-left: 4px solid var(--blue); border-radius: 8px; padding: 14px 16px; font-size: 0.96rem; min-height: 66px; display: flex; align-items: center; }
+  .step-desc.place { border-left-color: var(--green); }
+  .step-desc.bad { border-left-color: var(--red); }
+  .step-desc.back { border-left-color: var(--amber); }
+  .step-desc.found { border-left-color: var(--green); }
+  .step-desc strong { color: #fff; }
+
+  .main { display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap; }
+
+  /* board */
+  .board { display: grid; grid-template-columns: repeat(4, 58px); gap: 0; border: 3px solid #2d3a5a; border-radius: 8px; overflow: hidden; }
+  .sq { width: 58px; height: 58px; display: grid; place-items: center; font-size: 1.9rem; position: relative; transition: background 0.2s; }
+  .sq.light { background: #26314f; }
+  .sq.dark  { background: #1c263f; }
+  .sq.attack { background: rgba(239,68,68,0.30); }
+  .sq.try    { background: rgba(245,158,11,0.35); }
+  .sq.queen  { background: rgba(16,185,129,0.28); }
+  .sq .q { color: #fcd34d; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
+  .sq.queen .q { color: #6ee7b7; }
+  .sq.try .q { color: #fcd34d; }
+  .sq .x { color: var(--red); font-size: 1rem; font-weight: 700; font-family: 'Consolas', monospace; }
+  .rowlbl { position: absolute; top: 2px; left: 4px; font-size: 0.58rem; color: #5a6a90; font-family: 'Consolas', monospace; }
+
+  /* constraint sets */
+  .side { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 14px; }
+  .setbox { background: var(--panel2); border: 1px solid #2d3a5a; border-radius: 8px; padding: 10px 14px; font-family: 'Consolas', monospace; font-size: 0.85rem; }
+  .setbox .t { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .setbox .v { color: #bcd4ff; min-height: 1.3rem; }
+  .setbox.diag .v { color: #fcd34d; } .setbox.anti .v { color: #f0abfc; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 11px 22px; border-radius: 8px; border: none; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; } .btn-primary:hover { background: #2563eb; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: var(--muted); border: 1px solid #2d3a5a; } .btn-secondary:hover { background: #263248; }
+  .counter { font-size: 0.82rem; color: #5a6a90; margin-left: auto; }
+
+  .sols { display: flex; gap: 14px; flex-wrap: wrap; }
+  .mini { display: grid; grid-template-columns: repeat(4, 16px); gap: 1px; border: 1px solid var(--green); border-radius: 4px; padding: 3px; background: rgba(16,185,129,0.08); animation: pop 0.3s ease; }
+  @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .mini .ms { width: 16px; height: 16px; display: grid; place-items: center; font-size: 0.7rem; color: #5a6a90; }
+  .mini .ms.q { color: #6ee7b7; }
+  .sol-empty { color: #5a6a90; font-size: 0.82rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>N Queens &mdash; <span>Place, Check, Backtrack</span></h1>
+
+  <div class="analogy">
+    <div class="icon">♛</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <p>Seat one "diva" per row so none can see another along a column or
+      diagonal. Pick a safe column, move to the next row. <strong>No safe column
+      left? Back up</strong> the previous diva and re-seat her. All rows filled =
+      a valid arrangement.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-desc" id="stepDesc">Place 4 queens on a 4×4 board, one per row. Press <strong>Next</strong>.</div>
+    </div>
+
+    <div class="main">
+      <div>
+        <div class="section-label" style="margin-bottom:8px;">board (4 × 4) &nbsp;<span style="color:#5a6a90;text-transform:none;font-weight:400">red = attacked</span></div>
+        <div class="board" id="board"></div>
+      </div>
+      <div class="side">
+        <div class="setbox cols"><div class="t">cols used</div><div class="v" id="setCols">{ }</div></div>
+        <div class="setbox diag"><div class="t">diag &nbsp;(r − c)</div><div class="v" id="setDiag">{ }</div></div>
+        <div class="setbox anti"><div class="t">anti &nbsp;(r + c)</div><div class="v" id="setAnti">{ }</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">solutions found</div>
+      <div class="sols" id="sols"><span class="sol-empty">none yet</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn">◀ Prev</button>
+      <button class="btn btn-primary" id="nextBtn">Next ▶</button>
+      <span class="counter" id="counter">Step 0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="icon">💡</div>
+    <div>
+      <div class="label">Key takeaway</div>
+      <p>One queen per row kills row conflicts for free. A column is unsafe if its
+      <code>c ∈ cols</code>, <code>r−c ∈ diag</code>, or <code>r+c ∈ anti</code> —
+      all O(1). Place → recurse → <strong>remove from the three sets</strong> to
+      backtrack. 4×4 yields exactly <strong>2</strong> solutions.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const N = 4;
+
+  // Record the real backtracking run, snapshotting board + sets at each event.
+  const steps = [];
+  (function build() {
+    const queens = [];               // queens[r] = c  (placed rows)
+    const cols = new Set(), diag = new Set(), anti = new Set();
+    const sols = [];                 // each = array of c per row
+
+    function snap(kind, note, tryCell, attackCells) {
+      steps.push({
+        queens: queens.slice(),
+        cols: [...cols].sort((a,b)=>a-b),
+        diag: [...diag].sort((a,b)=>a-b),
+        anti: [...anti].sort((a,b)=>a-b),
+        tryCell: tryCell ? tryCell.slice() : null,   // [r,c] currently testing
+        attack: attackCells ? attackCells.map(a=>a.slice()) : [],
+        sols: sols.map(s => s.slice()),
+        kind, note
+      });
+    }
+    function attackedCells(r) {
+      // cells in row r that are attacked by placed queens (for visualization)
+      const out = [];
+      for (let c = 0; c < N; c++) {
+        if (cols.has(c) || diag.has(r - c) || anti.has(r + c)) out.push([r, c]);
+      }
+      return out;
+    }
+
+    function dfs(r) {
+      if (r === N) {
+        sols.push(queens.slice());
+        snap("found", `All ${N} rows filled — <strong>valid arrangement #${sols.length}!</strong> Record it, then keep searching. ✅`, null, []);
+        return;
+      }
+      for (let c = 0; c < N; c++) {
+        const unsafe = cols.has(c) || diag.has(r - c) || anti.has(r + c);
+        if (unsafe) {
+          const reasons = [];
+          if (cols.has(c)) reasons.push(`col ${c} taken`);
+          if (diag.has(r - c)) reasons.push(`diag r−c=${r-c} taken`);
+          if (anti.has(r + c)) reasons.push(`anti r+c=${r+c} taken`);
+          snap("bad", `Row ${r}, col ${c}: <strong style="color:#fca5a5">attacked</strong> (${reasons.join(", ")}). Skip.`, [r, c], attackedCells(r));
+          continue;
+        }
+        cols.add(c); diag.add(r - c); anti.add(r + c); queens.push(c);
+        snap("place", `Row ${r}, col ${c}: <strong style="color:#6ee7b7">safe</strong> → place queen. Add <code>col ${c}</code>, <code>r−c=${r-c}</code>, <code>r+c=${r+c}</code>. Recurse to row ${r+1}.`, [r, c], []);
+        dfs(r + 1);
+        queens.pop(); cols.delete(c); diag.delete(r - c); anti.delete(r + c);
+        snap("back", `Row ${r}: branch at col ${c} exhausted. <strong>Backtrack</strong> — remove the queen and its constraints, try next col.`, null, []);
+      }
+    }
+    snap("info", `Start at row 0. Sets are empty, so every column is safe.`, null, []);
+    dfs(0);
+    const last = steps[steps.length - 1];
+    snap("done", `Search complete. <strong style="color:#10b981">${sols.length} distinct solutions</strong> for 4-Queens.`, null, []);
+  })();
+
+  const $ = id => document.getElementById(id);
+  const TOTAL = steps.length;
+  let cur = -1;
+
+  // static board
+  (function init() {
+    let h = "";
+    for (let r = 0; r < N; r++)
+      for (let c = 0; c < N; c++) {
+        const shade = (r + c) % 2 === 0 ? "light" : "dark";
+        h += `<div class="sq ${shade}" id="s${r}-${c}"><span class="rowlbl">${r},${c}</span></div>`;
+      }
+    $("board").innerHTML = h;
+  })();
+
+  function fmtSet(arr) { return arr.length ? "{ " + arr.join(", ") + " }" : "{ }"; }
+
+  function render() {
+    // clear board
+    for (let r = 0; r < N; r++)
+      for (let c = 0; c < N; c++) {
+        const el = $(`s${r}-${c}`);
+        const shade = (r + c) % 2 === 0 ? "light" : "dark";
+        el.className = `sq ${shade}`;
+        el.innerHTML = `<span class="rowlbl">${r},${c}</span>`;
+      }
+
+    if (cur < 0) {
+      $("setCols").textContent = "{ }"; $("setDiag").textContent = "{ }"; $("setAnti").textContent = "{ }";
+      $("sols").innerHTML = `<span class="sol-empty">none yet</span>`;
+      $("stepDesc").className = "step-desc";
+      $("stepDesc").innerHTML = `Place 4 queens on a 4×4 board, one per row. Press <strong>Next</strong>.`;
+      updateControls(); return;
+    }
+    const st = steps[cur];
+
+    // placed queens
+    st.queens.forEach((c, r) => {
+      const el = $(`s${r}-${c}`);
+      el.classList.add("queen");
+      el.innerHTML = `<span class="rowlbl">${r},${c}</span><span class="q">♛</span>`;
+    });
+    // attacked cells (only on bad steps)
+    st.attack.forEach(([r,c]) => {
+      const el = $(`s${r}-${c}`);
+      if (!el.classList.contains("queen")) {
+        el.classList.add("attack");
+        el.innerHTML = `<span class="rowlbl">${r},${c}</span><span class="x">✕</span>`;
+      }
+    });
+    // try cell
+    if (st.tryCell) {
+      const [r,c] = st.tryCell;
+      const el = $(`s${r}-${c}`);
+      if (st.kind === "bad") {
+        el.classList.remove("attack"); el.classList.add("attack");
+        el.innerHTML = `<span class="rowlbl">${r},${c}</span><span class="x">✕</span>`;
+      } else {
+        el.classList.add("try");
+        el.innerHTML = `<span class="rowlbl">${r},${c}</span><span class="q">♛</span>`;
+      }
+    }
+
+    $("setCols").textContent = fmtSet(st.cols);
+    $("setDiag").textContent = fmtSet(st.diag);
+    $("setAnti").textContent = fmtSet(st.anti);
+
+    // solutions minis
+    $("sols").innerHTML = st.sols.length
+      ? st.sols.map(s => {
+          let m = "";
+          for (let r = 0; r < N; r++)
+            for (let c = 0; c < N; c++)
+              m += `<div class="ms ${s[r] === c ? 'q' : ''}">${s[r] === c ? '♛' : '·'}</div>`;
+          return `<div class="mini">${m}</div>`;
+        }).join("")
+      : `<span class="sol-empty">none yet</span>`;
+
+    $("stepDesc").className = "step-desc " + (
+      st.kind === "found" || st.kind === "done" ? "found" :
+      st.kind === "bad" ? "bad" :
+      st.kind === "back" ? "back" :
+      st.kind === "place" ? "place" : "");
+    $("stepDesc").innerHTML = st.note;
+    updateControls();
+  }
+  function updateControls() {
+    $("counter").textContent = `Step ${cur + 1} / ${TOTAL}`;
+    $("prevBtn").disabled = cur < 0;
+    $("nextBtn").disabled = cur >= TOTAL - 1;
+  }
+  $("nextBtn").addEventListener("click", () => { if (cur < TOTAL - 1) { cur++; render(); } });
+  $("prevBtn").addEventListener("click", () => { if (cur >= 0) { cur--; render(); } });
+  $("resetBtn").addEventListener("click", () => { cur = -1; render(); });
+  render();
+</script>
+</body>
+</html>

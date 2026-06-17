@@ -1,0 +1,19 @@
+{
+  "current_track": null,
+  "current_category": null,
+  "topics": {
+    "dns-request-lifecycle": {
+      "status": "done",
+      "quiz_score": null,
+      "quiz_total": null,
+      "completed_at": "2026-06-16"
+    },
+    "http-https": {
+      "status": "done",
+      "quiz_score": 2,
+      "quiz_total": 2,
+      "completed_at": "2026-06-16"
+    }
+  },
+  "category_summary": {}
+}

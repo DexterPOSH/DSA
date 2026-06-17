@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Two Sum — Hash Map Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+
+  h1 {
+    margin: 0 0 6px;
+    color: #ffffff;
+    font-size: 28px;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    color: #a0a0b8;
+    margin-bottom: 28px;
+    font-size: 15px;
+  }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px;
+    border-radius: 8px;
+    margin-bottom: 28px;
+  }
+  .analogy h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #3b82f6;
+  }
+  .analogy p {
+    margin: 0;
+    color: #d0d0e0;
+    font-size: 15px;
+  }
+
+  .problem {
+    background: #24243e;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+  }
+  .problem .label {
+    color: #8888aa;
+    margin-right: 8px;
+  }
+  .problem code {
+    color: #fbbf24;
+  }
+
+  .stage {
+    background: #24243e;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .section-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #8888aa;
+    margin: 0 0 14px;
+  }
+
+  /* Array */
+  .array {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .cell {
+    position: relative;
+    min-width: 68px;
+    padding: 16px 8px 8px;
+    background: #2d2d50;
+    border: 2px solid #3a3a5c;
+    border-radius: 8px;
+    text-align: center;
+    transition: all 0.35s ease;
+  }
+  .cell .idx {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a2e;
+    font-size: 11px;
+    color: #8888aa;
+    padding: 0 6px;
+  }
+  .cell .val {
+    font-size: 20px;
+    font-weight: 600;
+    color: #e0e0e0;
+  }
+
+  .cell.current {
+    background: #1e3a8a;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    transform: translateY(-4px);
+  }
+  .cell.current .val { color: #ffffff; }
+
+  .cell.matched {
+    background: #14532d;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+  }
+  .cell.matched .val { color: #ffffff; }
+
+  .cell.visited {
+    opacity: 0.55;
+  }
+
+  /* Computation box */
+  .compute {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .compute-card {
+    background: #2d2d50;
+    border: 1px solid #3a3a5c;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .compute-card .label {
+    font-size: 11px;
+    color: #8888aa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .compute-card .value {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 16px;
+    color: #e0e0e0;
+  }
+  .compute-card .value .num {
+    color: #3b82f6;
+    font-weight: 600;
+  }
+  .compute-card .value .complement {
+    color: #fbbf24;
+    font-weight: 600;
+  }
+
+  /* Hash Map */
+  .hashmap {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-height: 70px;
+    padding: 14px;
+    background: #1f1f3a;
+    border: 1px dashed #3a3a5c;
+    border-radius: 8px;
+  }
+  .hashmap:empty::after {
+    content: "(empty)";
+    color: #666680;
+    font-style: italic;
+    font-size: 13px;
+  }
+  .entry {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 12px;
+    background: #2d2d50;
+    border: 1px solid #3a3a5c;
+    border-radius: 6px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    min-width: 60px;
+    animation: popin 0.3s ease;
+  }
+  .entry .k { font-size: 15px; color: #e0e0e0; font-weight: 600; }
+  .entry .arrow { color: #666680; font-size: 10px; margin: 2px 0; }
+  .entry .v { font-size: 12px; color: #8888aa; }
+
+  .entry.searching {
+    background: #3f2e0d;
+    border-color: #fbbf24;
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.25);
+  }
+  .entry.searching .k { color: #fbbf24; }
+  .entry.found {
+    background: #14532d;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+  }
+  .entry.found .k { color: #10b981; }
+
+  @keyframes popin {
+    from { transform: scale(0.8); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* Narration */
+  .narration {
+    background: #1f1f3a;
+    border-left: 3px solid #3b82f6;
+    padding: 14px 18px;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #d0d0e0;
+    min-height: 52px;
+    transition: border-color 0.3s ease;
+  }
+  .narration.match {
+    border-left-color: #10b981;
+    background: #14321f;
+  }
+  .narration.search {
+    border-left-color: #fbbf24;
+  }
+  .narration code {
+    background: #2d2d50;
+    color: #fbbf24;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    margin: 24px 0 8px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: #3b82f6;
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+    font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled {
+    background: #3a3a5c;
+    color: #666680;
+    cursor: not-allowed;
+  }
+  button.secondary {
+    background: transparent;
+    border: 1px solid #3a3a5c;
+    color: #a0a0b8;
+  }
+  button.secondary:hover:not(:disabled) {
+    background: #2d2d50;
+    color: #e0e0e0;
+  }
+
+  .step-indicator {
+    color: #8888aa;
+    font-size: 13px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    margin: 0 8px;
+  }
+
+  /* Takeaway */
+  .takeaway {
+    margin-top: 32px;
+    background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981;
+    padding: 18px 22px;
+    border-radius: 8px;
+  }
+  .takeaway h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #10b981;
+  }
+  .takeaway p {
+    margin: 0;
+    color: #d0d0e0;
+    font-size: 15px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #8888aa;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch {
+    width: 12px; height: 12px; border-radius: 3px; display: inline-block;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Two Sum — One-Pass Hash Map</h1>
+  <div class="subtitle">Walk through how a single pass with a hash map turns an O(n&sup2;) brute-force into O(n).</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy</h3>
+    <p>You're at a party looking for someone whose age + yours equals a target. You keep a <b>mental map</b> of everyone you've already met. When you meet someone new, you check: <i>"Is the partner age I need already in my map?"</i> If yes — pair found. If no — add this person to your map and keep mingling.</p>
+  </div>
+
+  <div class="problem">
+    <span class="label">Input:</span><code>nums = [2, 7, 11, 15]</code>
+    &nbsp;&nbsp;
+    <span class="label">target:</span><code>9</code>
+  </div>
+
+  <div class="stage">
+    <div class="section-title">Array (nums)</div>
+    <div class="array" id="array"></div>
+
+    <div class="section-title">Current Computation</div>
+    <div class="compute">
+      <div class="compute-card">
+        <div class="label">Current element</div>
+        <div class="value" id="current-val">—</div>
+      </div>
+      <div class="compute-card">
+        <div class="label">Complement needed (target − num)</div>
+        <div class="value" id="complement-val">—</div>
+      </div>
+    </div>
+
+    <div class="section-title">Hash Map &nbsp;<span style="color:#666680;font-weight:400;text-transform:none;letter-spacing:0">{ num → index }</span></div>
+    <div class="hashmap" id="hashmap"></div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>current element</div>
+      <div class="legend-item"><span class="swatch" style="background:#fbbf24"></span>complement being searched</div>
+      <div class="legend-item"><span class="swatch" style="background:#10b981"></span>match found</div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to begin. We'll scan <code>nums</code> left to right.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>By trading a little memory for lookup speed, one pass is enough: for each number, ask the hash map if its complement has already shown up. O(n) time, O(n) space.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const nums = [2, 7, 11, 15];
+  const target = 9;
+
+  // Precompute steps.
+  // Each step is an atomic visual state.
+  // Phases per index i:
+  //   A: highlight current element, compute complement
+  //   B: search hash map for complement (miss OR hit)
+  //   C: if miss -> insert into hash map; if hit -> final matched state
+  const steps = [];
+  steps.push({
+    kind: "intro",
+    highlight: -1,
+    complement: null,
+    map: {},
+    searchKey: null,
+    matchPair: null,
+    narration: `We scan <code>nums</code> left to right. The hash map starts empty.`,
+    narrClass: ""
+  });
+
+  const map = {};
+  let done = false;
+  for (let i = 0; i < nums.length && !done; i++) {
+    const num = nums[i];
+    const complement = target - num;
+
+    // Phase A: focus current
+    steps.push({
+      kind: "focus",
+      highlight: i,
+      complement: complement,
+      map: { ...map },
+      searchKey: null,
+      matchPair: null,
+      narration: `i = ${i}. Current element is <code>nums[${i}] = ${num}</code>. Compute complement = <code>${target} − ${num} = ${complement}</code>.`,
+      narrClass: ""
+    });
+
+    // Phase B: look up complement
+    if (complement in map) {
+      // HIT -> final step
+      steps.push({
+        kind: "search",
+        highlight: i,
+        complement: complement,
+        map: { ...map },
+        searchKey: complement,
+        searchHit: true,
+        matchPair: null,
+        narration: `Check the map for key <code>${complement}</code>… <b>found it!</b> It was stored with index <code>${map[complement]}</code>.`,
+        narrClass: "search"
+      });
+      steps.push({
+        kind: "match",
+        highlight: i,
+        complement: complement,
+        map: { ...map },
+        searchKey: complement,
+        searchHit: true,
+        matchPair: [map[complement], i],
+        narration: `Pair found: <code>nums[${map[complement]}] + nums[${i}] = ${nums[map[complement]]} + ${num} = ${target}</code>. Return <code>[${map[complement]}, ${i}]</code>.`,
+        narrClass: "match"
+      });
+      done = true;
+    } else {
+      // MISS -> insert
+      steps.push({
+        kind: "search",
+        highlight: i,
+        complement: complement,
+        map: { ...map },
+        searchKey: complement,
+        searchHit: false,
+        matchPair: null,
+        narration: `Check the map for key <code>${complement}</code>… not there. So store the current number so future elements can find it.`,
+        narrClass: "search"
+      });
+      map[num] = i;
+      steps.push({
+        kind: "insert",
+        highlight: i,
+        complement: complement,
+        map: { ...map },
+        searchKey: null,
+        matchPair: null,
+        inserted: num,
+        narration: `Insert <code>${num} → ${i}</code> into the hash map. Move on.`,
+        narrClass: ""
+      });
+    }
+  }
+
+  // DOM refs
+  const arrayEl = document.getElementById("array");
+  const mapEl = document.getElementById("hashmap");
+  const currentValEl = document.getElementById("current-val");
+  const complementValEl = document.getElementById("complement-val");
+  const narrEl = document.getElementById("narration");
+  const stepIndicatorEl = document.getElementById("step-indicator");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+
+  // Build static array cells once
+  function buildArray() {
+    arrayEl.innerHTML = "";
+    nums.forEach((n, i) => {
+      const c = document.createElement("div");
+      c.className = "cell";
+      c.dataset.idx = i;
+      c.innerHTML = `<span class="idx">idx ${i}</span><span class="val">${n}</span>`;
+      arrayEl.appendChild(c);
+    });
+  }
+
+  let cursor = 0;
+
+  function render() {
+    const s = steps[cursor];
+
+    // Array cells
+    [...arrayEl.children].forEach((cell, idx) => {
+      cell.classList.remove("current", "matched", "visited");
+      if (s.matchPair && (idx === s.matchPair[0] || idx === s.matchPair[1])) {
+        cell.classList.add("matched");
+      } else if (s.highlight === idx) {
+        cell.classList.add("current");
+      } else if (s.highlight > idx) {
+        cell.classList.add("visited");
+      }
+    });
+
+    // Compute cards
+    if (s.highlight >= 0) {
+      currentValEl.innerHTML = `<span class="num">nums[${s.highlight}] = ${nums[s.highlight]}</span>`;
+      complementValEl.innerHTML = `${target} − ${nums[s.highlight]} = <span class="complement">${s.complement}</span>`;
+    } else {
+      currentValEl.textContent = "—";
+      complementValEl.textContent = "—";
+    }
+
+    // Hash map entries
+    mapEl.innerHTML = "";
+    const keys = Object.keys(s.map);
+    keys.forEach(k => {
+      const e = document.createElement("div");
+      e.className = "entry";
+      if (s.searchKey !== null && Number(k) === s.searchKey) {
+        e.classList.add(s.searchHit ? "found" : "searching");
+      }
+      if (s.kind === "match" && s.matchPair && Number(k) === s.searchKey) {
+        e.classList.add("found");
+      }
+      e.innerHTML = `<span class="k">${k}</span><span class="arrow">&darr;</span><span class="v">idx ${s.map[k]}</span>`;
+      mapEl.appendChild(e);
+    });
+
+    // If searching for a key that is NOT in the map, show a "ghost" searching entry
+    if (s.searchKey !== null && !s.searchHit && !(s.searchKey in s.map)) {
+      const ghost = document.createElement("div");
+      ghost.className = "entry searching";
+      ghost.style.opacity = "0.7";
+      ghost.style.borderStyle = "dashed";
+      ghost.innerHTML = `<span class="k">${s.searchKey}?</span><span class="arrow">&darr;</span><span class="v">not found</span>`;
+      mapEl.appendChild(ghost);
+    }
+
+    // Narration
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    // Step indicator
+    stepIndicatorEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+
+    // Buttons
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() {
+    if (cursor < steps.length - 1) { cursor++; render(); }
+  }
+  function prev() {
+    if (cursor > 0) { cursor--; render(); }
+  }
+  function reset() {
+    cursor = 0;
+    render();
+  }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+
+  // Keyboard
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  buildArray();
+  render();
+})();
+</script>
+</body>
+</html>

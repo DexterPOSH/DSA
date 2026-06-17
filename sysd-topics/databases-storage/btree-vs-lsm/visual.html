@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>B-Tree vs LSM-Tree — Write &amp; Read Path Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0 0 8px; color: #d0d0e0; font-size: 15px; }
+  .analogy p:last-child { margin-bottom: 0; }
+  .analogy b { color: #ffffff; }
+  .analogy .bt { color: #93c5fd; }
+  .analogy .lsm { color: #6ee7b7; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 22px; margin-bottom: 20px;
+  }
+  .stage-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 8px; }
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0;
+  }
+  .mode-pill { font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; color:#a0a0b8;
+               border:1px solid #3a3a5c; border-radius: 99px; padding: 3px 10px; }
+
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 980px; height: auto; }
+
+  .col-title { font: 700 14px -apple-system, sans-serif; }
+  .lane-label { fill:#8a8aa8; font: 10px "SF Mono", Menlo, Consolas, monospace; }
+  .box-label  { fill:#e8e8f4; font: 600 12px -apple-system, sans-serif; }
+  .box-sub    { fill:#9a9ab8; font: 10px "SF Mono", Menlo, Consolas, monospace; }
+  .flow-arrow { stroke:#4a4a6a; stroke-width:2; fill:none; marker-end:url(#ah); }
+  .divider    { stroke:#33334d; stroke-width:1.5; stroke-dasharray:4 5; }
+
+  .stagebox { transition: all .4s ease; }
+  .stagebox rect { transition: all .4s ease; }
+  .stagebox.active rect { stroke:#fbbf24; stroke-width:3; filter:url(#glow); }
+  .stagebox.dim { opacity:.32; }
+
+  .packet { transition: all .45s ease; }
+  .packet circle { transition: all .45s ease; }
+
+  /* side stats below diagram */
+  .side { display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top:18px; }
+  @media (max-width: 760px){ .side { grid-template-columns:1fr; } }
+  .statcard { border-radius:10px; padding:14px 16px; }
+  .statcard.bt { background:#16213e; border:1px solid #2f4a78; }
+  .statcard.lsm { background:#11291f; border:1px solid #2c5b41; }
+  .statcard h4 { margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:1px; }
+  .statcard.bt h4 { color:#93c5fd; }
+  .statcard.lsm h4 { color:#6ee7b7; }
+  .ampgrid { display:grid; grid-template-columns: auto 1fr; gap:6px 10px; align-items:center; }
+  .ampgrid .k { font-size:11px; color:#8888aa; text-transform:uppercase; letter-spacing:.5px; }
+  .ampgrid .v { font-family:"SF Mono", Menlo, Consolas, monospace; font-size:12px; }
+  .pip { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:2px; vertical-align:middle; opacity:.25; }
+  .pip.on { opacity:1; }
+  .amp-lo .pip.on { background:#10b981; }
+  .amp-mid .pip.on { background:#fbbf24; }
+  .amp-hi .pip.on { background:#ef4444; }
+  .amp-lo, .amp-mid, .amp-hi { font-family:inherit; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:14px; font-size:12px; color:#a0a0b8;
+            background:#1f1f3a; border:1px solid #3a3a5c; border-radius:8px; padding:11px 16px; margin-top:16px; }
+  .legend-item { display:flex; align-items:center; gap:7px; }
+  .swatch { width:13px; height:13px; border-radius:3px; display:inline-block; flex:none; }
+  .swatch.round { border-radius:50%; }
+
+  .narration {
+    background:#1f1f3a; border-left:3px solid #3b82f6; padding:14px 18px; border-radius:4px;
+    font-size:14px; color:#d0d0e0; min-height:62px; transition:border-color .3s ease; margin-top:18px;
+  }
+  .narration.bt { border-left-color:#3b82f6; background:#16213e; }
+  .narration.lsm { border-left-color:#10b981; background:#11291f; }
+  .narration.warn { border-left-color:#f59e0b; background:#332611; }
+  .narration code { background:#2d2d50; color:#fbbf24; padding:1px 6px; border-radius:3px; font-size:13px; }
+  .narration b { color:#fff; }
+
+  .controls { display:flex; gap:10px; justify-content:center; align-items:center; margin:22px 0 8px; flex-wrap:wrap; }
+  button {
+    background:#3b82f6; color:#fff; border:none; padding:10px 20px; font-size:14px; font-weight:500;
+    border-radius:6px; cursor:pointer; transition:background .15s ease, transform .1s ease; font-family:inherit;
+  }
+  button:hover:not(:disabled){ background:#2563eb; }
+  button:active:not(:disabled){ transform:translateY(1px); }
+  button:disabled{ background:#3a3a5c; color:#666680; cursor:not-allowed; }
+  button.secondary{ background:transparent; border:1px solid #3a3a5c; color:#a0a0b8; }
+  button.secondary:hover:not(:disabled){ background:#2d2d50; color:#e0e0e0; }
+  .step-indicator{ color:#8888aa; font-size:13px; font-family:"SF Mono", Menlo, Consolas, monospace; margin:0 8px; }
+
+  .contrast { margin-top:32px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:700px){ .contrast{ grid-template-columns:1fr; } }
+  .cx { border-radius:12px; padding:20px 22px; }
+  .cx.bt { background:#16213e; border:1px solid #3b82f6; }
+  .cx.lsm { background:#11291f; border:1px solid #10b981; }
+  .cx h3 { margin:0 0 6px; font-size:14px; text-transform:uppercase; letter-spacing:1px; }
+  .cx.bt h3 { color:#93c5fd; }
+  .cx.lsm h3 { color:#6ee7b7; }
+  .cx .formula { font-family:"SF Mono", Menlo, Consolas, monospace; font-size:13px; color:#fff; margin-bottom:10px;
+                 background:#00000033; padding:8px 10px; border-radius:6px; }
+  .cx p { margin:6px 0 0; font-size:13px; color:#c8c8d8; }
+  .cx .big { font-size:18px; font-weight:800; font-family:"SF Mono", Menlo, Consolas, monospace; }
+  .cx.bt .big { color:#3b82f6; }
+  .cx.lsm .big { color:#10b981; }
+  .cx ul { margin:10px 0 0; padding-left:18px; }
+  .cx li { font-size:13px; color:#c8c8d8; margin:4px 0; }
+  .cx code { background:#00000033; color:#fbbf24; padding:1px 5px; border-radius:3px; font-size:12px; }
+
+  .edge { margin-top:32px; background:#24243e; border-radius:12px; padding:22px 24px; }
+  .edge h3 { margin:0 0 14px; font-size:14px; text-transform:uppercase; letter-spacing:1px; color:#fbbf24; }
+  .edge ul { margin:0; padding:0; list-style:none; }
+  .edge li { padding:9px 0; border-bottom:1px solid #2d2d50; font-size:14px; color:#d0d0e0; }
+  .edge li:last-child { border-bottom:none; }
+  .edge li code { background:#2d2d50; color:#fbbf24; padding:1px 6px; border-radius:3px; font-size:13px; }
+  .edge li b { color:#fff; }
+
+  .takeaway {
+    margin-top:20px; background:linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left:4px solid #10b981; padding:18px 22px; border-radius:8px;
+  }
+  .takeaway h3 { margin:0 0 8px; font-size:14px; text-transform:uppercase; letter-spacing:1px; color:#10b981; }
+  .takeaway p { margin:0; color:#d0d0e0; font-size:15px; }
+  .takeaway b { color:#fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>B-Tree vs LSM-Tree — Two Ways to Put Data on Disk</h1>
+  <div class="subtitle">Both are sorted on-disk storage engines, but they make opposite bets. A B-Tree does the <b>hard work at write time</b> (find the right page, update it <code>in-place</code> → random I/O). An LSM-Tree does the <b>hard work at read time</b> plus background cleanup (buffer in RAM, append <code>sequentially</code>, merge later). Watch a single <code>PUT</code>, then a <code>GET</code>, flow through each.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the classroom register</h3>
+    <p>You keep a class register where students must stay alphabetically sorted.</p>
+    <p><span class="bt"><b>B-Tree way:</b></span> one proper register, each page sorted. New student <b>"Karan"</b> arrives → you flip to the <code>Ka…</code> page and physically insert him there (a <b>random write</b>); if the page is full you <b>split</b> it. Lookups are lightning-fast — follow the index straight to the name — but every write costs you a seek to the exact spot.</p>
+    <p><span class="lsm"><b>LSM way:</b></span> you never write into the register directly. A small <b>desk notebook (memtable)</b> takes new names instantly, no sorting tension. When it fills, you sort it once and lay down a fresh <b>clean sheet (immutable SSTable)</b> on a pile, then grab a new notebook. Writing is super fast — you only ever move forward. <b>Catch:</b> to find "Karan" you check the notebook, then every sheet newest→oldest, so a <b>peon (compaction)</b> keeps merging sheets in the background to kill duplicates and keep reads sane.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">b-tree:</span><code>balanced tree of 4–16 KB pages, sorted keys, in-place update, WAL first</code></div>
+    <div class="row"><span class="label">lsm:</span><code>memtable (RAM) → flush → immutable SSTables → background compaction, WAL first</code></div>
+    <div class="row"><span class="label">both:</span><code>durability via Write-Ahead Log — WAL is NOT a distinguishing feature</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="stage-head">
+      <p class="section-title">Write &amp; read path — side by side</p>
+      <span class="mode-pill" id="mode-pill">PUT(key=k, value=v)</span>
+    </div>
+    <div class="diagram-holder">
+      <svg viewBox="0 0 980 470" id="diagram">
+        <defs>
+          <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 z" fill="#5a5a80"/>
+          </marker>
+          <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3.2" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- ===== column titles ===== -->
+        <text class="col-title" x="245" y="26" text-anchor="middle" fill="#93c5fd">B-TREE  (read-optimized)</text>
+        <text class="col-title" x="735" y="26" text-anchor="middle" fill="#6ee7b7">LSM-TREE  (write-optimized)</text>
+        <line class="divider" x1="490" y1="40" x2="490" y2="450"/>
+
+        <!-- client -->
+        <g class="stagebox" id="bx-client">
+          <rect x="395" y="48" width="190" height="40" rx="9" fill="#2d2d50" stroke="#3a3a5c" stroke-width="2"/>
+          <text class="box-label" x="490" y="66" text-anchor="middle">Client request</text>
+          <text class="box-sub"   x="490" y="80" text-anchor="middle" id="client-sub">PUT k = v</text>
+        </g>
+
+        <!-- ===================== B-TREE side ===================== -->
+        <text class="lane-label" x="60" y="120">WAL (durability)</text>
+        <g class="stagebox" id="bt-wal">
+          <rect x="55" y="128" width="380" height="34" rx="7" fill="#1d2b1f" stroke="#2c5b41" stroke-width="2"/>
+          <text class="box-label" x="245" y="150" text-anchor="middle">1 · append to Write-Ahead Log</text>
+        </g>
+
+        <text class="lane-label" x="60" y="196">In-memory: descend the tree</text>
+        <g class="stagebox" id="bt-root">
+          <rect x="180" y="204" width="130" height="30" rx="6" fill="#1e2a44" stroke="#3b82f6" stroke-width="2"/>
+          <text class="box-label" x="245" y="223" text-anchor="middle" font-size="11">root page</text>
+        </g>
+        <path class="flow-arrow" d="M210,234 L150,260"/>
+        <path class="flow-arrow" d="M280,234 L340,260"/>
+        <g class="stagebox" id="bt-internal">
+          <rect x="90" y="262" width="120" height="28" rx="6" fill="#1e2a44" stroke="#3b82f6" stroke-width="1.5"/>
+          <text class="box-sub" x="150" y="280" text-anchor="middle">internal page</text>
+        </g>
+        <g class="stagebox">
+          <rect x="280" y="262" width="120" height="28" rx="6" fill="#1e2a44" stroke="#3b82f6" stroke-width="1.5" opacity="0.55"/>
+          <text class="box-sub" x="340" y="280" text-anchor="middle" opacity="0.6">internal page</text>
+        </g>
+        <path class="flow-arrow" d="M150,290 L150,316"/>
+
+        <text class="lane-label" x="60" y="330">On disk: the right leaf page</text>
+        <g class="stagebox" id="bt-leaf">
+          <rect x="55" y="338" width="380" height="58" rx="8" fill="#16213e" stroke="#3b82f6" stroke-width="2"/>
+          <text class="box-label" x="245" y="360" text-anchor="middle">leaf page  (sorted keys)</text>
+          <!-- key cells -->
+          <g id="bt-cells">
+            <rect x="70"  y="368" width="40" height="20" rx="3" fill="#24304f" stroke="#3a4a72"/>
+            <rect x="115" y="368" width="40" height="20" rx="3" fill="#24304f" stroke="#3a4a72"/>
+            <rect x="160" y="368" width="40" height="20" rx="3" fill="#24304f" stroke="#3a4a72"/>
+            <rect x="205" y="368" width="40" height="20" rx="3" fill="#24304f" stroke="#3a4a72"/>
+            <rect x="250" y="368" width="40" height="20" rx="3" fill="#24304f" stroke="#3a4a72"/>
+            <rect x="295" y="368" width="40" height="20" rx="3" fill="#24304f" stroke="#3a4a72"/>
+            <rect x="340" y="368" width="40" height="20" rx="3" fill="#24304f" stroke="#3a4a72"/>
+            <rect x="385" y="368" width="40" height="20" rx="3" fill="#24304f" stroke="#3a4a72"/>
+          </g>
+        </g>
+        <text class="box-sub" x="245" y="416" text-anchor="middle" id="bt-leaf-note" fill="#f59e0b" opacity="0"></text>
+
+        <!-- ===================== LSM side ===================== -->
+        <text class="lane-label" x="545" y="120">WAL (durability)</text>
+        <g class="stagebox" id="lsm-wal">
+          <rect x="545" y="128" width="380" height="34" rx="7" fill="#1d2b1f" stroke="#2c5b41" stroke-width="2"/>
+          <text class="box-label" x="735" y="150" text-anchor="middle">1 · append to Write-Ahead Log</text>
+        </g>
+
+        <text class="lane-label" x="545" y="196">In RAM: sorted buffer</text>
+        <g class="stagebox" id="lsm-memtable">
+          <rect x="545" y="204" width="380" height="42" rx="8" fill="#11291f" stroke="#10b981" stroke-width="2"/>
+          <text class="box-label" x="735" y="223" text-anchor="middle">2 · memtable  (skip-list, O(log n))</text>
+          <text class="box-sub" x="735" y="238" text-anchor="middle">writes land here instantly — no disk seek</text>
+        </g>
+        <path class="flow-arrow" d="M735,246 L735,272"/>
+        <text class="lane-label" x="545" y="266" id="flush-label" opacity="0">flush when full →</text>
+
+        <text class="lane-label" x="545" y="290">On disk: immutable sorted files (newest → oldest)</text>
+        <g id="sst-group">
+          <g class="stagebox" id="sst0">
+            <rect x="545" y="298" width="118" height="40" rx="7" fill="#16302a" stroke="#10b981" stroke-width="2"/>
+            <text class="box-label" x="604" y="318" text-anchor="middle" font-size="11">SSTable L0</text>
+            <text class="box-sub"   x="604" y="331" text-anchor="middle">newest</text>
+          </g>
+          <g class="stagebox" id="sst1">
+            <rect x="676" y="298" width="118" height="40" rx="7" fill="#15291f" stroke="#2c8c63" stroke-width="2"/>
+            <text class="box-label" x="735" y="318" text-anchor="middle" font-size="11">SSTable L1</text>
+            <text class="box-sub"   x="735" y="331" text-anchor="middle">~10× bigger</text>
+          </g>
+          <g class="stagebox" id="sst2">
+            <rect x="807" y="298" width="118" height="40" rx="7" fill="#142318" stroke="#236b4c" stroke-width="2"/>
+            <text class="box-label" x="866" y="318" text-anchor="middle" font-size="11">SSTable L2</text>
+            <text class="box-sub"   x="866" y="331" text-anchor="middle">oldest</text>
+          </g>
+        </g>
+
+        <!-- bloom filters -->
+        <g class="stagebox" id="lsm-bloom">
+          <rect x="545" y="352" width="200" height="34" rx="7" fill="#2a1f3a" stroke="#a78bfa" stroke-width="2"/>
+          <text class="box-label" x="645" y="373" text-anchor="middle" font-size="11" fill="#d6c8ff">Bloom filters — skip files</text>
+        </g>
+        <!-- compaction -->
+        <g class="stagebox" id="lsm-compaction">
+          <rect x="757" y="352" width="168" height="34" rx="7" fill="#3a2a17" stroke="#f59e0b" stroke-width="2"/>
+          <text class="box-label" x="841" y="373" text-anchor="middle" font-size="11" fill="#fcd9a0">Compaction (background)</text>
+        </g>
+        <text class="box-sub" x="735" y="408" text-anchor="middle" id="lsm-note" fill="#f59e0b" opacity="0"></text>
+
+        <!-- ===== travelling packet ===== -->
+        <g class="packet" id="packet" opacity="0">
+          <circle cx="490" cy="68" r="13" fill="#fbbf24" stroke="#fff7e0" stroke-width="2"/>
+          <text x="490" y="72" text-anchor="middle" id="packet-txt" style="font:700 11px sans-serif;fill:#1a1a2e">k</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="statcard bt">
+        <h4>B-Tree — this operation</h4>
+        <div class="ampgrid">
+          <span class="k">Write amp</span><span class="v amp-mid" id="bt-wa"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></span>
+          <span class="k">Read amp</span><span class="v amp-lo" id="bt-ra"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></span>
+          <span class="k">Space amp</span><span class="v amp-lo" id="bt-sa"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></span>
+          <span class="k">I/O</span><span class="v" id="bt-io" style="color:#fca5a5">—</span>
+        </div>
+      </div>
+      <div class="statcard lsm">
+        <h4>LSM-Tree — this operation</h4>
+        <div class="ampgrid">
+          <span class="k">Write amp</span><span class="v amp-hi" id="lsm-wa"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></span>
+          <span class="k">Read amp</span><span class="v amp-mid" id="lsm-ra"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></span>
+          <span class="k">Space amp</span><span class="v amp-mid" id="lsm-sa"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></span>
+          <span class="k">I/O</span><span class="v" id="lsm-io" style="color:#6ee7b7">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="swatch round" style="background:#fbbf24"></span>Travelling write/read (the key)</div>
+      <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>B-Tree page (in-place)</div>
+      <div class="legend-item"><span class="swatch" style="background:#10b981"></span>LSM memtable / SSTable</div>
+      <div class="legend-item"><span class="swatch" style="background:#a78bfa"></span>Bloom filter</div>
+      <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Compaction / random I/O cost</div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to send a single <code>PUT</code> down both engines and watch where the work happens.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx bt">
+      <h3>B-Tree — pay at write time</h3>
+      <div class="formula">lookup: 3–4 page reads · write: in-place (random)</div>
+      <p>A large DB packs <code>2³²</code> keys into just <span class="big">3–4 levels</span> (high fan-out), so a point lookup is <b>~4 page reads</b>, sub-ms on SSD. The cost: every write must seek to where the key belongs in sorted order → <b>random I/O</b>, plus occasional <b>page splits</b>.</p>
+      <ul>
+        <li>Bounded, predictable read &amp; tail latency</li>
+        <li>Random writes (was brutal on HDD)</li>
+        <li>Page-level locks/latches on mutation</li>
+        <li><b>Postgres 8 KB</b>, <b>InnoDB 16 KB</b>, Oracle, SQLite, lmdb</li>
+      </ul>
+    </div>
+    <div class="cx lsm">
+      <h3>LSM-Tree — pay at read time + cleanup</h3>
+      <div class="formula">write: append (sequential) · read: memtable + N SSTables</div>
+      <p>Writes hit RAM then flush <b>sequentially</b> as immutable SSTables → huge ingest throughput. A read may touch <b>many</b> files (memtable → newest → oldest); <b>Bloom filters</b> tame this by skipping files that can't hold the key. Counter-intuitively LSM <b>write amplification is often <span class="big">higher</span></b> (compaction rewrites data) — the win is writes are <b>sequential &amp; batched</b>.</p>
+      <ul>
+        <li>High write throughput, SSD-friendly</li>
+        <li>Reads/space amp paid back via <b>compaction</b></li>
+        <li>Deletes = <b>tombstones</b>, not free</li>
+        <li><b>Cassandra, RocksDB, LevelDB, HBase, Bigtable, ScyllaDB</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>"LSM is always faster" — wrong.</b> LSM only optimizes the <b>write</b> path. Reads (without good Bloom filters, or on a missing key) can hit multiple SSTables; B-Tree reads are bounded to tree height and are often faster. A blanket "LSM faster" is a red flag.</li>
+      <li><b>The core insight: random vs sequential writes.</b> B-Tree must write data where it belongs in sorted order → <b>random I/O</b>. LSM always appends forward → <b>sequential I/O</b>, sorting later via compaction. Game-changer on HDD, still wear/IOPS-friendly on SSD.</li>
+      <li><b>Write amplification is backwards from intuition.</b> LSM's write amp is <b>often higher</b> than a B-Tree's (compaction rewrites data again and again). The advantage isn't lower amplification — it's that the writes are <b>sequential and batched</b>, giving high throughput and low latency.</li>
+      <li><b>Bloom filters are load-bearing.</b> Explaining LSM reads without them is half a picture — they let reads skip SSTables that <code>definitely</code> don't hold a key (no false negatives, small false-positive rate).</li>
+      <li><b>Deletes aren't free.</b> An LSM delete is itself a write — a <b>tombstone</b>. Data lingers until compaction; high-churn / TTL-heavy loads hit Cassandra's classic "tombstone hell".</li>
+      <li><b>Compaction is a hidden cost.</b> It burns CPU + disk I/O and can spike foreground <code>p99/p999</code> latency — a major production tuning axis, not free background magic.</li>
+      <li><b>WAL is in both.</b> Both engines append to a WAL/commit-log first for durability — it does <b>not</b> distinguish the two designs.</li>
+      <li><b>Compaction strategies:</b> <b>Leveled</b> (low read amp, high write amp) vs <b>Size-tiered</b> (low write amp, high read amp) — RocksDB offers both; pick by workload.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Both store sorted data with a WAL, but they move the work to opposite ends: a <b>B-Tree</b> does the hard work <b>at write time</b> — find the sorted spot, update the page <b>in-place</b> (random I/O) — buying <b>bounded, predictable reads</b>. An <b>LSM-Tree</b> buffers in RAM and appends <b>sequentially</b>, deferring the work to <b>reads + background compaction</b> — buying <b>high write throughput</b> at the price of read/space amplification and compaction spikes. Choose by workload: <b>write-heavy/high-ingest → LSM</b>, <b>read-heavy/low-latency OLTP → B-Tree</b>, and always justify with the amplification trade-offs.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const packet = $("packet"), packetTxt = $("packet-txt");
+  const narrEl = $("narration"), stepEl = $("step-indicator"), modePill = $("mode-pill");
+  const btnNext = $("btn-next"), btnPrev = $("btn-prev"), btnReset = $("btn-reset");
+  const btLeafNote = $("bt-leaf-note"), lsmNote = $("lsm-note");
+  const flushLabel = $("flush-label"), clientSub = $("client-sub");
+  const btCells = $("bt-cells").children;
+
+  // helper: set active / dim classes on a stagebox by id
+  function setBoxes(activeIds, dimIds) {
+    document.querySelectorAll(".stagebox").forEach(g => g.classList.remove("active","dim"));
+    (activeIds||[]).forEach(id => { const e=$(id); if(e) e.classList.add("active"); });
+    (dimIds||[]).forEach(id => { const e=$(id); if(e) e.classList.add("dim"); });
+  }
+  // helper: move packet to (x,y), optionally hide
+  function movePacket(x, y, show, txt, color) {
+    packet.style.opacity = show ? "1" : "0";
+    if (show) {
+      packet.querySelector("circle").setAttribute("cx", x);
+      packet.querySelector("circle").setAttribute("cy", y);
+      packetTxt.setAttribute("x", x);
+      packetTxt.setAttribute("y", y + 4);
+      if (txt !== undefined) packetTxt.textContent = txt;
+      if (color) packet.querySelector("circle").setAttribute("fill", color);
+    }
+  }
+  // amp pip setter: n of 5 lit
+  function setAmp(id, n) {
+    const pips = $(id).querySelectorAll(".pip");
+    pips.forEach((p,i)=> p.classList.toggle("on", i < n));
+  }
+
+  // highlight a single leaf cell (insert target)
+  function highlightCell(idx, color) {
+    for (let i=0;i<btCells.length;i++){
+      btCells[i].setAttribute("fill", i===idx ? (color||"#f59e0b") : "#24304f");
+      btCells[i].setAttribute("stroke", i===idx ? "#fbbf24" : "#3a4a72");
+    }
+  }
+  function clearCells(){ for (let i=0;i<btCells.length;i++){ btCells[i].setAttribute("fill","#24304f"); btCells[i].setAttribute("stroke","#3a4a72"); } }
+
+  // ---------- steps ----------
+  const steps = [
+    { // 0
+      mode:"PUT(key=k, value=v)", pill:"PUT k = v", clientSub:"PUT k = v",
+      apply(){
+        movePacket(490,68,true,"k","#fbbf24");
+        setBoxes(["bx-client"], []);
+        clearCells(); btLeafNote.style.opacity=0; lsmNote.style.opacity=0; flushLabel.style.opacity=0;
+        setAmp("bt-wa",0);setAmp("bt-ra",0);setAmp("bt-sa",0);setAmp("lsm-wa",0);setAmp("lsm-ra",0);setAmp("lsm-sa",0);
+        $("bt-io").textContent="—"; $("lsm-io").textContent="—";
+      },
+      cls:"", narr:`<b>The write arrives.</b> A single <code>PUT k = v</code> enters both engines. Watch the same logical write take two very different journeys. <b>First stop in both:</b> durability.`
+    },
+    { // 1
+      mode:"WAL — durability (BOTH)", pill:"PUT k = v",
+      apply(){
+        movePacket(490,145,true,"k","#34d399");
+        setBoxes(["bt-wal","lsm-wal"], ["bt-root","bt-leaf","lsm-memtable","sst0","sst1","sst2","lsm-bloom","lsm-compaction","bt-internal"]);
+        setAmp("bt-wa",1);setAmp("lsm-wa",1);
+        $("bt-io").textContent="+1 WAL append"; $("lsm-io").textContent="+1 WAL append";
+      },
+      cls:"warn", narr:`<b>1 · Both append to the WAL first.</b> Before touching the real structure, each engine appends the change to a <b>Write-Ahead Log</b> (sequential). Crash mid-write? Replay the WAL. <b>Gotcha:</b> WAL lives in <i>both</i> designs — it is <b>not</b> a distinguishing feature.`
+    },
+    { // 2 — B-tree descends
+      mode:"B-Tree — descend to the leaf", pill:"PUT k = v",
+      apply(){
+        movePacket(245,219,true,"k","#60a5fa");
+        setBoxes(["bt-root","bt-internal"], ["lsm-wal","lsm-memtable","sst0","sst1","sst2","lsm-bloom","lsm-compaction"]);
+        setAmp("bt-ra",2);
+      },
+      cls:"bt", narr:`<b>2 · B-Tree finds the spot.</b> From the <code>root page</code> it binary-searches and follows child pointers down through internal pages to the one <b>leaf page</b> where <code>k</code> belongs in sorted order — only <b>~3–4 levels</b> deep even for billions of keys.`
+    },
+    { // 3 — B-tree in-place write
+      mode:"B-Tree — in-place write (random I/O)", pill:"PUT k = v",
+      apply(){
+        movePacket(245,378,true,"k","#60a5fa");
+        setBoxes(["bt-leaf"], ["lsm-wal","lsm-memtable","sst0","sst1","sst2","lsm-bloom","lsm-compaction","bt-root","bt-internal"]);
+        highlightCell(4,"#3b82f6");
+        btLeafNote.textContent="written exactly here → random disk write (+ split if full)";
+        btLeafNote.style.opacity=1;
+        setAmp("bt-wa",2); setAmp("bt-sa",1);
+        $("bt-io").textContent="WAL + in-place page write (random)";
+      },
+      cls:"bt", narr:`<b>3 · B-Tree writes in place.</b> The value is inserted <b>right where it belongs</b> in the sorted leaf — a <b>random write</b>. If the page is full it <b>splits</b> and promotes a key upward. Work done <b>now</b>: the data is already sorted and ready for fast reads.`
+    },
+    { // 4 — LSM memtable
+      mode:"LSM — write to memtable (RAM)", pill:"PUT k = v",
+      apply(){
+        movePacket(735,224,true,"k","#34d399");
+        setBoxes(["lsm-memtable"], ["bt-root","bt-internal","bt-leaf","sst0","sst1","sst2","lsm-bloom","lsm-compaction"]);
+        clearCells(); btLeafNote.style.opacity=0;
+        setAmp("lsm-ra",1);
+        $("lsm-io").textContent="WAL + RAM insert (no disk seek yet)";
+      },
+      cls:"lsm", narr:`<b>4 · LSM just buffers in RAM.</b> The write lands in the in-memory <b>memtable</b> (a skip-list, <code>O(log n)</code>) and returns <b>immediately</b> — no seek, no sorted-spot hunt. This is why ingest is so fast: the write path barely touches disk.`
+    },
+    { // 5 — LSM flush
+      mode:"LSM — flush memtable → SSTable (sequential)", pill:"flush",
+      apply(){
+        movePacket(604,318,true,"k","#34d399");
+        setBoxes(["sst0"], ["bt-root","bt-internal","bt-leaf","lsm-bloom","lsm-compaction","sst1","sst2"]);
+        flushLabel.style.opacity=1;
+        setAmp("lsm-wa",2); setAmp("lsm-sa",2);
+        $("lsm-io").textContent="WAL + sequential flush of whole SSTable";
+      },
+      cls:"lsm", narr:`<b>5 · Memtable fills, then flushes.</b> Once it crosses a size threshold the memtable is written out as one <b>immutable, sorted SSTable</b> — a single <b>sequential</b> write (newest at <code>L0</code>). A fresh empty memtable takes over. No file is ever edited in place.`
+    },
+    { // 6 — GET on B-tree
+      mode:"GET(k) — B-Tree read", pill:"GET k", clientSub:"GET k ?",
+      apply(){
+        movePacket(245,378,true,"k","#60a5fa");
+        setBoxes(["bt-root","bt-internal","bt-leaf"], ["lsm-memtable","sst0","sst1","sst2","lsm-bloom","lsm-compaction"]);
+        highlightCell(4,"#3b82f6"); btLeafNote.style.opacity=0;
+        setAmp("bt-ra",2);
+        $("bt-io").textContent="~3–4 page reads, bounded (sub-ms)";
+      },
+      cls:"bt", narr:`<b>6 · Reading from a B-Tree.</b> Descend root → internal → leaf, binary-searching each page: <b>~3–4 reads</b>, fully bounded. One sorted home per key → <b>predictable, low tail latency</b>. The write-time effort pays off here.`
+    },
+    { // 7 — GET on LSM
+      mode:"GET(k) — LSM read (memtable → SSTables)", pill:"GET k",
+      apply(){
+        movePacket(735,224,true,"k","#34d399");
+        setBoxes(["lsm-memtable","sst0","sst1","sst2","lsm-bloom"], ["bt-root","bt-internal","bt-leaf"]);
+        lsmNote.textContent="check memtable, then newest → oldest; Bloom filters skip files that can't hold k";
+        lsmNote.style.opacity=1;
+        setAmp("lsm-ra",3);
+        $("lsm-io").textContent="memtable + up to N SSTables (Bloom-pruned)";
+      },
+      cls:"lsm", narr:`<b>7 · Reading from an LSM.</b> Check the <b>memtable</b>, then SSTables <b>newest → oldest</b> — <code>k</code>'s latest value could be anywhere. <b>Read amplification!</b> <span style="color:#d6c8ff">Bloom filters</span> rescue this: they skip files that <b>definitely</b> don't contain <code>k</code> (no false negatives).`
+    },
+    { // 8 — compaction
+      mode:"Compaction — background merge", pill:"background",
+      apply(){
+        movePacket(841,318,true,"⤳","#f59e0b");
+        setBoxes(["lsm-compaction","sst0","sst1","sst2"], ["bt-root","bt-internal","bt-leaf","lsm-memtable","lsm-bloom"]);
+        lsmNote.textContent="merge-sort L0+L1+L2 → fewer, bigger, de-duped files; drop tombstones";
+        lsmNote.style.opacity=1;
+        setAmp("lsm-wa",4); setAmp("lsm-ra",1); setAmp("lsm-sa",1);
+        $("lsm-io").textContent="re-reads + re-writes data → write amp ↑, p99 spikes";
+        $("bt-io").textContent="—";
+      },
+      cls:"warn", narr:`<b>8 · Compaction cleans up — the hidden cost.</b> A background job merge-sorts SSTables into fewer, bigger, de-duplicated files and physically drops <b>tombstones</b>. It tames read &amp; space amp <i>but</i> <b>re-writes data repeatedly → high write amplification</b> and CPU/I-O that can spike foreground <code>p99/p999</code>.`
+    },
+    { // 9 — verdict
+      mode:"Verdict — opposite bets", pill:"summary",
+      apply(){
+        movePacket(0,0,false);
+        setBoxes(["bt-leaf","lsm-memtable","lsm-compaction"], []);
+        btLeafNote.style.opacity=0; lsmNote.style.opacity=0; flushLabel.style.opacity=0; clearCells();
+        setAmp("bt-wa",2);setAmp("bt-ra",1);setAmp("bt-sa",1);
+        setAmp("lsm-wa",4);setAmp("lsm-ra",3);setAmp("lsm-sa",3);
+        $("bt-io").textContent="random writes, bounded reads"; $("lsm-io").textContent="sequential writes, multi-file reads";
+      },
+      cls:"", narr:`<b>The trade-off in one line.</b> B-Tree = work <b>at write time</b> (random I/O) for <b>bounded, predictable reads</b>. LSM = work deferred to <b>reads + compaction</b> for <b>sequential, high-throughput writes</b>. <b>Write-heavy/high-ingest → LSM; read-heavy low-latency OLTP → B-Tree.</b> Always justify with the three amplifications.`
+    }
+  ];
+
+  // ---------- driver ----------
+  let cursor = 0, lastSub = "PUT k = v";
+  function render() {
+    const s = steps[cursor];
+    if (s.clientSub) { lastSub = s.clientSub; }
+    clientSub.textContent = lastSub;
+    modePill.textContent = s.pill;
+    s.apply();
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+  function next(){ if (cursor < steps.length-1){ cursor++; render(); } }
+  function prev(){ if (cursor > 0){ cursor--; render(); } }
+  function reset(){ cursor = 0; lastSub = "PUT k = v"; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

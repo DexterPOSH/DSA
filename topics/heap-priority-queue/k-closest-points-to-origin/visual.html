@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>K Closest Points to Origin — Max-Heap of Size k</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #1e2a4a;
+    --text: #e0e0e0; --muted: #93a0c0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444; --purple: #a855f7;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6; padding: 36px 20px 80px;
+    display: flex; flex-direction: column; align-items: center; gap: 26px;
+  }
+  .wrap { max-width: 820px; width: 100%; display: flex; flex-direction: column; gap: 24px; }
+  h1 { font-size: 1.65rem; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--green); }
+  .analogy {
+    background: var(--panel); border: 1px solid var(--amber); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px;
+  }
+  .analogy .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--amber); margin-bottom: 6px; }
+  .analogy p { font-size: 0.96rem; }
+  .analogy b { color: var(--text); }
+
+  .problem { background: var(--panel); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 14px 22px; font-size: 0.95rem; }
+  .problem code { background: var(--panel2); padding: 2px 8px; border-radius: 6px;
+    color: #ffd479; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+  .card { background: var(--panel); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 20px;
+    box-shadow: 0 8px 26px rgba(0,0,0,0.3); }
+  .section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+
+  .step-desc { background: var(--panel2); border-left: 4px solid var(--green);
+    border-radius: 8px; padding: 14px 16px; font-size: 0.95rem; min-height: 64px; }
+  .step-desc b { color: #fff; }
+  .step-desc .hl-green { color: var(--green); font-weight: 700; }
+  .step-desc .hl-amber { color: var(--amber); font-weight: 700; }
+  .step-desc .hl-red { color: var(--red); font-weight: 700; }
+  .step-desc .hl-purple { color: var(--purple); font-weight: 700; }
+
+  .grid-row { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+  .grid-col { flex: 1 1 320px; }
+  .heap-col { flex: 1 1 300px; }
+  svg.grid { width: 100%; max-width: 360px; height: 320px; background: #131c33; border-radius: 10px; }
+  .axis { stroke: #3a4a6e; stroke-width: 1.5; }
+  .gridline { stroke: #25304f; stroke-width: 1; }
+  .ring { fill: none; stroke: var(--amber); stroke-width: 1.5; stroke-dasharray: 4 4; opacity: 0; transition: opacity 0.3s; }
+  .ring.show { opacity: 0.7; }
+  .pt { fill: var(--panel2); stroke: var(--blue); stroke-width: 2; transition: all 0.3s; }
+  .pt.cur { fill: rgba(245,158,11,0.25); stroke: var(--amber); stroke-width: 3; }
+  .pt.inheap { fill: rgba(16,185,129,0.2); stroke: var(--green); stroke-width: 2.5; }
+  .pt.evicted { fill: rgba(239,68,68,0.18); stroke: var(--red); stroke-width: 2; opacity: 0.45; }
+  .pt-lbl { fill: var(--muted); font-size: 10px; text-anchor: middle; font-family: 'SF Mono', Menlo, monospace; }
+  .origin-lbl { fill: var(--red); font-size: 11px; text-anchor: middle; font-weight: 700; }
+
+  .tree-wrap { display: flex; justify-content: center; }
+  svg.tree { width: 100%; max-width: 300px; height: 180px; }
+  .edge { stroke: #3a4a6e; stroke-width: 2; }
+  .node-circle { fill: var(--panel2); stroke: var(--blue); stroke-width: 2; transition: all 0.3s; }
+  .node-circle.farthest { fill: rgba(239,68,68,0.18); stroke: var(--red); stroke-width: 3; }
+  .node-circle.incoming { fill: rgba(16,185,129,0.18); stroke: var(--green); stroke-width: 3; }
+  .node-text { fill: var(--text); font-family: 'SF Mono', Menlo, monospace;
+    font-weight: 700; font-size: 13px; text-anchor: middle; dominant-baseline: central; }
+  .node-sub { fill: var(--muted); font-size: 9px; text-anchor: middle; }
+
+  .heap-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .heap-item { display: flex; align-items: center; gap: 10px; background: var(--panel2);
+    border: 1px solid var(--blue); border-radius: 8px; padding: 8px 12px;
+    font-family: 'SF Mono', Menlo, monospace; font-size: 0.9rem; transition: all 0.3s; }
+  .heap-item.farthest { border-color: var(--red); background: rgba(239,68,68,0.12); }
+  .heap-item.incoming { border-color: var(--green); background: rgba(16,185,129,0.12); }
+  .heap-item .d { color: var(--amber); margin-left: auto; }
+  .heap-empty { color: #5a6a90; font-style: italic; font-size: 0.85rem; }
+
+  .answer { display: inline-flex; align-items: center; gap: 10px;
+    background: rgba(16,185,129,0.14); border: 1px solid var(--green);
+    color: #b6f0d8; padding: 10px 18px; border-radius: 10px;
+    font-family: 'SF Mono', Menlo, monospace; font-weight: 700; font-size: 1rem;
+    align-self: flex-start; opacity: 0; transition: opacity 0.3s; }
+  .answer.show { opacity: 1; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--green); color: #06281b; }
+  .btn-primary:hover { background: #0e9e6e; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel2); color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .counter { font-size: 0.82rem; color: #5a6a90; margin-left: auto;
+    font-family: 'SF Mono', Menlo, monospace; }
+
+  .takeaway { background: linear-gradient(135deg, rgba(16,185,129,0.14), rgba(59,130,246,0.1));
+    border: 1px solid rgba(16,185,129,0.4); border-radius: 12px; padding: 18px 24px; }
+  .takeaway .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--green); margin-bottom: 6px; }
+  .takeaway p { font-size: 1rem; }
+  .takeaway b { color: var(--text); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>K Closest Points to Origin &mdash; <span>Max-Heap of Size k</span></h1>
+
+  <div class="analogy">
+    <div class="label">Real-world analogy</div>
+    <p>Ek <b>delivery dispatcher</b> ko 2 sabse paas wale riders chahiye. Board pe sirf 2 "current closest" rakhe jaate hain, aur <b>sabse door wala top pe</b> dikhta hai. Naya rider closer hua to door wale ko hatao. Wo board ek <b>max-heap of size k</b> hai — root = farthest, evict karne ke liye ready.</p>
+  </div>
+
+  <div class="problem">
+    <b>points = [[1,3], [-2,2], [5,8], [0,1]]</b>, <b>k = 2</b>. Rank by <code>dist² = x² + y²</code> (no sqrt needed). Keep a max-heap of the k smallest.
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">What happens</div>
+      <div class="step-desc" id="stepDesc">Press <b>Next</b>. We scan points one by one, maintaining a size-2 max-heap whose root is the current farthest kept point.</div>
+    </div>
+
+    <div class="grid-row">
+      <div class="grid-col">
+        <div class="section-label">Plane (red = origin, dashed ring = current farthest kept)</div>
+        <svg class="grid" id="gridSvg" viewBox="0 0 360 320"></svg>
+      </div>
+      <div class="heap-col">
+        <div class="section-label">Max-heap by dist² (root = farthest)</div>
+        <div class="tree-wrap"><svg class="tree" id="treeSvg" viewBox="0 0 300 180"></svg></div>
+        <div class="heap-list" id="heapList"></div>
+      </div>
+    </div>
+
+    <div class="answer" id="answer"></div>
+
+    <div class="legend">
+      <span><i class="dot" style="background:var(--amber)"></i> current point</span>
+      <span><i class="dot" style="background:var(--green)"></i> in heap (kept)</span>
+      <span><i class="dot" style="background:var(--red)"></i> evicted / origin</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">‹ Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next ›</button>
+      <span class="counter" id="counter">0 / 0</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="label">Key takeaway</div>
+    <p>Keep a <b>max-heap of size k</b> ordered by <code>dist²</code>. The root is the farthest kept point, so a closer newcomer instantly evicts it. Result: the k closest in <b>O(n log k)</b> — and never compute a <code>sqrt</code>.</p>
+  </div>
+</div>
+
+<script>
+const points = [[1,3],[-2,2],[5,8],[0,1]];
+const k = 2;
+const d2 = ([x,y]) => x*x + y*y;
+
+// max-heap of [dist2, x, y]
+function siftUp(h,i){ while(i>0){const p=(i-1)>>1; if(h[p][0]>=h[i][0])break; [h[p],h[i]]=[h[i],h[p]]; i=p;} }
+function siftDown(h){ let i=0; while(true){let b=i,l=2*i+1,r=2*i+2;
+  if(l<h.length&&h[l][0]>h[b][0])b=l; if(r<h.length&&h[r][0]>h[b][0])b=r; if(b===i)break; [h[b],h[i]]=[h[i],h[b]]; i=b;} }
+function push(h,v){ h.push(v); siftUp(h,h.length-1); }
+function replaceTop(h,v){ h[0]=v; siftDown(h); }
+
+const steps = [];
+let heap = [];
+function key(p){ return p[0]+','+p[1]; }
+function snap(desc, opts={}) {
+  steps.push({ heap: heap.map(e=>e.slice()), desc,
+    curIdx: opts.curIdx ?? -1,
+    scanned: opts.scanned ?? 0,            // how many points processed (for grid coloring)
+    incoming: opts.incoming ?? null,       // "x,y" key just added
+    evicted: opts.evicted ?? null,         // "x,y" key evicted permanently
+    ring: opts.ring ?? null,               // dist (actual) of farthest in heap -> ring radius
+    answer: opts.answer ?? null });
+}
+const evictedKeys = new Set();
+
+snap(`Goal: keep the k=2 points closest to origin. Use a max-heap of size 2 keyed by dist² — its root is the farthest we're keeping.`);
+points.forEach((p, i) => {
+  const d = d2(p);
+  if (heap.length < k) {
+    push(heap, [d, p[0], p[1]]);
+    snap(`Point <span class="hl-amber">(${p})</span>, dist² = ${d}. Heap has room (< k) → just push it.`, {curIdx:i, scanned:i+1, incoming:key(p), ring: Math.sqrt(heap[0][0])});
+  } else if (d < heap[0][0]) {
+    const old = heap[0];
+    evictedKeys.add(old[1]+','+old[2]);
+    replaceTop(heap, [d, p[0], p[1]]);
+    snap(`Point <span class="hl-amber">(${p})</span>, dist² = ${d}. Closer than the root (farthest = ${old[0]}) → <span class="hl-red">evict (${old[1]},${old[2]})</span>, push this.`, {curIdx:i, scanned:i+1, incoming:key(p), evicted:old[1]+','+old[2], ring: Math.sqrt(heap[0][0])});
+  } else {
+    snap(`Point <span class="hl-amber">(${p})</span>, dist² = ${d}. NOT closer than the root (farthest = ${heap[0][0]}) → <span class="hl-red">skip it</span>.`, {curIdx:i, scanned:i+1, evicted:key(p), ring: Math.sqrt(heap[0][0])});
+    evictedKeys.add(key(p));
+  }
+});
+const ans = heap.map(e=>`[${e[1]},${e[2]}]`).join(', ');
+snap(`Scan done. The heap holds the k=2 closest points. <b>return [${ans}]</b>.`, {scanned:points.length, ring: Math.sqrt(heap[0][0]), answer:ans});
+
+// ---- grid rendering ----
+const SCALE = 30, OX = 180, OY = 200;   // origin pixel
+const gx = x => OX + x*SCALE;
+const gy = y => OY - y*SCALE;
+const gridSvg = document.getElementById('gridSvg');
+const treeSvg = document.getElementById('treeSvg');
+const heapList = document.getElementById('heapList');
+const stepDesc = document.getElementById('stepDesc');
+const counter = document.getElementById('counter');
+const answerEl = document.getElementById('answer');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
+function gridState(st) {
+  let s = '';
+  // gridlines
+  for (let gxv=-1; gxv<=6; gxv++) s += `<line class="gridline" x1="${gx(gxv)}" y1="0" x2="${gx(gxv)}" y2="320" />`;
+  for (let gyv=-1; gyv<=9; gyv++) s += `<line class="gridline" x1="0" y1="${gy(gyv)}" x2="360" y2="${gy(gyv)}" />`;
+  // axes
+  s += `<line class="axis" x1="0" y1="${OY}" x2="360" y2="${OY}" />`;
+  s += `<line class="axis" x1="${OX}" y1="0" x2="${OX}" y2="320" />`;
+  // ring (farthest kept distance)
+  if (st.ring) s += `<circle class="ring show" cx="${OX}" cy="${OY}" r="${st.ring*SCALE}" />`;
+  // origin
+  s += `<circle cx="${OX}" cy="${OY}" r="4" fill="var(--red)" /><text class="origin-lbl" x="${OX}" y="${OY+16}">(0,0)</text>`;
+  // points
+  const heapKeys = new Set(st.heap.map(e=>e[1]+','+e[2]));
+  points.forEach((p, i) => {
+    if (i >= st.scanned && i !== st.curIdx) {
+      // not yet scanned -> faint
+      s += `<circle class="pt" cx="${gx(p[0])}" cy="${gy(p[1])}" r="7" style="opacity:0.35" />`;
+      s += `<text class="pt-lbl" x="${gx(p[0])}" y="${gy(p[1])-12}" style="opacity:0.35">(${p})</text>`;
+      return;
+    }
+    let cls = '';
+    const kk = p[0]+','+p[1];
+    if (i === st.curIdx) cls = 'cur';
+    else if (heapKeys.has(kk)) cls = 'inheap';
+    else cls = 'evicted';
+    s += `<circle class="pt ${cls}" cx="${gx(p[0])}" cy="${gy(p[1])}" r="7" />`;
+    s += `<text class="pt-lbl" x="${gx(p[0])}" y="${gy(p[1])-12}">(${p})</text>`;
+  });
+  return s;
+}
+
+const TREE_POS = [ {x:150,y:30}, {x:80,y:120}, {x:220,y:120} ];
+const TREE_EDGES = [[0,1],[0,2]];
+
+function treeState(st) {
+  let edges = '', nodes = '';
+  TREE_EDGES.forEach(([a,b]) => {
+    if (a < st.heap.length && b < st.heap.length) {
+      const pa = TREE_POS[a], pb = TREE_POS[b];
+      edges += `<line class="edge" x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" />`;
+    }
+  });
+  st.heap.forEach((e, idx) => {
+    if (idx >= TREE_POS.length) return;
+    const p = TREE_POS[idx];
+    const kk = e[1]+','+e[2];
+    let cls = '';
+    if (idx === 0) cls = 'farthest';
+    if (st.incoming === kk) cls = 'incoming';
+    nodes += `<circle class="node-circle ${cls}" cx="${p.x}" cy="${p.y}" r="26" />
+      <text class="node-text" x="${p.x}" y="${p.y-5}">(${e[1]},${e[2]})</text>
+      <text class="node-sub" x="${p.x}" y="${p.y+11}">d²=${e[0]}</text>`;
+  });
+  return edges + nodes;
+}
+
+function heapListState(st) {
+  if (st.heap.length === 0) return '<span class="heap-empty">heap empty</span>';
+  return st.heap.map((e, idx) => {
+    const kk = e[1]+','+e[2];
+    let cls = '';
+    if (idx === 0) cls = 'farthest';
+    if (st.incoming === kk) cls = 'incoming';
+    return `<div class="heap-item ${cls}">[${idx}] (${e[1]}, ${e[2]}) <span class="d">d²=${e[0]}${idx===0?' ◄ root':''}</span></div>`;
+  }).join('');
+}
+
+function render(i) {
+  const st = steps[i];
+  stepDesc.innerHTML = st.desc;
+  counter.textContent = `${i} / ${steps.length - 1}`;
+  gridSvg.innerHTML = gridState(st);
+  treeSvg.innerHTML = treeState(st);
+  heapList.innerHTML = heapListState(st);
+  if (st.answer !== null) { answerEl.textContent = `return [${st.answer}]`; answerEl.classList.add('show'); }
+  else answerEl.classList.remove('show');
+  prevBtn.disabled = (i === 0);
+  nextBtn.disabled = (i === steps.length - 1);
+}
+
+let cur = 0;
+function next(){ if(cur<steps.length-1){cur++; render(cur);} }
+function prev(){ if(cur>0){cur--; render(cur);} }
+render(0);
+</script>
+</body>
+</html>

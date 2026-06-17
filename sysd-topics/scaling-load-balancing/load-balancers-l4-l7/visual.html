@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Load Balancers — L4 vs L7 Routing Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* diagram SVG */
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 520px; height: auto; }
+
+  .box-stroke { stroke: #1a1a2e; stroke-width: 2; }
+  .lane-label { fill: #8888aa; font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; text-transform: uppercase; letter-spacing: 1px; }
+  .node-label { fill: #fff; font-size: 12px; font-weight: 700; font-family: -apple-system, sans-serif; }
+  .node-sub { fill: #cdd; font-size: 9px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .wire { fill: none; stroke: #3a3a5c; stroke-width: 3; }
+  .wire.lit { stroke: #3b82f6; }
+  .wire.lit7 { stroke: #ec4899; }
+  .wire.tls { stroke: #f59e0b; stroke-dasharray: 7 5; }
+  .lb-box { transition: all .35s ease; }
+  .backend.dim { opacity: .28; transition: opacity .35s ease; }
+  .backend.hot rect { stroke: #10b981; stroke-width: 3.5; }
+  .pkt { transition: opacity .25s ease; }
+  .pkt-payload { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8px; }
+  .lock { font-size: 13px; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.pink { color: #ec4899; }
+  .var .value.grey { color: #8888aa; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.line { height: 4px; border-radius: 2px; }
+  .swatch.dash { background: repeating-linear-gradient(90deg,#f59e0b 0 5px,transparent 5px 9px); }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.l4 { border-left-color: #3b82f6; background: #14223a; }
+  .narration.l7 { border-left-color: #ec4899; background: #321427; }
+  .narration.tls { border-left-color: #f59e0b; background: #332611; }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* contrast panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.l4 { background: #14223a; border: 1px solid #3b82f6; }
+  .cx.l7 { background: #321427; border: 1px solid #ec4899; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.l4 h3 { color: #93c5fd; }
+  .cx.l7 h3 { color: #f9a8d4; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 20px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.l4 .big { color: #3b82f6; }
+  .cx.l7 .big { color: #ec4899; }
+  .cx ul { margin: 10px 0 0; padding-left: 18px; }
+  .cx li { font-size: 12.5px; color: #c8c8d8; margin: 4px 0; }
+  .cx li b { color: #fff; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Load Balancers — L4 vs L7</h1>
+  <div class="subtitle">How a load balancer spreads traffic across backends, and the core split: an <b>L4</b> balancer routes on the <code>5-tuple</code> (IP + port) without opening the packet, while an <b>L7</b> balancer <b>terminates TLS</b> and reads the <code>HTTP</code> path/headers/cookies to route on <b>content</b>.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the airport gate</h3>
+    <p>Thousands of passengers (<b>requests</b>) pour into an airport. An <b>L4 load balancer</b> is the security guard who just glances at the <b>gate number on your boarding pass</b> (IP + port) and waves you straight to that counter — fast, because they never open your bag. Once you're sent to a counter, your whole conversation stays there (<b>connection sticky</b>). An <b>L7 load balancer</b> is the smart concierge who actually <i>talks</i> to you — "where are you headed? business class? wheelchair?" — reading the <b>content of your request</b> (URL path, header, cookie) to pick the best specialised counter. Smarter, but talking to everyone costs a little more time. L4 reads the envelope; L7 opens the letter.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">client:</span><code>GET https://shop.example.com/api/video  (Host, Cookie, TLS)</code></div>
+    <div class="row"><span class="label">L4 sees:</span><code>src/dst IP + port + proto (the 5-tuple) — payload stays encrypted</code></div>
+    <div class="row"><span class="label">L7 sees:</span><code>method + path + headers + cookies — after TLS termination</code></div>
+    <div class="row"><span class="label">pools:</span><code>api-pool  ·  static-pool  ·  video-pool</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 520 420" id="diagram">
+        <!-- lane label -->
+        <text class="lane-label" x="10" y="22" id="mode-label">layer 4 — transport</text>
+
+        <!-- client -->
+        <g id="client">
+          <rect x="14" y="170" width="86" height="60" rx="10" fill="#475569" class="box-stroke"/>
+          <text class="node-label" x="57" y="196" text-anchor="middle">Client</text>
+          <text class="node-sub" x="57" y="212" text-anchor="middle">browser</text>
+        </g>
+
+        <!-- wire client -> LB -->
+        <path id="wire-cl" class="wire" d="M100 200 H 210"/>
+
+        <!-- LB box -->
+        <g id="lb" class="lb-box">
+          <rect id="lb-rect" x="210" y="158" width="110" height="84" rx="12" fill="#3b82f6" class="box-stroke"/>
+          <text id="lb-title" class="node-label" x="265" y="186" text-anchor="middle">L4 LB</text>
+          <text id="lb-sub" class="node-sub" x="265" y="202" text-anchor="middle">VIP : forward</text>
+          <text id="lb-sub2" class="node-sub" x="265" y="216" text-anchor="middle">5-tuple hash</text>
+          <text id="lb-tls" class="lock" x="265" y="232" text-anchor="middle"></text>
+        </g>
+
+        <!-- wires LB -> backends -->
+        <path id="wire-b0" class="wire" d="M320 178 C 380 150, 400 110, 430 96"/>
+        <path id="wire-b1" class="wire" d="M320 200 H 430"/>
+        <path id="wire-b2" class="wire" d="M320 222 C 380 250, 400 290, 430 304"/>
+
+        <!-- backends -->
+        <g id="be0" class="backend">
+          <rect x="430" y="74" width="80" height="44" rx="9" fill="#8b5cf6" class="box-stroke"/>
+          <text class="node-label" x="470" y="93" text-anchor="middle">api-pool</text>
+          <text class="node-sub" x="470" y="107" text-anchor="middle">/api/*</text>
+        </g>
+        <g id="be1" class="backend">
+          <rect x="430" y="178" width="80" height="44" rx="9" fill="#06b6d4" class="box-stroke"/>
+          <text class="node-label" x="470" y="197" text-anchor="middle">static-pool</text>
+          <text class="node-sub" x="470" y="211" text-anchor="middle">/static/*</text>
+        </g>
+        <g id="be2" class="backend">
+          <rect x="430" y="282" width="80" height="44" rx="9" fill="#ec4899" class="box-stroke"/>
+          <text class="node-label" x="470" y="301" text-anchor="middle">video-pool</text>
+          <text class="node-sub" x="470" y="315" text-anchor="middle">/api/video</text>
+        </g>
+
+        <!-- travelling packet -->
+        <g id="pkt" class="pkt" style="opacity:0">
+          <rect id="pkt-rect" x="-20" y="-13" width="40" height="26" rx="5" fill="#fbbf24" stroke="#1a1a2e" stroke-width="2"/>
+          <text id="pkt-text" class="pkt-payload" x="0" y="3" text-anchor="middle" fill="#1a1a2e">REQ</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Layer</div><div class="value" id="v-layer">L4</div></div>
+        <div class="var"><div class="label">Routes on</div><div class="value grey" id="v-routeon">5-tuple</div></div>
+        <div class="var"><div class="label">TLS</div><div class="value amber" id="v-tls">pass-through</div></div>
+        <div class="var"><div class="label">Added latency</div><div class="value green" id="v-lat">~µs</div></div>
+        <div class="var"><div class="label">Throughput</div><div class="value" id="v-tput">M pkts/s</div></div>
+        <div class="var"><div class="label">Stickiness</div><div class="value grey" id="v-sticky">connection</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>L4 load balancer (transport)</div>
+        <div class="legend-item"><span class="swatch" style="background:#ec4899"></span>L7 load balancer (application)</div>
+        <div class="legend-item"><span class="swatch line" style="background:#3b82f6"></span>Chosen route path</div>
+        <div class="legend-item"><span class="swatch dash"></span>TLS handshake / termination</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Selected backend pool</div>
+        <div class="legend-item"><span class="swatch" style="background:#fbbf24"></span>Travelling request / packet</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to watch a request travel through an <b>L4</b> balancer, then replay it through an <b>L7</b> balancer.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx l4">
+      <h3>L4 — Transport layer</h3>
+      <div class="formula">backend = hash(src/dst IP + port + proto)</div>
+      <p>Reads only the <b>5-tuple</b>, forwards packets (NAT / Direct Server Return) <b>without parsing the payload</b>. TLS is <b>pass-through</b> — encrypted bytes flow end-to-end to the backend.</p>
+      <ul>
+        <li>Latency added: <b class="big">~µs</b> (sub-millisecond)</li>
+        <li>Throughput: <b>millions of packets/sec</b></li>
+        <li>Sticky at <b>connection</b> level — one TCP conn pinned to one backend</li>
+        <li>Protocol-agnostic: balances <b>any TCP/UDP</b> (DBs, brokers, gaming, VoIP)</li>
+        <li>e.g. AWS <b>NLB</b>, Google <b>Maglev</b>, <b>LVS/IPVS</b></li>
+      </ul>
+    </div>
+    <div class="cx l7">
+      <h3>L7 — Application layer</h3>
+      <div class="formula">backend = route(method, path, host, header, cookie)</div>
+      <p><b>Terminates TLS</b> (decrypts), parses the <b>HTTP</b> request, then routes on content: <code>/api/*</code>→one pool, <code>/static/*</code>→another. New pooled connection to the backend.</p>
+      <ul>
+        <li>Latency added: <b class="big">~1–5 ms</b> (TLS + parse cost)</li>
+        <li>Throughput: tens-to-hundreds of <b>thousands req/sec</b></li>
+        <li>Sticky at <b>request</b> level — cookie-based session affinity</li>
+        <li>Enables retries, rewrites, canary, gRPC/HTTP-2 routing, <b>WAF</b></li>
+        <li>e.g. AWS <b>ALB</b>, <b>NGINX</b>, <b>HAProxy</b>, <b>Envoy</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>"L7 is always better" is wrong.</b> L7 adds features <i>and</i> latency + CPU. For DB connections or gRPC streaming, plain <b>L4 is often the better choice</b>. The right answer is "depends on the requirement."</li>
+      <li><b>L4 cannot do URL-based routing.</b> It never sees the HTTP path (encrypted / un-parsed payload), so "send <code>/api</code> to a different backend on L4" is impossible — path routing is strictly an <b>L7</b> thing.</li>
+      <li><b>Pass-through vs termination.</b> L4 = TLS <b>pass-through</b> (forwards encrypted bytes). L7 = TLS <b>termination</b> (decrypts). To route on cookies/headers, L7 <b>must</b> terminate — you can't read encrypted content.</li>
+      <li><b>Deep vs shallow health checks.</b> L4 checks are usually shallow (<code>TCP connect</code> succeeds?). L7 can do deep checks (<code>GET /health</code> → expect <code>200</code>), catching backends that are listening but broken.</li>
+      <li><b>Stickiness vs even load.</b> Sticky sessions (L4 connection-level or L7 cookie-based) can overload one server if a client is heavy — perfect even distribution and stickiness can't both be fully achieved. Name the tradeoff.</li>
+      <li><b>Layered in practice.</b> Big systems put a global <b>L4</b> in front (raw throughput, DDoS absorption) feeding regional <b>L7</b> balancers (smart routing). Both layers together impresses interviewers.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>An <b>L4</b> balancer routes on the <b>5-tuple (IP + port)</b> without opening the packet — TLS passes through, latency is microseconds, and it balances any TCP/UDP. An <b>L7</b> balancer <b>terminates TLS</b> and reads the <b>HTTP path / headers / cookies</b> to route on content — costing a few milliseconds but unlocking path routing, cookie affinity, retries, and WAF. Speed vs intelligence — and large systems use <b>both, layered</b>.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- refs ----------
+  const $ = (id) => document.getElementById(id);
+  const pkt = $("pkt"), pktRect = $("pkt-rect"), pktText = $("pkt-text");
+  const wireCl = $("wire-cl");
+  const wires = [$("wire-b0"), $("wire-b1"), $("wire-b2")];
+  const backends = [$("be0"), $("be1"), $("be2")];
+  const lbRect = $("lb-rect"), lbTitle = $("lb-title"), lbSub = $("lb-sub"), lbSub2 = $("lb-sub2"), lbTls = $("lb-tls");
+  const modeLabel = $("mode-label");
+
+  const narrEl = $("narration");
+  const stepEl = $("step-indicator");
+  const btnNext = $("btn-next"), btnPrev = $("btn-prev"), btnReset = $("btn-reset");
+
+  const vLayer = $("v-layer"), vRouteOn = $("v-routeon"), vTls = $("v-tls"),
+        vLat = $("v-lat"), vTput = $("v-tput"), vSticky = $("v-sticky");
+
+  // backend chosen by L4 (hash on 5-tuple) vs L7 (content /api/video -> video-pool)
+  const L4_TARGET = 1;   // static-pool (arbitrary hash bucket — L4 can't read the path)
+  const L7_TARGET = 2;   // video-pool  (content-based: /api/video)
+
+  // ---------- helpers ----------
+  function placePkt(x, y, label, color) {
+    pkt.setAttribute("transform", `translate(${x} ${y})`);
+    pkt.style.opacity = 1;
+    pktText.textContent = label;
+    pktRect.setAttribute("fill", color || "#fbbf24");
+    // widen for longer labels
+    const w = Math.max(40, label.length * 6 + 14);
+    pktRect.setAttribute("width", w);
+    pktRect.setAttribute("x", -w / 2);
+  }
+  function hidePkt() { pkt.style.opacity = 0; }
+
+  function litWire(el, cls) { el.setAttribute("class", "wire " + cls); }
+  function resetWires() {
+    wireCl.setAttribute("class", "wire");
+    wires.forEach(w => w.setAttribute("class", "wire"));
+  }
+  function highlightBackend(idx) {
+    backends.forEach((b, i) => {
+      b.setAttribute("class", "backend" + (i === idx ? " hot" : (idx === null ? "" : " dim")));
+    });
+  }
+
+  function setLB(mode) {
+    if (mode === 7) {
+      lbRect.setAttribute("fill", "#ec4899");
+      lbTitle.textContent = "L7 LB";
+      lbSub.textContent = "TLS terminate";
+      lbSub2.textContent = "parse HTTP";
+      modeLabel.textContent = "layer 7 — application";
+    } else {
+      lbRect.setAttribute("fill", "#3b82f6");
+      lbTitle.textContent = "L4 LB";
+      lbSub.textContent = "VIP : forward";
+      lbSub2.textContent = "5-tuple hash";
+      modeLabel.textContent = "layer 4 — transport";
+    }
+  }
+
+  function setSideL4() {
+    vLayer.textContent = "L4"; vLayer.className = "value";
+    vRouteOn.textContent = "5-tuple"; vRouteOn.className = "value grey";
+    vTls.textContent = "pass-through"; vTls.className = "value amber";
+    vLat.textContent = "~µs"; vLat.className = "value green";
+    vTput.textContent = "M pkts/s"; vTput.className = "value";
+    vSticky.textContent = "connection"; vSticky.className = "value grey";
+  }
+  function setSideL7() {
+    vLayer.textContent = "L7"; vLayer.className = "value pink";
+    vRouteOn.textContent = "path/header"; vRouteOn.className = "value pink";
+    vTls.textContent = "terminated"; vTls.className = "value amber";
+    vLat.textContent = "~1–5 ms"; vLat.className = "value amber";
+    vTput.textContent = "K–100K req/s"; vTput.className = "value pink";
+    vSticky.textContent = "cookie"; vSticky.className = "value grey";
+  }
+
+  // backend anchor points (entry x,y on each backend's left edge mid)
+  const beAnchor = [
+    { x: 430, y: 96 },
+    { x: 430, y: 200 },
+    { x: 430, y: 304 },
+  ];
+
+  // ---------- steps ----------
+  // each step is a function that paints the full state for that step.
+  const steps = [
+    // 0 — intro / empty
+    () => {
+      setLB(4); setSideL4(); resetWires(); highlightBackend(null); hidePkt(); lbTls.textContent = "";
+      narrEl.className = "narration";
+      narrEl.innerHTML = `<b>One job, two ways to do it.</b> A client wants <code>GET /api/video</code> on <code>shop.example.com</code>. The load balancer must pick one of three backend pools. We'll first send it through an <b>L4</b> balancer (transport layer), then replay through an <b>L7</b> balancer (application layer).`;
+    },
+    // 1 — L4: client opens TCP to VIP, packet arrives
+    () => {
+      setLB(4); setSideL4(); resetWires(); highlightBackend(null); lbTls.textContent = "🔒";
+      litWire(wireCl, "lit");
+      placePkt(155, 200, "🔒 bytes", "#fbbf24");
+      narrEl.className = "narration l4";
+      narrEl.innerHTML = `<b>L4 · step 1 — connect to the VIP.</b> The client opens a <code>TCP</code> connection to the balancer's <b>virtual IP</b>. The packet is still <b>encrypted</b> (🔒). The L4 LB sees only the <code>5-tuple</code>: src IP/port, dst IP/port, protocol.`;
+    },
+    // 2 — L4: hash 5-tuple, no payload read
+    () => {
+      setLB(4); setSideL4(); resetWires(); highlightBackend(null); lbTls.textContent = "🔒";
+      litWire(wireCl, "lit");
+      placePkt(265, 200, "5-tuple", "#3b82f6");
+      pktText.setAttribute("fill", "#fff");
+      narrEl.className = "narration l4";
+      narrEl.innerHTML = `<b>L4 · step 2 — hash, don't read.</b> The LB hashes the <code>5-tuple</code> to pick a backend. It <b>never opens the payload</b> — no idea this is <code>/api/video</code>. No decrypt, no parse → added latency is <b>microseconds</b>, throughput <b>millions of packets/sec</b>.`;
+    },
+    // 3 — L4: forward to a backend (arbitrary bucket), connection pinned
+    () => {
+      setLB(4); setSideL4(); resetWires(); lbTls.textContent = "🔒";
+      pktText.setAttribute("fill", "#1a1a2e");
+      litWire(wireCl, "lit"); litWire(wires[L4_TARGET], "lit");
+      highlightBackend(L4_TARGET);
+      const a = beAnchor[L4_TARGET];
+      placePkt(a.x - 20, a.y, "🔒 bytes", "#fbbf24");
+      narrEl.className = "narration l4";
+      narrEl.innerHTML = `<b>L4 · step 3 — forward, still sealed.</b> Packets are forwarded (NAT / Direct Server Return) to the hashed backend — <b>encrypted bytes pass straight through</b> to the backend, which terminates TLS itself. This whole TCP connection is now <b>pinned</b> to that one backend (<b>connection stickiness</b>).`;
+    },
+    // 4 — switch to L7: full TLS handshake + termination
+    () => {
+      setLB(7); setSideL7(); resetWires(); highlightBackend(null); lbTls.textContent = "🔓";
+      litWire(wireCl, "tls");
+      placePkt(155, 200, "🔒 TLS", "#f59e0b");
+      pktText.setAttribute("fill", "#1a1a2e");
+      narrEl.className = "narration tls";
+      narrEl.innerHTML = `<b>L7 · step 1 — terminate TLS.</b> Now replay through an <b>L7</b> balancer. The client does a full <code>TLS</code> handshake <b>with the LB</b>, which <b>decrypts</b> (🔓 termination). This costs CPU + cert management, but it's the only way to read the request's content.`;
+    },
+    // 5 — L7: parse HTTP, see path/host/cookie
+    () => {
+      setLB(7); setSideL7(); resetWires(); highlightBackend(null); lbTls.textContent = "🔓";
+      litWire(wireCl, "lit7");
+      placePkt(265, 200, "/api/video", "#ec4899");
+      pktText.setAttribute("fill", "#fff");
+      narrEl.className = "narration l7";
+      narrEl.innerHTML = `<b>L7 · step 2 — read the content.</b> Decrypted, the LB <b>parses the HTTP request</b>: method <code>GET</code>, <code>Host: shop.example.com</code>, path <code>/api/video</code>, plus headers & cookies. Now it can make a <b>content-based</b> routing decision.`;
+    },
+    // 6 — L7: content route to video-pool, new pooled connection
+    () => {
+      setLB(7); setSideL7(); resetWires(); lbTls.textContent = "🔓";
+      litWire(wireCl, "lit7"); litWire(wires[L7_TARGET], "lit7");
+      highlightBackend(L7_TARGET);
+      const a = beAnchor[L7_TARGET];
+      placePkt(a.x - 20, a.y, "→ video", "#ec4899");
+      pktText.setAttribute("fill", "#fff");
+      narrEl.className = "narration l7";
+      narrEl.innerHTML = `<b>L7 · step 3 — route on the path.</b> <code>/api/video</code> matches the <b>video-pool</b> rule, so the LB opens a fresh <b>pooled keep-alive connection</b> to that pool and forwards the request. Different requests on the <i>same</i> client connection can fan out to <i>different</i> backends (<b>request-level</b> routing + cookie affinity).`;
+    },
+    // 7 — side by side takeaway
+    () => {
+      setLB(7); setSideL7(); resetWires();
+      litWire(wires[L4_TARGET], "lit"); litWire(wires[L7_TARGET], "lit7");
+      backends.forEach((b,i)=> b.setAttribute("class","backend" + ((i===L4_TARGET||i===L7_TARGET)?" hot":" dim")));
+      hidePkt(); lbTls.textContent = "🔓";
+      narrEl.className = "narration good";
+      narrEl.innerHTML = `<b>Same request, two destinations.</b> The <b>L4</b> path (blue) bucketed the connection by <code>5-tuple</code> — fast but blind, it can't honour <code>/api/video</code>. The <b>L7</b> path (pink) read the path and sent it to <b>video-pool</b>. <b>Speed vs intelligence</b> — and big systems chain an L4 front into L7 backends to get both.`;
+    },
+  ];
+
+  let cursor = 0;
+  function render() {
+    steps[cursor]();
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

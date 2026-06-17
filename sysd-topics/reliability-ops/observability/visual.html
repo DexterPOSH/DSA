@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Observability — Logs, Metrics &amp; Traces Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0 0 8px; color: #d0d0e0; font-size: 15px; }
+  .analogy p:last-child { margin-bottom: 0; }
+  .analogy b { color: #ffffff; }
+  .analogy .pill { display:inline-block; font-weight:700; padding:1px 7px; border-radius:4px; font-size:13px; }
+  .pill.m { background:#10391f; color:#6ee7b7; }
+  .pill.l { background:#3a2a11; color:#fbbf24; }
+  .pill.t { background:#2a1a3a; color:#c4a3ff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 860px) { .stage { grid-template-columns: 1fr; } }
+
+  .diagram-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+
+  .svc rect { transition: all .4s ease; }
+  .svc text { font-family: -apple-system, sans-serif; font-weight: 700; font-size: 12px; fill: #fff; }
+  .svc .sub { font-weight: 400; font-size: 9px; fill: #b9b9d6; font-family:"SF Mono",Menlo,Consolas,monospace; }
+  .wire { stroke: #3a3a5c; stroke-width: 2.5; fill: none; }
+  .wire.hot { stroke: #f59e0b; }
+  .hdr { font-family:"SF Mono",Menlo,Consolas,monospace; font-size: 8.5px; fill:#fbbf24; }
+
+  .packet { fill:#f59e0b; stroke:#fff; stroke-width:1.5; }
+  .packet-label { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:8px; fill:#1a1a2e; font-weight:700; }
+
+  /* pillar emission badges floating off a service */
+  .emit { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:8.5px; font-weight:700; }
+  .col-head { font-family:-apple-system,sans-serif; font-size:11px; font-weight:700; }
+
+  /* waterfall */
+  .wf-bar { transition: all .4s ease; }
+  .wf-label { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:9px; fill:#cdd; }
+  .wf-ms { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:8.5px; fill:#888; }
+  .wf-axis { stroke:#3a3a5c; stroke-width:1; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #3b82f6; font-weight: 700; word-break: break-all; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.purple { color: #c4a3ff; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.trace { border-left-color: #c4a3ff; background: #241834; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* three pillars compare */
+  .pillars { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .pillars { grid-template-columns: 1fr; } }
+  .px { border-radius: 12px; padding: 18px 20px; }
+  .px.metrics { background: #10291c; border: 1px solid #10b981; }
+  .px.logs { background: #2a2111; border: 1px solid #f59e0b; }
+  .px.traces { background: #221634; border: 1px solid #a78bfa; }
+  .px h3 { margin: 0 0 4px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .px.metrics h3 { color: #6ee7b7; }
+  .px.logs h3 { color: #fbbf24; }
+  .px.traces h3 { color: #c4a3ff; }
+  .px .q { font-size: 12px; color:#cfcfe0; font-style:italic; margin-bottom:10px; }
+  .px .ex { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:11px; color:#fff;
+            background:#00000033; padding:8px 10px; border-radius:6px; word-break:break-all; }
+  .px .meta { margin-top:10px; font-size:12px; color:#c8c8d8; }
+  .px .meta b { color:#fff; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Observability — Logs, Metrics &amp; Traces</h1>
+  <div class="subtitle">How the <b>three pillars</b> let you infer a system's internal state from the outside — and how a single shared <code>trace_id</code> stitches them together so a 3am pager turns into a root cause in minutes.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — monitoring a hospital patient</h3>
+    <p><span class="pill m">METRICS</span> = the <b>bedside monitor</b> showing heart rate, BP and oxygen as live numbers. It instantly screams <i>"something's wrong"</i> (BP dropped!) but never says <i>why</i>. Cheap, continuous, always on.</p>
+    <p><span class="pill l">LOGS</span> = the <b>nurse's diary</b>, every event timestamped: "2:04pm gave medicine X", "2:11pm patient complained of pain". Rich detail to reconstruct exactly <i>what happened</i> — but storing every patient's full diary is expensive.</p>
+    <p><span class="pill t">TRACES</span> = the <b>patient file that travels</b> ER → X-ray → surgery → ICU, recording time spent at each stop. It reveals the bottleneck was the X-ray queue, not surgery — i.e. <i>where</i> the delay was.</p>
+    <p>No single tool tells the whole story. The metric <b>shouts there's a problem</b>, the trace says <b>where</b>, the log says <b>exactly what</b> — observability is fusing all three to diagnose problems you never anticipated.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">request:</span><code>GET /checkout</code> &nbsp;enters at the gateway, fans out across services</div>
+    <div class="row"><span class="label">trace:</span><code>trace_id</code> minted at entry, propagated via <code>traceparent</code> header to every downstream call</div>
+    <div class="row"><span class="label">goal:</span> metric alert &rarr; slow trace &rarr; that trace's <code>trace_id</code> &rarr; exact logs</div>
+  </div>
+
+  <div class="stage">
+    <div class="diagram-holder">
+      <svg viewBox="0 0 560 360" id="diagram">
+        <!-- wires (drawn first, behind) -->
+        <g id="g-wires"></g>
+        <!-- emission badges -->
+        <g id="g-emit"></g>
+        <!-- services -->
+        <g id="g-svcs"></g>
+        <!-- travelling packet -->
+        <g id="g-packet"></g>
+        <!-- waterfall overlay -->
+        <g id="g-waterfall"></g>
+        <!-- correlation overlay -->
+        <g id="g-correlate"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">trace_id</div><div class="value purple" id="v-trace">—</div></div>
+        <div class="var"><div class="label">active span</div><div class="value amber" id="v-span">—</div></div>
+        <div class="var"><div class="label">metrics emitted</div><div class="value green" id="v-metrics">0</div></div>
+        <div class="var"><div class="label">log lines</div><div class="value" id="v-logs">0</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch round" style="background:#3b82f6"></span>Service (microservice / hop)</div>
+        <div class="legend-item"><span class="swatch round" style="background:#f59e0b"></span>Request packet carrying <code>traceparent</code></div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Metric &mdash; aggregate number</div>
+        <div class="legend-item"><span class="swatch" style="background:#fbbf24"></span>Log &mdash; discrete event line</div>
+        <div class="legend-item"><span class="swatch" style="background:#a78bfa"></span>Trace span &mdash; one timed operation</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to send a request into the system and watch all three pillars get generated.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="pillars">
+    <div class="px metrics">
+      <h3>Metrics</h3>
+      <div class="q">"Is something wrong, right now?"</div>
+      <div class="ex">http_requests_total{svc="pay"}<br>request_latency_ms p99=820</div>
+      <div class="meta"><b>Aggregate numbers</b> in a time-series DB (Prometheus). Cost scales with <b>cardinality</b>, not request volume — 1M requests = 1 counter bump. Cheapest pillar, runs at 100% traffic, powers dashboards &amp; alerts. <b>Never</b> put <code>user_id</code> here (cardinality explosion).</div>
+    </div>
+    <div class="px logs">
+      <h3>Logs</h3>
+      <div class="q">"What exactly happened?"</div>
+      <div class="ex">{"ts":...,"level":"ERROR",<br>"user_id":42,"trace_id":"a1b2"}</div>
+      <div class="meta"><b>Discrete timestamped events</b>, shipped to ELK / Loki / Splunk. Use <b>structured (JSON)</b> logging so machines can query. Volume dominates cost at scale → tame with <b>log levels</b>, <b>sampling</b>, and <b>retention tiers</b>.</div>
+    </div>
+    <div class="px traces">
+      <h3>Traces</h3>
+      <div class="q">"Where did the time go?"</div>
+      <div class="ex">trace a1b2 → tree of spans<br>gateway · auth · pay · db</div>
+      <div class="meta"><b>End-to-end request journey</b> as a tree of <b>spans</b> (Jaeger / Tempo / Zipkin). A <code>trace_id</code> + parent <code>span_id</code> ride <b>HTTP headers</b> to each hop (context propagation). Most expensive → use <b>sampling</b>.</div>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Monitoring &ne; Observability.</b> Monitoring answers <i>pre-defined</i> questions ("is CPU high?"). Observability lets you ask <i>unknown</i> ones ("which tenant with feature-flag X on is slow?") without deploying new code. High-cardinality traces + structured logs give that explorability.</li>
+      <li><b>Cardinality is the metric killer.</b> Putting <code>user_id</code>, <code>request_id</code> or <code>trace_id</code> as a Prometheus label spawns one series per value → millions of series → TSDB OOM. Unique-per-request data belongs in <b>logs/traces</b>, not metrics.</li>
+      <li><b>Context propagation</b> — the entry point mints a <code>trace_id</code>; every downstream call forwards it + the parent <code>span_id</code> via the W3C <code>traceparent</code> header. Without it, 30 services' logs can't be correlated.</li>
+      <li><b>Sampling = deliberate data loss.</b> <b>Head</b>-based decides at entry (cheap, can miss rare errors). <b>Tail</b>-based buffers the whole trace then keeps all errors/slow ones (pricier, needs a central collector). Bias toward keeping anomalies.</li>
+      <li><b>Push vs pull</b> — Prometheus <b>pulls</b> (scrapes); short-lived batch jobs need a Pushgateway. StatsD / OTel <b>push</b>, better for ephemeral workloads.</li>
+      <li><b>OpenTelemetry (OTel)</b> is the vendor-neutral standard: one SDK emits traces/metrics/logs to any backend — avoids lock-in at the cost of running a collector layer.</li>
+      <li><b>Clock skew</b> — trace waterfalls depend on different machines' wall clocks, so span alignment can be slightly off. <code>trace_id</code> parent/child links are causal and immune; read the timeline with a grain of salt.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Emit all three pillars and <b>correlate them with a shared <code>trace_id</code></b>: a <b>metric</b> alert tells you <i>something</i> broke, a <b>trace</b> waterfall tells you <i>where</i> the latency went, and the <b>logs</b> for that exact <code>trace_id</code> tell you <i>why</i>. Keep high-cardinality data out of metrics, sample traces/logs to control cost, and instrument once with OpenTelemetry.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- layout: services in a flow ----------
+  // gateway -> auth -> pay -> db, with a final emit-to-backends row conceptually
+  const SVC = {
+    client:  { x: 36,  y: 30,  w: 92, h: 40, label:"Client",      sub:"GET /checkout" },
+    gateway: { x: 232, y: 30,  w: 96, h: 40, label:"API Gateway", sub:"entry point" },
+    auth:    { x: 232, y: 110, w: 96, h: 40, label:"auth-svc",    sub:"verify token" },
+    pay:     { x: 232, y: 190, w: 96, h: 40, label:"payment-svc", sub:"charge card" },
+    db:      { x: 232, y: 270, w: 96, h: 40, label:"orders-db",   sub:"INSERT order" },
+  };
+  // wires: [from, to]
+  const WIRES = [
+    ["client","gateway"], ["gateway","auth"], ["auth","pay"], ["pay","db"]
+  ];
+  function cx(s){ return s.x + s.w/2; }
+  function cy(s){ return s.y + s.h/2; }
+
+  // span timing for the waterfall (ms offsets + durations)
+  const SPANS = [
+    { id:"gateway", svc:"gateway", start:0,   dur:820, color:"#3b82f6", label:"gateway /checkout" },
+    { id:"auth",    svc:"auth",    start:20,  dur:40,  color:"#06b6d4", label:"auth verify" },
+    { id:"pay",     svc:"pay",     start:70,  dur:700, color:"#a78bfa", label:"payment charge" },
+    { id:"db",      svc:"db",      start:120, dur:600, color:"#f59e0b", label:"orders-db INSERT  ← slow!" },
+  ];
+  const TRACE_ID = "a1b2c3d4";
+
+  // ---------- steps ----------
+  // fields: wiresHot(Set of "from>to"), pktAt(svc id or null), emit(svc -> {m,l,t}),
+  //         showWaterfall, highlightSpan, showCorrelate, narration, narrClass, stats
+  const steps = [];
+
+  steps.push({
+    wiresHot:new Set(), pkt:null, emit:{}, waterfall:false, correlate:false,
+    narration:`<b>1. A request arrives.</b> The client fires <code>GET /checkout</code>. In a distributed system this one request will fan out across many services — gateway, auth, payment, database. Each hop is a chance for latency or failure to hide.`,
+    narrClass:"", stats:{trace:"—", span:"—", metrics:0, logs:0}
+  });
+
+  steps.push({
+    wiresHot:new Set(["client>gateway"]), pkt:"gateway", emit:{},
+    waterfall:false, correlate:false,
+    narration:`<b>2. Mint the <code>trace_id</code> at the entry.</b> The gateway generates one unique <code>trace_id = ${TRACE_ID}</code> for this request and opens the root <b>span</b>. From here on, that id rides along inside the W3C <code>traceparent</code> HTTP header — this is <b>context propagation</b>.`,
+    narrClass:"trace", stats:{trace:TRACE_ID, span:"gateway", metrics:0, logs:0}
+  });
+
+  steps.push({
+    wiresHot:new Set(["client>gateway","gateway>auth"]), pkt:"auth",
+    emit:{ gateway:{m:true,l:true,t:true}, auth:{t:true} },
+    waterfall:false, correlate:false,
+    narration:`<b>3. Each hop emits all three pillars.</b> As the packet flows gateway → auth, every service emits a <span style="color:#6ee7b7">metric</span> (counter / latency), a <span style="color:#fbbf24">log line</span> (with the same <code>trace_id</code> baked in!), and a <span style="color:#c4a3ff">span</span> for the trace. The <code>traceparent</code> header carries <code>${TRACE_ID}</code> + parent span_id forward.`,
+    narrClass:"good", stats:{trace:TRACE_ID, span:"auth", metrics:2, logs:2}
+  });
+
+  steps.push({
+    wiresHot:new Set(["client>gateway","gateway>auth","auth>pay","pay>db"]), pkt:"db",
+    emit:{ gateway:{m:true,l:true,t:true}, auth:{m:true,l:true,t:true}, pay:{m:true,l:true,t:true}, db:{m:true,l:true,t:true} },
+    waterfall:false, correlate:false,
+    narration:`<b>4. Full fan-out.</b> The request reaches payment → orders-db. Now four spans exist under one trace, dozens of structured log lines all tagged <code>trace_id=${TRACE_ID}</code>, and metrics counters incremented per service. Notice: 1 request = 1 counter bump per metric, but many log lines — that's why <b>log volume dominates cost</b>.`,
+    narrClass:"good", stats:{trace:TRACE_ID, span:"orders-db", metrics:4, logs:9}
+  });
+
+  steps.push({
+    wiresHot:new Set(), pkt:null, emit:{},
+    waterfall:true, correlate:false, highlightSpan:null,
+    narration:`<b>5. Reassemble the trace into a waterfall.</b> The backend (Jaeger / Tempo) groups all spans sharing <code>${TRACE_ID}</code> and lays them out by start time. Total request = <b>820ms</b>. Each bar is one span; nesting shows parent → child calls.`,
+    narrClass:"trace", stats:{trace:TRACE_ID, span:"4 spans", metrics:4, logs:9}
+  });
+
+  steps.push({
+    wiresHot:new Set(), pkt:null, emit:{},
+    waterfall:true, correlate:false, highlightSpan:"db",
+    narration:`<b>6. The trace pinpoints WHERE.</b> The waterfall makes it obvious: of the 820ms, <b>~600ms</b> is the <code>orders-db INSERT</code> span. Without tracing you'd only know "checkout is slow" — now you know which of 4 services to blame. The metric shouted <i>that</i> it's slow; the trace shows <i>where</i>.`,
+    narrClass:"move", stats:{trace:TRACE_ID, span:"orders-db 600ms", metrics:4, logs:9}
+  });
+
+  steps.push({
+    wiresHot:new Set(), pkt:null, emit:{},
+    waterfall:true, correlate:true, highlightSpan:"db",
+    narration:`<b>7. Correlate → the WHY.</b> This is observability's superpower. Alert fires (<code>p99 &gt; 500ms</code>) → open the slow trace → copy its <code>trace_id=${TRACE_ID}</code> → pull every log line with that id. The DB log reveals the cause: <code>{"level":"WARN","msg":"lock wait timeout","trace_id":"${TRACE_ID}"}</code>. Three pillars, one shared id = full root cause.`,
+    narrClass:"good", stats:{trace:TRACE_ID, span:"orders-db 600ms", metrics:4, logs:9}
+  });
+
+  // ---------- DOM ----------
+  const gWires = document.getElementById("g-wires");
+  const gEmit  = document.getElementById("g-emit");
+  const gSvcs  = document.getElementById("g-svcs");
+  const gPacket= document.getElementById("g-packet");
+  const gWf    = document.getElementById("g-waterfall");
+  const gCorr  = document.getElementById("g-correlate");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const vTrace = document.getElementById("v-trace");
+  const vSpan  = document.getElementById("v-span");
+  const vMet   = document.getElementById("v-metrics");
+  const vLog   = document.getElementById("v-logs");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+
+  function el(tag, attrs, text) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  let cursor = 0;
+
+  function clearAll() {
+    [gWires,gEmit,gSvcs,gPacket,gWf,gCorr].forEach(g => g.innerHTML = "");
+  }
+
+  function drawServices(dim) {
+    for (const id in SVC) {
+      const s = SVC[id];
+      const g = el("g", { class:"svc", opacity: dim ? 0.18 : 1 });
+      g.appendChild(el("rect", {
+        x:s.x, y:s.y, width:s.w, height:s.h, rx:8,
+        fill: id==="client" ? "#2d2d50" : "#1e3a5f",
+        stroke: id==="client" ? "#64748b" : "#3b82f6", "stroke-width":2
+      }));
+      g.appendChild(el("text", { x:cx(s), y:s.y+18, "text-anchor":"middle" }, s.label));
+      g.appendChild(el("text", { x:cx(s), y:s.y+31, "text-anchor":"middle", class:"sub" }, s.sub));
+      gSvcs.appendChild(g);
+    }
+  }
+
+  function drawWires(hot) {
+    for (const [a,b] of WIRES) {
+      const sa = SVC[a], sb = SVC[b];
+      const key = a+">"+b;
+      const isHot = hot.has(key);
+      let d;
+      if (a==="client") {
+        // horizontal into gateway
+        d = `M ${sa.x+sa.w} ${cy(sa)} L ${sb.x} ${cy(sb)}`;
+      } else {
+        // vertical down the stack
+        d = `M ${cx(sa)} ${sa.y+sa.h} L ${cx(sb)} ${sb.y}`;
+      }
+      gWires.appendChild(el("path", { class:"wire"+(isHot?" hot":""), d }));
+      if (isHot) {
+        // little traceparent tag near the wire midpoint
+        const mx = a==="client" ? (sa.x+sa.w+sb.x)/2 : cx(sa);
+        const my = a==="client" ? cy(sa)-6 : (sa.y+sa.h+sb.y)/2;
+        gWires.appendChild(el("text", { class:"hdr", x:mx+ (a==="client"?0:8), y:my, "text-anchor":"middle" }, "traceparent"));
+      }
+    }
+  }
+
+  function drawEmit(emit) {
+    // badges to the right of each service: M (green) L (amber) T (purple)
+    for (const id in emit) {
+      const s = SVC[id]; const e = emit[id];
+      const bx = s.x + s.w + 14;
+      const by = cy(s);
+      const items = [];
+      if (e.m) items.push(["M","#10b981"]);
+      if (e.l) items.push(["L","#f59e0b"]);
+      if (e.t) items.push(["T","#a78bfa"]);
+      items.forEach((it, i) => {
+        const ox = bx + i*26;
+        const g = el("g", {});
+        g.appendChild(el("circle", { cx:ox+8, cy:by, r:9, fill:it[1], stroke:"#1a1a2e", "stroke-width":1.5 }));
+        g.appendChild(el("text", { class:"emit", x:ox+8, y:by+3, "text-anchor":"middle", fill:"#1a1a2e" }, it[0]));
+        gEmit.appendChild(g);
+      });
+    }
+  }
+
+  function drawPacket(svcId) {
+    if (!svcId) return;
+    const s = SVC[svcId];
+    const px = svcId==="gateway" ? s.x - 14 : cx(s);
+    const py = svcId==="gateway" ? cy(s) : s.y - 14;
+    const g = el("g", {});
+    g.appendChild(el("circle", { class:"packet", cx:px, cy:py, r:13 }));
+    g.appendChild(el("text", { class:"packet-label", x:px, y:py+3, "text-anchor":"middle" }, "req"));
+    gPacket.appendChild(g);
+  }
+
+  function drawWaterfall(highlight) {
+    // panel on the right region of the svg, replacing the service stack visually
+    const X0 = 372, Y0 = 60, W = 168, ROW = 30, totalMs = 820;
+    gWf.appendChild(el("text", { class:"col-head", x:X0, y:Y0-22, fill:"#c4a3ff" }, "Trace waterfall · "+TRACE_ID));
+    gWf.appendChild(el("text", { class:"wf-ms", x:X0, y:Y0-8 }, "0ms"));
+    gWf.appendChild(el("text", { class:"wf-ms", x:X0+W, y:Y0-8, "text-anchor":"end" }, totalMs+"ms"));
+    gWf.appendChild(el("line", { class:"wf-axis", x1:X0, y1:Y0-4, x2:X0+W, y2:Y0-4 }));
+    SPANS.forEach((sp, i) => {
+      const y = Y0 + i*ROW;
+      const bx = X0 + (sp.start/totalMs)*W;
+      const bw = Math.max(4, (sp.dur/totalMs)*W);
+      const hot = highlight === sp.id;
+      gWf.appendChild(el("rect", {
+        class:"wf-bar", x:bx, y:y, width:bw, height:16, rx:3,
+        fill: hot ? "#f59e0b" : sp.color,
+        stroke: hot ? "#fbbf24" : "none", "stroke-width": hot ? 2.5 : 0,
+        opacity: hot ? 1 : 0.9
+      }));
+      gWf.appendChild(el("text", { class:"wf-label", x:X0, y:y+12,
+        fill: hot ? "#fbbf24" : "#cdd", "font-weight": hot?"700":"400" }, sp.label));
+      gWf.appendChild(el("text", { class:"wf-ms", x:X0+W, y:y+12, "text-anchor":"end" }, sp.dur+"ms"));
+    });
+  }
+
+  function drawCorrelate() {
+    // a log card under the waterfall linked to db span via trace_id
+    const X0 = 372, Y = 196;
+    gCorr.appendChild(el("text", { class:"col-head", x:X0, y:Y, fill:"#fbbf24" }, "Logs filtered by trace_id ↓"));
+    const cardY = Y+10;
+    gCorr.appendChild(el("rect", { x:X0, y:cardY, width:168, height:96, rx:6, fill:"#2a2111", stroke:"#f59e0b", "stroke-width":1.5 }));
+    const lines = [
+      ['{"svc":"gateway","level":"INFO",', "#b9b9d6"],
+      [' "msg":"checkout start"}', "#b9b9d6"],
+      ['{"svc":"orders-db","level":"WARN",', "#fbbf24"],
+      [' "msg":"lock wait timeout",', "#fbbf24"],
+      [' "trace_id":"'+TRACE_ID+'"}', "#6ee7b7"],
+    ];
+    lines.forEach((ln, i) => {
+      gCorr.appendChild(el("text", {
+        x:X0+8, y:cardY+18+i*16, fill:ln[1],
+        "font-family":'"SF Mono",Menlo,Consolas,monospace', "font-size":"8.5px",
+        "font-weight": i>=2 ? "700":"400"
+      }, ln[0]));
+    });
+    // arrow from db waterfall bar to the log card
+    gCorr.appendChild(el("path", {
+      d:`M ${X0+150} ${60+3*30+8} C ${X0+170} ${150}, ${X0+150} ${175}, ${X0+120} ${cardY}`,
+      fill:"none", stroke:"#a78bfa", "stroke-width":2, "stroke-dasharray":"4 4",
+      "marker-end":"url(#arrow)"
+    }));
+  }
+
+  function render() {
+    const s = steps[cursor];
+    clearAll();
+
+    // arrow marker def
+    const defs = el("defs", {});
+    const marker = el("marker", { id:"arrow", markerWidth:"8", markerHeight:"8", refX:"6", refY:"3", orient:"auto" });
+    marker.appendChild(el("path", { d:"M0,0 L6,3 L0,6 Z", fill:"#a78bfa" }));
+    defs.appendChild(marker);
+    gWires.appendChild(defs);
+
+    if (s.waterfall) {
+      // dim the service flow, show waterfall + (maybe) correlate
+      drawWires(new Set());
+      drawServices(true);
+      drawWaterfall(s.highlightSpan);
+      if (s.correlate) drawCorrelate();
+    } else {
+      drawWires(s.wiresHot);
+      drawServices(false);
+      drawEmit(s.emit);
+      drawPacket(s.pkt);
+    }
+
+    vTrace.textContent = s.stats.trace;
+    vSpan.textContent  = s.stats.span;
+    vMet.textContent   = s.stats.metrics;
+    vLog.textContent   = s.stats.logs;
+
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KMP String Matching — LPS Build &amp; Smart Slide Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 {
+    margin: 0 0 6px;
+    color: #ffffff;
+    font-size: 28px;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    color: #a0a0b8;
+    margin-bottom: 28px;
+    font-size: 15px;
+  }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px;
+    border-radius: 8px;
+    margin-bottom: 24px;
+  }
+  .analogy h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #3b82f6;
+  }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy p + p { margin-top: 8px; }
+
+  .problem {
+    background: #24243e;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  /* Phase tabs */
+  .tabs { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab {
+    background: #24243e; border: 1px solid #3a3a5c; color: #a0a0b8;
+    padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 14px;
+    font-family: inherit; transition: all 0.15s ease;
+  }
+  .tab:hover { background: #2d2d50; color: #e0e0e0; }
+  .tab.active { background: #3b82f6; border-color: #3b82f6; color: #fff; font-weight: 600; }
+  .tab .pico { font-size: 12px; color: inherit; opacity: 0.75; margin-left: 6px; }
+
+  .stage {
+    background: #24243e;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .section-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #8888aa;
+    margin: 0 0 14px;
+  }
+  .section-title .sub {
+    color: #666680; font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 6px;
+  }
+
+  /* Character strips */
+  .strip {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 30px;
+  }
+  .ch {
+    position: relative;
+    min-width: 38px;
+    flex: 0 0 38px;
+    padding: 16px 4px 8px;
+    background: #2d2d50;
+    border: 2px solid #3a3a5c;
+    border-radius: 8px;
+    text-align: center;
+    transition: all 0.25s ease;
+  }
+  .ch .idx {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a2e;
+    font-size: 10px;
+    color: #777796;
+    padding: 0 4px;
+  }
+  .ch .val {
+    font-size: 19px;
+    font-weight: 600;
+    color: #e0e0e0;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  /* highlight states */
+  .ch.prefixrun { background: #1e3a5f; border-color: #3b82f6; }   /* matched prefix region (search: j chars already matched) */
+  .ch.prefixrun .val { color: #93c5fd; }
+  .ch.window { background: #3f2e0d; border-color: #fbbf24; }       /* the active char being compared */
+  .ch.window .val { color: #fbbf24; }
+  .ch.probe {
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4);
+    transform: translateY(-3px);
+  }
+  .ch.probe-bad {
+    background: #4a1d1d;
+    border-color: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35);
+  }
+  .ch.probe-bad .val { color: #fca5a5; }
+  .ch.matched {
+    background: #14532d;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+  }
+  .ch.matched .val { color: #ffffff; }
+  .ch.consumed { opacity: 0.4; }
+  /* pointer arrows */
+  .ch .ptr {
+    position: absolute;
+    bottom: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .ch .ptr.i  { color: #3b82f6; }
+  .ch .ptr.j  { color: #f59e0b; }
+  .ch .ptr.len{ color: #a78bfa; }
+  .ch .ptr.two { bottom: -40px; }
+
+  /* LPS array row */
+  .lpsrow { display: flex; gap: 6px; margin-top: 26px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; }
+  .lps {
+    min-width: 38px; flex: 0 0 38px; padding: 10px 4px; text-align: center;
+    background: #20203a; border: 1px solid #3a3a5c; border-radius: 6px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #c0c0d8;
+    transition: all 0.2s ease;
+  }
+  .lps.set { background: #2e2356; border-color: #a78bfa; color: #c4b5fd; }
+  .lps.justset {
+    background: #3b2d6b; border-color: #a78bfa; color: #ddd6fe;
+    box-shadow: 0 0 0 3px rgba(167,139,250,0.35);
+  }
+  .lps.empty { color: #555570; }
+
+  /* the sliding pattern row (search phase) */
+  .patternline {
+    display: flex; gap: 6px; margin: 4px 0 8px;
+    min-height: 44px; align-items: center;
+    overflow-x: auto; padding-bottom: 28px;
+  }
+  .patbox { display: flex; gap: 6px; transition: margin-left 0.35s ease; }
+  .pch {
+    min-width: 38px; flex: 0 0 38px; padding: 8px 4px; text-align: center; position: relative;
+    background: #20203a; border: 1px dashed #4a4a6c; border-radius: 6px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #c0c0d8;
+    transition: all 0.2s ease;
+  }
+  .pch.ok { background: #14321f; border-color: #10b981; border-style: solid; color: #6ee7b7; }
+  .pch.bad { background: #3a1414; border-color: #ef4444; border-style: solid; color: #fca5a5; }
+  .pch.active { box-shadow: 0 0 0 2px rgba(245,158,11,0.6); }
+  .pch .jptr {
+    position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: #f59e0b; font-weight: 700; white-space: nowrap;
+  }
+
+  /* state vars */
+  .vars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 24px 0 22px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .var .label { font-size: 11px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 17px; font-weight: 600; color: #3b82f6; }
+  .var.j .value { color: #f59e0b; }
+  .var.len .value { color: #a78bfa; }
+  .var.hit .value { color: #10b981; }
+
+  /* Narration */
+  .narration {
+    background: #1f1f3a;
+    border-left: 3px solid #3b82f6;
+    padding: 14px 18px;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #d0d0e0;
+    min-height: 54px;
+    transition: border-color 0.3s ease;
+  }
+  .narration.match { border-left-color: #10b981; background: #14321f; }
+  .narration.miss  { border-left-color: #ef4444; background: #2a1717; }
+  .narration.slide { border-left-color: #a78bfa; background: #221b3a; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b.slidekw { color: #c4b5fd; }
+
+  /* Controls */
+  .controls {
+    display: flex; gap: 10px; justify-content: center; align-items: center;
+    margin: 22px 0 8px; flex-wrap: wrap;
+  }
+  button {
+    background: #3b82f6; color: #ffffff; border: none;
+    padding: 10px 20px; font-size: 14px; font-weight: 500; border-radius: 6px;
+    cursor: pointer; transition: background 0.15s ease, transform 0.1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 18px; font-size: 12px; color: #8888aa; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  /* contrast / complexity */
+  .edge {
+    margin-top: 32px;
+    background: #24243e;
+    border-radius: 12px;
+    padding: 22px 24px;
+  }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 8px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #ffffff; }
+  .edge li b.bad { color: #fca5a5; }
+
+  .complexity { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .cx { background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 10px; padding: 16px 18px; }
+  .cx .big { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .cx.naive .big { color: #fbbf24; }
+  .cx.kmp .big { color: #10b981; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #a0a0b8; }
+  .cx p code { background: #2d2d50; color: #fbbf24; padding: 1px 5px; border-radius: 3px; }
+
+  .practice {
+    margin-top: 20px; background: #24243e; border-radius: 12px; padding: 22px 24px;
+  }
+  .practice h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .practice ul { margin: 0; padding: 0; list-style: none; }
+  .practice li { padding: 8px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .practice li:last-child { border-bottom: none; }
+  .practice .num { display: inline-block; min-width: 64px; color: #fbbf24; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .practice .tag { font-size: 11px; color: #8888aa; margin-left: 8px; }
+
+  .takeaway {
+    margin-top: 20px;
+    background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981;
+    padding: 18px 22px;
+    border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+
+  @media (max-width: 680px) {
+    .vars { grid-template-columns: 1fr 1fr; }
+    .complexity { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>KMP String Matching — the Smart Slide</h1>
+  <div class="subtitle">Knuth–Morris–Pratt finds a pattern <code style="color:#fbbf24">P</code> inside a text <code style="color:#fbbf24">T</code> in <b>O(n + m)</b> by never re-reading a text character. The trick is a precomputed <b>LPS</b> table (Longest proper Prefix that is also a Suffix). Two linked animations below: first <b>build LPS</b>, then <b>search</b>.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — proofreading a manuscript</h3>
+    <p>You're hunting for the phrase <code style="color:#fbbf24">"ABABCABAB"</code> in a long manuscript. You read along and match <code>ABAB…</code> then hit a wrong letter. The naive proofreader jumps the finger back to where the phrase started and re-reads every letter. <b>Wasteful.</b></p>
+    <p>The KMP proofreader remembers: "the part I already matched, <code>ABAB</code>, ends in <code>AB</code> — which is also how my phrase <i>begins</i>." So instead of restarting, the finger slides forward just enough that the already-confirmed <code>AB</code> lines up — and keeps reading from the <b>same spot in the manuscript</b>. The <b>LPS table is that memory</b>: for every position it records "longest already-matched prefix I can fall back to."</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">text  T:</span><code id="p-text">"ABABDABACDABABCABAB"</code></div>
+    <div class="row"><span class="label">pattern P:</span><code id="p-pat">"ABABCABAB"</code></div>
+    <div class="row"><span class="label">lps(P):</span><code id="p-lps">[0,0,1,2,0,1,2,3,4]</code></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-phase="lps1">① Build LPS <span class="pico">P="ABABC"</span></button>
+    <button class="tab" data-phase="lps2">② Build LPS <span class="pico">P="AABAACAABAA"</span></button>
+    <button class="tab" data-phase="search">③ Search <span class="pico">slide P under T</span></button>
+  </div>
+
+  <div class="stage">
+    <!-- TEXT / PATTERN strip (used by search) -->
+    <div class="section-title" id="title-top">Pattern P <span class="sub">two pointers: <span style="color:#a78bfa">length</span> (prefix end) and <span style="color:#3b82f6">i</span> (scan)</span></div>
+    <div class="strip" id="strip-top"></div>
+
+    <!-- second strip: pattern (only shown in search) -->
+    <div id="patwrap" style="display:none">
+      <div class="section-title">Pattern P <span class="sub">slides right; pointer <span style="color:#f59e0b">j</span> = how much of P currently matches</span></div>
+      <div class="patternline"><div class="patbox" id="patbox"></div></div>
+    </div>
+
+    <!-- LPS array (only shown in build) -->
+    <div id="lpswrap">
+      <div class="section-title">LPS array <span class="sub">lps[k] = length of longest proper prefix of P[0..k] that is also a suffix</span></div>
+      <div class="lpsrow" id="lpsrow"></div>
+    </div>
+
+    <div class="vars" id="vars"></div>
+
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="narration" id="narration">Pick a phase above, then press <b>Next</b> to begin.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="edge">
+    <h3>Why you can't hand-roll a single pass without the LPS table</h3>
+    <ul>
+      <li><b>The seductive bug.</b> A natural-looking "one loop, advance <code>j</code> on match, reset <code>j=0</code> on mismatch" passes easy tests but is <b class="bad">silently wrong</b> on inputs where a partial match overlaps the pattern's own prefix.</li>
+      <li><b>Adjacent matches</b> — searching <code>P="ab"</code> in <code>T="abab"</code>. After matching index 0–1 you must be ready to match again at index 2. Resetting <code>j=0</code> on the next char works here, but the same naive reset breaks the next case…</li>
+      <li><b>Overlapping prefix</b> — <code>P="aab"</code> in <code>T="aaab"</code>. You match <code>a,a</code> then hit <code>a≠b</code> at text index 2. Naive code resets <code>j=0</code> and consumes that <code>a</code> as "no match" — but it was actually the start of a fresh <code>aa</code>! You'd <b class="bad">miss the match</b> at index 1. LPS says <code>j = lps[1] = 1</code>, keeping one matched <code>a</code> so the next char completes <code>aab</code>. Correct.</li>
+      <li><b>The fix is the table.</b> On mismatch with <code>j&gt;0</code>, do <code>j = lps[j-1]</code> (fall back, <i>don't</i> advance text <code>i</code>); only when <code>j==0</code> do you advance <code>i</code>. That single line is the whole algorithm — and it's impossible to get right without precomputing LPS.</li>
+    </ul>
+  </div>
+
+  <div class="complexity">
+    <div class="cx naive">
+      <div class="big">O(n · m)</div>
+      <p><b>Naive re-scan.</b> On every mismatch the text pointer backtracks to <code>start+1</code> and you recompare from scratch. Worst case (e.g. <code>T="aaaa…a"</code>, <code>P="aaa…b"</code>) does ~<code>n·m</code> comparisons.</p>
+    </div>
+    <div class="cx kmp">
+      <div class="big">O(n + m)</div>
+      <p><b>KMP.</b> Build LPS in <code>O(m)</code>, then scan <code>T</code> once. Text pointer <code>i</code> <b>never moves backward</b>; <code>j</code> only falls back via the table. Total comparisons are linear — provably no re-reads.</p>
+    </div>
+  </div>
+
+  <div class="practice">
+    <h3>Practice problems</h3>
+    <ul>
+      <li><span class="num">LC 28</span> Find the Index of the First Occurrence in a String <span class="tag">— vanilla KMP search</span></li>
+      <li><span class="num">LC 1392</span> Longest Happy Prefix <span class="tag">— it's literally lps[n-1]</span></li>
+      <li><span class="num">LC 459</span> Repeated Substring Pattern <span class="tag">— derive period from LPS</span></li>
+      <li><span class="num">LC 214</span> Shortest Palindrome <span class="tag">— LPS over s + '#' + reverse(s)</span></li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Build a fallback table once (<code>length = lps[length-1]</code> on prefix mismatch), then search with a text pointer that <b>only ever moves forward</b>: match → advance both; mismatch with <code>j&gt;0</code> → <code>j = lps[j-1]</code> (slide, reusing the matched prefix); mismatch with <code>j==0</code> → advance <code>i</code>. The LPS table is what makes the slide correct.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const CELL = 44; // 38 min-width + 6 gap
+
+  // ---------- LPS builder that also records visual steps ----------
+  function buildLpsSteps(P) {
+    const m = P.length;
+    const lps = new Array(m).fill(0);
+    const steps = [];
+    // snapshot helper
+    const snap = (extra) => Object.assign({
+      P, lps: lps.slice(), length: extra.length, i: extra.i,
+    }, extra);
+
+    steps.push(snap({
+      length: 0, i: 1, just: null, compareA: null, compareB: null, bad: false,
+      narration: `Init: <code>lps[0] = 0</code> always (a single char has no proper prefix). Pointers <code>length = 0</code> (length of current prefix-suffix) and <code>i = 1</code>.`,
+      cls: ""
+    }));
+
+    let length = 0, i = 1;
+    while (i < m) {
+      if (P[i] === P[length]) {
+        length++;
+        lps[i] = length;
+        steps.push(snap({
+          length, i, just: i, compareA: i, compareB: length - 1, bad: false,
+          narration: `<code>P[${i}]='${P[i]}'</code> equals <code>P[length=${length-1}]='${P[length-1]}'</code> → extend the prefix. Set <code>length++</code> and <code>lps[${i}] = ${length}</code>, then <code>i++</code>.`,
+          cls: "match"
+        }));
+        i++;
+      } else if (length > 0) {
+        const before = length;
+        length = lps[length - 1];
+        steps.push(snap({
+          length, i, just: null, compareA: i, compareB: before, bad: true,
+          narration: `<code>P[${i}]='${P[i]}'</code> ≠ <code>P[length=${before}]='${P[before]}'</code>. Don't reset to 0 — <b class="slidekw">fall back</b>: <code>length = lps[length-1] = lps[${before-1}] = ${length}</code>. <code>i</code> stays put so we retry the compare.`,
+          cls: "slide"
+        }));
+      } else {
+        lps[i] = 0;
+        steps.push(snap({
+          length: 0, i, just: i, compareA: i, compareB: null, bad: true,
+          narration: `<code>P[${i}]='${P[i]}'</code> ≠ <code>P[0]='${P[0]}'</code> and <code>length</code> is already 0 — nothing to fall back to. Set <code>lps[${i}] = 0</code> and <code>i++</code>.`,
+          cls: "miss"
+        }));
+        i++;
+      }
+    }
+    steps.push(snap({
+      length, i: m, just: null, compareA: null, compareB: null, bad: false, done: true,
+      narration: `Done. <code>lps = [${lps.join(',')}]</code>. This table is the fallback memory the search phase will use.`,
+      cls: "match"
+    }));
+    return { kind: "lps", P, lps, steps };
+  }
+
+  // ---------- Search builder ----------
+  function buildSearchSteps(T, P, lps) {
+    const n = T.length, m = P.length;
+    const steps = [];
+    const snap = (e) => Object.assign({ T, P, lps }, e);
+
+    steps.push(snap({
+      i: 0, j: 0, compareBad: false, hit: false,
+      narration: `Start: text pointer <code>i = 0</code>, pattern pointer <code>j = 0</code>. <code>j</code> tells us how many leading chars of <code>P</code> currently match the text ending at <code>i</code>. <code>i</code> will <b>never decrease</b>.`,
+      cls: ""
+    }));
+
+    let i = 0, j = 0;
+    while (i < n) {
+      if (T[i] === P[j]) {
+        steps.push(snap({
+          i, j, compareBad: false, hit: false, matchChar: true,
+          narration: `<code>T[${i}]='${T[i]}'</code> = <code>P[${j}]='${P[j]}'</code> → match. Advance <b>both</b>: <code>i++</code>, <code>j++</code>.`,
+          cls: "match"
+        }));
+        i++; j++;
+        if (j === m) {
+          steps.push(snap({
+            i, j, compareBad: false, hit: true, hitStart: i - j,
+            narration: `<code>j</code> reached <code>len(P) = ${m}</code> — <b>full match found</b> ending at text index ${i - 1}, starting at <code>${i - j}</code>! To keep searching for more, slide via <code>j = lps[j-1] = lps[${m-1}] = ${lps[m-1]}</code>.`,
+            cls: "match"
+          }));
+          j = lps[j - 1];
+        }
+      } else if (j > 0) {
+        const before = j;
+        j = lps[j - 1];
+        steps.push(snap({
+          i, j, compareBad: true, hit: false, slid: true, slidFrom: before,
+          narration: `<code>T[${i}]='${T[i]}'</code> ≠ <code>P[${before}]='${P[before]}'</code> with <code>j=${before}>0</code>. <b class="slidekw">Smart slide</b>: <code>j = lps[j-1] = lps[${before-1}] = ${j}</code>. We keep the already-matched <code>${P.slice(0,j)}</code> and <b>do not move <code>i</code></b> — no text char is re-read.`,
+          cls: "slide"
+        }));
+      } else {
+        steps.push(snap({
+          i, j, compareBad: true, hit: false,
+          narration: `<code>T[${i}]='${T[i]}'</code> ≠ <code>P[0]='${P[0]}'</code> and <code>j=0</code> — nothing matched, nothing to fall back to. Just advance <code>i++</code>.`,
+          cls: "miss"
+        }));
+        i++;
+      }
+    }
+    steps.push(snap({
+      i: n, j, compareBad: false, hit: false, done: true,
+      narration: `<code>i</code> reached the end of <code>T</code>. Search complete — each text char was visited at most a constant number of times (<b>O(n + m)</b> total).`,
+      cls: ""
+    }));
+    return { kind: "search", T, P, lps, steps };
+  }
+
+  // raw lps for a pattern (no steps) — used to seed search
+  function rawLps(P) {
+    const m = P.length, lps = new Array(m).fill(0);
+    let len = 0, i = 1;
+    while (i < m) {
+      if (P[i] === P[len]) { len++; lps[i] = len; i++; }
+      else if (len > 0) { len = lps[len - 1]; }
+      else { lps[i] = 0; i++; }
+    }
+    return lps;
+  }
+
+  // ---------- Build all three phases ----------
+  const PHASES = {
+    lps1: buildLpsSteps("ABABC"),
+    lps2: buildLpsSteps("AABAACAABAA"),
+    search: (() => {
+      const T = "ABABDABACDABABCABAB", P = "ABABCABAB";
+      return buildSearchSteps(T, P, rawLps(P));
+    })()
+  };
+
+  // ---------- DOM refs ----------
+  const stripTop = document.getElementById("strip-top");
+  const titleTop = document.getElementById("title-top");
+  const patwrap = document.getElementById("patwrap");
+  const patbox = document.getElementById("patbox");
+  const lpswrap = document.getElementById("lpswrap");
+  const lpsrow = document.getElementById("lpsrow");
+  const varsEl = document.getElementById("vars");
+  const legendEl = document.getElementById("legend");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset = document.getElementById("btn-reset");
+  const tabs = [...document.querySelectorAll(".tab")];
+
+  let phaseKey = "lps1";
+  let cursor = 0;
+
+  // build the static char strip for current phase top row
+  function buildStrip(str, withIdx) {
+    stripTop.innerHTML = "";
+    for (let k = 0; k < str.length; k++) {
+      const d = document.createElement("div");
+      d.className = "ch";
+      d.dataset.idx = k;
+      d.innerHTML = `<span class="idx">${k}</span><span class="val">${str[k]}</span>`;
+      stripTop.appendChild(d);
+    }
+  }
+  function buildLpsCells(m) {
+    lpsrow.innerHTML = "";
+    for (let k = 0; k < m; k++) {
+      const c = document.createElement("div");
+      c.className = "lps empty";
+      c.dataset.idx = k;
+      c.textContent = "·";
+      lpsrow.appendChild(c);
+    }
+  }
+  function buildPatbox(P) {
+    patbox.innerHTML = "";
+    for (let k = 0; k < P.length; k++) {
+      const c = document.createElement("div");
+      c.className = "pch";
+      c.dataset.idx = k;
+      c.textContent = P[k];
+      patbox.appendChild(c);
+    }
+  }
+
+  function setLegend(kind) {
+    let items;
+    if (kind === "lps") {
+      items = [
+        ['#a78bfa', 'length pointer (prefix end)'],
+        ['#3b82f6', 'i pointer (scan)'],
+        ['#10b981', 'match → extend & write lps'],
+        ['#ef4444', 'mismatch → fall back length = lps[length-1]'],
+      ];
+    } else {
+      items = [
+        ['#3b82f6', 'i pointer (text — never moves back)'],
+        ['#f59e0b', 'j pointer (matched length of P)'],
+        ['#10b981', 'full match found'],
+        ['#a78bfa', 'smart slide j = lps[j-1]'],
+      ];
+    }
+    legendEl.innerHTML = items.map(([c, t]) =>
+      `<div class="legend-item"><span class="swatch" style="background:${c}"></span>${t}</div>`).join("");
+  }
+
+  function setVars(kind) {
+    if (kind === "lps") {
+      varsEl.innerHTML = `
+        <div class="var len"><div class="label">length (prefix end)</div><div class="value" id="v-len">0</div></div>
+        <div class="var"><div class="label">i (scan)</div><div class="value" id="v-i">1</div></div>
+        <div class="var"><div class="label">compare</div><div class="value" id="v-cmp">—</div></div>
+        <div class="var"><div class="label">lps written</div><div class="value" id="v-written">1</div></div>`;
+    } else {
+      varsEl.innerHTML = `
+        <div class="var"><div class="label">i (text)</div><div class="value" id="v-i">0</div></div>
+        <div class="var j"><div class="label">j (pattern)</div><div class="value" id="v-j">0</div></div>
+        <div class="var"><div class="label">compare</div><div class="value" id="v-cmp">—</div></div>
+        <div class="var hit"><div class="label">matches found</div><div class="value" id="v-hit">0</div></div>`;
+    }
+  }
+
+  // initialize a phase
+  function loadPhase(key) {
+    phaseKey = key;
+    cursor = 0;
+    const ph = PHASES[key];
+    tabs.forEach(t => t.classList.toggle("active", t.dataset.phase === key));
+
+    if (ph.kind === "lps") {
+      titleTop.innerHTML = `Pattern P = "${ph.P}" <span class="sub">two pointers: <span style="color:#a78bfa">length</span> (prefix end) and <span style="color:#3b82f6">i</span> (scan)</span>`;
+      buildStrip(ph.P);
+      buildLpsCells(ph.P.length);
+      lpswrap.style.display = "";
+      patwrap.style.display = "none";
+    } else {
+      titleTop.innerHTML = `Text T <span class="sub">pointer <span style="color:#3b82f6">i</span> scans left → right and never backtracks</span>`;
+      buildStrip(ph.T);
+      lpswrap.style.display = "none";
+      patwrap.style.display = "";
+      buildPatbox(ph.P);
+    }
+    setVars(ph.kind);
+    setLegend(ph.kind);
+    render();
+  }
+
+  // count matches up to a given step (search)
+  function matchesSoFar(steps, upto) {
+    let c = 0;
+    for (let k = 0; k <= upto; k++) if (steps[k].hit) c++;
+    return c;
+  }
+  function lpsWrittenSoFar(s) {
+    // number of defined lps entries: lps[0] always + any > index logic; count non-undefined
+    return s.lps.filter((v, idx) => idx === 0 ? true : (idx < s.i)).length;
+  }
+
+  function render() {
+    const ph = PHASES[phaseKey];
+    const steps = ph.steps;
+    const s = steps[cursor];
+
+    if (ph.kind === "lps") renderLps(ph, s);
+    else renderSearch(ph, s);
+
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narration;
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function renderLps(ph, s) {
+    const m = ph.P.length;
+    // top strip: highlight length pointer (purple) and i pointer (blue), compare cells
+    [...stripTop.children].forEach((cell, k) => {
+      cell.className = "ch";
+      cell.querySelectorAll(".ptr").forEach(p => p.remove());
+
+      // the prefix run is P[0..length-1]; tint it as prefixrun
+      if (s.length > 0 && k < s.length) cell.classList.add("prefixrun");
+
+      // active compares
+      if (s.compareA === k) {
+        if (s.bad) {
+          cell.classList.add("probe-bad");
+        } else {
+          cell.classList.add("window", "probe");
+        }
+      }
+      // length cell being compared against (P[length])
+      if (s.compareB === k && !s.bad) {
+        cell.classList.add("window");
+      }
+    });
+    // pointer arrows
+    const addPtr = (idx, cls, label, two) => {
+      if (idx == null || idx < 0 || idx >= m) return;
+      const cell = stripTop.children[idx];
+      if (!cell) return;
+      const p = document.createElement("span");
+      p.className = "ptr " + cls + (two ? " two" : "");
+      p.textContent = label;
+      cell.appendChild(p);
+    };
+    // length pointer points at P[length] (the next char to extend with)
+    addPtr(s.length, "len", "▲ len", false);
+    addPtr(s.i, "i", "▲ i", s.length === s.i); // offset if collide
+
+    // lps cells
+    [...lpsrow.children].forEach((cell, k) => {
+      cell.className = "lps";
+      const defined = (k === 0) || (k < s.i) ;
+      if (defined) {
+        cell.classList.add("set");
+        cell.textContent = s.lps[k];
+      } else {
+        cell.classList.add("empty");
+        cell.textContent = "·";
+      }
+      if (s.just === k) { cell.classList.remove("empty"); cell.classList.add("justset"); cell.textContent = s.lps[k]; }
+    });
+
+    // vars
+    const vLen = document.getElementById("v-len");
+    const vI = document.getElementById("v-i");
+    const vCmp = document.getElementById("v-cmp");
+    const vW = document.getElementById("v-written");
+    if (vLen) vLen.textContent = s.length;
+    if (vI) vI.textContent = s.i;
+    if (vCmp) vCmp.textContent = (s.compareA != null && s.compareB != null)
+      ? `P[${s.compareA}] ${s.bad ? '≠' : '='} P[${s.compareB}]`
+      : (s.compareA != null ? `P[${s.compareA}] vs P[0]` : "—");
+    if (vW) vW.textContent = [...lpsrow.children].filter(c => c.classList.contains("set") || c.classList.contains("justset")).length;
+  }
+
+  function renderSearch(ph, s) {
+    const n = ph.T.length, m = ph.P.length;
+    // align pattern under text: pattern starts at i - j
+    const start = s.i - s.j;
+    patbox.style.marginLeft = (start * CELL) + "px";
+
+    // text strip
+    [...stripTop.children].forEach((cell, k) => {
+      cell.className = "ch";
+      cell.querySelectorAll(".ptr").forEach(p => p.remove());
+
+      // chars already matched in current run: [start, i)
+      if (k >= start && k < s.i) cell.classList.add("prefixrun");
+
+      // full match highlight
+      if (s.hit && k >= s.hitStart && k < s.hitStart + m) {
+        cell.classList.remove("prefixrun");
+        cell.classList.add("matched");
+      }
+
+      // the active compare char at text index i
+      if (k === s.i && s.i < n && !s.done) {
+        if (s.compareBad) cell.classList.add("probe-bad");
+        else cell.classList.add("window", "probe");
+      }
+
+      // i pointer arrow
+      if (k === s.i && s.i < n) {
+        const p = document.createElement("span");
+        p.className = "ptr i";
+        p.textContent = "▲ i";
+        cell.appendChild(p);
+      }
+    });
+
+    // pattern boxes
+    [...patbox.children].forEach((cell, k) => {
+      cell.className = "pch";
+      cell.querySelectorAll(".jptr").forEach(p => p.remove());
+      if (k < s.j) cell.classList.add("ok");        // already matched portion
+      if (k === s.j && s.i < n && !s.done) {
+        cell.classList.add("active");
+        if (s.compareBad) cell.classList.add("bad");
+      }
+      if (s.hit) cell.classList.add("ok");
+      // j pointer arrow on the pattern char being compared
+      if (k === s.j && k < m) {
+        const p = document.createElement("span");
+        p.className = "jptr";
+        p.textContent = "▲ j";
+        cell.appendChild(p);
+      }
+    });
+
+    // vars
+    const vI = document.getElementById("v-i");
+    const vJ = document.getElementById("v-j");
+    const vCmp = document.getElementById("v-cmp");
+    const vHit = document.getElementById("v-hit");
+    if (vI) vI.textContent = s.i;
+    if (vJ) vJ.textContent = s.j;
+    if (vCmp) vCmp.textContent = (s.i < n && s.j < m && !s.done)
+      ? `T[${s.i}] ${s.compareBad ? '≠' : '='} P[${s.j}]`
+      : "—";
+    if (vHit) vHit.textContent = matchesSoFar(ph.steps, cursor);
+  }
+
+  function next() { const len = PHASES[phaseKey].steps.length; if (cursor < len - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  tabs.forEach(t => t.addEventListener("click", () => loadPhase(t.dataset.phase)));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") { e.preventDefault(); next(); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); prev(); }
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  loadPhase("lps1");
+})();
+</script>
+</body>
+</html>

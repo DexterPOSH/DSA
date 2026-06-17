@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Backpressure — The Flow-Control Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* pipeline SVG */
+  .pipe-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+  .box-fill { transition: fill .3s ease, stroke .3s ease; }
+  .stage-label { fill: #cdd5e1; font-size: 12px; font-weight: 700; font-family: -apple-system, sans-serif; }
+  .stage-sub { fill: #8888aa; font-size: 9.5px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .rate-num { font-family: "SF Mono", Menlo, Consolas, monospace; font-weight: 700; }
+
+  /* buffer column fill */
+  .buf-frame { fill: #1f1f3a; stroke: #3a3a5c; stroke-width: 2; }
+  .buf-level { transition: y .5s ease, height .5s ease, fill .4s ease; }
+  .wm-line { stroke-dasharray: 4 3; stroke-width: 1.5; }
+  .wm-text { font-size: 9px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  /* travelling packets */
+  .pkt { transition: opacity .3s ease; }
+
+  /* signal arrow */
+  .signal-path { fill: none; stroke-width: 3; stroke-dasharray: 7 5; opacity: 0; transition: opacity .4s ease; }
+  .signal-path.on { opacity: 1; animation: dash 0.7s linear infinite; }
+  @keyframes dash { to { stroke-dashoffset: -24; } }
+  .signal-text { font-size: 10px; font-weight: 700; font-family: "SF Mono", Menlo, Consolas, monospace; opacity: 0; transition: opacity .4s ease; }
+  .signal-text.on { opacity: 1; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #3b82f6; font-weight: 700; transition: color .3s ease; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease, background .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.warn { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* strategies panel */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 18px 20px; }
+  .cx.naive { background: #2a1717; border: 1px solid #ef4444; }
+  .cx.consistent { background: #14321f; border: 1px solid #10b981; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.naive h3 { color: #fca5a5; }
+  .cx.consistent h3 { color: #6ee7b7; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 20px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.naive .big { color: #ef4444; }
+  .cx.consistent .big { color: #10b981; }
+  .cx code { background: #00000040; color: #fbbf24; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+  .strat { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .strat h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .strat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 700px) { .strat-grid { grid-template-columns: 1fr; } }
+  .strat-card { background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 13px 15px; }
+  .strat-card .t { font-weight: 700; color: #fff; font-size: 13px; margin-bottom: 4px; }
+  .strat-card .t .tag { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+  .tag.lossless { background: #14321f; color: #6ee7b7; border: 1px solid #10b981; }
+  .tag.lossy { background: #2a1717; color: #fca5a5; border: 1px solid #ef4444; }
+  .strat-card p { margin: 0; font-size: 12.5px; color: #c8c8d8; }
+  .strat-card code { background: #2d2d50; color: #fbbf24; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Backpressure — Letting the Slow Consumer Set the Pace</h1>
+  <div class="subtitle">A fast producer is flooding a slow consumer. Watch how a <b>bounded buffer</b> with <b>watermarks</b> raises a <code>slow-down</code> signal that travels back upstream — so the system settles at <code>min(P_rate, C_rate)</code> instead of growing the queue forever and crashing with an <code>OOM</code>.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the one-chef kitchen</h3>
+    <p>Waiters (the <b>producer</b>) bring in <b>30 orders/min</b>, but a single chef (the <b>consumer</b>) can only cook <b>10 orders/min</b>. The order tickets pile up on a rail (the <b>buffer</b>). Two outcomes: either the pile grows forever until the rail snaps (memory blows up), or the chef shouts <b>"stop — my rail is full, wait till I clear a few!"</b>. That shout is <b>backpressure</b>: the consumer signals its saturation upstream, and the waiters slow themselves down. Ignore it and you either crash the kitchen or tickets fall on the floor and get lost (data loss). The whole point is to propagate the pressure backward <i>gracefully</i> — not to silently drop or explode.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">producer:</span><code>P</code> emits <code>50,000 events/sec</code></div>
+    <div class="row"><span class="label">consumer:</span><code>C</code> processes <code>10,000 events/sec</code> &nbsp;(~100ms downstream call, limited concurrency)</div>
+    <div class="row"><span class="label">buffer:</span><code>bounded, capacity 100,000</code> &nbsp;high-watermark <code>80%</code>, low-watermark <code>30%</code></div>
+    <div class="row"><span class="label">net fill:</span><code>50k − 10k = 40,000 events/sec</code> &nbsp;→ buffer fills fast unless we act</div>
+  </div>
+
+  <div class="stage">
+    <div class="pipe-holder">
+      <svg viewBox="0 0 560 360" id="pipe">
+        <!-- ============ static labels ============ -->
+        <!-- Producer box -->
+        <rect id="prod-box" class="box-fill" x="20" y="120" width="110" height="80" rx="10" fill="#3b82f6" stroke="#1a1a2e" stroke-width="3"/>
+        <text class="stage-label" x="75" y="150" text-anchor="middle" fill="#fff">PRODUCER</text>
+        <text class="stage-sub" x="75" y="168" text-anchor="middle">emits at</text>
+        <text id="prod-rate" class="rate-num" x="75" y="186" text-anchor="middle" fill="#fff" font-size="13">50k/s</text>
+
+        <!-- Buffer frame -->
+        <rect class="buf-frame" x="240" y="70" width="80" height="180" rx="8"/>
+        <!-- buffer liquid level -->
+        <rect id="buf-level" class="buf-level" x="242" y="248" width="76" height="0" fill="#3b82f6" rx="2"/>
+        <!-- watermark lines (180px tall frame: y=70 top .. y=250 bottom) -->
+        <!-- high 80%: y = 250 - 0.8*180 = 106 -->
+        <line class="wm-line" x1="240" y1="106" x2="320" y2="106" stroke="#ef4444"/>
+        <text class="wm-text" x="324" y="103" fill="#ef4444">HWM 80%</text>
+        <!-- low 30%: y = 250 - 0.3*180 = 196 -->
+        <line class="wm-line" x1="240" y1="196" x2="320" y2="196" stroke="#10b981"/>
+        <text class="wm-text" x="324" y="210" fill="#10b981">LWM 30%</text>
+        <text class="stage-label" x="280" y="60" text-anchor="middle">BUFFER</text>
+        <text id="buf-cap" class="stage-sub" x="280" y="268" text-anchor="middle">cap 100k</text>
+
+        <!-- Consumer box -->
+        <rect id="cons-box" class="box-fill" x="430" y="120" width="110" height="80" rx="10" fill="#8b5cf6" stroke="#1a1a2e" stroke-width="3"/>
+        <text class="stage-label" x="485" y="150" text-anchor="middle" fill="#fff">CONSUMER</text>
+        <text class="stage-sub" x="485" y="168" text-anchor="middle">processes at</text>
+        <text id="cons-rate" class="rate-num" x="485" y="186" text-anchor="middle" fill="#fff" font-size="13">10k/s</text>
+
+        <!-- flow connectors -->
+        <line x1="130" y1="160" x2="240" y2="160" stroke="#3a3a5c" stroke-width="3"/>
+        <line x1="320" y1="160" x2="430" y2="160" stroke="#3a3a5c" stroke-width="3"/>
+        <!-- arrowheads -->
+        <path d="M240 160 l-12 -5 l0 10 z" fill="#3a3a5c"/>
+        <path d="M430 160 l-12 -5 l0 10 z" fill="#3a3a5c"/>
+
+        <!-- travelling packets in -> buffer -->
+        <g id="g-pkts-in"></g>
+        <!-- travelling packets buffer -> consumer -->
+        <g id="g-pkts-out"></g>
+
+        <!-- ============ backpressure signal: consumer -> buffer -> producer ============ -->
+        <path id="sig-path" class="signal-path" stroke="#f59e0b"
+              d="M485 210 L485 320 L75 320 L75 210"/>
+        <path id="sig-head" class="signal-path" stroke="#f59e0b" d="M75 210 l-6 12 l12 0 z" fill="#f59e0b"/>
+        <text id="sig-text" class="signal-text" x="280" y="338" text-anchor="middle" fill="#f59e0b">◄ "slow down" signal propagates upstream</text>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Producer rate</div><div class="value" id="v-prate">50k/s</div></div>
+        <div class="var"><div class="label">Consumer rate</div><div class="value green" id="v-crate">10k/s</div></div>
+        <div class="var"><div class="label">Buffer fill</div><div class="value amber" id="v-fill">0%</div></div>
+        <div class="var"><div class="label">Net flow</div><div class="value red" id="v-net">+40k/s</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Producer / inbound event</div>
+        <div class="legend-item"><span class="swatch round" style="background:#8b5cf6"></span>Consumer (slow downstream call)</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Buffer over high-watermark</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Healthy / under low-watermark</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Backpressure "slow-down" signal</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to start the flow with a fast producer and a slow consumer.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx naive">
+      <h3>"Just add a bigger buffer"</h3>
+      <div class="formula">queue = unbounded</div>
+      <p>Net flow is <code>+40k/s</code> — <b>negative capacity</b>. A bigger buffer only delays the crash. By Little's Law a deeper queue means longer waits, so latency climbs without limit, then the process dies with an <span class="big">OOM</span>.</p>
+      <p>Result: a <b>silent time-bomb</b> — looks fine under light load, falls over the moment producer outpaces consumer.</p>
+    </div>
+    <div class="cx consistent">
+      <h3>Bounded buffer + backpressure</h3>
+      <div class="formula">P settles at min(P_rate, C_rate)</div>
+      <p>The buffer is capped at <code>100k</code>. At the <code>80%</code> high-watermark it raises a signal; the producer slows to the consumer's <span class="big">10k/s</span>. Queue depth stays flat, latency is bounded, memory is flat.</p>
+      <p>Result: <b>graceful saturation</b> — the slowest stage sets the pace, and nothing crashes.</p>
+    </div>
+  </div>
+
+  <div class="strat">
+    <h3>The four ways to propagate the signal upstream</h3>
+    <div class="strat-grid">
+      <div class="strat-card">
+        <div class="t">Block / pause <span class="tag lossless">lossless</span></div>
+        <p>Producer's <code>send()</code> blocks when the buffer is full — classic <code>BlockingQueue.put()</code>. The slowest path sets total throughput. Risk: head-of-line stall ripples upstream.</p>
+      </div>
+      <div class="strat-card">
+        <div class="t">Pull / demand <span class="tag lossless">lossless</span></div>
+        <p>Consumer says "I can take <code>n=256</code> more"; producer sends only that many. Reactive Streams <code>request(n)</code> and gRPC streaming flow control work this way.</p>
+      </div>
+      <div class="strat-card">
+        <div class="t">Credit / sliding window <span class="tag lossless">lossless</span></div>
+        <p>Receiver advertises a window; sender can't exceed it until an <code>ACK</code> arrives. This is TCP flow control; Kafka's <code>max.poll.records</code> is conceptually pull + credit.</p>
+      </div>
+      <div class="strat-card">
+        <div class="t">Drop / shed <span class="tag lossy">lossy</span></div>
+        <p>Buffer full → drop new (or old) events — load shedding. Correct for metrics &amp; live video where <b>stale data is useless</b>; freshness beats completeness.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Backpressure ≠ rate limiting.</b> Rate limiting is <i>static &amp; proactive</i> — a fixed cap (e.g. <code>1000 req/s</code>) whether or not the consumer is busy. Backpressure is <i>dynamic &amp; reactive</i> — the signal comes from <b>actual consumer saturation</b>. They're complementary, not the same.</li>
+      <li><b>A big buffer is not a fix.</b> If net flow is negative, an unbounded buffer just postpones the OOM and inflates latency (Little's Law). <code>bounded buffer + explicit signal</code> is the real fix.</li>
+      <li><b>Dropping isn't always failure.</b> For logs / metrics / live video, shedding stale data is <i>correct design</i>. The bug is silently buffering unbounded until you crash.</li>
+      <li><b>Lossless vs lossy.</b> Block/buffer for orders &amp; financial txns (every event matters). Drop/sample for telemetry &amp; dashboards (freshness &gt; completeness). Wrong choice = data loss <i>or</i> cascading stall.</li>
+      <li><b>Cascading failure.</b> Blindly blocking to propagate pressure can stall the whole upstream and exhaust thread pools. Pair backpressure with <code>timeouts</code>, <code>bounded queues</code>, <code>circuit breakers</code>, and <b>load shedding at the edge</b> (e.g. HTTP <code>429</code>).</li>
+      <li><b>Implicit backpressure is real.</b> A blocking synchronous call waiting on a slow downstream <i>is</i> backpressure — it naturally throttles the caller's rate, no explicit <code>request(n)</code> needed.</li>
+      <li><b>Push vs pull.</b> Pull systems (Kafka, Reactive Streams) have backpressure built in — the consumer controls its rate. Push systems must engineer it explicitly.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>When a fast producer meets a slow consumer, put a <b>bounded buffer</b> between them and let the consumer's saturation raise a <b>signal that travels back upstream</b> — block, pull, credit, or drop. The producer then settles at <b>min(P_rate, C_rate)</b>, so queue depth, latency, and memory all stay flat instead of growing until an <code>OOM</code>. The slow stage sets the pace, gracefully.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- geometry constants ----------
+  const BUF_TOP = 70, BUF_BOTTOM = 250, BUF_H = BUF_BOTTOM - BUF_TOP; // 180
+  const BUF_X = 242, BUF_W = 76;
+
+  // colors
+  const C_BLUE = "#3b82f6", C_PURPLE = "#8b5cf6", C_AMBER = "#f59e0b",
+        C_RED = "#ef4444", C_GREEN = "#10b981";
+
+  // ---------- DOM ----------
+  const gIn   = document.getElementById("g-pkts-in");
+  const gOut  = document.getElementById("g-pkts-out");
+  const bufLvl= document.getElementById("buf-level");
+  const prodBox = document.getElementById("prod-box");
+  const consBox = document.getElementById("cons-box");
+  const prodRate= document.getElementById("prod-rate");
+  const consRate= document.getElementById("cons-rate");
+  const sigPath = document.getElementById("sig-path");
+  const sigHead = document.getElementById("sig-head");
+  const sigText = document.getElementById("sig-text");
+
+  const vPrate = document.getElementById("v-prate");
+  const vCrate = document.getElementById("v-crate");
+  const vFill  = document.getElementById("v-fill");
+  const vNet   = document.getElementById("v-net");
+
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+  const btnNext= document.getElementById("btn-next");
+  const btnPrev= document.getElementById("btn-prev");
+  const btnReset=document.getElementById("btn-reset");
+
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // draw a row of small square "packets" between x1..x2 at y, count = density
+  function drawPackets(g, x1, x2, y, count, color) {
+    g.innerHTML = "";
+    if (count <= 0) return;
+    const span = x2 - x1;
+    for (let i = 0; i < count; i++) {
+      const t = (i + 0.5) / count;
+      const cx = x1 + span * t;
+      g.appendChild(svgEl("rect", {
+        class: "pkt", x: cx - 4, y: y - 4, width: 8, height: 8, rx: 2,
+        fill: color, opacity: 0.9
+      }));
+    }
+  }
+
+  // set buffer liquid to a fraction 0..1 with a color
+  function setBuffer(frac, color) {
+    const h = Math.max(0, Math.min(1, frac)) * BUF_H;
+    bufLvl.setAttribute("height", h);
+    bufLvl.setAttribute("y", BUF_BOTTOM - h - 2);
+    bufLvl.setAttribute("fill", color);
+  }
+
+  function setSignal(on) {
+    [sigPath, sigHead].forEach(el => el.classList.toggle("on", on));
+    sigText.classList.toggle("on", on);
+  }
+
+  // ---------- steps ----------
+  // Each step is a state-setter object.
+  const steps = [
+    {
+      apply() {
+        setBuffer(0, C_BLUE);
+        drawPackets(gIn, 135, 235, 160, 5, C_BLUE);
+        drawPackets(gOut, 325, 425, 160, 1, C_PURPLE);
+        prodRate.textContent = "50k/s"; consRate.textContent = "10k/s";
+        prodBox.setAttribute("fill", C_BLUE); consBox.setAttribute("fill", C_PURPLE);
+        setSignal(false);
+        setVars("50k/s", "10k/s", "0%", "+40k/s", { fill:"amber", net:"red" });
+      },
+      narr:`<b>1. Rate mismatch.</b> The producer fires <b>50k events/sec</b> (dense blue stream in). The consumer drains only <b>10k/sec</b> — each event triggers a ~100ms downstream call with limited concurrency (thin purple stream out). Net inflow is <code>+40k/sec</code>: the buffer <i>must</i> start filling.`,
+      cls:""
+    },
+    {
+      apply() {
+        setBuffer(0.45, C_AMBER);
+        drawPackets(gIn, 135, 235, 160, 5, C_BLUE);
+        drawPackets(gOut, 325, 425, 160, 1, C_PURPLE);
+        setSignal(false);
+        setVars("50k/s", "10k/s", "45%", "+40k/s", { fill:"amber", net:"red" });
+      },
+      narr:`<b>2. Buffer fills.</b> With <code>+40k/sec</code> net, the bounded buffer climbs fast — already <b>45%</b> full. It's <b>bounded</b> on purpose: an unbounded queue here would just grow until an <code>OOM</code>. The watermarks (<span style="color:#ef4444">HWM 80%</span> / <span style="color:#10b981">LWM 30%</span>) are the trigger levels.`,
+      cls:"warn"
+    },
+    {
+      apply() {
+        setBuffer(0.82, C_RED);
+        drawPackets(gIn, 135, 235, 160, 5, C_BLUE);
+        drawPackets(gOut, 325, 425, 160, 1, C_PURPLE);
+        setSignal(false);
+        consBox.setAttribute("fill", C_RED);
+        setVars("50k/s", "10k/s", "82%", "+40k/s", { fill:"red", net:"red" });
+      },
+      narr:`<b>3. High-watermark hit.</b> Fill crosses the <span style="color:#ef4444"><b>80% high-watermark</b></span> — the buffer turns red. This is the moment the consumer-side decides "I'm saturated." Without action, the next stop is <code>100k</code> capacity and a crash.`,
+      cls:"bad"
+    },
+    {
+      apply() {
+        setBuffer(0.82, C_RED);
+        drawPackets(gIn, 135, 235, 160, 5, C_BLUE);
+        drawPackets(gOut, 325, 425, 160, 1, C_PURPLE);
+        setSignal(true);
+        consBox.setAttribute("fill", C_RED);
+        setVars("50k/s", "10k/s", "82%", "+40k/s", { fill:"red", net:"red" });
+      },
+      narr:`<b>4. Raise the signal.</b> The buffer emits a <span style="color:#f59e0b"><b>"slow down"</b></span> signal that travels <b>back upstream</b> (amber path). This is the heart of backpressure — pressure propagates <i>backward</i>, toward the source, rather than being silently absorbed or dropped.`,
+      cls:"warn"
+    },
+    {
+      apply() {
+        setBuffer(0.82, C_RED);
+        drawPackets(gIn, 135, 235, 160, 1, C_AMBER); // producer throttled: sparse stream
+        drawPackets(gOut, 325, 425, 160, 1, C_PURPLE);
+        setSignal(true);
+        prodBox.setAttribute("fill", C_AMBER);
+        prodRate.textContent = "10k/s";
+        consBox.setAttribute("fill", C_RED);
+        setVars("10k/s", "10k/s", "82%", "0/s", { prate:"amber", fill:"red", net:"green" });
+      },
+      narr:`<b>5. Producer throttles.</b> On receiving the signal the producer drops to <b>10k/sec</b> — the inbound stream goes sparse (amber). Net flow is now <code>0/sec</code>: the buffer stops growing. The producer is effectively pinned to <code>min(P_rate, C_rate) = 10k/sec</code>.`,
+      cls:"warn"
+    },
+    {
+      apply() {
+        setBuffer(0.30, C_GREEN);
+        drawPackets(gIn, 135, 235, 160, 1, C_GREEN);
+        drawPackets(gOut, 325, 425, 160, 1, C_PURPLE);
+        setSignal(false);
+        prodBox.setAttribute("fill", C_GREEN);
+        consBox.setAttribute("fill", C_PURPLE);
+        prodRate.textContent = "10k/s";
+        setVars("10k/s", "10k/s", "30%", "0/s", { fill:"green", net:"green" });
+      },
+      narr:`<b>6. Drain to low-watermark.</b> The consumer keeps draining, so fill falls. At the <span style="color:#10b981"><b>30% low-watermark</b></span> the buffer raises a <b>"resume"</b> signal and clears the slow-down. Hysteresis between the two watermarks prevents rapid on/off flapping.`,
+      cls:"good"
+    },
+    {
+      apply() {
+        setBuffer(0.45, C_GREEN);
+        drawPackets(gIn, 135, 235, 160, 2, C_GREEN);
+        drawPackets(gOut, 325, 425, 160, 1, C_PURPLE);
+        setSignal(false);
+        prodBox.setAttribute("fill", C_GREEN);
+        prodRate.textContent = "10k/s";
+        setVars("10k/s", "10k/s", "~40%", "≈0/s", { fill:"green", net:"green" });
+      },
+      narr:`<b>7. Steady state.</b> The system settles around <b>10k/sec</b> end-to-end. Buffer depth stays bounded (~30–45%), latency is bounded, and memory is <b>flat</b> instead of growing forever. <b>The slowest stage sets the pace</b> — that's backpressure doing its job.`,
+      cls:"good"
+    },
+    {
+      apply() {
+        setBuffer(0.55, C_GREEN);
+        drawPackets(gIn, 135, 235, 160, 2, C_GREEN);
+        drawPackets(gOut, 325, 425, 160, 1, C_PURPLE);
+        setSignal(true);
+        prodBox.setAttribute("fill", C_GREEN);
+        prodRate.textContent = "≤C";
+        setVars("≤ C", "10k/s", "~50%", "≈0/s", { fill:"green", net:"green" });
+      },
+      narr:`<b>8. It propagates down the chain.</b> Real pipelines are <code>P → Q1 → A → Q2 → B(DB)</code>. If the DB slows, B slows, Q2 fills, A feels backpressure, Q1 fills, and the pressure reaches <b>P</b>. The same signal ripples through <i>every</i> stage — and at the edge you'd add a bounded queue + load shedding (HTTP <code>429</code>) so internal blocking never deadlocks the thread pool.`,
+      cls:"good"
+    }
+  ];
+
+  function setVars(p, c, f, net, classes) {
+    vPrate.textContent = p; vCrate.textContent = c; vFill.textContent = f; vNet.textContent = net;
+    vPrate.className = "value" + (classes.prate ? " " + classes.prate : "");
+    vCrate.className = "value green";
+    vFill.className  = "value" + (classes.fill ? " " + classes.fill : "");
+    vNet.className   = "value" + (classes.net ? " " + classes.net : "");
+  }
+
+  let cursor = 0;
+  function render() {
+    steps[cursor].apply();
+    narrEl.className = "narration" + (steps[cursor].cls ? " " + steps[cursor].cls : "");
+    narrEl.innerHTML = steps[cursor].narr;
+    stepEl.textContent = `step ${cursor + 1} / ${steps.length}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meeting Rooms — can one person attend them all?</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
+    --blue:#3b82f6; --amber:#f59e0b; --green:#10b981; --red:#ef4444; --purple:#a855f7;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:30px 18px 70px;}
+  .wrap{max-width:920px;margin:0 auto;}
+  h1{font-size:1.7rem;margin:0 0 6px;}
+  h1 span{color:var(--blue);}
+  .subtitle{color:var(--muted);margin:0 0 24px;}
+  .analogy{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(168,85,247,.10));
+    border:1px solid rgba(245,158,11,.4);border-left:5px solid var(--amber);border-radius:12px;padding:16px 20px;margin-bottom:24px;}
+  .analogy h3{margin:0 0 6px;color:var(--amber);font-size:1.02rem;}
+  .analogy p{margin:0;}
+  .problem{background:var(--panel);border-radius:12px;padding:14px 20px;margin-bottom:22px;border:1px solid rgba(255,255,255,.06);}
+  .problem code{background:var(--panel2);padding:2px 8px;border-radius:6px;color:#ffd479;font-family:"SF Mono",Menlo,monospace;}
+  .arrow{color:var(--green);font-weight:bold;}
+
+  .stage{background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:20px 22px 24px;margin-bottom:18px;}
+  .timeline{position:relative;height:200px;margin:10px 0 6px;}
+  .axis{position:absolute;left:0;right:0;bottom:30px;height:2px;background:rgba(255,255,255,.15);}
+  .tick{position:absolute;bottom:14px;transform:translateX(-50%);font-size:.72rem;color:var(--muted);font-family:"SF Mono",Menlo,monospace;}
+  .tick::before{content:'';position:absolute;left:50%;top:-16px;width:1px;height:10px;background:rgba(255,255,255,.18);}
+  .bar{position:absolute;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    font-family:"SF Mono",Menlo,monospace;font-weight:700;font-size:.8rem;border:2px solid;transition:all .4s ease;}
+  .bar.base{background:rgba(148,163,184,.16);border-color:#586387;color:#c3cbe6;}
+  .bar.prev{background:rgba(59,130,246,.2);border-color:var(--blue);color:#bcd4ff;box-shadow:0 0 0 3px rgba(59,130,246,.25);}
+  .bar.cur{background:rgba(245,158,11,.22);border-color:var(--amber);color:#ffe3a8;box-shadow:0 0 0 3px rgba(245,158,11,.28);}
+  .bar.ok{background:rgba(16,185,129,.18);border-color:var(--green);color:#b6f0d8;}
+  .bar.clash{background:rgba(239,68,68,.22);border-color:var(--red);color:#ffc7c7;box-shadow:0 0 0 3px rgba(239,68,68,.3);}
+  .overlap-shade{position:absolute;bottom:32px;top:6px;background:repeating-linear-gradient(45deg,rgba(239,68,68,.12),rgba(239,68,68,.12) 6px,transparent 6px,transparent 12px);border-left:2px solid var(--red);border-right:2px solid var(--red);}
+
+  .verdict{margin-top:10px;display:inline-flex;gap:8px;align-items:center;padding:10px 18px;border-radius:10px;
+    font-weight:700;font-family:"SF Mono",Menlo,monospace;font-size:1.05rem;}
+  .verdict.t{background:rgba(16,185,129,.16);border:1px solid var(--green);color:#b6f0d8;}
+  .verdict.f{background:rgba(239,68,68,.16);border:1px solid var(--red);color:#ffc7c7;}
+
+  .caption{background:var(--panel2);border-left:4px solid var(--blue);border-radius:8px;padding:12px 16px;margin:14px 0 16px;font-size:.98rem;min-height:50px;}
+  .caption b{color:#bcd4ff;}
+  .controls{display:flex;align-items:center;gap:10px;margin:6px 0 22px;}
+  button{background:var(--blue);color:#fff;border:none;padding:10px 22px;border-radius:9px;font-size:.98rem;font-weight:600;cursor:pointer;transition:transform .12s,background .2s;}
+  button:hover{background:#2f6fd6;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  button.ghost{background:var(--panel2);}
+  button.ghost:hover{background:#33457a;}
+  .stepind{color:var(--muted);font-size:.9rem;margin-left:auto;font-family:"SF Mono",Menlo,monospace;}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:4px 0 14px;font-size:.82rem;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid rgba(255,255,255,.2);}
+  .takeaway{background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(16,185,129,.12));
+    border:1px solid rgba(59,130,246,.4);border-radius:12px;padding:18px 22px;margin-top:26px;text-align:center;}
+  .takeaway h3{margin:0 0 6px;color:var(--blue);}
+  .takeaway p{margin:0;font-size:1.05rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Meeting Rooms — can <span>one person</span> attend them all?</h1>
+  <p class="subtitle">Sort by start, then just check neighbouring pairs for any overlap. First clash → False.</p>
+
+  <div class="analogy">
+    <h3>🧍 The one-person analogy</h3>
+    <p>Tum ek hi insaan ho — do jagah ek saath nahi ho sakte. Meetings ko <b>start ke order me line up</b> karo. Bas check karo: koi meeting pichhli ke <b>khatam hone se pehle</b> shuru to nahi ho rahi? Ek bhi clash → <code>False</code>. Sab clear → <code>True</code>.</p>
+  </div>
+
+  <div class="problem">
+    <b>Input.</b> <code>[[0,30],[5,10],[15,20]]</code>
+    <span class="arrow">→</span> <code>False</code> &nbsp;(meetings collide)
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#586387"></i>pending</span>
+    <span><i class="dot" style="background:var(--blue)"></i>previous</span>
+    <span><i class="dot" style="background:var(--amber)"></i>current pair-check</span>
+    <span><i class="dot" style="background:var(--red)"></i>clash</span>
+  </div>
+
+  <div class="stage">
+    <div class="timeline" id="timeline"></div>
+    <div id="verdictWrap"></div>
+  </div>
+
+  <div class="caption" id="caption">Press <b>Next</b> to sort by start, then check adjacent pairs.</div>
+  <div class="controls">
+    <button id="prev" class="ghost">‹ Prev</button>
+    <button id="next">Next ›</button>
+    <button id="auto" class="ghost">▶ Auto</button>
+    <span class="stepind" id="ind"></span>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>After sorting by start, any overlap must be between <i>adjacent</i> intervals — so a single O(n) neighbour scan answers it. Test is <code>cur.start &lt; prev.end</code> (touching is fine).</p>
+  </div>
+</div>
+
+<script>
+const raw=[[0,30],[5,10],[15,20]];
+const sorted=[...raw].sort((a,b)=>a[0]-b[0]);   // [[0,30],[5,10],[15,20]]
+const MIN=0, MAX=32, SPAN=MAX-MIN;
+const $=id=>document.getElementById(id);
+
+function buildSteps(){
+  const steps=[];
+  let verdict=null; // true/false once decided
+  const cleared=new Set(); // pair indices verified ok (right index)
+  const snap=o=>({
+    sorted:o.sorted??false, prev:o.prev??-1, cur:o.cur??-1,
+    cleared:new Set(cleared), clash:o.clash??-1, shade:o.shade??null,
+    verdict:o.verdict??verdict, caption:o.caption
+  });
+
+  steps.push(snap({caption:`Input: [[0,30],[5,10],[15,20]]. First sort by <b>start</b> so any overlap lands between neighbours.`}));
+  steps.push(snap({sorted:true,caption:`Sorted by start → <b>[[0,30],[5,10],[15,20]]</b>. Now compare each meeting with the one before it.`}));
+
+  for(let i=1;i<sorted.length;i++){
+    const [ps,pe]=sorted[i-1], [cs,ce]=sorted[i];
+    steps.push(snap({sorted:true,prev:i-1,cur:i,caption:`Pair check: previous <b>[${ps},${pe}]</b> vs current <b>[${cs},${ce}]</b>. Does current start before previous ends? <code>${cs} &lt; ${pe}</code>?`}));
+    if(cs<pe){
+      verdict=false;
+      const shade=[cs,Math.min(pe,ce)];
+      steps.push(snap({sorted:true,prev:i-1,cur:i,clash:i,shade,verdict:false,caption:`Yes — <code>${cs} &lt; ${pe}</code>. The two meetings <b>overlap</b> (red zone). One person can't attend both → return <b>False</b>. ✋`}));
+      return steps;
+    }else{
+      cleared.add(i);
+      steps.push(snap({sorted:true,prev:i-1,cur:i,caption:`No — <code>${cs} ≥ ${pe}</code>, no overlap. This pair is fine, move on.`}));
+    }
+  }
+  verdict=true;
+  steps.push(snap({sorted:true,verdict:true,caption:`All adjacent pairs clear → no conflicts → return <b>True</b>. ✅`}));
+  return steps;
+}
+const steps=buildSteps();
+let cur=0, timer=null;
+
+function x(t){return ((t-MIN)/SPAN)*100;}
+function drawTimeline(s){
+  let h='';
+  for(let t=0;t<=MAX;t+=2) h+=`<div class="tick" style="left:${x(t)}%">${t}</div>`;
+  h+=`<div class="axis"></div>`;
+  const arr=s.sorted?sorted:raw;
+  arr.forEach((iv,idx)=>{
+    let cls='bar base';
+    if(s.sorted){
+      if(idx===s.cur) cls = s.clash===s.cur?'bar clash':'bar cur';
+      else if(idx===s.prev) cls = (s.clash!==-1)?'bar clash':'bar prev';
+      else if(s.cleared.has(idx)||s.cleared.has(idx+1)) cls='bar ok';
+    }
+    const left=x(iv[0]), w=Math.max(x(iv[1])-x(iv[0]),4);
+    h+=`<div class="${cls}" style="left:${left}%;width:${w}%;top:${10+idx*38}px;">[${iv[0]},${iv[1]}]</div>`;
+  });
+  if(s.shade){
+    const left=x(s.shade[0]), w=Math.max(x(s.shade[1])-x(s.shade[0]),2);
+    h+=`<div class="overlap-shade" style="left:${left}%;width:${w}%;"></div>`;
+  }
+  $('timeline').innerHTML=h;
+}
+function drawVerdict(s){
+  if(s.verdict===null){$('verdictWrap').innerHTML='';return;}
+  $('verdictWrap').innerHTML = s.verdict
+    ? `<div class="verdict t">return True — one person can attend all ✓</div>`
+    : `<div class="verdict f">return False — meetings collide ✗</div>`;
+}
+function render(){
+  const s=steps[cur];
+  drawTimeline(s); drawVerdict(s);
+  $('caption').innerHTML=s.caption;
+  $('ind').textContent=`Step ${cur+1} / ${steps.length}`;
+  $('prev').disabled=cur===0; $('next').disabled=cur===steps.length-1;
+}
+$('next').onclick=()=>{if(cur<steps.length-1){cur++;render();}};
+$('prev').onclick=()=>{if(cur>0){cur--;render();}};
+$('auto').onclick=function(){
+  if(timer){clearInterval(timer);timer=null;this.textContent='▶ Auto';return;}
+  this.textContent='⏸ Pause';
+  timer=setInterval(()=>{if(cur<steps.length-1){cur++;render();}else{clearInterval(timer);timer=null;$('auto').textContent='▶ Auto';}},1100);
+};
+render();
+</script>
+</body>
+</html>

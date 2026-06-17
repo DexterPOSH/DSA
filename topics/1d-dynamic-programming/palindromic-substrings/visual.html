@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Palindromic Substrings — Count by Expanding Centers</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px 70px; gap: 28px; line-height: 1.55;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy, .takeaway {
+    background: var(--panel); border-radius: 12px; padding: 18px 26px;
+    max-width: 720px; width: 100%; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .analogy { border: 1px solid var(--blue); border-left: 5px solid var(--blue); }
+  .takeaway { border: 1px solid #2d3a5a; }
+  .ic { font-size: 1.8rem; flex-shrink: 0; line-height: 1; }
+  .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px; }
+  .analogy-text, .takeaway p { font-size: 0.98rem; color: #c0c0d0; }
+  .takeaway strong { color: var(--text); }
+
+  .card {
+    background: var(--panel); border: 1px solid #2d3a5a; border-radius: 16px;
+    padding: 30px; max-width: 820px; width: 100%; display: flex; flex-direction: column; gap: 24px;
+  }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+  .step-desc {
+    min-height: 56px; background: var(--panel2); border-radius: 8px; padding: 14px 20px;
+    font-size: 0.96rem; color: #c8c8e0; border-left: 3px solid var(--blue); transition: border-color 0.3s;
+  }
+  .step-desc.match { border-color: var(--green); }
+  .step-desc.stop  { border-color: var(--amber); }
+
+  .str-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .ch {
+    width: 58px; height: 58px; border-radius: 10px; border: 2px solid #2d3a5a;
+    background: var(--panel2); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-size: 1.45rem; font-weight: 700;
+    position: relative; transition: all 0.3s;
+  }
+  .ch .idx { position: absolute; bottom: 3px; font-size: 0.58rem; font-weight: 400; color: #5a6a90; }
+  .ch.window { border-color: var(--green); background: #0d2a1a; color: #86efac; }
+  .ch.pointer-l { border-color: var(--blue); box-shadow: 0 0 16px rgba(59,130,246,0.55); transform: translateY(-4px); }
+  .ch.pointer-r { border-color: var(--amber); box-shadow: 0 0 16px rgba(245,158,11,0.55); transform: translateY(-4px); }
+  .ch.mismatch { border-color: var(--red); background: #2a0d0d; color: #fca5a5; }
+
+  .ptr-tags { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; min-height: 24px; }
+  .ptr-tag { width: 58px; text-align: center; font-size: 0.72rem; font-weight: 700; }
+  .tag-l { color: var(--blue); }
+  .tag-r { color: var(--amber); }
+
+  .center-note { text-align: center; font-size: 0.85rem; color: var(--muted); }
+  .center-note b { color: var(--amber); }
+
+  .panels { display: flex; gap: 16px; flex-wrap: wrap; }
+  .counter-box {
+    flex: 1; min-width: 180px;
+    background: var(--panel2); border: 1px dashed #2d3a5a; border-radius: 10px;
+    padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .counter-box .k { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; }
+  .counter-box .v { font-weight: 700; color: var(--green); font-size: 2rem; font-family: 'JetBrains Mono', Consolas, monospace; transition: transform 0.2s; }
+  .counter-box .v.bump { transform: scale(1.25); }
+
+  .found-list { flex: 2; min-width: 240px; background: var(--panel2); border: 1px dashed #2d3a5a; border-radius: 10px; padding: 12px 16px; }
+  .found-list .k { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    padding: 4px 12px; border-radius: 7px; background: #0d2a1a; border: 1.5px solid var(--green);
+    color: #86efac; font-size: 0.95rem; font-weight: 700; font-family: 'JetBrains Mono', Consolas, monospace;
+    animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes pop { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn { padding: 11px 26px; border-radius: 8px; border: none; font-size: 0.93rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+  code.inline { background: var(--panel2); padding: 2px 7px; border-radius: 5px; font-size: 0.85rem; color: #93c5fd; }
+</style>
+</head>
+<body>
+
+  <h1>Palindromic Substrings &mdash; <span>Count by Expanding Centers</span></h1>
+
+  <div class="analogy">
+    <div class="ic">🔢</div>
+    <div>
+      <div class="label">Real-world analogy</div>
+      <div class="analogy-text">
+        Same <strong>mirror trick</strong> as longest-palindrome — but here we don't want the longest,
+        we want a <strong>count</strong>. Every time both pointers match while expanding from a center,
+        a brand-new palindrome was just formed → bump the counter <code class="inline">+1</code>.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">What's happening</div>
+      <div class="step-desc" id="stepDesc">Press "Next" to begin. We expand from every center in <code class="inline">s = "aba"</code> and count each match.</div>
+    </div>
+
+    <div>
+      <div class="section-label">String &nbsp;<code class="inline">s = "aba"</code></div>
+      <div class="str-row" id="strRow"></div>
+      <div class="ptr-tags" id="ptrTags"></div>
+    </div>
+
+    <div class="center-note" id="centerNote"></div>
+
+    <div class="panels">
+      <div class="counter-box">
+        <span class="k">Total count</span>
+        <span class="v" id="countVal">0</span>
+      </div>
+      <div class="found-list">
+        <div class="k">Palindromes found</div>
+        <div class="chips" id="chips"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" onclick="reset()">Reset</button>
+      <button class="btn btn-secondary" id="prevBtn" onclick="prev()">Prev</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="next()">Next</button>
+      <button class="btn btn-secondary" id="autoBtn" onclick="toggleAuto()">Auto-play</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="ic">💡</div>
+    <div>
+      <div class="label">Key Takeaway</div>
+      <p>
+        Identical engine to <strong>Longest Palindromic Substring</strong> — the only change is
+        <code class="inline">count += 1</code> on <em>every</em> successful match instead of tracking the
+        longest. <strong>O(n²) time, O(1) space.</strong>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const s = "aba";
+    const n = s.length;
+
+    // Build steps; each match increments count and pushes the substring.
+    const steps = [];
+    let count = 0;
+    const found = [];
+
+    function pushCenter(cl, cr, kind) {
+      let l = cl, r = cr;
+      const centerLabel = kind === 'odd'
+        ? `Odd center at index ${cl} ('${s[cl]}')`
+        : `Even center between index ${cl} and ${cr}`;
+
+      steps.push({
+        l, r, kind, phase: 'center', window: null, mismatch: null,
+        desc: `<b>New center.</b> ${centerLabel}. Place pointers and expand outward.`,
+        descClass: '', count, found: [...found], bump: false
+      });
+
+      while (l >= 0 && r < n && s[l] === s[r]) {
+        const win = s.slice(l, r + 1);
+        count++;
+        found.push(win);
+        steps.push({
+          l, r, kind, phase: 'match', window: [l, r], mismatch: null,
+          desc: `s[${l}]='${s[l]}' == s[${r}]='${s[r]}' ✔ &nbsp;<code class="inline">"${win}"</code> is a palindrome → <b>count = ${count}</b>.`,
+          descClass: 'match', count, found: [...found], bump: true
+        });
+        l--; r++;
+      }
+
+      let reason;
+      if (l < 0 || r >= n) reason = `pointer hit boundary`;
+      else reason = `s[${l}]='${s[l]}' ≠ s[${r}]='${s[r]}'`;
+      steps.push({
+        l, r, kind, phase: 'stop', window: null,
+        mismatch: (l >= 0 && r < n) ? [l, r] : null,
+        desc: `<b>Stop</b> — ${reason}. Move to the next center.`,
+        descClass: 'stop', count, found: [...found], bump: false
+      });
+    }
+
+    for (let i = 0; i < n; i++) {
+      pushCenter(i, i, 'odd');
+      if (i + 1 < n) pushCenter(i, i + 1, 'even');
+    }
+    steps.push({
+      l: -1, r: -1, phase: 'done', window: null, mismatch: null,
+      desc: `✅ <b>Done.</b> Every center explored. Total palindromic substrings = <b>${count}</b>.`,
+      descClass: 'match', count, found: [...found], bump: false, done: true
+    });
+
+    // ── Render ─────────────────────────────────────────────
+    const strRow = document.getElementById('strRow');
+    const ptrTags = document.getElementById('ptrTags');
+    const stepDesc = document.getElementById('stepDesc');
+    const centerNote = document.getElementById('centerNote');
+    const countVal = document.getElementById('countVal');
+    const chipsEl = document.getElementById('chips');
+    const counter = document.getElementById('stepCounter');
+    const nextBtn = document.getElementById('nextBtn');
+    const prevBtn = document.getElementById('prevBtn');
+
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement('div');
+      d.className = 'ch'; d.id = 'ch-' + i;
+      d.innerHTML = `${s[i]}<span class="idx">${i}</span>`;
+      strRow.appendChild(d);
+      const t = document.createElement('div');
+      t.className = 'ptr-tag'; t.id = 'tag-' + i;
+      ptrTags.appendChild(t);
+    }
+
+    let cur = -1;
+    let autoTimer = null;
+
+    function clearCells() {
+      for (let i = 0; i < n; i++) {
+        document.getElementById('ch-' + i).className = 'ch';
+        const tg = document.getElementById('tag-' + i);
+        tg.textContent = ''; tg.className = 'ptr-tag';
+      }
+    }
+
+    function render() {
+      clearCells();
+      counter.textContent = `Step ${cur + 1} / ${steps.length}`;
+
+      if (cur < 0) {
+        stepDesc.innerHTML = 'Press "Next" to begin. We expand from every center in <code class="inline">s = "aba"</code> and count each match.';
+        stepDesc.className = 'step-desc';
+        centerNote.innerHTML = '';
+        countVal.textContent = '0';
+        chipsEl.innerHTML = '';
+        prevBtn.disabled = true; nextBtn.disabled = false;
+        return;
+      }
+
+      const st = steps[cur];
+      stepDesc.innerHTML = st.desc;
+      stepDesc.className = 'step-desc ' + (st.descClass || '');
+
+      if (st.window) {
+        for (let i = st.window[0]; i <= st.window[1]; i++)
+          document.getElementById('ch-' + i).classList.add('window');
+      }
+      if (st.mismatch) {
+        document.getElementById('ch-' + st.mismatch[0]).classList.add('mismatch');
+        document.getElementById('ch-' + st.mismatch[1]).classList.add('mismatch');
+      }
+      if (!st.done && st.l >= 0 && st.l < n) {
+        document.getElementById('ch-' + st.l).classList.add('pointer-l');
+        const tg = document.getElementById('tag-' + st.l);
+        tg.textContent = 'l'; tg.classList.add('tag-l');
+      }
+      if (!st.done && st.r >= 0 && st.r < n) {
+        document.getElementById('ch-' + st.r).classList.add('pointer-r');
+        const tg = document.getElementById('tag-' + st.r);
+        if (st.r === st.l) tg.textContent = 'l,r';
+        else { tg.textContent = 'r'; tg.classList.add('tag-r'); }
+      }
+
+      if (st.phase === 'center') {
+        centerNote.innerHTML = st.kind === 'odd'
+          ? `Center type: <b>ODD</b> — l and r start on the same cell.`
+          : `Center type: <b>EVEN</b> — l and r start adjacent.`;
+      } else if (st.done) {
+        centerNote.innerHTML = '';
+      }
+
+      countVal.textContent = st.count;
+      if (st.bump) { countVal.classList.add('bump'); setTimeout(() => countVal.classList.remove('bump'), 200); }
+
+      chipsEl.innerHTML = '';
+      st.found.forEach(f => {
+        const c = document.createElement('div');
+        c.className = 'chip'; c.textContent = `"${f}"`;
+        chipsEl.appendChild(c);
+      });
+
+      prevBtn.disabled = (cur <= -1);
+      nextBtn.disabled = (cur >= steps.length - 1);
+    }
+
+    function next() { if (cur < steps.length - 1) { cur++; render(); } }
+    function prev() { if (cur > -1) { cur--; render(); } }
+    function reset() { stopAuto(); cur = -1; render(); }
+    function toggleAuto() {
+      if (autoTimer) stopAuto();
+      else {
+        document.getElementById('autoBtn').textContent = 'Pause';
+        autoTimer = setInterval(() => { if (cur >= steps.length - 1) { stopAuto(); return; } next(); }, 850);
+      }
+    }
+    function stopAuto() {
+      if (autoTimer) clearInterval(autoTimer);
+      autoTimer = null;
+      document.getElementById('autoBtn').textContent = 'Auto-play';
+    }
+
+    render();
+  </script>
+</body>
+</html>

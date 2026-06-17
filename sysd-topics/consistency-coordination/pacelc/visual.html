@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PACELC — The Two-Question Decision Tree</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0 0 8px; color: #d0d0e0; font-size: 15px; }
+  .analogy p:last-child { margin-bottom: 0; }
+  .analogy b { color: #ffffff; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* tree SVG */
+  .tree-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+
+  .box rect { transition: all .4s ease; }
+  .box text { font-family: -apple-system, sans-serif; fill: #fff; }
+  .box.dim { opacity: .28; }
+  .edge-line { stroke: #3a3a5c; stroke-width: 3; fill: none; transition: all .4s ease; }
+  .edge-line.active { stroke: #f59e0b; stroke-width: 4; }
+  .edge-line.dim { opacity: .2; }
+  .edge-label { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px; fill: #8888aa; transition: all .4s ease; }
+  .edge-label.active { fill: #fbbf24; font-weight: 700; }
+
+  .packet { transition: all .15s linear; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; color: #3b82f6; font-weight: 700; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.round { border-radius: 50%; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.move { border-left-color: #f59e0b; background: #332611; }
+  .narration.warn { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* classification grid */
+  .grid-panel { margin-top: 32px; }
+  .grid-panel h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .matrix { grid-template-columns: 1fr; } }
+  .cell { border-radius: 12px; padding: 18px 20px; }
+  .cell.pael { background: #14321f; border: 1px solid #10b981; }
+  .cell.pcec { background: #1a2138; border: 1px solid #3b82f6; }
+  .cell.mixed { background: #24243e; border: 1px solid #3a3a5c; }
+  .cell h4 { margin: 0 0 4px; font-size: 15px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cell.pael h4 { color: #6ee7b7; }
+  .cell.pcec h4 { color: #93c5fd; }
+  .cell.mixed h4 { color: #cbd5e1; }
+  .cell .desc { font-size: 13px; color: #c8c8d8; margin: 0 0 10px; }
+  .cell .stores { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12px; font-family: "SF Mono", Menlo, Consolas, monospace; padding: 3px 9px;
+          border-radius: 12px; background: #00000033; color: #e0e0e0; border: 1px solid #ffffff22; }
+
+  .edge { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>PACELC — The Two-Question Decision Tree</h1>
+  <div class="subtitle">CAP only asks one question — <i>"partition par Availability ya Consistency?"</i> PACELC adds the question CAP forgets: <code>if (P) then (A or C), else (L or C)</code> — yaani <b>normal din mein bhi</b> har distributed datastore Latency aur Consistency ke beech choose kar raha hai.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — do bank branches (Mumbai + Delhi)</h3>
+    <p>Aap ek bank ke do branches chalate ho — ek <b>Mumbai</b>, ek <b>Delhi</b> — dono ki passbook (data) same honi chahiye. Customer Delhi pe paisa nikaalne aata hai. Do situations:</p>
+    <p><b>(P) Phone line kat gayi</b> — partition. Ab choice: "sorry, line down, service nahi" (consistency rakhi, par <b>availability</b> gayi = <b>PC</b>), ya bina Mumbai confirm kiye withdrawal de do (available, par balance mismatch = <b>PA</b>).</p>
+    <p><b>(E = Else) Line bilkul theek hai</b> — yahi CAP miss karta hai. Phir bhi sawaal: har transaction se pehle Mumbai ko call karke balance confirm karo (strong <b>consistency</b>, par extra round-trip = <b>EC</b>)? Ya local copy se turant paisa do, baad mein sync (fast, low <b>latency</b>, thodi der stale = <b>EL</b>)?</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">formula:</span><code>if (P) then (A or C), else (L or C)</code></div>
+    <div class="row"><span class="label">P:</span><code>partition ho raha hai</code> &nbsp; <span class="label">E:</span><code>no partition — normal steady state (99%+ of life)</code></div>
+    <div class="row"><span class="label">label:</span><code>2 letters partition-branch + 2 letters else-branch</code> &nbsp;e.g. <code>PA/EL</code>, <code>PC/EC</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="tree-holder">
+      <svg viewBox="0 0 560 420" id="tree">
+        <!-- edges drawn first (behind boxes) -->
+        <g id="g-edges"></g>
+        <g id="g-edge-labels"></g>
+        <!-- boxes -->
+        <g id="g-boxes"></g>
+        <!-- travelling request packet -->
+        <g id="g-packet"></g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">Condition</div><div class="value" id="v-cond">—</div></div>
+        <div class="var"><div class="label">Chosen branch</div><div class="value amber" id="v-branch">—</div></div>
+        <div class="var"><div class="label">Sacrifices</div><div class="value red" id="v-sac">—</div></div>
+        <div class="var"><div class="label">Latency</div><div class="value green" id="v-lat">—</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch round" style="background:#94a3b8"></span>Incoming request (the packet)</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Partition branch (P → A or C)</div>
+        <div class="legend-item"><span class="swatch" style="background:#3b82f6"></span>Else / steady-state branch (E → L or C)</div>
+        <div class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Active path the request takes</div>
+        <div class="legend-item"><span class="swatch" style="background:#10b981"></span>Low-latency / available outcome</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to send a request into the decision tree and watch which branch it takes.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="grid-panel">
+    <h3>How real datastores classify (partition-branch / else-branch)</h3>
+    <div class="matrix">
+      <div class="cell pael">
+        <h4>PA / EL &nbsp;— "AP-flavoured"</h4>
+        <p class="desc">Partition par available rahe (reconcile later); normal par one replica se turant respond — <b>~1–5 ms</b> local read, baaki replicas async update. Stale read ka risk, eventual consistency.</p>
+        <div class="stores"><span class="chip">Cassandra (CL=ONE)</span><span class="chip">DynamoDB default</span><span class="chip">Riak</span></div>
+      </div>
+      <div class="cell pcec">
+        <h4>PC / EC &nbsp;— "CP-flavoured"</h4>
+        <p class="desc">Partition par consistency (kuch nodes reject karein); normal par bhi quorum/all se confirm — same-DC <b>~10–30 ms</b>, cross-region quorum <b>50–150 ms</b>. Correctness paramount.</p>
+        <div class="stores"><span class="chip">HBase</span><span class="chip">BigTable</span><span class="chip">Spanner (TrueTime)</span><span class="chip">etcd</span><span class="chip">ZooKeeper</span></div>
+      </div>
+      <div class="cell mixed">
+        <h4>PA / EC &nbsp;and&nbsp; PC / EL</h4>
+        <p class="desc">Mixed corners — exist karte hain par kam common. Ek branch availability/latency choose karta hai aur doosra consistency.</p>
+        <div class="stores"><span class="chip">rare combinations</span></div>
+      </div>
+      <div class="cell mixed">
+        <h4>Tunable per-request</h4>
+        <p class="desc">Modern systems fixed label nahi — per-request consistency level. Cassandra <code>ONE</code> (EL) vs <code>QUORUM/ALL</code> (EC). DynamoDB eventually- vs strongly-consistent read (~2× cost). MongoDB default majority-leaning, but tunable.</p>
+        <div class="stores"><span class="chip">"depends on config"</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="edge">
+    <h3>Interview gotchas</h3>
+    <ul>
+      <li><b>"PACELC sirf CAP ka rename hai" — galat.</b> CAP sirf partition (failure) dekhta hai. PACELC ka asli contribution <b>ELC</b> hai: bina kisi failure ke, normal din mein bhi har datastore latency vs consistency choose kar raha hai. Ye distinction bolna depth dikhata hai.</li>
+      <li><b>"CA" koi real option nahi.</b> Distributed system mein partitions <b>inevitable</b> — P ko opt-out nahi kar sakte. P ek <b>condition</b> hai (jab hota hai PA ya PC chuno), na ki choice.</li>
+      <li><b>EL ≠ "no consistency".</b> EL = "abhi fast respond, sync baad mein" → usually eventual consistency. Replicas aakhir mein converge ho jaate hain; data corrupt nahi hota.</li>
+      <li><b>Strong consistency = higher latency, fundamentally.</b> EC ko zyada replicas se confirm karna padta hai (quorum/all) → extra network round-trips → speed-of-light limit cross-region. Kabhi mat bolo "strong consistency bhi free mein fast ho sakti hai."</li>
+      <li><b>Classification absolute mat samjho.</b> "Cassandra PA/EL hai" theek hai <i>default</i> ke liye; actual behaviour consistency level (<code>ONE</code> vs <code>QUORUM</code> vs <code>ALL</code>) par depend karta hai.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>PACELC = <b>if (P) then (A or C), else (L or C)</b>. Partition par availability ya consistency choose karo — par asli insight ye hai ki <b>partition na hone par bhi</b> (jo 99%+ time hai) har distributed datastore <b>Latency aur Consistency</b> ke beech trade kar raha hai. Datastore choose karte waqt dono branches articulate karo: "partition par X, normal operation par Y."</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- layout coordinates (SVG 560 x 420) ----------
+  // node id -> {x,y,w,h,label,sub,fill,stroke}
+  const NODES = {
+    req:   { cx:280, cy:36,  w:200, h:40, label:"Incoming request",  sub:"read / write",      fill:"#2d2d50", stroke:"#64748b" },
+    p:     { cx:280, cy:128, w:230, h:46, label:"Is there a PARTITION?", sub:"network split between replicas", fill:"#3a2740", stroke:"#a855f7" },
+    // partition branch (left)
+    pa:    { cx:120, cy:248, w:150, h:54, label:"PA", sub:"stay Available\nreconcile later", fill:"#3a2018", stroke:"#ef4444" },
+    pc:    { cx:120, cy:340, w:150, h:54, label:"PC", sub:"stay Consistent\nreject some nodes", fill:"#3a2018", stroke:"#ef4444" },
+    // else branch (right)
+    el:    { cx:440, cy:248, w:150, h:54, label:"EL", sub:"low Latency\n~1–5 ms, 1 replica", fill:"#14321f", stroke:"#10b981" },
+    ec:    { cx:440, cy:340, w:150, h:54, label:"EC", sub:"strong Consistency\nquorum 10–150 ms", fill:"#1a2138", stroke:"#3b82f6" },
+  };
+
+  // edges: from -> to, with optional label + a midpoint for the label
+  const EDGES = [
+    { id:"req-p",  from:"req", to:"p" },
+    { id:"p-pa",   from:"p",   to:"pa", label:"P = YES → A", lx:150, ly:196 },
+    { id:"p-pc",   from:"p",   to:"pc" },
+    { id:"p-el",   from:"p",   to:"el", label:"E = no partition → L", lx:430, ly:196 },
+    { id:"p-ec",   from:"p",   to:"ec" },
+  ];
+  // note: p->pa edge visually also covers continuing to pc; we draw an internal link pa->pc and el->ec
+  EDGES.push({ id:"pa-pc", from:"pa", to:"pc", straight:true });
+  EDGES.push({ id:"el-ec", from:"el", to:"ec", straight:true });
+
+  // ---------- step model ----------
+  // each step describes: which nodes/edges highlighted, packet target node,
+  // vars panel, narration.
+  const steps = [
+    {
+      packet: null, active: [], activeEdges: [], dim: [],
+      vars: { cond:"—", branch:"—", sac:"—", lat:"—" },
+      narration:`<b>1. The shape of PACELC.</b> Every request entering a distributed datastore faces a decision tree with <b>two questions</b>, not one. Top question (purple) is the only thing CAP looks at. The bottom-right pair is what PACELC adds.`,
+      narrClass:""
+    },
+    {
+      packet: "req", active: ["req"], activeEdges: [], dim: [],
+      vars: { cond:"request arrives", branch:"—", sac:"—", lat:"—" },
+      narration:`<b>2. A request arrives.</b> A read or write enters the system. Before it can be served, the system must know: <b>are we in a partition right now, or running normally?</b>`,
+      narrClass:""
+    },
+    {
+      packet: "p", active: ["req","p"], activeEdges: ["req-p"], dim: [],
+      vars: { cond:"check partition?", branch:"—", sac:"—", lat:"—" },
+      narration:`<b>3. Question 1 — is there a partition?</b> A network split between replicas. You can't <i>opt out</i> of partitions (they're inevitable) — so <code>P</code> is a <b>condition</b>, not a choice. The branch you take depends on the answer.`,
+      narrClass:""
+    },
+    {
+      packet: "pa", active: ["p","pa"], activeEdges: ["p-pa"], dim: ["el","ec","p-el","p-ec","el-ec"],
+      vars: { cond:"P = YES (partition)", branch:"PA", sac:"Consistency", lat:"available" },
+      narration:`<b>4a. If P = YES → choose A (PA).</b> System stays <b>Available</b>: serve the request from whichever replicas you can reach, reconcile divergent data later. The cost — replicas may disagree, so you <b>sacrifice Consistency</b>. (Bank: Delhi gives cash without confirming Mumbai.)`,
+      narrClass:"move"
+    },
+    {
+      packet: "pc", active: ["p","pc"], activeEdges: ["p-pc"], dim: ["el","ec","p-el","p-ec","el-ec"],
+      vars: { cond:"P = YES (partition)", branch:"PC", sac:"Availability", lat:"rejects" },
+      narration:`<b>4b. …or if P = YES → choose C (PC).</b> System stays <b>Consistent</b>: some nodes <b>reject</b> requests so divergent data never forms. The cost — you <b>sacrifice Availability</b>. (Bank: "sorry, line down, can't serve right now.") This is the entire CAP debate.`,
+      narrClass:"warn"
+    },
+    {
+      packet: "p", active: ["req","p"], activeEdges: ["req-p"], dim: ["pa","pc","p-pa","p-pc","pa-pc"],
+      vars: { cond:"P = NO (normal)", branch:"→ Else", sac:"—", lat:"—" },
+      narration:`<b>5. The question CAP forgets — E (Else).</b> But a system spends <b>99%+ of its life with NO partition</b>. CAP says nothing about this case. PACELC asks a second question: even when everything is healthy, do you favour <b>Latency</b> or <b>Consistency</b>?`,
+      narrClass:""
+    },
+    {
+      packet: "el", active: ["p","el"], activeEdges: ["p-el"], dim: ["pa","pc","ec","p-pa","p-pc","pa-pc","p-ec"],
+      vars: { cond:"P = NO (normal)", branch:"EL", sac:"freshness", lat:"~1–5 ms" },
+      narration:`<b>6a. If no partition → favour L (EL).</b> Respond from <b>one local replica immediately</b> (~1–5 ms), push updates to the others <b>async</b>. Fast, but a read might be slightly <b>stale</b> → eventual consistency. EL ≠ "no consistency" — replicas converge later.`,
+      narrClass:"good"
+    },
+    {
+      packet: "ec", active: ["p","ec"], activeEdges: ["p-ec"], dim: ["pa","pc","el","p-pa","p-pc","pa-pc","p-el"],
+      vars: { cond:"P = NO (normal)", branch:"EC", sac:"latency", lat:"10–150 ms" },
+      narration:`<b>6b. …or favour C (EC).</b> Confirm read/write across a <b>quorum or all</b> replicas before answering. Same-DC adds <b>~10–30 ms</b>; a cross-region quorum can cost <b>50–150 ms</b>. Strong consistency, but every request pays extra network round-trips.`,
+      narrClass:"move"
+    },
+    {
+      packet: null,
+      active: ["pa","el"], activeEdges: ["p-pa","p-el"],
+      dim: ["pc","ec","p-pc","p-ec","pa-pc","el-ec"],
+      vars: { cond:"label = PA / EL", branch:"PA/EL", sac:"consistency", lat:"~1–5 ms" },
+      narration:`<b>7. Putting it together — the 2+2 label.</b> Pick one from each branch → a 4-letter classification. <b>PA/EL</b> (shown) = Cassandra, DynamoDB default, Riak: available under partition, low-latency when normal. The opposite corner <b>PC/EC</b> = HBase, BigTable, Spanner, etcd, ZooKeeper.`,
+      narrClass:"good"
+    },
+  ];
+
+  // ---------- DOM / SVG refs ----------
+  const gEdges  = document.getElementById("g-edges");
+  const gLabels = document.getElementById("g-edge-labels");
+  const gBoxes  = document.getElementById("g-boxes");
+  const gPacket = document.getElementById("g-packet");
+  const narrEl  = document.getElementById("narration");
+  const stepEl  = document.getElementById("step-indicator");
+  const vCond   = document.getElementById("v-cond");
+  const vBranch = document.getElementById("v-branch");
+  const vSac    = document.getElementById("v-sac");
+  const vLat    = document.getElementById("v-lat");
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // connection point on a box edge facing the target
+  function anchor(n, towards) {
+    // returns bottom-center for downward edges (tree flows top->down)
+    if (towards.cy > n.cy) return { x: n.cx, y: n.cy + n.h/2 };
+    return { x: n.cx, y: n.cy - n.h/2 };
+  }
+
+  function edgePath(e) {
+    const a = NODES[e.from], b = NODES[e.to];
+    if (e.straight) {
+      // vertical-ish straight link between stacked boxes (pa->pc, el->ec)
+      const p1 = { x: a.cx, y: a.cy + a.h/2 };
+      const p2 = { x: b.cx, y: b.cy - b.h/2 };
+      return `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
+    }
+    const p1 = anchor(a, b);
+    const p2 = anchor(b, a);
+    const midY = (p1.y + p2.y) / 2;
+    return `M ${p1.x} ${p1.y} C ${p1.x} ${midY}, ${p2.x} ${midY}, ${p2.x} ${p2.y}`;
+  }
+
+  // pre-build static structure once; we just toggle classes per render
+  function buildStatic() {
+    gEdges.innerHTML = ""; gLabels.innerHTML = ""; gBoxes.innerHTML = "";
+    // edges
+    for (const e of EDGES) {
+      const p = svgEl("path", { class:"edge-line", id:"edge-"+e.id, d: edgePath(e) });
+      gEdges.appendChild(p);
+      if (e.label) {
+        const t = svgEl("text", { class:"edge-label", id:"elbl-"+e.id, x:e.lx, y:e.ly, "text-anchor":"middle" });
+        t.textContent = e.label;
+        gLabels.appendChild(t);
+      }
+    }
+    // boxes
+    for (const id in NODES) {
+      const n = NODES[id];
+      const g = svgEl("g", { class:"box", id:"box-"+id });
+      const rect = svgEl("rect", {
+        x: n.cx - n.w/2, y: n.cy - n.h/2, width:n.w, height:n.h,
+        rx: 10, fill:n.fill, stroke:n.stroke, "stroke-width":2
+      });
+      g.appendChild(rect);
+      // main label
+      const hasSub = !!n.sub;
+      const subLines = hasSub ? n.sub.split("\n") : [];
+      const lbl = svgEl("text", {
+        x:n.cx, y: hasSub ? n.cy - (subLines.length*6) + 2 : n.cy + 5,
+        "text-anchor":"middle", "font-size": (id==="pa"||id==="pc"||id==="el"||id==="ec") ? 18 : 14,
+        "font-weight":700
+      });
+      lbl.textContent = n.label;
+      g.appendChild(lbl);
+      // sub lines
+      subLines.forEach((line, i) => {
+        const st = svgEl("text", {
+          x:n.cx, y: n.cy + 4 + i*12, "text-anchor":"middle",
+          "font-size":10, fill:"#b8b8d0", "font-weight":400
+        });
+        st.textContent = line;
+        g.appendChild(st);
+      });
+      gBoxes.appendChild(g);
+    }
+  }
+
+  // ---------- packet animation ----------
+  let packetAnim = null;
+  function clearPacket() {
+    if (packetAnim) { cancelAnimationFrame(packetAnim); packetAnim = null; }
+    gPacket.innerHTML = "";
+  }
+  function placePacketAt(node) {
+    clearPacket();
+    if (!node) return;
+    const n = NODES[node];
+    const c = svgEl("circle", { class:"packet", cx:n.cx, cy:n.cy, r:9, fill:"#94a3b8", stroke:"#e2e8f0", "stroke-width":2 });
+    const glow = svgEl("circle", { cx:n.cx, cy:n.cy, r:14, fill:"none", stroke:"#94a3b8", "stroke-width":1.5, opacity:0.4 });
+    gPacket.appendChild(glow); gPacket.appendChild(c);
+    // gentle pulse
+    let t = 0;
+    function pulse() {
+      t += 0.06;
+      const r = 14 + Math.sin(t) * 3;
+      glow.setAttribute("r", r.toFixed(1));
+      glow.setAttribute("opacity", (0.45 - Math.sin(t)*0.15).toFixed(2));
+      packetAnim = requestAnimationFrame(pulse);
+    }
+    pulse();
+  }
+  // animate packet travelling from -> to along the edge, then settle
+  function animatePacket(fromId, toId, color) {
+    clearPacket();
+    const a = NODES[fromId], b = NODES[toId];
+    const p1 = anchor(a, b), p2 = anchor(b, a);
+    const midY = (p1.y + p2.y) / 2;
+    const c = svgEl("circle", { class:"packet", cx:p1.x, cy:p1.y, r:9, fill:color||"#94a3b8", stroke:"#fff", "stroke-width":2 });
+    gPacket.appendChild(c);
+    let prog = 0;
+    function bez(t) {
+      const mt = 1 - t;
+      const x = mt*mt*mt*p1.x + 3*mt*mt*t*p1.x + 3*mt*t*t*p2.x + t*t*t*p2.x;
+      const y = mt*mt*mt*p1.y + 3*mt*mt*t*midY + 3*mt*t*t*midY + t*t*t*p2.y;
+      return { x, y };
+    }
+    function frame() {
+      prog += 0.035;
+      if (prog >= 1) { placePacketAt(toId); return; }
+      const pt = bez(prog);
+      c.setAttribute("cx", pt.x.toFixed(1));
+      c.setAttribute("cy", pt.y.toFixed(1));
+      packetAnim = requestAnimationFrame(frame);
+    }
+    packetAnim = requestAnimationFrame(frame);
+  }
+
+  // ---------- render ----------
+  let cursor = 0;
+  let prevPacket = null;
+
+  function render(animate) {
+    const s = steps[cursor];
+
+    // edges + labels classes
+    for (const e of EDGES) {
+      const el = document.getElementById("edge-"+e.id);
+      el.classList.toggle("active", s.activeEdges.includes(e.id));
+      el.classList.toggle("dim", s.dim.includes(e.id));
+      const lbl = document.getElementById("elbl-"+e.id);
+      if (lbl) lbl.classList.toggle("active", s.activeEdges.includes(e.id));
+    }
+    // boxes
+    for (const id in NODES) {
+      const box = document.getElementById("box-"+id);
+      box.classList.toggle("dim", s.dim.includes(id));
+    }
+
+    // packet
+    const target = s.packet;
+    const branchColor = (target === "el" || target === "pa") ? "#10b981"
+                        : (target === "ec") ? "#3b82f6"
+                        : (target === "pc") ? "#ef4444" : "#94a3b8";
+    if (animate && prevPacket && target && prevPacket !== target) {
+      // figure out an edge from prevPacket to target to animate along
+      const edge = EDGES.find(e => e.from === prevPacket && e.to === target);
+      if (edge) animatePacket(prevPacket, target, branchColor);
+      else placePacketAt(target);
+    } else {
+      placePacketAt(target);
+    }
+    prevPacket = target;
+
+    // vars
+    vCond.textContent = s.vars.cond;
+    vBranch.textContent = s.vars.branch;
+    vSac.textContent = s.vars.sac;
+    vLat.textContent = s.vars.lat;
+
+    // narration
+    narrEl.className = "narration" + (s.narrClass ? " " + s.narrClass : "");
+    narrEl.innerHTML = s.narration;
+
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(true); } }
+  function prev() { if (cursor > 0) { cursor--; render(false); } }
+  function reset() { cursor = 0; prevPacket = null; render(false); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  buildStatic();
+  render(false);
+})();
+</script>
+</body>
+</html>

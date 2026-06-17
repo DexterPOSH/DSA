@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SLA / SLO / SLI — The Error-Budget Walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 64px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  h1 { margin: 0 0 6px; color: #ffffff; font-size: 28px; letter-spacing: -0.5px; }
+  .subtitle { color: #a0a0b8; margin-bottom: 28px; font-size: 15px; }
+  .subtitle code { color: #fbbf24; }
+  .subtitle b { color: #fff; }
+
+  .analogy {
+    background: linear-gradient(135deg, #232344 0%, #2a2a4e 100%);
+    border-left: 4px solid #3b82f6;
+    padding: 18px 22px; border-radius: 8px; margin-bottom: 24px;
+  }
+  .analogy h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; }
+  .analogy p { margin: 0 0 8px; color: #d0d0e0; font-size: 15px; }
+  .analogy p:last-child { margin-bottom: 0; }
+  .analogy b { color: #ffffff; }
+  .analogy .tag { display:inline-block; font-weight:700; border-radius:4px; padding:1px 7px; margin-right:4px; font-size:13px; }
+  .tag.sli { background:#0c3a4a; color:#67e8f9; }
+  .tag.slo { background:#10331f; color:#6ee7b7; }
+  .tag.sla { background:#3a1330; color:#f0abfc; }
+
+  .problem {
+    background: #24243e; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  }
+  .problem .label { color: #8888aa; margin-right: 8px; }
+  .problem code { color: #fbbf24; }
+  .problem .row { margin-bottom: 6px; }
+  .problem .row:last-child { margin-bottom: 0; }
+
+  .stage {
+    background: #24243e; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start;
+  }
+  @media (max-width: 860px) { .stage { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #8888aa; margin: 0 0 14px;
+  }
+
+  /* chart SVG */
+  .chart-holder { display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+  .axis { stroke: #3a3a5c; stroke-width: 1.5; }
+  .gridline { stroke: #2a2a48; stroke-width: 1; }
+  .axis-label { fill: #666680; font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .band-label { font-size: 11px; font-weight: 700; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  /* layered relationship bars */
+  .layer-bar { transition: all .5s ease; }
+  .layer-txt { font-family:-apple-system,sans-serif; font-weight:700; font-size:12px; }
+  .layer-sub { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:10px; fill:#cdd; }
+
+  /* burn-down */
+  .budget-track { fill:#2a1717; stroke:#46303a; stroke-width:1.5; }
+  .budget-fill { transition: all .7s cubic-bezier(.4,0,.2,1); }
+  .slo-line { stroke:#10b981; stroke-width:2; stroke-dasharray:5 4; }
+  .sla-line { stroke:#d946ef; stroke-width:2; stroke-dasharray:5 4; }
+  .sli-dot { transition: all .6s ease; }
+  .sli-path { fill:none; stroke:#22d3ee; stroke-width:2.5; transition: all .6s ease; }
+  .outage-band { fill:#ef4444; opacity:0; transition: opacity .6s ease; }
+
+  /* side panel */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .var { background: #2d2d50; border: 1px solid #3a3a5c; border-radius: 8px; padding: 10px 12px; }
+  .var .label { font-size: 10px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .var .value { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; color: #3b82f6; font-weight: 700; }
+  .var .value.cyan { color: #22d3ee; }
+  .var .value.green { color: #10b981; }
+  .var .value.amber { color: #f59e0b; }
+  .var .value.red { color: #ef4444; }
+  .var .value.magenta { color: #d946ef; }
+
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a0a0b8;
+            background: #1f1f3a; border: 1px solid #3a3a5c; border-radius: 8px; padding: 12px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+  .swatch.dot { border-radius: 50%; }
+  .swatch.dash { width:16px; height:0; border-top:2px dashed; border-radius:0; }
+
+  .narration {
+    background: #1f1f3a; border-left: 3px solid #3b82f6; padding: 14px 18px; border-radius: 4px;
+    font-size: 14px; color: #d0d0e0; min-height: 56px; transition: border-color .3s ease;
+  }
+  .narration.good { border-left-color: #10b981; background: #14321f; }
+  .narration.warn { border-left-color: #f59e0b; background: #332611; }
+  .narration.bad  { border-left-color: #ef4444; background: #2a1717; }
+  .narration code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .narration b { color: #fff; }
+
+  .controls { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 22px 0 8px; flex-wrap: wrap; }
+  button {
+    background: #3b82f6; color: #fff; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500;
+    border-radius: 6px; cursor: pointer; transition: background .15s ease, transform .1s ease; font-family: inherit;
+  }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: #3a3a5c; color: #666680; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid #3a3a5c; color: #a0a0b8; }
+  button.secondary:hover:not(:disabled) { background: #2d2d50; color: #e0e0e0; }
+  .step-indicator { color: #8888aa; font-size: 13px; font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0 8px; }
+
+  /* strictness / contrast */
+  .contrast { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .contrast { grid-template-columns: 1fr; } }
+  .cx { border-radius: 12px; padding: 20px 22px; }
+  .cx.right { background: #14321f; border: 1px solid #10b981; }
+  .cx.wrong { background: #2a1717; border: 1px solid #ef4444; }
+  .cx h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .cx.right h3 { color: #6ee7b7; }
+  .cx.wrong h3 { color: #fca5a5; }
+  .cx .formula { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; color: #fff; margin-bottom: 10px;
+                 background: #00000033; padding: 8px 10px; border-radius: 6px; }
+  .cx p { margin: 6px 0 0; font-size: 13px; color: #c8c8d8; }
+  .cx .big { font-size: 20px; font-weight: 800; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .cx.right .big { color: #10b981; }
+  .cx.wrong .big { color: #ef4444; }
+
+  /* nines table */
+  .nines { margin-top: 32px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .nines h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #2d2d50; }
+  th { color: #8888aa; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+  td { color: #d0d0e0; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  td.nine { color: #fff; font-weight: 700; }
+  tr:last-child td { border-bottom: none; }
+  .nines .note { font-size:12px; color:#8888aa; margin-top:12px; }
+
+  .edge { margin-top: 20px; background: #24243e; border-radius: 12px; padding: 22px 24px; }
+  .edge h3 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #fbbf24; }
+  .edge ul { margin: 0; padding: 0; list-style: none; }
+  .edge li { padding: 9px 0; border-bottom: 1px solid #2d2d50; font-size: 14px; color: #d0d0e0; }
+  .edge li:last-child { border-bottom: none; }
+  .edge li code { background: #2d2d50; color: #fbbf24; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+  .edge li b { color: #fff; }
+
+  .takeaway {
+    margin-top: 20px; background: linear-gradient(135deg, #14321f 0%, #0f2a1a 100%);
+    border-left: 4px solid #10b981; padding: 18px 22px; border-radius: 8px;
+  }
+  .takeaway h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #10b981; }
+  .takeaway p { margin: 0; color: #d0d0e0; font-size: 15px; }
+  .takeaway b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SLA / SLO / SLI — The Error-Budget Walkthrough</h1>
+  <div class="subtitle">Three terms interviewers love to test. <b>SLI</b> is a <i>measured number</i>, <b>SLO</b> is an <i>internal target</i> on that number, and <b>SLA</b> is an <i>external contract</i> with penalties. Watch one service's <code>99.9%</code> availability SLO spend its error budget across a rolling 28-day window — and decide ship-vs-freeze from it.</div>
+
+  <div class="analogy">
+    <h3>Real-world analogy — the "30 minutes or free" pizza shop</h3>
+    <p><span class="tag sli">SLI</span> the <b>stopwatch reading</b> on every order — "what % of today's deliveries arrived under 30 min." Raw measurement, truth as-is.</p>
+    <p><span class="tag slo">SLO</span> the shop's <b>internal target</b> — "we want 95% of deliveries on time." A goal the team works toward; customers get nothing if it slips.</p>
+    <p><span class="tag sla">SLA</span> the <b>printed promise</b> on the box — "late = pizza free." Breaking it costs the shop real money (a refund).</p>
+    <p>Key move: the internal target (SLO) is kept <b>stricter</b> than the public promise (SLA) so one late order never bankrupts the shop. <span class="tag sli">SLI</span> measures, <span class="tag slo">SLO</span> targets, <span class="tag sla">SLA</span> bills — that's the whole exam.</p>
+  </div>
+
+  <div class="problem">
+    <div class="row"><span class="label">SLI:</span><code>availability = good requests / total valid requests</code></div>
+    <div class="row"><span class="label">SLO:</span><code>99.9% availability over a rolling 28-day window</code></div>
+    <div class="row"><span class="label">budget:</span><code>100% − 99.9% = 0.1%  →  0.001 × (28×24×60) = 40,320 min × 0.001 ≈ 40.3 min downtime</code></div>
+    <div class="row"><span class="label">SLA:</span><code>99.5% promised externally (looser) → service credits on breach</code></div>
+  </div>
+
+  <div class="stage">
+    <div class="chart-holder">
+      <svg viewBox="0 0 560 380" id="chart">
+        <!-- title row -->
+        <text class="band-label" x="20" y="22" fill="#8888aa" id="chart-title">SLI &rarr; SLO &rarr; SLA relationship</text>
+
+        <!-- LAYER VIEW (relationship bars) : group toggled -->
+        <g id="layer-view">
+          <!-- 100% reference -->
+          <line class="gridline" x1="170" y1="60"  x2="540" y2="60" />
+          <line class="gridline" x1="170" y1="300" x2="540" y2="300" />
+          <text class="axis-label" x="540" y="56" text-anchor="end">100% perfect</text>
+          <text class="axis-label" x="540" y="316" text-anchor="end">lower = worse</text>
+
+          <!-- SLI bar -->
+          <text class="layer-txt" x="20" y="100" fill="#67e8f9">SLI</text>
+          <text class="layer-sub" x="20" y="116">measured</text>
+          <rect class="layer-bar" id="bar-sli" x="170" y="78" width="0" height="34" rx="5" fill="#22d3ee" />
+          <text class="layer-sub" id="bar-sli-v" x="178" y="100" fill="#06303a" style="font-weight:700">—</text>
+
+          <!-- SLO bar -->
+          <text class="layer-txt" x="20" y="170" fill="#6ee7b7">SLO</text>
+          <text class="layer-sub" x="20" y="186">internal target</text>
+          <rect class="layer-bar" id="bar-slo" x="170" y="148" width="0" height="34" rx="5" fill="#10b981" />
+          <text class="layer-sub" id="bar-slo-v" x="178" y="170" fill="#04241a" style="font-weight:700">—</text>
+
+          <!-- SLA bar -->
+          <text class="layer-txt" x="20" y="240" fill="#f0abfc">SLA</text>
+          <text class="layer-sub" x="20" y="256">external contract</text>
+          <rect class="layer-bar" id="bar-sla" x="170" y="218" width="0" height="34" rx="5" fill="#d946ef" />
+          <text class="layer-sub" id="bar-sla-v" x="178" y="240" fill="#2a0a22" style="font-weight:700">—</text>
+
+          <text class="axis-label" id="strict-note" x="170" y="296" fill="#fbbf24" opacity="0"></text>
+        </g>
+
+        <!-- BURN-DOWN VIEW : 28-day window -->
+        <g id="burn-view" style="display:none">
+          <!-- y axis (budget) -->
+          <line class="axis" x1="60" y1="50" x2="60" y2="300" />
+          <!-- x axis (days) -->
+          <line class="axis" x1="60" y1="300" x2="540" y2="300" />
+          <text class="axis-label" x="300" y="332" text-anchor="middle">28-day rolling window  (day 0 &rarr; day 28)</text>
+          <text class="axis-label" x="14" y="60">100%</text>
+          <text class="axis-label" x="20" y="304">0</text>
+          <text class="axis-label" x="6" y="180" transform="rotate(-90 6 180)" text-anchor="middle">error budget remaining</text>
+
+          <!-- gridlines -->
+          <line class="gridline" x1="60" y1="50"  x2="540" y2="50" />
+          <line class="gridline" x1="60" y1="112" x2="540" y2="112" />
+          <line class="gridline" x1="60" y1="175" x2="540" y2="175" />
+          <line class="gridline" x1="60" y1="237" x2="540" y2="237" />
+
+          <!-- outage shading -->
+          <rect class="outage-band" id="ob1" x="150" y="50" width="40" height="250" />
+          <rect class="outage-band" id="ob2" x="330" y="50" width="70" height="250" />
+
+          <!-- budget area under SLI line -->
+          <path class="budget-fill" id="budget-area" d="" fill="#14321f" opacity="0.55" />
+
+          <!-- SLA floor line (looser, lower) -->
+          <line class="sla-line" id="sla-floor" x1="60" y1="282" x2="540" y2="282" />
+          <text class="band-label" x="540" y="276" text-anchor="end" fill="#d946ef" id="sla-lbl" opacity="0">SLA 99.5% floor (breach = refund)</text>
+
+          <!-- SLO line (target) -->
+          <line class="slo-line" id="slo-line" x1="60" y1="50" x2="540" y2="50" />
+          <text class="band-label" x="64" y="44" fill="#10b981" id="slo-lbl" opacity="0">SLO 99.9% target — budget = 100%</text>
+
+          <!-- SLI burn path + cursor dot -->
+          <path class="sli-path" id="sli-line" d="" />
+          <circle class="sli-dot" id="sli-cursor" cx="60" cy="50" r="6" fill="#22d3ee" stroke="#1a1a2e" stroke-width="2" opacity="0" />
+
+          <!-- freeze gate marker -->
+          <g id="freeze-gate" opacity="0">
+            <line x1="400" y1="50" x2="400" y2="300" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="3 3" />
+            <rect x="406" y="120" width="120" height="46" rx="6" fill="#332611" stroke="#f59e0b" />
+            <text x="466" y="139" text-anchor="middle" class="band-label" fill="#fbbf24">budget &lt; 0 ?</text>
+            <text x="466" y="156" text-anchor="middle" class="layer-sub" fill="#fbbf24" style="fill:#fbbf24">FEATURE FREEZE</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="side">
+      <div class="vars">
+        <div class="var"><div class="label">SLI now</div><div class="value cyan" id="v-sli">—</div></div>
+        <div class="var"><div class="label">SLO target</div><div class="value green" id="v-slo">99.9%</div></div>
+        <div class="var"><div class="label">Budget left</div><div class="value amber" id="v-budget">40.3 min</div></div>
+        <div class="var"><div class="label">SLA floor</div><div class="value magenta" id="v-sla">99.5%</div></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch dot" style="background:#22d3ee"></span>SLI — measured availability</div>
+        <div class="legend-item"><span class="swatch dash" style="border-color:#10b981"></span>SLO — internal target (99.9%)</div>
+        <div class="legend-item"><span class="swatch dash" style="border-color:#d946ef"></span>SLA — external floor (99.5%)</div>
+        <div class="legend-item"><span class="swatch" style="background:#14321f;border:1px solid #10b981"></span>Error budget remaining</div>
+        <div class="legend-item"><span class="swatch" style="background:#ef4444"></span>Outage — budget burning</div>
+        <div class="legend-item"><span class="swatch" style="background:#332611;border:1px solid #f59e0b"></span>Ship vs freeze decision gate</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration" id="narration">Press <b>Next</b> to line up the three terms and see why SLO must sit between reality and the SLA.</div>
+
+  <div class="controls">
+    <button id="btn-prev" class="secondary">&larr; Back</button>
+    <span class="step-indicator" id="step-indicator">step 0 / 0</span>
+    <button id="btn-next">Next &rarr;</button>
+    <button id="btn-reset" class="secondary">Reset</button>
+  </div>
+
+  <div class="contrast">
+    <div class="cx right">
+      <h3>SLO stricter than SLA ✓</h3>
+      <div class="formula">SLI ≈ 99.95% &nbsp;≥&nbsp; SLO 99.9% &gt; SLA 99.5%</div>
+      <p>The internal target sits <b>above</b> the public promise. The <span class="big">~0.4% gap</span> is a deliberate buffer: you can miss your own SLO, alarm internally, freeze features — and <b>still never owe a refund</b>. SLA missed = money out the door; SLO missed = an internal alarm only.</p>
+    </div>
+    <div class="cx wrong">
+      <h3>SLA tighter than SLO ✗</h3>
+      <div class="formula">SLA 99.99% &gt; SLO 99.9%  (inverted!)</div>
+      <p>If you promise customers <b>more</b> than you target internally, you are designed to <span class="big">pay penalties</span> on every normal SLO slip. Also fatal: setting <b>SLO = 100%</b> — error budget becomes zero, nobody can ever deploy, and cost goes infinite.</p>
+    </div>
+  </div>
+
+  <div class="nines">
+    <h3>"How many nines?" — every extra nine ≈ 10× the cost</h3>
+    <table>
+      <thead><tr><th>SLO</th><th>Downtime / month</th><th>Downtime / year</th><th>Typical use</th></tr></thead>
+      <tbody>
+        <tr><td class="nine">99% &nbsp;(two)</td><td>~7.2 hours</td><td>~3.65 days</td><td>internal / non-critical</td></tr>
+        <tr><td class="nine">99.9% &nbsp;(three)</td><td>~43 min</td><td>~8.76 hours</td><td>most internal services</td></tr>
+        <tr><td class="nine">99.99% &nbsp;(four)</td><td>~4.3 min</td><td>~52.6 min</td><td>critical revenue path</td></tr>
+        <tr><td class="nine">99.999% &nbsp;(five)</td><td>~26 sec</td><td>~5.26 min</td><td>telephony / payments core</td></tr>
+      </tbody>
+    </table>
+    <div class="note">Interview move: don't say "five nines" reflexively. Pick the <b>lowest</b> SLO users tolerate — if nobody complains at 99.9%, paying for 99.99% is wasted money.</div>
+  </div>
+
+  <div class="edge">
+    <h3>Things to know in the interview</h3>
+    <ul>
+      <li><b>Direction of strictness</b> is the whole game: <code>SLI (reality) ≈/≥ SLO (internal) &gt; SLA (external)</code>. SLA must always be <b>looser</b> than SLO — that buffer is non-negotiable.</li>
+      <li><b>Error budget is meant to be spent.</b> <code>budget = 100% − SLO</code>. A full budget means you're shipping too cautiously; spend it on risky-but-valuable launches. It's a currency, not a punishment quota.</li>
+      <li><b>Burn-rate alerting beats fixed thresholds</b> — page when "budget is burning 5% in 2 hours," because it's SLO-aware instead of a blind error-count threshold.</li>
+      <li><b>Measure with percentiles, never averages.</b> "Avg latency 50ms" hides the tail; <code>p99</code> tells you what the worst 1% (often your revenue-critical users) actually feel.</li>
+      <li><b>Window choice matters.</b> A 1-day window is noisy (one incident eats it all); a 28/30-day <b>rolling</b> window is smoother and doesn't snap-reset at a calendar boundary.</li>
+      <li><b>Denominator hygiene</b> — exclude health-check traffic (it inflates the number); decide carefully whether 4xx client errors count against you.</li>
+      <li><b>Compose dependencies serially:</b> two services in a chain → <code>0.999 × 0.999 = 0.998</code>. Your SLO can't exceed what you depend on.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p><b>SLI = the measured number, SLO = your internal target on it, SLA = the external promise with penalties.</b> Keep them ordered <b>reality ≥ SLO &gt; SLA</b>, turn the gap below 100% into an <b>error budget</b> (<code>100% − SLO</code>), and let that budget be the objective referee for "ship fast" vs "freeze and stabilise" — instead of opinions.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- geometry for burn chart ----------
+  const X0 = 60, X1 = 540, Y_TOP = 50, Y_BOT = 300;   // budget 100% at top, 0% at bottom
+  const days = 28;
+  function xAt(d) { return X0 + (X1 - X0) * (d / days); }
+  function yAt(budgetFrac) { return Y_BOT - (Y_BOT - Y_TOP) * budgetFrac; } // 1 -> top, 0 -> bottom
+
+  // budget burn-down samples: {day, budget(0..1)} — budget = remaining fraction of the 0.1% allowance.
+  // Two outages: small dip ~day 8, big dip ~day 16 that pushes below the freeze line.
+  const burn = [
+    {d:0,  b:1.00}, {d:4, b:0.93}, {d:8, b:0.55}, {d:11, b:0.50},
+    {d:14, b:0.46}, {d:16, b:0.12}, {d:18, b:0.02}, {d:21, b:-0.06},
+    {d:24, b:-0.06}, {d:28, b:0.10}
+  ];
+  function clampY(b){ return yAt(Math.max(-0.1, Math.min(1, b))); }
+
+  // SLI availability shown in side panel, tracking the burn (closer to 99.9 as budget drains)
+  // budget 1.0 -> 100% (no errors yet), budget 0 -> exactly 99.9, negative -> below 99.9
+  function sliFromBudget(b){
+    // allowance is 0.1%. used = (1-b)*0.1%. availability = 100 - used
+    const used = (1 - b) * 0.1;
+    return 100 - used;
+  }
+  function budgetMin(b){ return (40.3 * b).toFixed(1); }
+
+  // ---------- steps ----------
+  const steps = [
+    {
+      view:"layer",
+      sli: 99.95, slo: 99.9, sla: 99.5, strict:false,
+      title:"SLI → SLO → SLA relationship",
+      narr:`<b>1. Three different things, one stack.</b> The <b style="color:#67e8f9">SLI</b> is whatever your monitoring actually measures right now — here availability is <code>99.95%</code>. It's just a number, the raw truth. We'll set a target on it next.`,
+      cls:""
+    },
+    {
+      view:"layer",
+      sli: 99.95, slo: 99.9, sla: 99.5, strict:false, showSlo:true,
+      title:"SLI → SLO → SLA relationship",
+      narr:`<b>2. SLO — the internal target.</b> We pick <code>99.9% over a rolling 28-day window</code> as the goal the team commits to. It sits a hair <i>below</i> measured reality — achievable, but tight enough to mean something. Penalty-free: missing it triggers an <i>internal</i> alarm, not a refund.`,
+      cls:"good"
+    },
+    {
+      view:"layer",
+      sli: 99.95, slo: 99.9, sla: 99.5, strict:true, showSlo:true, showSla:true,
+      title:"SLI → SLO → SLA relationship",
+      narr:`<b>3. SLA — the external contract, kept LOOSER.</b> The public promise is only <code>99.5%</code> — deliberately below the <code>99.9%</code> SLO. That <b>0.4% buffer</b> means you can blow your own target, scramble internally, and <i>still</i> owe customers nothing. <b>reality ≥ SLO &gt; SLA</b> — memorise that ordering.`,
+      cls:"good"
+    },
+    {
+      view:"burn", phase:0,
+      title:"Error budget = 100% − SLO",
+      narr:`<b>4. Turn the SLO into an error budget.</b> <code>100% − 99.9% = 0.1%</code> of allowed failure. Over a 28-day window that's <code>0.001 × 40,320 min ≈ 40.3 min</code> of downtime you're <i>permitted</i> to spend. Start of window: budget is <b>full (100%)</b>.`,
+      cls:""
+    },
+    {
+      view:"burn", phase:1,
+      title:"Error budget burn-down (28 days)",
+      narr:`<b>5. Normal traffic + a small outage.</b> Every error nibbles the budget. A brief incident around day 8 drains it to ~<b>55%</b> (~22 min left). Still healthy — the team keeps <b>shipping features</b> and taking risky deploys. The budget is currency, and it's fine to spend it.`,
+      cls:"good"
+    },
+    {
+      view:"burn", phase:2,
+      title:"Error budget burn-down (28 days)",
+      narr:`<b>6. A big outage blows the budget.</b> A multi-hour incident around day 16 burns most of what's left; by day 18 only ~<b>2%</b> remains and the SLI line is sinking toward the <code>99.9%</code> SLO floor. Burn-rate alerts have already paged on-call.`,
+      cls:"warn"
+    },
+    {
+      view:"burn", phase:3,
+      title:"Decision gate: ship vs freeze",
+      narr:`<b>7. Budget exhausted → FEATURE FREEZE.</b> Past day 21 the budget goes <b>negative</b> — the SLO is violated for this window. The gate flips: <b>no risky launches, reliability work only</b> until the rolling window heals. Crucially the SLI never fell to the <code>99.5%</code> <b style="color:#f0abfc">SLA</b> floor — internal pain, but <b>no customer refund</b>.`,
+      cls:"bad"
+    },
+    {
+      view:"burn", phase:4,
+      title:"Rolling window recovers",
+      narr:`<b>8. The window rolls forward.</b> As old bad days fall out of the trailing 28-day window, budget <b>regenerates</b> (~10% by day 28) and the freeze lifts. This is why a <i>rolling</i> window beats a calendar month — recovery is gradual, not a sudden boundary reset. Back to shipping.`,
+      cls:"good"
+    }
+  ];
+
+  // ---------- DOM ----------
+  const layerView = document.getElementById("layer-view");
+  const burnView  = document.getElementById("burn-view");
+  const chartTitle= document.getElementById("chart-title");
+  const narrEl = document.getElementById("narration");
+  const stepEl = document.getElementById("step-indicator");
+
+  const barSli = document.getElementById("bar-sli"), barSliV = document.getElementById("bar-sli-v");
+  const barSlo = document.getElementById("bar-slo"), barSloV = document.getElementById("bar-slo-v");
+  const barSla = document.getElementById("bar-sla"), barSlaV = document.getElementById("bar-sla-v");
+  const strictNote = document.getElementById("strict-note");
+
+  const budgetArea = document.getElementById("budget-area");
+  const sliLine = document.getElementById("sli-line");
+  const sliCursor = document.getElementById("sli-cursor");
+  const sloLbl = document.getElementById("slo-lbl");
+  const slaLbl = document.getElementById("sla-lbl");
+  const freezeGate = document.getElementById("freeze-gate");
+  const ob1 = document.getElementById("ob1"), ob2 = document.getElementById("ob2");
+
+  const vSli = document.getElementById("v-sli");
+  const vSlo = document.getElementById("v-slo");
+  const vBudget = document.getElementById("v-budget");
+  const vSla = document.getElementById("v-sla");
+
+  const btnNext = document.getElementById("btn-next");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnReset= document.getElementById("btn-reset");
+
+  // map a percentage in [99.0,100] to bar width (bars area 170..540 = 370px)
+  const BAR_X = 170, BAR_W = 370, P_LO = 99.0, P_HI = 100;
+  function barWidth(pct){ return BAR_W * (pct - P_LO) / (P_HI - P_LO); }
+
+  let cursor = 0;
+
+  // build path for burn-down up to a given last-day index
+  function burnUpTo(maxDay) {
+    const pts = burn.filter(p => p.d <= maxDay + 0.001);
+    if (pts.length === 0) return {line:"", area:"", last:null};
+    let line = `M ${xAt(pts[0].d)} ${clampY(pts[0].b)}`;
+    for (let i = 1; i < pts.length; i++) line += ` L ${xAt(pts[i].d)} ${clampY(pts[i].b)}`;
+    const last = pts[pts.length - 1];
+    // area: down to axis baseline
+    let area = `M ${xAt(pts[0].d)} ${Y_BOT} L ${xAt(pts[0].d)} ${clampY(pts[0].b)}`;
+    for (let i = 1; i < pts.length; i++) area += ` L ${xAt(pts[i].d)} ${clampY(pts[i].b)}`;
+    area += ` L ${xAt(last.d)} ${Y_BOT} Z`;
+    return {line, area, last};
+  }
+
+  function render() {
+    const s = steps[cursor];
+    chartTitle.textContent = s.title;
+
+    if (s.view === "layer") {
+      layerView.style.display = "";
+      burnView.style.display = "none";
+
+      // SLI always shown
+      barSli.setAttribute("width", barWidth(s.sli));
+      barSliV.textContent = s.sli.toFixed(2) + "%";
+      vSli.textContent = s.sli.toFixed(2) + "%";
+
+      // SLO
+      if (s.showSlo) {
+        barSlo.setAttribute("width", barWidth(s.slo));
+        barSloV.textContent = s.slo.toFixed(1) + "%";
+      } else {
+        barSlo.setAttribute("width", 0); barSloV.textContent = "—";
+      }
+      // SLA
+      if (s.showSla) {
+        barSla.setAttribute("width", barWidth(s.sla));
+        barSlaV.textContent = s.sla.toFixed(1) + "%";
+      } else {
+        barSla.setAttribute("width", 0); barSlaV.textContent = "—";
+      }
+
+      if (s.strict) {
+        strictNote.setAttribute("opacity", 1);
+        strictNote.textContent = "stricter ↑  reality ≥ SLO > SLA  ↓ looser";
+      } else {
+        strictNote.setAttribute("opacity", 0);
+      }
+
+      vSlo.textContent = "99.9%";
+      vBudget.textContent = "40.3 min";
+      vSla.textContent = "99.5%";
+
+    } else {
+      // burn view
+      layerView.style.display = "none";
+      burnView.style.display = "";
+
+      // SLO line at top (budget=100% reference), SLA floor near bottom
+      sloLbl.setAttribute("opacity", 1);
+      // reveal SLA floor + gate progressively
+      slaLbl.setAttribute("opacity", s.phase >= 3 ? 1 : (s.phase >= 1 ? 0.6 : 0));
+      document.getElementById("sla-floor").setAttribute("opacity", s.phase >= 1 ? 1 : 0.25);
+
+      // outage shading appears with phases
+      ob1.style.opacity = s.phase >= 1 ? 0.18 : 0;
+      ob2.style.opacity = s.phase >= 2 ? 0.20 : 0;
+
+      // freeze gate visible from phase 3
+      freezeGate.setAttribute("opacity", s.phase >= 3 ? 1 : 0);
+
+      // how far along the window we draw
+      let maxDay;
+      if (s.phase === 0) maxDay = 0;
+      else if (s.phase === 1) maxDay = 11;
+      else if (s.phase === 2) maxDay = 18;
+      else if (s.phase === 3) maxDay = 24;
+      else maxDay = 28;
+
+      const {line, area, last} = burnUpTo(maxDay);
+      sliLine.setAttribute("d", line);
+      budgetArea.setAttribute("d", area);
+
+      if (last) {
+        sliCursor.setAttribute("opacity", 1);
+        sliCursor.setAttribute("cx", xAt(last.d));
+        sliCursor.setAttribute("cy", clampY(last.b));
+        // colour cursor by health
+        const col = last.b < 0 ? "#ef4444" : (last.b < 0.2 ? "#f59e0b" : "#22d3ee");
+        sliCursor.setAttribute("fill", col);
+        sliLine.style.stroke = col;
+
+        // side panel numbers
+        const av = sliFromBudget(last.b);
+        vSli.textContent = av.toFixed(3) + "%";
+        const bmin = Math.max(0, 40.3 * last.b);
+        vBudget.textContent = (last.b < 0 ? "0 (over)" : bmin.toFixed(1) + " min");
+        vBudget.parentElement.querySelector(".value").className =
+          "value " + (last.b < 0 ? "red" : (last.b < 0.2 ? "amber" : "green"));
+      } else {
+        sliCursor.setAttribute("opacity", 0);
+        vSli.textContent = "100%";
+        vBudget.textContent = "40.3 min";
+      }
+      vSlo.textContent = "99.9%";
+      vSla.textContent = "99.5%";
+    }
+
+    narrEl.className = "narration" + (s.cls ? " " + s.cls : "");
+    narrEl.innerHTML = s.narr;
+    stepEl.textContent = `step ${cursor} / ${steps.length - 1}`;
+    btnPrev.disabled = cursor === 0;
+    btnNext.disabled = cursor === steps.length - 1;
+  }
+
+  function next() { if (cursor < steps.length - 1) { cursor++; render(); } }
+  function prev() { if (cursor > 0) { cursor--; render(); } }
+  function reset() { cursor = 0; render(); }
+
+  btnNext.addEventListener("click", next);
+  btnPrev.addEventListener("click", prev);
+  btnReset.addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") next();
+    else if (e.key === "ArrowLeft") prev();
+    else if (e.key === "r" || e.key === "R") reset();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

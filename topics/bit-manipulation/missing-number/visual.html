@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Missing Number — XOR cancels every pair, leaving the gap</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(59,130,246,0.08));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .card {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 22px 24px 26px;
+    margin-bottom: 26px;
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 6px 22px rgba(0,0,0,0.28);
+  }
+  .section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; }
+  code { background: var(--panel2); padding: 1px 7px; border-radius: 5px; color: #ffd479; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  .step-desc {
+    background: var(--panel2);
+    border-left: 4px solid var(--blue);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-height: 70px;
+    margin-bottom: 22px;
+    font-size: 1.02rem;
+  }
+
+  /* accumulator + operand registers */
+  .registers { display: flex; flex-direction: column; gap: 16px; margin-bottom: 8px; }
+  .reg { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .reg-label {
+    width: 132px; flex: 0 0 auto;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 0.92rem; color: var(--muted);
+  }
+  .reg-label b { color: var(--text); }
+  .reg-dec {
+    width: 54px; flex: 0 0 auto; text-align: center;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 1.25rem; font-weight: 700; color: var(--text);
+  }
+
+  /* bit cells */
+  .bits { display: flex; gap: 6px; }
+  .bit {
+    width: 38px; height: 42px;
+    border-radius: 7px;
+    display: grid; place-items: center;
+    font-family: "SF Mono", Menlo, monospace;
+    font-weight: 700; font-size: 1.15rem;
+    background: var(--panel2);
+    border: 2px solid rgba(255,255,255,0.12);
+    color: #6b7299;
+    transition: all .3s ease;
+  }
+  .bit.one { background: rgba(59,130,246,0.22); border-color: var(--blue); color: #bcd4ff; }
+  .acc .bit.one { background: rgba(16,185,129,0.20); border-color: var(--green); color: #b6f0d8; }
+  .bit.toggle { animation: flip .45s ease; box-shadow: 0 0 0 3px rgba(245,158,11,0.45); border-color: var(--amber); }
+  @keyframes flip {
+    0% { transform: rotateX(0deg); }
+    50% { transform: rotateX(90deg); }
+    100% { transform: rotateX(0deg); }
+  }
+  .acc-wrap { margin-top: 20px; padding-top: 18px; border-top: 1px dashed rgba(255,255,255,0.14); }
+
+  .calc-line {
+    margin-top: 16px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 1.0rem;
+    min-height: 26px;
+    color: var(--green);
+  }
+  .calc-line .src { color: var(--amber); }
+  .calc-line .res { color: var(--blue); font-weight: 700; }
+
+  .result-badge {
+    margin-top: 18px; display: none;
+    background: rgba(16,185,129,0.15);
+    border: 1px solid var(--green);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-weight: 700;
+    font-family: "SF Mono", Menlo, monospace;
+    color: #b6f0d8;
+  }
+  .result-badge.show { display: inline-block; }
+
+  .controls { display: flex; align-items: center; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 10px 22px; border-radius: 9px;
+    font-size: 0.98rem; font-weight: 600; cursor: pointer;
+    transition: transform .12s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #34345e; }
+  .step-counter { margin-left: auto; color: var(--muted); font-size: 0.9rem; font-family: "SF Mono", monospace; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 4px 0 18px; font-size: 0.85rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .dot.b { background: var(--blue); } .dot.g { background: var(--green); } .dot.a { background: var(--amber); }
+
+  .code-block {
+    background: #11111f; border-radius: 12px; padding: 18px 20px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.9rem;
+    line-height: 1.7; overflow-x: auto; margin-top: 6px;
+    border: 1px solid rgba(255,255,255,0.06); white-space: pre;
+  }
+  .kw { color: #c792ea; } .fn { color: #82aaff; } .cm { color: #5a6a90; } .num { color: #f78c6c; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px; padding: 18px 22px; margin-top: 30px;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Missing Number — <span>XOR</span> cancels every pair, leaving the gap</h1>
+  <p class="subtitle">Array <b>[3, 0, 1]</b>, range <b>[0, 3]</b>. We XOR every index and value into one accumulator; the missing <b>2</b> survives.</p>
+
+  <div class="analogy">
+    <h3>🔁 Real-world analogy</h3>
+    <p>Har expected number ek <b>light switch</b> hai. Index 0..n ko ek baar flip karo, phir present values ko dobara flip. Jo number dono jagah aaya wo do baar flip hua → off. Sirf <b>missing number</b> ek baar flip hua → on reh gaya.</p>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Step description</div>
+    <div class="step-desc" id="stepDesc">Press <b>Next →</b>. We seed the accumulator with <code>n = 3</code>, then fold in each <code>i ^ nums[i]</code>.</div>
+
+    <div class="legend">
+      <span><i class="dot b"></i> operand bit = 1</span>
+      <span><i class="dot g"></i> accumulator bit = 1</span>
+      <span><i class="dot a"></i> bit flipped this step</span>
+    </div>
+
+    <div class="registers">
+      <div class="reg" id="regIndex">
+        <div class="reg-label">index <b>i</b></div>
+        <div class="reg-dec" id="iDec">·</div>
+        <div class="bits" id="iBits"></div>
+      </div>
+      <div class="reg" id="regVal">
+        <div class="reg-label">value <b>nums[i]</b></div>
+        <div class="reg-dec" id="vDec">·</div>
+        <div class="bits" id="vBits"></div>
+      </div>
+    </div>
+
+    <div class="acc-wrap">
+      <div class="reg acc">
+        <div class="reg-label">accumulator <b>res</b></div>
+        <div class="reg-dec" id="accDec">3</div>
+        <div class="bits" id="accBits"></div>
+      </div>
+    </div>
+
+    <div class="calc-line" id="calcLine"></div>
+    <div class="result-badge" id="resultBadge"></div>
+
+    <div class="controls">
+      <button class="ghost" id="prevBtn" onclick="prev()">← Prev</button>
+      <button id="nextBtn" onclick="next()">Next →</button>
+      <button class="ghost" id="resetBtn" onclick="reset()">↺ Reset</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="section-label">The whole algorithm</div>
+  <div class="code-block"><span class="kw">def</span> <span class="fn">missing_number</span>(nums):
+    res = <span class="fn">len</span>(nums)              <span class="cm"># seed with n (top of range)</span>
+    <span class="kw">for</span> i, num <span class="kw">in</span> <span class="fn">enumerate</span>(nums):
+        res ^= i ^ num            <span class="cm"># matching index/value pairs cancel</span>
+    <span class="kw">return</span> res</div>
+
+  <div class="takeaway">
+    <h3>💡 Key takeaway</h3>
+    <p>Every value that appears as <i>both</i> an index and a number gets XORed twice → it cancels to 0. The one number that is only an index (never a value) is XORed an odd number of times and survives. <b>O(n) time, O(1) space, no overflow.</b></p>
+  </div>
+</div>
+
+<script>
+  const nums = [3, 0, 1];
+  const n = nums.length;            // 3
+  const WIDTH = 3;                   // bits to show (covers 0..7)
+
+  // Build the step list. Each step folds one term into the accumulator.
+  // term = i ^ nums[i]. We seed res = n first (a standalone "seed" step).
+  const steps = [];
+  steps.push({ type: 'seed', val: n });
+  for (let i = 0; i < n; i++) {
+    steps.push({ type: 'fold', i: i, num: nums[i] });
+  }
+  steps.push({ type: 'done' });
+
+  // Precompute accumulator value after each step.
+  function accAfter(stepIdx) {
+    let res = n;
+    for (let s = 1; s <= stepIdx; s++) {
+      const st = steps[s];
+      if (st.type === 'fold') res ^= (st.i ^ st.num);
+    }
+    return res;
+  }
+
+  const $ = id => document.getElementById(id);
+  const bitsOf = v => {
+    const arr = [];
+    for (let b = WIDTH - 1; b >= 0; b--) arr.push((v >> b) & 1);
+    return arr; // MSB first
+  };
+
+  function renderBitRow(container, val, klass, prevVal) {
+    const bits = bitsOf(val);
+    const prevBits = prevVal == null ? null : bitsOf(prevVal);
+    container.innerHTML = bits.map((bit, idx) => {
+      let c = 'bit';
+      if (bit === 1) c += ' one';
+      if (prevBits && prevBits[idx] !== bit) c += ' toggle';
+      return `<div class="${c}">${bit}</div>`;
+    }).join('');
+  }
+
+  let cur = 0; // 0 => nothing applied
+
+  function render() {
+    const accBits = $('accBits'), iBits = $('iBits'), vBits = $('vBits');
+    const stepDesc = $('stepDesc'), calcLine = $('calcLine'), resultBadge = $('resultBadge');
+    calcLine.innerHTML = '';
+    resultBadge.classList.remove('show');
+
+    if (cur === 0) {
+      $('iDec').textContent = '·'; $('vDec').textContent = '·';
+      renderBitRow(iBits, 0, ''); renderBitRow(vBits, 0, '');
+      // clear operand highlight
+      iBits.querySelectorAll('.bit').forEach(b => b.className = 'bit');
+      vBits.querySelectorAll('.bit').forEach(b => b.className = 'bit');
+      $('accDec').textContent = n;
+      renderBitRow(accBits, n, 'acc');
+      stepDesc.innerHTML = 'Press <b>Next →</b>. We seed the accumulator with <code>n = 3</code>, then fold in each <code>i ^ nums[i]</code>.';
+      counterAndButtons();
+      return;
+    }
+
+    const active = steps[cur];
+    const accNow = accAfter(cur);
+
+    if (active.type === 'seed') {
+      $('iDec').textContent = '·'; $('vDec').textContent = '·';
+      renderBitRow(iBits, 0, ''); renderBitRow(vBits, 0, '');
+      $('accDec').textContent = active.val;
+      renderBitRow(accBits, active.val, 'acc', 0);
+      stepDesc.innerHTML =
+        `<b>Seed:</b> <code>res = n = ${n}</code>. Index loop sirf <code>0..n-1</code> tak jaata hai, ` +
+        `to range ka top value <b>${n}</b> ko manually daalna padta hai.`;
+      calcLine.innerHTML = `res = <span class="res">${active.val}</span>`;
+    } else if (active.type === 'fold') {
+      const term = active.i ^ active.num;
+      const accPrev = accAfter(cur - 1);
+      $('iDec').textContent = active.i;
+      $('vDec').textContent = active.num;
+      renderBitRow(iBits, active.i, ''); renderBitRow(vBits, active.num, '');
+      $('accDec').textContent = accNow;
+      renderBitRow(accBits, accNow, 'acc', accPrev);
+      stepDesc.innerHTML =
+        `<b>Fold index ${active.i}:</b> compute <code>${active.i} ^ ${active.num} = ${term}</code>, ` +
+        `then <code>res ^= ${term}</code>. Amber cells dikhate hain kaun se accumulator bits is step me flip hue.`;
+      calcLine.innerHTML =
+        `res = <span class="src">${accPrev}</span> ^ (<span class="src">${active.i}</span> ^ <span class="src">${active.num}</span>) ` +
+        `= <span class="src">${accPrev}</span> ^ <span class="src">${term}</span> = <span class="res">${accNow}</span>`;
+    } else if (active.type === 'done') {
+      $('iDec').textContent = '·'; $('vDec').textContent = '·';
+      renderBitRow(iBits, 0, ''); renderBitRow(vBits, 0, '');
+      $('accDec').textContent = accNow;
+      renderBitRow(accBits, accNow, 'acc');
+      stepDesc.innerHTML =
+        `<b>Done!</b> Numbers 0, 1, 3 har ek do baar XOR hue (ek index ke roop me, ek value ke roop me) → cancel. ` +
+        `Sirf <b>2</b> bacha — wahi missing number hai.`;
+      resultBadge.textContent = `return res = ${accNow}`;
+      resultBadge.classList.add('show');
+    }
+    counterAndButtons();
+  }
+
+  function counterAndButtons() {
+    $('stepCounter').textContent = `Step ${cur} / ${steps.length - 1}`;
+    $('prevBtn').disabled = cur === 0;
+    $('nextBtn').disabled = cur === steps.length - 1;
+  }
+
+  function next() { if (cur < steps.length - 1) cur++; render(); }
+  function prev() { if (cur > 0) cur--; render(); }
+  function reset() { cur = 0; render(); }
+
+  render();
+</script>
+</body>
+</html>

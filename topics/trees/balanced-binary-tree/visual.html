@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Balanced Binary Tree — Heights Up, -1 Signals Imbalance</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #232342;
+    --text: #e0e0e0; --muted: #9a9ac0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444; --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg);
+    color: var(--text); line-height: 1.6; padding: 32px 20px 80px; }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.72rem; margin: 0 0 6px; font-weight: 700; }
+  h1 span { color: var(--red); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.0rem; }
+  .analogy { background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(239,68,68,0.10));
+    border: 1px solid rgba(245,158,11,0.4); border-left: 5px solid var(--amber);
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 26px; }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; font-size: .96rem; }
+  .stage { background: var(--panel); border-radius: 14px; padding: 20px 24px 26px;
+    border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+  .svg-wrap { width: 100%; display: flex; justify-content: center; }
+  svg { width: 100%; max-width: 560px; height: auto; }
+  .edge { stroke: #44446a; stroke-width: 3; transition: stroke .4s, stroke-width .4s; }
+  .edge.active { stroke: var(--blue); stroke-width: 4.5; }
+  .edge.bad { stroke: var(--red); stroke-width: 4.5; }
+  .node-circle { fill: var(--panel2); stroke: #44446a; stroke-width: 2.5; transition: fill .4s, stroke .4s; }
+  .node-circle.active { fill: rgba(59,130,246,0.35); stroke: var(--blue); }
+  .node-circle.returned { fill: rgba(16,185,129,0.26); stroke: var(--green); }
+  .node-circle.bad { fill: rgba(239,68,68,0.4); stroke: var(--red); }
+  .node-text { fill: var(--text); font-weight: 700; font-size: 16px;
+    font-family: 'Segoe UI', monospace; text-anchor: middle; dominant-baseline: central; }
+  .h-badge { font-weight: 700; font-size: 13px; font-family: "SF Mono", Menlo, monospace; text-anchor: middle; }
+  .h-badge.ok { fill: var(--amber); } .h-badge.bad { fill: var(--red); }
+  .h-badge-bg { fill: #2c2c52; stroke-width: 1.5; }
+  .h-badge-bg.ok { stroke: var(--amber); } .h-badge-bg.bad { stroke: var(--red); }
+  .caption { margin-top: 12px; background: var(--panel2); border-radius: 10px; padding: 14px 18px;
+    border-left: 4px solid var(--blue); font-size: .97rem; min-height: 60px; }
+  .caption .lbl { color: var(--amber); font-weight: 700; }
+  .caption .er { color: var(--red); font-weight: 700; }
+  .caption code, .stage code { background: #2c2c52; padding: 1px 6px; border-radius: 5px;
+    color: #ffd479; font-family: "SF Mono", Menlo, monospace; }
+  .controls { text-align: center; margin: 22px 0 6px; }
+  button { background: var(--blue); color: #fff; border: none; padding: 11px 24px;
+    border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s; }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .stepcount { color: var(--muted); margin: 0 12px; font-variant-numeric: tabular-nums; font-size: .95rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin: 18px 0 0; font-size: .82rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; }
+  .dot.blue { background: var(--blue); } .dot.amber { background: var(--amber); }
+  .dot.green { background: var(--green); } .dot.red { background: var(--red); }
+  .takeaway { background: linear-gradient(135deg, rgba(239,68,68,0.13), rgba(245,158,11,0.12));
+    border: 1px solid rgba(245,158,11,0.4); border-radius: 12px; padding: 18px 24px; margin-top: 30px; text-align: center; }
+  .takeaway h3 { margin: 0 0 6px; color: var(--amber); }
+  .takeaway p { margin: 0; font-size: 1.04rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Balanced Binary Tree — <span>-1 propagates the moment imbalance is found</span></h1>
+  <p class="subtitle">Bottom-up DFS returns a node's height, or <code>-1</code> if any node below is unbalanced (<code>|leftH − rightH| > 1</code>).</p>
+
+  <div class="analogy">
+    <h3>🎐 Hanging mobile sculpture</h3>
+    <p>Har joint pe dono taraf ki lambai lagbhag barabar honi chahiye. Ek bhi joint imbalanced (ek side 2+ level gehri) → poori sculpture tedhi. Hum neeche se heights compute karke <b>-1</b> ka flag upar bhej dete hain.</p>
+  </div>
+
+  <div class="stage">
+    <div class="svg-wrap">
+      <svg id="tree" viewBox="0 0 560 330" aria-label="binary tree"></svg>
+    </div>
+    <div class="caption" id="caption">Press <b>Next</b> to run the bottom-up check.</div>
+    <div class="controls">
+      <button class="ghost" id="prevBtn" disabled>◀ Prev</button>
+      <span class="stepcount" id="stepcount">Step 0 / 0</span>
+      <button id="nextBtn">Next ▶</button>
+    </div>
+    <div class="legend">
+      <span><i class="dot blue"></i> visiting</span>
+      <span><i class="dot amber"></i> returned height</span>
+      <span><i class="dot red"></i> unbalanced → -1</span>
+      <span><i class="dot green"></i> balanced subtree</span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Encode "unbalanced" as a sentinel <code>-1</code> height — once it appears, every parent short-circuits and returns <code>-1</code> too. One O(n) pass, no recomputed heights.</p>
+  </div>
+</div>
+
+<script>
+// Unbalanced tree:        1
+//                      2       3      (3 is a leaf -> right side shallow)
+//                    4   5
+//                  6
+//   Heights: 6=1, 4=2, 5=1, 2=3, 3=1. Nodes 2 and 4 are individually fine.
+//   At root 1: left height 3 vs right height 1 -> |3-1| = 2 > 1 -> UNBALANCED -> returns -1.
+const nodes = {
+  a: { val: 1, x: 280, y: 40,  left: 'b', right: 'c' },
+  b: { val: 2, x: 160, y: 130, left: 'd', right: 'e' },
+  c: { val: 3, x: 430, y: 130, left: null, right: null },
+  d: { val: 4, x: 90,  y: 222, left: 'f', right: null },
+  e: { val: 5, x: 230, y: 222, left: null, right: null },
+  f: { val: 6, x: 90,  y: 300, left: null, right: null },
+};
+const edges = [['a','b'],['a','c'],['b','d'],['b','e'],['d','f']];
+const ids = Object.keys(nodes);
+const $ = id => document.getElementById(id);
+
+const steps = [];
+(function build() {
+  const heightOf = {};         // resolved value (could be -1)
+  const returned = new Set();
+  const badSet = new Set();
+  const emit = (cap, primary, activeEdges, opts={}) => {
+    const state = {};
+    returned.forEach(id => state[id] = badSet.has(id) ? 'bad' : 'returned');
+    Object.assign(state, primary);
+    steps.push({ cap, state, heights: {...heightOf}, edges: activeEdges.slice(), edgeClass: opts.edgeClass || 'active' });
+  };
+  function height(id) {
+    if (!id) return 0;
+    emit(`Enter <code>height(${nodes[id].val})</code>. Check children, then verify <code>|L − R| ≤ 1</code>.`,
+         { [id]:'active' }, []);
+    let L = 0, R = 0;
+    if (nodes[id].left) {
+      emit(`Recurse LEFT into <span class="lbl">${nodes[nodes[id].left].val}</span>.`, { [id]:'active' }, [[id, nodes[id].left]]);
+      L = height(nodes[id].left);
+      if (L === -1) {
+        heightOf[id] = -1; returned.add(id); badSet.add(id);
+        emit(`Left subtree already returned <span class="er">-1</span> → short-circuit. <span class="lbl">${nodes[id].val}</span> returns <span class="er">-1</span> immediately.`,
+             { [id]:'bad' }, [[id, nodes[id].left]], { edgeClass: 'bad' });
+        return -1;
+      }
+    }
+    if (nodes[id].right) {
+      emit(`Recurse RIGHT into <span class="lbl">${nodes[nodes[id].right].val}</span>.`, { [id]:'active' }, [[id, nodes[id].right]]);
+      R = height(nodes[id].right);
+      if (R === -1) {
+        heightOf[id] = -1; returned.add(id); badSet.add(id);
+        emit(`Right subtree returned <span class="er">-1</span> → <span class="lbl">${nodes[id].val}</span> returns <span class="er">-1</span>.`,
+             { [id]:'bad' }, [[id, nodes[id].right]], { edgeClass: 'bad' });
+        return -1;
+      }
+    }
+    const diff = Math.abs(L - R);
+    if (diff > 1) {
+      heightOf[id] = -1; returned.add(id); badSet.add(id);
+      emit(`At <span class="er">${nodes[id].val}</span>: <code>|${L} − ${R}| = ${diff} > 1</code> → UNBALANCED. Return sentinel <span class="er">-1</span>. 🚫`,
+           { [id]:'bad' }, []);
+      return -1;
+    }
+    const h = 1 + Math.max(L, R);
+    heightOf[id] = h; returned.add(id);
+    const leaf = !nodes[id].left && !nodes[id].right;
+    emit(leaf
+      ? `<span class="lbl">${nodes[id].val}</span> is a leaf → height <code>1</code>. Balanced so far.`
+      : `<span class="lbl">${nodes[id].val}</span> balanced (<code>|${L} − ${R}| ≤ 1</code>) → return height <code>${h}</code>.`,
+      { [id]:'returned' }, []);
+    return h;
+  }
+  const res = height('a');
+  steps.push({ cap: res === -1
+      ? `Root <span class="er">1</span> is itself unbalanced: left subtree height 3 vs right height 1 (diff 2) → returns <span class="er">-1</span>, so <code>is_balanced = (-1 ≠ -1) = False</code>. NOT balanced. ✅ correctly rejected`
+      : `Root returned a real height → balanced.`,
+      state: ids.reduce((m,i)=>(m[i]=badSet.has(i)?'bad':'returned',m),{}),
+      heights: {...heightOf}, edges: [], edgeClass: 'bad' });
+})();
+
+const svg = $('tree');
+function render(i) {
+  const st = steps[i];
+  let h = '';
+  edges.forEach(([p,c]) => {
+    const on = st.edges.some(([a,b]) => a===p && b===c);
+    h += `<line class="edge${on?' '+st.edgeClass:''}" x1="${nodes[p].x}" y1="${nodes[p].y}" x2="${nodes[c].x}" y2="${nodes[c].y}" />`;
+  });
+  ids.forEach(id => {
+    const cls = st.state[id] ? ' ' + st.state[id] : '';
+    h += `<circle class="node-circle${cls}" cx="${nodes[id].x}" cy="${nodes[id].y}" r="22" />
+          <text class="node-text" x="${nodes[id].x}" y="${nodes[id].y}">${nodes[id].val}</text>`;
+    if (st.heights[id] !== undefined) {
+      const bad = st.heights[id] === -1;
+      const label = bad ? '-1' : 'h=' + st.heights[id];
+      const bx = nodes[id].x + 28, by = nodes[id].y - 20, w = bad ? 26 : 32;
+      h += `<rect class="h-badge-bg ${bad?'bad':'ok'}" x="${bx-w/2}" y="${by-12}" width="${w}" height="22" rx="6" />
+            <text class="h-badge ${bad?'bad':'ok'}" x="${bx}" y="${by+4}">${label}</text>`;
+    }
+  });
+  svg.innerHTML = h;
+  $('caption').innerHTML = st.cap;
+  $('stepcount').textContent = `Step ${i+1} / ${steps.length}`;
+  $('prevBtn').disabled = i===0;
+  $('nextBtn').disabled = i===steps.length-1;
+}
+
+let cur = 0;
+const go = d => { cur = Math.max(0, Math.min(steps.length-1, cur+d)); render(cur); };
+$('nextBtn').addEventListener('click', () => go(1));
+$('prevBtn').addEventListener('click', () => go(-1));
+render(0);
+</script>
+</body>
+</html>

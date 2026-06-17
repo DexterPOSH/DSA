@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Linked List Cycle — Floyd's Tortoise & Hare</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a;
+    --text: #e0e0e0; --muted: #7a8ab0;
+    --blue: #3b82f6; --amber: #f59e0b; --green: #10b981; --red: #ef4444; --purple:#a855f7;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px 70px; gap: 28px;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing:-0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy, .takeaway {
+    background: var(--panel); border-radius: 12px; padding: 18px 24px;
+    max-width: 780px; width: 100%; display:flex; gap:16px; align-items:flex-start;
+  }
+  .analogy { border:1px solid var(--blue); } .takeaway { border:1px solid #2d3a5a; }
+  .ic { font-size:1.8rem; line-height:1; flex-shrink:0; }
+  .label { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--blue); margin-bottom:5px; }
+  .analogy-text, .takeaway p { font-size:.97rem; line-height:1.55; color:#c0c0d0; }
+  .takeaway strong, .analogy-text strong { color: var(--text); }
+  .takeaway code, .analogy-text code { background:#1e293b; padding:1px 6px; border-radius:5px; color:#ffd479; font-family:monospace; }
+
+  .card {
+    background: var(--panel); border:1px solid #2d3a5a; border-radius:16px;
+    padding:30px; max-width:840px; width:100%;
+    display:flex; flex-direction:column; gap:24px;
+  }
+  .step-desc {
+    min-height:56px; background:var(--panel2); border-radius:8px; padding:14px 20px;
+    font-size:.96rem; line-height:1.55; color:#c8c8e0; border-left:3px solid var(--blue);
+  }
+  .step-desc.meet { border-color: var(--red); }
+  .step-desc.done { border-color: var(--green); }
+  .step-desc code { background:#1e293b; padding:1px 6px; border-radius:5px; color:#ffd479; font-family:monospace; }
+
+  .section-label { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:10px; }
+
+  .toggle-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .toggle-btn {
+    padding:8px 16px; border-radius:8px; border:1px solid #2d3a5a; background:#1e293b;
+    color:#94a3b8; font-size:.85rem; font-weight:600; cursor:pointer; transition: all .2s;
+  }
+  .toggle-btn.on { background: rgba(59,130,246,.2); border-color:var(--blue); color:#93c5fd; }
+
+  /* SVG stage for the (possibly) cyclic list */
+  .stage { width:100%; overflow-x:auto; }
+  svg.diagram { display:block; margin:0 auto; }
+  .lnode-box { fill: var(--panel2); stroke:#2d3a5a; stroke-width:2; rx:10; transition: all .3s; }
+  .lnode-val { fill: var(--text); font: 700 20px 'Segoe UI', sans-serif; text-anchor:middle; dominant-baseline:central; }
+  .edge { stroke:#4a5a7a; stroke-width:2.5; fill:none; marker-end:url(#ah); }
+  .edge.cycle { stroke: var(--amber); marker-end:url(#ah-amber); }
+
+  .slow-ring { fill:none; stroke: var(--green); stroke-width:3.5; transition: all .45s cubic-bezier(.4,1.3,.5,1); }
+  .fast-ring { fill:none; stroke: var(--blue); stroke-width:3.5; stroke-dasharray:6 5; transition: all .45s cubic-bezier(.4,1.3,.5,1); }
+  .ptr-text { font: 700 12px monospace; text-anchor:middle; }
+  .slow-text { fill: var(--green); } .fast-text { fill: var(--blue); }
+
+  .lnode-box.met { stroke: var(--red); fill:#2a0d0d; }
+  .lnode-box.ended { stroke: var(--green); }
+
+  .state { display:flex; gap:12px; flex-wrap:wrap; }
+  .state-box { background:var(--panel2); border:1px solid #2d3a5a; border-radius:8px; padding:10px 16px; font-family:monospace; flex:1; min-width:150px; }
+  .state-box .k { color:var(--muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; }
+  .state-box .v { font-size:1.05rem; font-weight:700; margin-top:3px; }
+  .state-box.sb-slow { border-color:var(--green); } .state-box.sb-slow .v { color:#86efac; }
+  .state-box.sb-fast { border-color:var(--blue); } .state-box.sb-fast .v { color:#93c5fd; }
+
+  .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .btn { padding:11px 24px; border-radius:8px; border:none; font-size:.92rem; font-weight:600; cursor:pointer; transition: background .2s, transform .1s, opacity .2s; }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background:var(--blue); color:#fff; } .btn-primary:hover { background:#2563eb; }
+  .btn:disabled { opacity:.35; cursor:not-allowed; }
+  .btn-secondary { background:#1e293b; color:#94a3b8; border:1px solid #2d3a5a; } .btn-secondary:hover { background:#263248; }
+  .step-counter { font-size:.85rem; color:var(--muted); margin-left:auto; }
+
+  .code-block {
+    background:var(--panel2); border:1px solid #2d3a5a; border-radius:10px; padding:18px 22px;
+    max-width:780px; width:100%; font-family:monospace; font-size:.8rem; line-height:1.7;
+    color:#94a3b8; overflow-x:auto; white-space:pre;
+  }
+  .code-block .kw { color:#818cf8; } .code-block .fn { color:#38bdf8; } .code-block .cm { color:#475569; font-style:italic; }
+  .code-block .hl { background: rgba(245,158,11,.15); display:inline-block; width:100%; }
+</style>
+</head>
+<body>
+
+<h1>Linked List Cycle &mdash; <span>Floyd's Tortoise &amp; Hare</span></h1>
+
+<div class="analogy">
+  <div class="ic">🏃</div>
+  <div>
+    <div class="label">Real-world analogy</div>
+    <div class="analogy-text">
+      Ek <strong>slow jogger</strong> aur ek <strong>fast sprinter</strong> ek track pe.
+      Agar track <strong>circular</strong> hai, fast wala chakkar kaat ke slow ko peeche se
+      <strong>pakad lega</strong> — dono milenge. Agar track ka <strong>dead-end (None)</strong>
+      hai, fast pehle hi end pe ruk jaayega — kabhi nahi milenge.
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="toggle-row">
+    <span class="section-label" style="margin:0 8px 0 0;">List shape:</span>
+    <button class="toggle-btn on" id="btnCycle">🔁 With cycle</button>
+    <button class="toggle-btn" id="btnNoCycle">➡️ No cycle</button>
+  </div>
+
+  <div>
+    <div class="section-label">Step description</div>
+    <div class="step-desc" id="stepDesc">Press "Next" — both pointers start at the head.</div>
+  </div>
+
+  <div class="stage">
+    <svg class="diagram" id="diagram" width="760" height="220" viewBox="0 0 760 220">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#4a5a7a"/>
+        </marker>
+        <marker id="ah-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <div>
+    <div class="section-label">Pointers</div>
+    <div class="state">
+      <div class="state-box sb-slow"><div class="k">slow (1 step)</div><div class="v" id="vSlow">node 3</div></div>
+      <div class="state-box sb-fast"><div class="k">fast (2 steps)</div><div class="v" id="vFast">node 3</div></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-secondary" id="resetBtn">Reset</button>
+    <button class="btn btn-secondary" id="prevBtn">◀ Prev</button>
+    <button class="btn btn-primary" id="nextBtn">Next ▶</button>
+    <span class="step-counter" id="counter">Step 0</span>
+  </div>
+</div>
+
+<div class="code-block" id="codeBlock"></div>
+
+<div class="takeaway">
+  <div class="ic">💡</div>
+  <div>
+    <div class="label">Key takeaway</div>
+    <p>
+      Move <code>slow</code> by 1 and <code>fast</code> by 2. If there's a cycle, the gap shrinks
+      by one each step until <strong><code>slow is fast</code></strong> — they collide. No cycle?
+      <code>fast</code> falls off the end (<code>None</code>). <strong>O(n) time, O(1) space</strong>
+      — beats the hash-set approach on memory.
+    </p>
+  </div>
+</div>
+
+<script>
+// ── List models ─────────────────────────────────────────────────────────
+// Values laid out left-to-right. cycleTo = index the tail loops back to (or null).
+const MODELS = {
+  cycle:   { vals: [3, 2, 0, -4], cycleTo: 1 },   // tail -4 -> node index 1 (value 2)
+  nocycle: { vals: [1, 2, 3, 4], cycleTo: null },
+};
+
+let mode = 'cycle';
+let steps = [];
+let idx = 0;
+
+const NODE_W = 64, NODE_H = 56, GAP = 110, X0 = 70, Y = 100;
+
+function nodeCenter(i) { return { x: X0 + i * GAP + NODE_W / 2, y: Y + NODE_H / 2 }; }
+
+// Build the next-index function for a model
+function nextIndex(model, i) {
+  if (i === model.vals.length - 1) return model.cycleTo; // null or loop target
+  return i + 1;
+}
+
+// Simulate Floyd's and record steps.
+function buildSteps(model) {
+  const out = [];
+  const n = model.vals.length;
+  let slow = 0, fast = 0;
+  const label = i => (i === null ? 'None' : 'node ' + model.vals[i]);
+
+  out.push({
+    slow, fast, descClass: '', line: 1,
+    desc: `Both <code>slow</code> and <code>fast</code> start at the head (<strong>${label(0)}</strong>).`
+  });
+
+  let guard = 0;
+  while (guard++ < 20) {
+    // advance fast by checking fast and fast.next
+    if (fast === null) break;
+    const f1 = nextIndex(model, fast);
+    if (f1 === null) { // fast.next is None -> no cycle
+      out.push({ slow, fast: null, descClass: 'done', line: 2,
+        desc: `<code>fast.next</code> is <strong>None</strong> → the list ends. No cycle. Return <strong style="color:#10b981">False</strong>. 🛑` });
+      break;
+    }
+    const f2 = nextIndex(model, f1);
+    if (f2 === null) {
+      out.push({ slow, fast: null, descClass: 'done', line: 2,
+        desc: `<code>fast</code> reaches the end (<strong>None</strong>) after two hops → No cycle. Return <strong style="color:#10b981">False</strong>. 🛑` });
+      break;
+    }
+    const newSlow = nextIndex(model, slow);
+    slow = newSlow; fast = f2;
+    if (slow === fast) {
+      out.push({ slow, fast, descClass: 'meet', line: 4,
+        desc: `<code>slow</code> moved to <strong>${label(slow)}</strong>, <code>fast</code> to <strong>${label(fast)}</strong>. <strong style="color:#ef4444">slow is fast — they met!</strong> A cycle exists → return <strong style="color:#ef4444">True</strong>. 🎯` });
+      break;
+    }
+    out.push({ slow, fast, descClass: '', line: 3,
+      desc: `Advance: <code>slow</code> → <strong>${label(slow)}</strong> (1 step), <code>fast</code> → <strong>${label(fast)}</strong> (2 steps). Not equal yet — keep going.` });
+  }
+  return out;
+}
+
+// ── SVG rendering ────────────────────────────────────────────────────────
+const diagram = document.getElementById('diagram');
+const DEFS = diagram.innerHTML; // keep markers
+
+function drawList() {
+  const model = MODELS[mode];
+  const n = model.vals.length;
+  let svg = DEFS;
+
+  // forward edges
+  for (let i = 0; i < n - 1; i++) {
+    const a = X0 + i * GAP + NODE_W, b = X0 + (i + 1) * GAP;
+    svg += `<line class="edge" x1="${a}" y1="${Y + NODE_H / 2}" x2="${b - 4}" y2="${Y + NODE_H / 2}"/>`;
+  }
+  // tail edge: cycle back or to None
+  if (model.cycleTo === null) {
+    const a = X0 + (n - 1) * GAP + NODE_W;
+    svg += `<line class="edge" x1="${a}" y1="${Y + NODE_H / 2}" x2="${a + 50}" y2="${Y + NODE_H / 2}"/>`;
+    svg += `<rect x="${a + 52}" y="${Y + 8}" width="56" height="40" rx="8" fill="none" stroke="#3a4a6a" stroke-dasharray="4 3"/>`;
+    svg += `<text x="${a + 80}" y="${Y + 28}" fill="#5a6a90" font-family="monospace" font-size="13" text-anchor="middle">None</text>`;
+  } else {
+    // curved back-edge from tail bottom to cycleTo bottom
+    const t = model.vals.length - 1;
+    const sx = X0 + t * GAP + NODE_W / 2, sy = Y + NODE_H;
+    const tx = X0 + model.cycleTo * GAP + NODE_W / 2, ty = Y + NODE_H;
+    const dipY = Y + NODE_H + 60;
+    svg += `<path class="edge cycle" d="M${sx},${sy} C ${sx},${dipY} ${tx},${dipY} ${tx + 2},${ty + 2}"/>`;
+    svg += `<text x="${(sx + tx) / 2}" y="${dipY + 14}" fill="#f59e0b" font-family="monospace" font-size="12" text-anchor="middle">tail loops back ↺</text>`;
+  }
+
+  // nodes
+  for (let i = 0; i < n; i++) {
+    const x = X0 + i * GAP;
+    svg += `<rect id="box-${i}" class="lnode-box" x="${x}" y="${Y}" width="${NODE_W}" height="${NODE_H}" rx="10"/>`;
+    svg += `<text class="lnode-val" x="${x + NODE_W / 2}" y="${Y + NODE_H / 2}">${model.vals[i]}</text>`;
+    svg += `<text x="${x + NODE_W / 2}" y="${Y - 12}" fill="#5a6a90" font-family="monospace" font-size="11" text-anchor="middle">i=${i}</text>`;
+  }
+
+  // pointer rings (positioned in updatePointers)
+  svg += `<rect id="slowRing" class="slow-ring" rx="13" width="${NODE_W + 14}" height="${NODE_H + 14}" x="-100" y="-100"/>`;
+  svg += `<text id="slowLbl" class="ptr-text slow-text" x="-100" y="-100">slow</text>`;
+  svg += `<rect id="fastRing" class="fast-ring" rx="16" width="${NODE_W + 24}" height="${NODE_H + 24}" x="-100" y="-100"/>`;
+  svg += `<text id="fastLbl" class="ptr-text fast-text" x="-100" y="-100">fast</text>`;
+
+  diagram.innerHTML = svg;
+}
+
+function placeRing(ringId, lblId, i, outer, labelDy) {
+  const ring = document.getElementById(ringId);
+  const lbl = document.getElementById(lblId);
+  if (i === null) { ring.setAttribute('x', -200); lbl.setAttribute('x', -200); return; }
+  const x = X0 + i * GAP;
+  const pad = outer ? 12 : 7;
+  ring.setAttribute('x', x - pad);
+  ring.setAttribute('y', Y - pad);
+  lbl.setAttribute('x', x + NODE_W / 2);
+  lbl.setAttribute('y', Y + labelDy);
+}
+
+const stepDesc = document.getElementById('stepDesc');
+const counter = document.getElementById('counter');
+const vSlow = document.getElementById('vSlow');
+const vFast = document.getElementById('vFast');
+const nextBtn = document.getElementById('nextBtn');
+const prevBtn = document.getElementById('prevBtn');
+const resetBtn = document.getElementById('resetBtn');
+
+function valLabel(i) { return i === null ? 'None' : 'node ' + MODELS[mode].vals[i]; }
+
+function render() {
+  const s = steps[idx];
+  // reset box states
+  MODELS[mode].vals.forEach((_, i) => {
+    const b = document.getElementById('box-' + i);
+    if (b) b.className.baseVal = 'lnode-box';
+  });
+
+  placeRing('slowRing', 'slowLbl', s.slow, false, NODE_H + 30);
+  placeRing('fastRing', 'fastLbl', s.fast, true, -18);
+
+  if (s.descClass === 'meet' && s.slow === s.fast && s.slow !== null) {
+    const b = document.getElementById('box-' + s.slow);
+    if (b) b.className.baseVal = 'lnode-box met';
+  }
+
+  stepDesc.innerHTML = s.desc;
+  stepDesc.className = 'step-desc ' + (s.descClass || '');
+  vSlow.textContent = valLabel(s.slow);
+  vFast.textContent = valLabel(s.fast);
+  counter.textContent = `Step ${idx} / ${steps.length - 1}`;
+  prevBtn.disabled = idx === 0;
+  nextBtn.disabled = idx === steps.length - 1;
+  renderCode(s.line);
+}
+
+const CODE_LINES = [
+  `<span class="kw">def</span> <span class="fn">hasCycle</span>(head):`,
+  `    slow = fast = head`,
+  `    <span class="kw">while</span> fast <span class="kw">and</span> fast.next:`,
+  `        slow = slow.next          <span class="cm"># 1 step</span>`,
+  `        fast = fast.next.next     <span class="cm"># 2 steps</span>`,
+  `        <span class="kw">if</span> slow <span class="kw">is</span> fast:`,
+  `            <span class="kw">return</span> <span class="fn">True</span>          <span class="cm"># cycle!</span>`,
+  `    <span class="kw">return</span> <span class="fn">False</span>                 <span class="cm"># hit None</span>`,
+];
+const LINE_MAP = { 1: 1, 2: 7, 3: 4, 4: 6 };
+function renderCode(stepLine) {
+  const target = LINE_MAP[stepLine];
+  document.getElementById('codeBlock').innerHTML =
+    CODE_LINES.map((l, i) => (i === target ? `<span class="hl">${l}</span>` : l)).join('\n');
+}
+
+function rebuild() {
+  steps = buildSteps(MODELS[mode]);
+  idx = 0;
+  // resize svg height for cycle dip
+  diagram.setAttribute('height', mode === 'cycle' ? 240 : 200);
+  diagram.setAttribute('viewBox', `0 0 760 ${mode === 'cycle' ? 240 : 200}`);
+  drawList();
+  render();
+}
+
+const btnCycle = document.getElementById('btnCycle');
+const btnNoCycle = document.getElementById('btnNoCycle');
+btnCycle.addEventListener('click', () => { mode = 'cycle'; btnCycle.classList.add('on'); btnNoCycle.classList.remove('on'); rebuild(); });
+btnNoCycle.addEventListener('click', () => { mode = 'nocycle'; btnNoCycle.classList.add('on'); btnCycle.classList.remove('on'); rebuild(); });
+
+nextBtn.addEventListener('click', () => { if (idx < steps.length - 1) { idx++; render(); } });
+prevBtn.addEventListener('click', () => { if (idx > 0) { idx--; render(); } });
+resetBtn.addEventListener('click', () => { idx = 0; render(); });
+
+rebuild();
+</script>
+</body>
+</html>

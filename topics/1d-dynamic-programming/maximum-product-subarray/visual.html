@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maximum Product Subarray — tracking max & min together</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #232342;
+    --text: #e0e0e0;
+    --muted: #9a9ac0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 {
+    font-size: 1.85rem;
+    margin: 0 0 6px;
+  }
+  h1 span { color: var(--blue); }
+  .subtitle { color: var(--muted); margin: 0 0 26px; font-size: 1.02rem; }
+
+  .analogy {
+    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(168,85,247,0.10));
+    border: 1px solid rgba(245,158,11,0.4);
+    border-left: 5px solid var(--amber);
+    border-radius: 12px;
+    padding: 16px 22px;
+    margin-bottom: 26px;
+  }
+  .analogy h3 { margin: 0 0 6px; color: var(--amber); font-size: 1.02rem; }
+  .analogy p { margin: 0; }
+
+  .problem {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px 22px;
+    margin-bottom: 28px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  code {
+    background: var(--panel2);
+    padding: 2px 8px;
+    border-radius: 6px;
+    color: #ffd479;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+  }
+  .arrow { color: var(--green); font-weight: bold; }
+
+  .stage {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 22px 24px 26px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .arr { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 6px; }
+  .cell {
+    min-width: 56px; height: 56px;
+    border-radius: 10px;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 1.15rem;
+    font-family: 'SF Mono', Menlo, monospace;
+    background: var(--panel2);
+    border: 2px solid rgba(255,255,255,0.08);
+    transition: all .35s ease;
+    position: relative;
+  }
+  .cell .idx {
+    position: absolute; top: -20px; left: 0; right: 0;
+    font-size: .72rem; color: var(--muted); font-weight: 500;
+  }
+  .cell.done { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.4); }
+  .cell.active { background: rgba(59,130,246,0.25); border-color: var(--blue); color: #bcd4ff; transform: translateY(-3px); }
+  .cell.best { box-shadow: 0 0 0 3px var(--green); }
+
+  .state {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 14px; margin: 26px 0 6px;
+  }
+  .sbox {
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    text-align: center;
+  }
+  .sbox h4 { margin: 0 0 8px; font-size: .82rem; color: var(--muted); font-weight: 600; letter-spacing: .03em; }
+  .sbox .big {
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 1.6rem; font-weight: 700;
+  }
+  .sbox.max { border-color: var(--blue); }
+  .sbox.max .big { color: #7eb0ff; }
+  .sbox.min { border-color: var(--amber); }
+  .sbox.min .big { color: var(--amber); }
+  .sbox.res { border-color: var(--green); background: rgba(16,185,129,0.08); }
+  .sbox.res .big { color: var(--green); }
+
+  .candidates {
+    margin: 22px 0 6px;
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border-left: 4px solid var(--purple);
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: .98rem;
+  }
+  .candidates .lbl { font-family: 'Segoe UI', system-ui, sans-serif; color: var(--muted); margin-bottom: 8px; }
+  .candidates .c { display: inline-block; margin: 3px 10px 3px 0; padding: 4px 10px; border-radius: 6px; background: var(--panel); }
+  .candidates .c.win { background: rgba(59,130,246,0.25); color: #bcd4ff; }
+  .candidates .c.lose { background: rgba(245,158,11,0.18); color: var(--amber); }
+
+  .caption {
+    margin-top: 20px;
+    background: var(--panel2);
+    border-radius: 10px;
+    padding: 14px 18px;
+    border-left: 4px solid var(--green);
+    font-size: 1rem; min-height: 24px;
+  }
+
+  .controls { text-align: center; margin: 24px 0 6px; }
+  button {
+    background: var(--blue); color: #fff; border: none;
+    padding: 11px 26px; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background .2s;
+  }
+  button:hover:not(:disabled) { background: #2f6fd6; transform: translateY(-1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: var(--panel2); color: var(--text); }
+  button.ghost:hover:not(:disabled) { background: #3a3a66; }
+  .stepcount { color: var(--muted); margin: 0 14px; font-size: .92rem; }
+
+  .takeaway {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.12));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin-top: 30px;
+    text-align: center;
+  }
+  .takeaway h3 { margin: 0 0 6px; color: var(--blue); }
+  .takeaway p { margin: 0; font-size: 1.06rem; }
+  @media (max-width: 560px) { .state { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Maximum Product <span>Subarray</span> — why we track max <em>and</em> min</h1>
+  <p class="subtitle">A negative number flips the order: today's smallest product can become tomorrow's largest.</p>
+
+  <div class="analogy">
+    <h3>📈 The trader's flip</h3>
+    <p>Do <b>bure (negative)</b> din milke ek <b>bada gain</b> ban sakte hain. Isliye sirf "best so far" yaad rakhna kaafi nahi — sabse <b>chhota (most negative)</b> product bhi carry karo, kyunki agla negative use palat ke sabse bada bana sakta hai.</p>
+  </div>
+
+  <div class="problem">
+    <b>Problem.</b> <code>nums = [2, 3, -2, 4, -1]</code> — find the contiguous subarray with the largest product.
+    <span class="arrow">→</span> Answer: <code>48</code> (whole array: 2·3·-2·4·-1)
+  </div>
+
+  <div class="stage">
+    <div class="arr" id="arr"></div>
+    <div class="state">
+      <div class="sbox max"><h4>cur_max</h4><div class="big" id="vmax">—</div></div>
+      <div class="sbox min"><h4>cur_min</h4><div class="big" id="vmin">—</div></div>
+      <div class="sbox res"><h4>result (best)</h4><div class="big" id="vres">—</div></div>
+    </div>
+    <div class="candidates" id="cands">
+      <div class="lbl">Press <b>Next</b> to start the walkthrough.</div>
+    </div>
+    <div class="caption" id="cap">We track both extremes because multiplication by a negative swaps them.</div>
+
+    <div class="controls">
+      <button class="ghost" id="prev" disabled>‹ Prev</button>
+      <span class="stepcount" id="cnt">step 0 / 0</span>
+      <button id="next">Next ›</button>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h3>Key takeaway</h3>
+    <p>Carry <b>both</b> the running max and min product. At each element the new max is the best of <code>n</code>, <code>cur_max·n</code>, <code>cur_min·n</code> — O(n) time, O(1) space.</p>
+  </div>
+</div>
+
+<script>
+const nums = [2, 3, -2, 4, -1];
+
+// Build the step trace by actually running the algorithm.
+const steps = [];
+(function build() {
+  let curMax = nums[0], curMin = nums[0], result = nums[0];
+  steps.push({
+    i: 0, n: nums[0],
+    curMax, curMin, result,
+    cands: null, picked: null,
+    cap: `Initialise everything with the first element: cur_max = cur_min = result = ${nums[0]}.`
+  });
+  for (let i = 1; i < nums.length; i++) {
+    const n = nums[i];
+    const a = n, b = curMax * n, c = curMin * n;
+    const newMax = Math.max(a, b, c);
+    const newMin = Math.min(a, b, c);
+    const newRes = Math.max(result, newMax);
+    const flip = n < 0;
+    const cands = [
+      { label: `n = ${a}`, v: a },
+      { label: `cur_max·n = ${curMax}·${n} = ${b}`, v: b },
+      { label: `cur_min·n = ${curMin}·${n} = ${c}`, v: c },
+    ];
+    steps.push({
+      i, n,
+      curMax: newMax, curMin: newMin, result: newRes,
+      cands, maxPick: newMax, minPick: newMin,
+      cap: (flip
+        ? `n = ${n} is negative → it flips order! cur_min·n = ${c} jumps up. New cur_max = ${newMax}, cur_min = ${newMin}.`
+        : `n = ${n}. New cur_max = max of candidates = ${newMax}, cur_min = ${newMin}.`)
+        + (newRes > result ? ` result improves to ${newRes}.` : ` result stays ${newRes}.`)
+    });
+    curMax = newMax; curMin = newMin; result = newRes;
+  }
+  steps.push({
+    i: nums.length - 1, n: nums[nums.length-1],
+    curMax, curMin, result, done: true, cands: null,
+    cap: `Done. Largest product over any contiguous subarray = ${result}.`
+  });
+})();
+
+const $ = id => document.getElementById(id);
+let idx = 0;
+
+function renderArr(s) {
+  $('arr').innerHTML = nums.map((v, i) => {
+    let cls = 'cell';
+    if (i < s.i) cls += ' done';
+    if (i === s.i) cls += ' active';
+    return `<div class="${cls}"><span class="idx">i=${i}</span>${v}</div>`;
+  }).join('');
+}
+
+function renderCands(s) {
+  if (!s.cands) {
+    $('cands').innerHTML = s.done
+      ? `<div class="lbl" style="color:var(--green)">✓ Walkthrough complete.</div>`
+      : `<div class="lbl">First element — no candidates, just initialise.</div>`;
+    return;
+  }
+  const chips = s.cands.map(c => {
+    let cls = 'c';
+    if (c.v === s.maxPick) cls += ' win';
+    else if (c.v === s.minPick) cls += ' lose';
+    return `<span class="${cls}">${c.label}</span>`;
+  }).join('');
+  $('cands').innerHTML =
+    `<div class="lbl">Candidates for element <b>${s.n}</b> &nbsp;(<span style="color:#bcd4ff">blue → new max</span>, <span style="color:var(--amber)">amber → new min</span>):</div>${chips}`;
+}
+
+function render() {
+  const s = steps[idx];
+  renderArr(s);
+  renderCands(s);
+  $('vmax').textContent = s.curMax;
+  $('vmin').textContent = s.curMin;
+  $('vres').textContent = s.result;
+  $('cap').textContent = s.cap;
+  $('cnt').textContent = `step ${idx} / ${steps.length - 1}`;
+  $('prev').disabled = idx === 0;
+  $('next').disabled = idx === steps.length - 1;
+}
+
+$('next').addEventListener('click', () => { if (idx < steps.length - 1) { idx++; render(); } });
+$('prev').addEventListener('click', () => { if (idx > 0) { idx--; render(); } });
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Product of Array Except Self — Prefix × Suffix</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --panel2: #0f172a;
+    --text: #e0e0e0;
+    --muted: #7a8ab0;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+    gap: 28px;
+    line-height: 1.55;
+  }
+  h1 { font-size: 1.7rem; font-weight: 700; text-align: center; letter-spacing: -0.02em; }
+  h1 span { color: var(--blue); }
+
+  .analogy {
+    background: var(--panel);
+    border: 1px solid var(--blue);
+    border-left: 5px solid var(--blue);
+    border-radius: 12px;
+    padding: 18px 24px;
+    max-width: 780px; width: 100%;
+    display: flex; gap: 16px;
+  }
+  .analogy-icon { font-size: 1.9rem; flex-shrink: 0; }
+  .analogy-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--blue); margin-bottom: 4px;
+  }
+  .analogy-text { font-size: 0.96rem; color: #c0c0d0; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid #2d3a5a;
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 880px; width: 100%;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+
+  .section-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 9px;
+  }
+
+  .step-desc {
+    min-height: 56px;
+    background: var(--panel2);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 0.95rem;
+    color: #c8c8e0;
+    border-left: 3px solid var(--blue);
+  }
+  .step-desc.suffix { border-color: var(--amber); }
+  .step-desc.done   { border-color: var(--green); }
+
+  .grid-wrap { overflow-x: auto; }
+  table.grid { border-collapse: separate; border-spacing: 8px; margin: 0 auto; }
+  table.grid td.rowlabel {
+    font-size: 0.72rem; color: var(--muted); text-align: right;
+    padding-right: 6px; white-space: nowrap; font-weight: 600;
+  }
+  .gcell {
+    width: 64px; height: 58px;
+    border-radius: 10px;
+    border: 2px solid #2d3a5a;
+    background: var(--panel2);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-weight: 700; font-size: 1.15rem;
+    color: #e0e0e0;
+    transition: all .3s;
+  }
+  .gcell.faint { color: #46557a; }
+  .gcell.nums  { color: #cbd5e1; }
+  .gcell.prefix-active { border-color: var(--blue);  background: #14233f; color: #93c5fd; box-shadow: 0 0 14px rgba(59,130,246,.4); transform: translateY(-3px); }
+  .gcell.prefix-set    { border-color: var(--blue);  background: #122036; color: #93c5fd; }
+  .gcell.suffix-active { border-color: var(--amber); background: #2a1f08; color: #fcd34d; box-shadow: 0 0 14px rgba(245,158,11,.4); transform: translateY(-3px); }
+  .gcell.suffix-set    { border-color: var(--amber); background: #221a08; color: #fcd34d; }
+  .gcell.out-active    { border-color: var(--green); background: #0d2a1a; color: #86efac; box-shadow: 0 0 16px rgba(16,185,129,.45); transform: translateY(-3px); }
+  .gcell.out-set       { border-color: var(--green); background: #0c2417; color: #86efac; }
+  .idxrow td { font-size: 0.62rem; color: #5a6a90; text-align: center; padding-top: 0; }
+
+  .accum {
+    display: flex; gap: 14px; flex-wrap: wrap;
+    font-family: 'JetBrains Mono', Consolas, monospace; font-size: 0.9rem;
+  }
+  .accum .chip {
+    background: var(--panel2); border-radius: 8px; padding: 9px 14px;
+    border: 1px solid #2d3a5a;
+  }
+  .accum .chip.prefix { border-color: var(--blue);  color: #93c5fd; }
+  .accum .chip.suffix { border-color: var(--amber); color: #fcd34d; }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    padding: 11px 24px; border-radius: 8px; border: none;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: all .15s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #2d3a5a; }
+  .btn-secondary:hover { background: #263248; }
+  .step-counter { font-size: 0.82rem; color: var(--muted); margin-left: auto; font-family: monospace; }
+
+  .takeaway {
+    background: var(--panel);
+    border: 1px solid #2d3a5a;
+    border-radius: 12px;
+    padding: 18px 24px;
+    max-width: 780px; width: 100%;
+    display: flex; gap: 16px;
+  }
+  .takeaway-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .takeaway-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--green); margin-bottom: 4px;
+  }
+  .takeaway p { font-size: 0.94rem; color: #c0c0d0; }
+  .takeaway strong { color: #e0e0e0; }
+</style>
+</head>
+<body>
+
+  <h1>Product of Array Except Self &mdash; <span>Prefix × Suffix</span></h1>
+
+  <div class="analogy">
+    <div class="analogy-icon">🧒</div>
+    <div>
+      <div class="analogy-label">Real-world analogy</div>
+      <div class="analogy-text">
+        Bachche ek line me. Pehli walk <strong style="color:#93c5fd">left→right</strong>: har bachche ko
+        "tujhse pehle wale sabka product" batao. Doosri walk <strong style="color:#fcd34d">right→left</strong>:
+        "tere baad wale sabka product" multiply karo. Apna number kabhi badge me nahi aata — no division.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div>
+      <div class="section-label">Step description</div>
+      <div class="step-desc" id="stepDesc">Press "Next Step". Pass 1 builds prefix products into the output array; Pass 2 multiplies suffix products in.</div>
+    </div>
+
+    <div class="grid-wrap">
+      <table class="grid">
+        <tr>
+          <td class="rowlabel">nums</td>
+          <td><div class="gcell nums" id="n-0">1</div></td>
+          <td><div class="gcell nums" id="n-1">2</div></td>
+          <td><div class="gcell nums" id="n-2">3</div></td>
+          <td><div class="gcell nums" id="n-3">4</div></td>
+        </tr>
+        <tr>
+          <td class="rowlabel">output</td>
+          <td><div class="gcell faint" id="o-0">1</div></td>
+          <td><div class="gcell faint" id="o-1">1</div></td>
+          <td><div class="gcell faint" id="o-2">1</div></td>
+          <td><div class="gcell faint" id="o-3">1</div></td>
+        </tr>
+        <tr class="idxrow">
+          <td></td><td>i=0</td><td>i=1</td><td>i=2</td><td>i=3</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="accum">
+      <div class="chip prefix" id="prefixChip">prefix = 1</div>
+      <div class="chip suffix" id="suffixChip">suffix = 1</div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" onclick="reset()">Reset</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="advance()">Next Step</button>
+      <span class="step-counter" id="stepCounter"></span>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-icon">💡</div>
+    <div>
+      <div class="takeaway-label">Key Takeaway</div>
+      <p>
+        <strong>output[i] = (product of everything left of i) × (product of everything right of i)</strong>.
+        Two linear passes, a running prefix then a running suffix, give the answer in
+        <strong>O(n) time, O(1) extra space</strong> — no division, zeros handled for free.
+      </p>
+    </div>
+  </div>
+
+<script>
+const nums = [1, 2, 3, 4];
+const n = nums.length;
+const output = [1, 1, 1, 1];
+
+const $ = id => document.getElementById(id);
+
+// Build the full step list up-front.
+// Each step mutates a virtual state and carries a render instruction.
+function buildSteps() {
+  const steps = [];
+  // ----- PASS 1: prefix -----
+  let prefix = 1;
+  for (let i = 0; i < n; i++) {
+    steps.push({
+      pass: 'prefix', i, prefix,                 // BEFORE multiply
+      outVal: prefix,
+      desc: `<strong style="color:#93c5fd">Pass 1 (prefix)</strong> · i=${i}: set output[${i}] = prefix = <strong>${prefix}</strong> ` +
+            `(product of everything to the left of index ${i}). Then prefix *= nums[${i}] = ${prefix} × ${nums[i]} = <strong>${prefix*nums[i]}</strong>.`,
+      prefixAfter: prefix * nums[i]
+    });
+    prefix *= nums[i];
+  }
+  // ----- PASS 2: suffix -----
+  let suffix = 1;
+  for (let i = n - 1; i >= 0; i--) {
+    steps.push({
+      pass: 'suffix', i, suffix,
+      desc: `<strong style="color:#fcd34d">Pass 2 (suffix)</strong> · i=${i}: output[${i}] *= suffix → ` +
+            `multiply the stored prefix by suffix = <strong>${suffix}</strong> ` +
+            `(product of everything to the right). Then suffix *= nums[${i}] = ${suffix} × ${nums[i]} = <strong>${suffix*nums[i]}</strong>.`,
+      suffixAfter: suffix * nums[i]
+    });
+    suffix *= nums[i];
+  }
+  return steps;
+}
+
+const steps = buildSteps();
+let step = 0;
+const outState = [1,1,1,1];     // current displayed output values
+let prefixVal = 1, suffixVal = 1;
+
+function clearHighlights() {
+  for (let i = 0; i < n; i++) {
+    const o = $('o-'+i);
+    o.classList.remove('prefix-active','suffix-active','out-active');
+  }
+}
+
+function reset() {
+  step = 0;
+  prefixVal = 1; suffixVal = 1;
+  for (let i = 0; i < n; i++) {
+    outState[i] = 1;
+    const o = $('o-'+i);
+    o.className = 'gcell faint';
+    o.textContent = '1';
+  }
+  $('prefixChip').textContent = 'prefix = 1';
+  $('suffixChip').textContent = 'suffix = 1';
+  $('stepDesc').className = 'step-desc';
+  $('stepDesc').innerHTML = 'Press "Next Step". Pass 1 builds prefix products into the output array; Pass 2 multiplies suffix products in.';
+  $('nextBtn').disabled = false;
+  $('stepCounter').textContent = `Step 0 / ${steps.length}`;
+}
+
+function advance() {
+  if (step >= steps.length) return;
+  clearHighlights();
+  const st = steps[step];
+  const o = $('o-'+st.i);
+
+  if (st.pass === 'prefix') {
+    outState[st.i] = st.outVal;
+    o.textContent = st.outVal;
+    o.className = 'gcell prefix-active';
+    // mark previously set prefix cells
+    for (let k = 0; k < st.i; k++) $('o-'+k).className = 'gcell prefix-set';
+    prefixVal = st.prefixAfter;
+    $('prefixChip').textContent = `prefix = ${prefixVal}`;
+    $('stepDesc').className = 'step-desc';
+  } else {
+    outState[st.i] = outState[st.i] * st.suffix;
+    o.textContent = outState[st.i];
+    o.className = 'gcell out-active';
+    // cells already finalized (to the right) shown as out-set
+    for (let k = st.i + 1; k < n; k++) $('o-'+k).className = 'gcell out-set';
+    // cells not yet revisited keep prefix-set styling
+    for (let k = 0; k < st.i; k++) $('o-'+k).className = 'gcell prefix-set';
+    suffixVal = st.suffixAfter;
+    $('suffixChip').textContent = `suffix = ${suffixVal}`;
+    $('stepDesc').className = 'step-desc suffix';
+  }
+  $('stepDesc').innerHTML = st.desc;
+
+  step++;
+  $('stepCounter').textContent = `Step ${step} / ${steps.length}`;
+
+  if (step >= steps.length) {
+    for (let k = 0; k < n; k++) $('o-'+k).className = 'gcell out-set';
+    $('stepDesc').className = 'step-desc done';
+    $('stepDesc').innerHTML = `Done! output = [${outState.join(', ')}] — each entry is the product of all others, computed with no division in O(n).`;
+    $('nextBtn').disabled = true;
+  }
+}
+
+reset();
+</script>
+</body>
+</html>
