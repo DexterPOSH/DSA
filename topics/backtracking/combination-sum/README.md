@@ -20,12 +20,11 @@ candidates = [2, 3, 5], target = 8
 
 ## Real-World Analogy
 
-Socho tumhare paas unlimited coins hain of fixed denominations — `[2, 3, 6, 7]` rupaye ke
-sikke — aur tumhe **exactly 7 rupaye** banane ka har tareeka chahiye. Ek coin jitni baar
-chaaho utni baar use kar sakte ho. Tum ek coin uthate ho, remaining amount ghataate ho,
-aur recurse karte ho. Agar remaining 0 ho gaya → ek valid combo mila. Agar remaining negative
-ho gaya → too far, **backtrack** karo. Duplicate combos (`[2,3]` vs `[3,2]`) avoid karne ke
-liye ek `start` index rakhte ho taaki coins hamesha non-decreasing order me hi pick ho.
+**What Azure Virtual Machines capacity planning is:** Azure Virtual Machines let you deploy compute instances from predefined SKU sizes, each with a known amount of CPU and memory. In capacity planning, a team may need to choose a mix of VM sizes that exactly consumes a vCPU quota for a service or environment. Azure deployments often reuse the same SKU many times, because scaling out usually means adding more identical instances.
+
+**What reusable SKU selection is, and why it's used:** Reusable SKU selection means an allowed VM size can be picked again and again until the remaining quota is filled. This exists because real Azure plans are combinations of sizes, not ordered shopping lists: two 2-vCPU VMs and one 3-vCPU VM describe capacity, regardless of the order you wrote them down. Tracking the remaining quota and keeping choices in nondecreasing SKU order prevents duplicate plans like `[2, 3]` and `[3, 2]`.
+
+**The mapping:** Each candidate is an Azure VM SKU's vCPU count, and `remain` is the quota still unfilled. The recursion chooses a SKU, subtracts its vCPUs, and calls itself with the same `start` index so that SKU may be reused; `remain == 0` records a complete plan, while `remain < 0` prunes an over-allocation. The key insight is to enumerate combinations by capacity, not permutations by order.
 
 ## Approach — backtracking with reuse + `start` pointer
 

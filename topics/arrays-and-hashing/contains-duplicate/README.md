@@ -9,8 +9,11 @@ Given an integer array `nums`, return `True` if any value appears at least twice
 
 ## Real-World Analogy
 
-Imagine you're a **bouncer at a club with a guest list**. As each person walks in, you check if you've already seen their name tonight. You could scan the entire list every time (slow), or you could keep a set of names you've already checked off — one glance tells you "seen this one before." That set of checked-off names is a **hash set**.
+**What Azure Cache for Redis is:** Azure Cache for Redis is Azure's managed Redis service: an in-memory data store built for very fast key lookups, counters, and lightweight coordination. Apps use it when they need an answer like "have I seen this ID before?" without scanning a database table or list. Because Redis stores keys in hash-table-like structures, membership checks are effectively constant time for normal workloads.
 
+**What SETNX is, and why it's used:** `SETNX` means "set this key only if it does not already exist." Redis performs that check-and-write atomically, so the first caller creates the key and every later caller can tell the key was already present. Azure workloads use this pattern for deduplication, idempotency tokens, and simple locks because it turns "is this new?" into one safe operation instead of a slow scan plus a race-prone insert.
+
+**The mapping:** Each number in the array is like a VM instance ID being written as a Redis key. If `SETNX(num)` succeeds, the number is new, so the algorithm keeps going; if it fails, that key already exists, so we found a duplicate and return `true`. The key insight is that a hash set gives the same direct membership test as Azure Cache for Redis: remember what you've seen, then stop the instant a repeat appears.
 ## Approach
 
 **Brute force** — compare every pair (O(n²)):

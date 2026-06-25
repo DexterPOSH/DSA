@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Max Area of Island — DFS area count</title>
+<title>Max Area of Island — Azure Resource Graph component size</title>
 <style>
   :root{
     --bg:#1a1a2e; --panel:#16213e; --panel2:#202a4d; --text:#e0e0e0; --muted:#9aa4c8;
@@ -66,12 +66,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Max Area of Island — DFS that <span>returns size</span></h1>
-  <p class="subtitle">Same flood-fill as Number of Islands, but each DFS counts its cells; keep the running max.</p>
+  <h1>Max Area of Island — Azure Resource Graph <span>component size</span></h1>
+  <p class="subtitle">Same flood-fill as Number of Islands, but each DFS counts the connected Azure resources in one component and keeps the largest size.</p>
 
   <div class="analogy">
-    <h3>🏝️ Measure, don't just count</h3>
-    <p>Har island ko flood-fill karte waqt ek counter rakho — jitne land cells doobe, utna area. Har island ka area nikaalo aur ab tak ka <b>maximum</b> yaad rakho.</p>
+    <h3>📊 Azure Resource Graph component size</h3>
+    <p>Treat each <code>1</code> as an Azure resource/subnet and adjacent <code>1</code>s as connectivity links. DFS flood-fill marks one connected component and counts its resources; the answer is the largest component size.</p>
   </div>
 
   <div class="board-wrap">
@@ -79,21 +79,21 @@
     <div class="panel">
       <h4>Live state</h4>
       <div class="statrow">
-        <div class="stat cur"><span class="num" id="curArea">0</span><small>this island</small></div>
+        <div class="stat cur"><span class="num" id="curArea">0</span><small>this component</small></div>
         <div class="stat best"><span class="num" id="bestArea">0</span><small>best so far</small></div>
       </div>
       <div class="stack" id="stack">DFS stack: —</div>
       <div class="legend">
         <div><span class="sw" style="background:var(--water)"></span> water <code>0</code></div>
-        <div><span class="sw" style="background:var(--panel2)"></span> unvisited land</div>
+        <div><span class="sw" style="background:var(--panel2)"></span> unvisited resource</div>
         <div><span class="sw" style="background:rgba(245,158,11,.6)"></span> current cell</div>
         <div><span class="sw" style="background:rgba(59,130,246,.6)"></span> on DFS stack</div>
-        <div><span class="sw" style="background:rgba(16,185,129,.6)"></span> counted in this island</div>
+        <div><span class="sw" style="background:rgba(16,185,129,.6)"></span> counted in this component</div>
       </div>
     </div>
   </div>
 
-  <div class="caption" id="caption">Press <b>Next</b> to scan the grid for the first land cell.</div>
+  <div class="caption" id="caption">Press <b>Next</b> to scan the topology grid for the first resource cell.</div>
 
   <div class="controls">
     <button class="ghost" id="prevBtn" disabled>◀ Prev</button>
@@ -104,7 +104,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Make the DFS <b>return the count of cells it sank</b>; compare each island's area to a global best. Largest connected region in <b>O(m·n)</b>.</p>
+    <p>Make DFS return the count of Azure resources it visits in one connected component, then compare that size to a global best. Largest topology segment in <b>O(m·n)</b>.</p>
   </div>
 </div>
 
@@ -141,12 +141,12 @@ function buildSteps(){
       caption, highlightIsland:highlightIsland??null
     });
   }
-  snap(null,[],"Start: scan row by row for an unvisited land cell (<b>1</b>).",null);
+  snap(null,[],"Start: scan row by row for an unvisited Azure resource cell (<b>1</b>).",null);
   for(let r=0;r<ROWS;r++){
     for(let c=0;c<COLS;c++){
       if(grid[r][c]===1 && !status[key(r,c)]){
         islandId++; cur=0;
-        snap([r,c],[[r,c]],`Fresh land at <b>(${r},${c})</b> → start DFS. Reset <code>this island = 0</code>.`,null);
+        snap([r,c],[[r,c]],`Unvisited resource at <b>(${r},${c})</b> → start DFS. Reset <code>this component = 0</code>.`,null);
         const stack=[[r,c]]; const onStack=new Set([key(r,c)]);
         while(stack.length){
           const [cr,cc]=stack.pop(); onStack.delete(key(cr,cc));
@@ -158,15 +158,15 @@ function buildSteps(){
               stack.push([nr,nc]); onStack.add(key(nr,nc));
             }
           }
-          snap([cr,cc],stack.map(s=>s),`Count <b>(${cr},${cc})</b> → <code>area = ${cur}</code>. Push unvisited land neighbours.`,null);
+          snap([cr,cc],stack.map(s=>s),`Count Azure resource <b>(${cr},${cc})</b> → <code>size = ${cur}</code>. Push unvisited connected neighbours.`,null);
         }
         const prevBest=best; best=Math.max(best,cur);
         const verdict = cur>prevBest ? `<b>${cur} &gt; ${prevBest}</b> → new best!` : `${cur} ≤ ${prevBest} → best stays ${best}.`;
-        snap(null,[],`Island #${islandId} done: area = <b>${cur}</b>. ${verdict}`,islandId);
+        snap(null,[],`Component #${islandId} done: size = <b>${cur}</b>. ${verdict}`,islandId);
       }
     }
   }
-  snap(null,[],`Scan complete. Largest island area = <b>${best}</b>. ✅`,null);
+  snap(null,[],`Scan complete. Largest Azure component size = <b>${best}</b>. ✅`,null);
   return steps;
 }
 

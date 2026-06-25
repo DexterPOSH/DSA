@@ -20,12 +20,11 @@ to divide `nums` into **k non-empty subsets whose sums are all equal**.
 
 ## Real-World Analogy
 
-Socho `k` doston me ek restaurant ka bill **exactly barabar** baatna hai. Har
-dost ke paas ek "plate" (bucket) hai jisme uska hissa `target = total/k` tak
-bharna hai. Tum items ek-ek uthate ho aur kisi dost ki plate me daalte ho. Agar
-kisi item ko daalne se aage koi valid baatwara nahi banta, to **wapas le lo
-(backtrack)** aur agle dost ki plate try karo. Saare items sahi fit ho gaye →
-barabar baat ho gaya.
+**What Azure Capacity Reservations are:** Azure Capacity Reservations let teams reserve compute capacity for specific VM sizes in a chosen Azure region or Availability Zone before they actually deploy VMs. Think of them as pre-booked room for critical workloads: Azure holds the capacity, then matching VM instances consume it when they start. Because the reserved capacity is finite and scoped, the planner has to be careful about where each VM request lands.
+
+**What balanced reservation-bucket tracking is, and why it's used:** A reservation or zone bucket represents a fixed amount of vCPU capacity that should be filled without going over its target. Keeping `k` buckets balanced solves the real planning problem of avoiding one overfull zone or reservation group while another sits underused. Any VM placement that would push a bucket above `target = total / k` is impossible, and identical empty buckets are symmetric, so exploring both only repeats the same failed Azure layout.
+
+**The mapping:** Each number is a VM vCPU request, each bucket is an Azure reservation/zone bucket, and `target` is the exact capacity each bucket must end with. Backtracking tries a request in one bucket, recurses only if the bucket stays under target, then removes the request and restores the bucket when the branch fails. The key insight is that capacity limits and symmetry let us prune huge parts of the search tree before they become full deployment plans.
 
 ## Approach — bucket-filling backtracking
 

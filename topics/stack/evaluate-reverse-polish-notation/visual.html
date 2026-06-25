@@ -83,13 +83,10 @@
   <h1>Evaluate RPN &mdash; <span>Operand Stack</span></h1>
 
   <div class="analogy">
-    <div class="icon">🍱</div>
+    <div class="icon">🏭</div>
     <div>
       <div class="label">Real-world analogy</div>
-      <p>A <strong>tray stack</strong>: numbers go on as trays. An operator says
-      "take the <strong>top two trays</strong>, apply me, put one result tray back".
-      At the end exactly <strong>one tray</strong> remains — the answer. No precedence,
-      no parentheses needed.</p>
+      <p>Azure Data Factory's expression engine pushes resolved pipeline values, then an operator pops the two most recent values and pushes one computed result. The expression is complete when one output remains on the stack.</p>
     </div>
   </div>
 

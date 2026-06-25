@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Binary Tree Maximum Path Sum — gain vs peak</title>
+<title>Binary Tree Maximum Path Sum — gain vs path</title>
 <style>
   :root {
     --bg: #1a1a2e; --panel: #16213e; --panel2: #232342;
@@ -65,19 +65,19 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Max Path Sum — <span>gain passed up</span> vs <span>best peak here</span></h1>
-  <p class="subtitle">Postorder DFS. Har node ek "straight gain" upar bhejta hai, par "left + right" se ek global best peak banata hai.</p>
+  <h1>Max Path Sum — <span>gain passed up</span> vs <span>best path through here</span></h1>
+  <p class="subtitle">Postorder DFS: each node returns one straight gain upward, while left + right can update the global best path through that node.</p>
 
   <div class="analogy">
-    <h3>⛰️ Analogy</h3>
-    <p>Trekking trail of altitude-scores. Har junction pe: ek hi side neeche jaake parent ke kaam aao (<b class="g">gain ↑</b>), <b>ya</b> yahi turn karke left+right dono dips jod ke ek peak-path banao (<b class="p">best</b>). Negative branch → skip (clamp to 0).</p>
+    <h3>💸 Azure Cost Management rollup</h3>
+    <p>Azure Cost Management rolls resource costs up through Resource Groups, Subscriptions, and Management Groups. Each scope returns <b class="g">one best gain</b> to its parent, while the <b class="p">global best</b> may turn through that scope and include both child branches.</p>
   </div>
 
   <div class="stage">
     <svg viewBox="0 0 720 360" id="tree"></svg>
     <div class="legend">
       <span><i class="sw" style="background:var(--amber)"></i> gain returned UP (one side)</span>
-      <span><i class="sw" style="background:var(--green)"></i> best peak so far (turns here)</span>
+      <span><i class="sw" style="background:var(--green)"></i> best path so far (turns here)</span>
     </div>
     <div class="caption" id="caption">Press <b>Next ▶</b>. We process leaves first (postorder), bubbling gains upward. <code>best = -∞</code> to start.</div>
     <div class="statebar">
@@ -95,7 +95,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>The function <b>returns</b> <code>node.val + max(leftGain, rightGain)</code> (one straight side for the parent), but <b>updates</b> <code>best</code> with <code>node.val + leftGain + rightGain</code> (the path peaking here). Two different quantities — that split is the whole trick.</p>
+    <p>The function <b>returns</b> <code>node.val + max(leftGain, rightGain)</code> (one straight side for the parent), but <b>updates</b> <code>best</code> with <code>node.val + leftGain + rightGain</code> (the path through this node). Two different quantities — that split is the whole trick.</p>
   </div>
 </div>
 
@@ -118,15 +118,15 @@ const EDGES = [['a','b','eab'],['a','c','eac'],['c','d','ecd'],['c','e','ece']];
 // Postorder: b, d, e, c, a
 const STEPS = [
   { node:'b', gain:9, best:9, peakNodes:['b'], peakEdges:[],
-    cap:'Leaf <code>9</code>. No children → leftGain=rightGain=0. <span class="g">gain = 9 + max(0,0) = 9</span>. Peak here = 9. <span class="p">best = 9</span>.' },
+    cap:'Leaf <code>9</code>. No children → leftGain=rightGain=0. <span class="g">gain = 9 + max(0,0) = 9</span>. Path through here = 9. <span class="p">best = 9</span>.' },
   { node:'d', gain:15, best:15, peakNodes:['d'], peakEdges:[],
-    cap:'Leaf <code>15</code>. <span class="g">gain = 15</span>. Peak = 15 > 9 → <span class="p">best = 15</span>.' },
+    cap:'Leaf <code>15</code>. <span class="g">gain = 15</span>. Path through here = 15 > 9 → <span class="p">best = 15</span>.' },
   { node:'e', gain:7, best:15, peakNodes:['e'], peakEdges:[],
-    cap:'Leaf <code>7</code>. <span class="g">gain = 7</span>. Peak = 7, not better. <span class="p">best stays 15</span>.' },
+    cap:'Leaf <code>7</code>. <span class="g">gain = 7</span>. Path through here = 7, not better. <span class="p">best stays 15</span>.' },
   { node:'c', gain:35, best:42, peakNodes:['d','c','e'], peakEdges:['ecd','ece'],
-    cap:'Node <code>20</code>: leftGain=15, rightGain=7 (both ≥0, kept). Peak here = <code>20+15+7 = 42</code> → <span class="p">best = 42</span> 🎉. But gain passed UP uses only ONE side: <span class="g">gain = 20 + max(15,7) = 35</span>.' },
+    cap:'Node <code>20</code>: leftGain=15, rightGain=7 (both ≥0, kept). Path through here = <code>20+15+7 = 42</code> → <span class="p">best = 42</span> 🎉. But gain passed UP uses only ONE side: <span class="g">gain = 20 + max(15,7) = 35</span>.' },
   { node:'a', gain:0, best:42, peakNodes:['d','c','e'], peakEdges:['ecd','ece'], done:true,
-    cap:'Root <code>-10</code>: leftGain = max(0,9)=9, rightGain = max(0,35)=35. Peak here = <code>-10+9+35 = 34</code> — not better. <span class="g">gain up = -10+max(9,35)=25</span> (irrelevant, no parent). <span class="p">best = 42</span> — final answer!' },
+    cap:'Root <code>-10</code>: leftGain = max(0,9)=9, rightGain = max(0,35)=35. Path through here = <code>-10+9+35 = 34</code> — not better. <span class="g">gain up = -10+max(9,35)=25</span> (irrelevant, no parent). <span class="p">best = 42</span> — final answer!' },
 ];
 
 const $ = id => document.getElementById(id);

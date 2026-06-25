@@ -17,12 +17,11 @@ Given an array `nums` containing `n` distinct numbers taken from the range `[0, 
 
 ## Real-World Analogy
 
-Socho ek classroom me roll numbers `0` se `n` tak hone chahiye, par ek student absent hai. Tum do tarah se pata laga sakte ho:
+**What Azure Event Hubs is:** Azure Event Hubs is Azure's high-throughput event-ingestion and streaming service for telemetry, logs, and clickstreams. It shards each event hub into partitions, which are ordered lanes of events that let consumers process data in parallel. Azure Resource Graph gives operators a searchable inventory of Azure resources, which is useful for reconciliation jobs that compare expected state with actual state.
 
-1. **Sum wala tarika** — pehle se pata hai ki agar sab present hote to roll numbers ka total kitna hota (`0+1+...+n`). Phir jo students actually present hain unke roll numbers jod do. Dono ka **difference** = absent student ka roll number. Seedha ghatao, ho gaya.
-2. **XOR wala tarika** — har expected roll number ko ek "switch" maano. Tum pehle saare expected `0..n` ko ek baar flip karte ho, phir saare present roll numbers ko dobara flip karte ho. Jo number dono jagah aaya (expected + present) wo do baar flip hua → wapas off. Sirf absent number ek hi baar flip hua → on reh gaya. Wahi answer hai.
+**What a partition manifest is, and why it's used:** An Event Hubs deployment can have a manifest saying which partition IDs should exist, while the observed Azure inventory lists which IDs were actually discovered. Keeping IDs as a complete sequence makes routing and consumer assignment predictable; a gap means one partition lane is missing from the configuration. Reconciliation exists to find that gap automatically instead of manually inspecting every ID.
 
-XOR wala tarika overflow-proof hai, isliye interview me thoda zyada elegant maana jaata hai.
+**The mapping:** The expected sequence `0..n` is the desired Event Hubs partition manifest, and `nums` is the actual Azure inventory snapshot. XORing both lists cancels every ID that appears in both places because `x ^ x = 0`; the sum formula compares expected and actual totals to find the same gap. The key insight is that matched IDs vanish, so the only value left is the missing partition number.
 
 ## Approach
 

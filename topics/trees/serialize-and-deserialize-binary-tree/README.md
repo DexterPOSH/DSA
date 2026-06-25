@@ -27,7 +27,11 @@ The tree can contain any structure (not a BST). Round-trip must be lossless: `de
 
 ## Real-World Analogy
 
-Socho ek **origami structure** hai jo tumhe courier se bhejni hai. Tum usse ek specific order me **fold karke ek flat strip** bana dete ho (serialize), aur saath me clear instructions: "yaha child hai", "yaha khaali hai (`#`)". Doosri taraf jo banda strip kholega, agar wo **bilkul same order** me fold-instructions follow kare, to exactly wahi structure wapas ban jaata. Null markers (`#`) critical hain — unke bina pata hi nahi chalega ki ek node ke kitne children the aur shape kya thi.
+**What Azure Resource Manager is:** Azure Resource Manager is Azure's control plane for deploying and organizing cloud resources. ARM templates and Bicep files sit on top of that control plane as infrastructure-as-code formats, capturing resources and relationships so an environment can be reviewed, versioned, and recreated. Exporting and redeploying is essentially turning a live Azure structure into text and then rebuilding it.
+
+**What template serialization with null shape markers is, and why it's used:** When a hierarchy has optional child slots, values alone do not fully describe the shape. Explicit markers for missing children preserve where a branch is absent, just as infrastructure-as-code needs enough relationship data to recreate the same parent/child structure. Without those markers, different Azure-shaped trees could produce the same token stream and deserialize incorrectly.
+
+**The mapping:** Serialization writes the tree like an Azure template export in preorder: current node, then left child, then right child, using a null token for empty slots. Deserialization consumes tokens in the same order, creating a node for each value and returning `None` for each null marker. The key insight is that values plus explicit missing-child markers make the stream self-describing enough to rebuild the exact tree.
 
 ## Approach
 

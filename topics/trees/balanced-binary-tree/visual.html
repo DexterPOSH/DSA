@@ -71,8 +71,8 @@
   <p class="subtitle">Bottom-up DFS returns a node's height, or <code>-1</code> if any node below is unbalanced (<code>|leftH − rightH| > 1</code>).</p>
 
   <div class="analogy">
-    <h3>🎐 Hanging mobile sculpture</h3>
-    <p>Har joint pe dono taraf ki lambai lagbhag barabar honi chahiye. Ek bhi joint imbalanced (ek side 2+ level gehri) → poori sculpture tedhi. Hum neeche se heights compute karke <b>-1</b> ka flag upar bhej dete hain.</p>
+    <h3>☁️ Azure management hierarchy</h3>
+    <p>Azure Management Groups, Subscriptions, Resource Groups, and Resources form a real tree. This bottom-up check returns each scope's height, or <b>-1</b> when sibling branches differ by more than one level, then propagates that signal upward.</p>
   </div>
 
   <div class="stage">

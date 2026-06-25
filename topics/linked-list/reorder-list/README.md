@@ -20,13 +20,11 @@ You may not modify node **values** — only rearrange the nodes themselves.
 
 ## Real-World Analogy
 
-Socho ek lambi line of people hai aur tumhe usse **"zip" karna hai** — pehla front se, phir
-ekdum last wala, phir doosra front se, phir second-last... ek-ek karke aage aur peeche se
-alternate. Aise karne ka sabse aasaan tareeka? Line ko **beech se kaato**: ek aadhi line
-front-half, doosri back-half. Ab back-half ko **ulta ghuma do** (taaki last wala uske aage
-aa jaaye), aur phir dono halves ko **alternate karke aapas me interleave (zip)** kar do.
+**What Azure Logic Apps is:** Azure Logic Apps is Azure's workflow automation service for connecting apps, services, and data with low-code workflows. A workflow is made of actions, and the workflow definition describes how one action should run after another. That makes it a natural analogy for a chain of linked-list nodes.
 
-Teen familiar moves ka combo: **find middle → reverse second half → merge/zip two halves**.
+**What `runAfter` dependency modeling is, and why it's used:** In a Logic Apps definition, an action's `runAfter` property says which previous action or actions must finish, and with which status, before this action can run. This exists so workflows can express ordering, branching, retries, and error paths instead of relying on a single hidden execution order. Rewriting dependencies changes the execution chain without creating new actions.
+
+**The mapping:** The original linked list is the Azure Logic Apps action chain `L0 -> L1 -> ... -> Ln`. Reordering means finding the middle of the chain, reversing the second half's `runAfter` links so the last action becomes the next candidate, then alternating nodes from the first half and reversed second half. The key insight is to transform the tail into forward order first; once the second half is reversed, the final weave is just pointer relinking.
 
 ## Approach
 

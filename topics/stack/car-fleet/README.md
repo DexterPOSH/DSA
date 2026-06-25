@@ -22,27 +22,22 @@ speed    = [ 2, 4, 1, 1, 3]
 
 ## Real-World Analogy
 
-Socho highway pe ek single lane hai, overtaking allowed nahi. Sabse aage wali car
-ka **arrival time** fix hai. Uske peeche koi tej car aati hai — agar wo destination
-pe pehle pahunchti (akele chalti to), matlab wo aage wali ko **pakad legi** raaste
-me, aur fir uske peeche chipak ke ussi pace pe chalegi → **same fleet**. Lekin agar
-peeche wali car aage wali se bhi *zyada time* leti hai (slower effectively), to wo
-kabhi nahi pakad paayegi → **apni alag nayi fleet** ban jaati hai, aur ab *wo* nayi
-"leader" ban jaati hai jise peeche walon ko match karna hoga.
+**What Azure Virtual Machine Scale Sets is:** Azure Virtual Machine Scale Sets let you run and manage many identical VMs as one elastic compute group. Azure can add or remove instances, spread them across zones, and apply model or OS updates without treating every VM as a separate snowflake. For a service behind a load balancer, the goal is coordinated capacity: change the group while keeping enough healthy instances serving traffic.
 
-Trick: cars ko **destination ke najdik se door ki taraf** (right-to-left) process
-karo. Har car ka "akele lagne wala time" nikaalo. Ek stack jaisa leader-time rakho.
+**What the rolling upgrade mechanism is, and why it's used:** A VM Scale Set rolling upgrade applies an update in batches instead of updating every instance at once. Azure waits for each batch to complete and pass health checks before moving farther through the set, with settings such as batch size and pause time controlling blast radius. That batching exists because the rollout should be governed by safe, ordered waves rather than by whichever individual instance could finish fastest on its own.
+
+**The mapping:** Sort cars by position descending like looking at Azure upgrade waves from the instances closest to the target state back toward the ones still behind. A car's solo arrival time is a batch's solo completion time; the stack top is the current wave leader's completion gate. If a behind car would arrive sooner or at the same time, it catches that gate and merges into the leader's fleet; if it would arrive later, it becomes a new wave leader. The key insight is that only strictly slower completion times survive on the stack, so `len(stack)` is the number of independent fleets/waves.
 
 ## Approach
 
-Har car ka **time-to-reach** akele chalne pe: `(target - position) / speed`.
-Cars ko **position ke descending order** me sort karo (destination ke sabse paas
-wali pehle). Ab left-to-right is sorted order me chalo:
+Each car's solo **time-to-reach** is `(target - position) / speed`.
+Sort cars by **position in descending order** (the car closest to the destination
+comes first). Then scan this sorted order from left to right:
 
-- Agar current car ka time **strictly zyada** hai pichhli fleet-leader ke time se,
-  to ye car kabhi nahi pakad paayegi → **nayi fleet**, ye nayi leader ban jaati.
-- Agar current car ka time **<=** leader ke time se hai, to ye pakad legi →
-  same fleet me merge, leader nahi badalti.
+- If the current car's time is **strictly greater** than the previous fleet leader's time,
+  it can never catch that fleet → **new fleet**, and this car becomes the new leader.
+- If the current car's time is **<=** the leader's time, it will catch up →
+  merge into the same fleet, and the leader does not change.
 
 ```python
 def car_fleet(target, position, speed):
@@ -58,36 +53,36 @@ def car_fleet(target, position, speed):
     return len(stack)
 ```
 
-`len(stack)` hi fleets ka count hai — har stack entry ek alag leader/fleet hai.
+`len(stack)` is the fleet count — each stack entry is a separate leader/fleet.
 
-> **Stack kyun?** Technically yahan ek running-max bhi kaam karta, lekin
-> conceptually ye **monotonic stack** hai: stack ke arrival times bottom→top
-> increasing rehte hain, aur ek choti (faster-catching) car peeche wali ko "absorb"
-> kar leti — bilkul next-greater style pop-merge logic.
+> **Why a stack?** Technically a running maximum also works here, but conceptually
+> this is a **monotonic stack**: arrival times increase from bottom→top, and a
+> smaller-time (faster-catching) car gets "absorbed" by the fleet ahead — just like
+> next-greater-style pop/merge logic.
 
 ## Complexity
 
-- **Time:** O(n log n) — sorting dominate karti hai. Sort ke baad single pass O(n).
-- **Space:** O(n) — pairs aur stack ke liye.
+- **Time:** O(n log n) — sorting dominates. After sorting, the scan is O(n).
+- **Space:** O(n) — for the pairs and the stack.
 
 ## Common Pitfalls
 
-- **Sort direction galat** — destination ke **paas** wali car pehle aani chahiye
-  (descending position). Ascending karoge to leader logic ulta ho jaayega.
-- **`>` vs `>=`** — current time leader ke time ke **barabar** ho to wo same time pe
-  pahunchti hai → problem statement ke mutabik **same fleet**. Isliye nayi fleet
-  sirf jab `time > stack[-1]` (strictly greater).
-- **Integer division** — `(target - pos) // spd` mat karo; time float hai, warna
-  tie-breaking aur catch-up galat compute hoga. Plain `/` use karo.
-- **Equal positions** — single lane me do car ek hi spot pe nahi ho sakti
-  (constraint), so usually safe; par sort stable rakho.
+- **Wrong sort direction** — the car **closest** to the destination must come first
+  (descending position). If you sort ascending, the leader logic is reversed.
+- **`>` vs `>=`** — if the current time is **equal** to the leader's time, it arrives
+  at the same time → per the problem statement, that is the **same fleet**. Create a
+  new fleet only when `time > stack[-1]` (strictly greater).
+- **Integer division** — do not use `(target - pos) // spd`; time is fractional, and
+  integer division breaks tie and catch-up logic. Use plain `/`.
+- **Equal positions** — on a single-lane road, two cars cannot usually start at the
+  same spot (constraint), so this is normally safe; still keep sorting deterministic.
 
 ## When to Use This Pattern
 
-"Order-preserving merge / kaun kisko 'absorb' karega aage" type questions — jahan
-elements ek direction me process hote hain aur ek monotonic property maintain hoti
-hai. Cue: "cars/people/intervals jo ek doosre ko overtake nahi kar sakte" → right-
-to-left scan + leader/stack. Cousins: Asteroid Collision, Next Greater Element.
+"Order-preserving merge / who absorbs whom ahead" type questions — where elements
+are processed in one direction while a monotonic property is maintained. Cue:
+"cars/people/intervals that cannot overtake each other" → right-to-left scan +
+leader/stack. Cousins: Asteroid Collision, Next Greater Element.
 
 ## Practice
 

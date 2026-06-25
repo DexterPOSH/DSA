@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Combination Sum II — Once-Each + Skip-Duplicate Tree</title>
+<title>Combination Sum II — Finite Azure SKU Slots + Duplicate Skip</title>
 <style>
   :root {
     --bg:#1a1a2e; --panel:#16213e; --panel2:#232342; --text:#e0e0e0; --muted:#9a9ac0;
@@ -78,18 +78,18 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Combination Sum II — use each once, <span>skip duplicates</span></h1>
-  <p class="subtitle">Recurse with <code>i+1</code> (each coin once) + sort &amp; same-level skip (no repeat combos).</p>
+  <h1>Combination Sum II — finite SKU slots, <span>skip duplicates</span></h1>
+  <p class="subtitle">Recurse with <code>i+1</code> (each reservation slot once) + sort &amp; same-level skip (no repeat plans).</p>
 
   <div class="analogy">
-    <h3>🪙 Real-world analogy: a pocket of coins, some identical</h3>
-    <p>Coins <code>[1,1,2,3]</code>, banao <b>4</b>. Har coin sirf ek baar (pocket me jitne hai). Do <code>1</code>-coins identical hain → same level pe doosra <code>1</code> uthane lago to <b>skip</b>, warna <code>[1,3]</code> jaise combos double ho jaate.</p>
+    <h3>☁️ Real-world analogy: finite Azure reservation slots</h3>
+    <p>An Azure Capacity Reservation group may contain finite VM-size slots, including identical slots. Use each slot once, sort identical SKUs together, and skip the second equal slot at the same recursion level so the same quota plan is not emitted twice.</p>
   </div>
 
   <div class="panel">
     <h2>Candidates (sorted) &amp; target</h2>
     <div class="cands" id="cands"></div>
-    <div class="sortnote">The two <code>1</code>s (amber) are duplicates — same-level repeats get skipped.</div>
+    <div class="sortnote">The two <code>1</code>s (amber) are duplicate SKU slots — same-level repeats get skipped.</div>
   </div>
 
   <div class="panel">
@@ -125,7 +125,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Combination Sum II = CS-I's reuse swapped to <code>i+1</code> (once each) <b>+</b> Subsets II's <code>i&gt;start &amp;&amp; equal</code> skip (no dup combos). Same building blocks, recombined.</p>
+    <p>Combination Sum II = reusable Azure SKU planning changed to <code>i+1</code> (each reservation slot once) <b>+</b> duplicate-SKU skipping at the same level. The branch still rolls back each slot after exploring it.</p>
   </div>
 </div>
 
@@ -261,21 +261,21 @@ function render(){
 
   const cap=$('caption'); cap.className='caption';
   if(st.type==='visit')
-    cap.innerHTML=`Node with <b class="bl">remain=${st.remain}</b>. Loop coins from <code>start</code>; recurse with <code>i+1</code> (use once).`;
+    cap.innerHTML=`Node with <b class="bl">remain=${st.remain}</b>. Loop SKU slots from <code>start</code>; recurse with <code>i+1</code> (use once).`;
   else if(st.type==='pick')
-    cap.innerHTML=`<b class="g">PICK</b> <code>${candidates[st.idx]}</code> (index ${st.idx}) → new remain <b class="bl">${st.remain}</b>. Recurse with <code>start=${st.idx+1}</code>.`;
+    cap.innerHTML=`<b class="g">PICK</b> SKU slot <code>${candidates[st.idx]}</code> (index ${st.idx}) → new remain <b class="bl">${st.remain}</b>. Recurse with <code>start=${st.idx+1}</code>.`;
   else if(st.type==='hit'){ cap.classList.add('hit');
-    cap.innerHTML=`<b class="g">remain == 0</b> 🎯 — path sums exactly to target!`; }
+    cap.innerHTML=`<b class="g">remain == 0</b> 🎯 — selected SKU slots match the Azure quota exactly!`; }
   else if(st.type==='record'){ cap.classList.add('hit');
     cap.innerHTML=`<b class="a">Record</b> <b class="a">[${st.recorded.join(',')}]</b>. ✅`; }
   else if(st.type==='skip'){ cap.classList.add('skip');
-    cap.innerHTML=`<b class="r">SKIP</b> index ${st.idx}: <code>i &gt; start</code> &amp; <code>candidates[${st.idx}]==candidates[${st.idx-1}]</code> → would duplicate the left sibling's combos. ✂️`; }
+    cap.innerHTML=`<b class="r">SKIP</b> index ${st.idx}: <code>i &gt; start</code> &amp; <code>candidates[${st.idx}]==candidates[${st.idx-1}]</code> → would duplicate the left sibling's Azure plan. ✂️`; }
   else if(st.type==='break'){ cap.classList.add('over');
-    cap.innerHTML=`<code>${candidates[st.idx]} &gt; remain (${st.remain})</code> — sorted, so every later coin overshoots too. <b class="r">break</b> the loop.`; }
+    cap.innerHTML=`<code>${candidates[st.idx]} &gt; remain (${st.remain})</code> — sorted, so every later SKU slot exceeds the quota too. <b class="r">break</b> the loop.`; }
   else if(st.type==='over'){ cap.classList.add('over');
-    cap.innerHTML=`<b class="r">Overshoot</b> (remain &lt; 0) — prune.`; }
+    cap.innerHTML=`<b class="r">Quota overshoot</b> (remain &lt; 0) — prune.`; }
   else if(st.type==='back'){ cap.classList.add('back');
-    cap.innerHTML=`<b class="a">BACKTRACK</b> — <code>path.pop()</code> removes <code>${candidates[st.idx]}</code>.`; }
+    cap.innerHTML=`<b class="a">BACKTRACK</b> — <code>path.pop()</code> releases SKU slot <code>${candidates[st.idx]}</code>.`; }
 
   $('counter').textContent=`step ${cur+1} / ${steps.length}`;
   $('prevBtn').disabled=cur===0; $('nextBtn').disabled=cur===steps.length-1;

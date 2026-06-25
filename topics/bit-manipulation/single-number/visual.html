@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Single Number — XOR Cancellation Walkthrough</title>
+<title>Single Number — Azure Storage Parity Walkthrough</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -121,16 +121,15 @@
 </head>
 <body>
 
-  <h1>Single Number &mdash; <span>XOR Cancellation</span></h1>
+  <h1>Single Number &mdash; <span>Azure Storage Parity</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">💃</div>
+    <div class="analogy-icon">🗄️</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Log <strong>jodi me</strong> aaye hain — ek hi akela hai. Do same log milte hi
-        <strong>cancel</strong> ho jaate (<code>x ^ x = 0</code>). Poore array ka XOR lo —
-        saare pairs khatam, sirf akela bachta hai (<code>x ^ 0 = x</code>).
+        Azure Blob Storage can verify replicated block checksums with a parity-style XOR pass.
+        Matching block checksums cancel as <code>x ^ x = 0</code>, and the unmatched checksum survives as the odd block to investigate.
       </div>
     </div>
   </div>
@@ -184,9 +183,9 @@
     <div>
       <div class="takeaway-label">Key Takeaway</div>
       <p>
-        XOR is its own inverse: <strong>x ^ x = 0</strong> and <strong>x ^ 0 = x</strong>.
-        Folding the whole array cancels every paired bit, leaving only the unique number &mdash;
-        <strong>O(n) time, O(1) space</strong>, no hash map needed.
+        Azure Storage-style parity reconciliation relies on XOR being its own inverse:
+        <strong>x ^ x = 0</strong> and <strong>x ^ 0 = x</strong>. Folding every checksum cancels paired replicas,
+        leaving only the odd block ID &mdash; <strong>O(n) time, O(1) space</strong>.
       </p>
     </div>
   </div>
@@ -204,19 +203,19 @@
   let acc = 0;
   // step 0: initial
   steps.push({ i: -1, acc: 0, prevAcc: 0, cur: 0, desc:
-    'Start: <strong>result = 0</strong> (all zero bits). Har number ko isme XOR karenge.' });
+    'Start: <strong>result = 0</strong> (all zero bits), the empty parity accumulator. Fold each checksum number into it.' });
   for (let i = 0; i < arr.length; i++) {
     const prevAcc = acc;
     acc = acc ^ arr[i];
     steps.push({
       i, acc, prevAcc, cur: arr[i],
       desc: `XOR in <strong>arr[${i}] = ${arr[i]}</strong> (binary <code>${toBits(arr[i]).join('')}</code>). ` +
-            `Bits jahan dono same the wahan <strong style="color:#10b981">cancel</strong> (→0), jahan alag the wahan <strong>1</strong>. ` +
+            `Matching bit positions <strong style="color:#10b981">cancel</strong> to 0; different positions stay <strong>1</strong>. ` +
             `result = <code>${toBits(prevAcc).join('')}</code> ^ <code>${toBits(arr[i]).join('')}</code> = <code>${toBits(acc).join('')}</code> (${acc}).`
     });
   }
   steps.push({ i: arr.length, acc, prevAcc: acc, cur: null, done: true,
-    desc: `Saare paired numbers cancel ho gaye. <strong style="color:#10b981">result = ${acc}</strong> &mdash; yahi single number hai. ✅` });
+    desc: `All paired values have canceled. <strong style="color:#10b981">result = ${acc}</strong> &mdash; the unpaired value remains. ✅` });
 
   const TOTAL = steps.length;
   let cur = 0;

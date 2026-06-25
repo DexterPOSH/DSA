@@ -19,12 +19,11 @@ candidates = [2, 5, 2, 1, 2], target = 5
 
 ## Real-World Analogy
 
-Combination Sum waala coins-banana yaad hai? Yahan twist do hain: (1) har coin **sirf ek baar**
-use ho sakta — pocket me jitne hai utne hi, unlimited nahi; aur (2) pocket me kuch coins
-**bilkul same value** ke ho sakte hain (do `1`-rupee coins). Agar tum dono `1`-coins ko alag
-treat karoge to `[1,7]` do baar count ho jaayega — par bill ke liye dono ek jaise hain. To
-Subsets II waali hi dedup-trick: coins ko **sort** karo, aur same recursion-level pe **doosra
-identical coin** dobara uthao to **skip**.
+**What Azure Capacity Reservations are:** Azure Capacity Reservations let you reserve compute capacity for specific VM sizes in a region or Availability Zone so future VM deployments have capacity waiting for them. A reservation group can contain a finite set of reserved VM-size slots, and a matching VM consumes one of those slots when it is placed. Unlike reusable SKU planning, each reserved slot is a concrete capacity unit that can be used at most once.
+
+**What finite-slot duplicate handling is, and why it's used:** A capacity reservation group may contain multiple separate slots for the same VM SKU, such as two 1-vCPU reservations. Those duplicates are real capacity, so a deployment may use both, but swapping which identical slot you name first does not create a new Azure plan. Sorting identical SKUs together and skipping duplicates at the same recursion level removes repeated plans while preserving the ability to consume multiple copies when needed.
+
+**The mapping:** Each number is one Azure reservation slot, `remain` is the target quota left, and choosing a slot moves recursion to `i + 1` because that exact slot cannot be reused. If the branch hits zero, the reservation mix is complete; if it overshoots or runs out, backtracking restores the slot and tries the next unique option. The key insight is to distinguish duplicate values from duplicate choices: use each slot once, but report each capacity combination once.
 
 ## Approach — sort + (`i+1` for one-use) + same-level dedup
 

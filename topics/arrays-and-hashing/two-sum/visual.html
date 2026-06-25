@@ -329,8 +329,10 @@
   <div class="subtitle">Walk through how a single pass with a hash map turns an O(n&sup2;) brute-force into O(n).</div>
 
   <div class="analogy">
-    <h3>Real-world analogy</h3>
-    <p>You're at a party looking for someone whose age + yours equals a target. You keep a <b>mental map</b> of everyone you've already met. When you meet someone new, you check: <i>"Is the partner age I need already in my map?"</i> If yes — pair found. If no — add this person to your map and keep mingling.</p>
+    <div class="analogy-icon">🔑</div>
+    <div class="analogy-text">
+      <strong>Real-world analogy:</strong> Azure Cache for Redis stores each seen number as a key with its index as the value. For a new number, look up <code>target - x</code>; a cache hit is the matching earlier index.
+    </div>
   </div>
 
   <div class="problem">

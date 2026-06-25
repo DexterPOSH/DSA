@@ -23,8 +23,11 @@ get("foo", 0)   ->  ""         # nothing <= 0
 
 ## Real-World Analogy
 
-Socho ek **git commit history** hai ek file ki. Har commit ka ek timestamp hai aur ek snapshot. Koi pooche "is file ka content time `T` pe kya tha?" — tum exact `T` wala commit nahi dhoondhte, balki **`T` se pehle ka sabse recent commit** dhoondhte ho (kyunki wahi version us waqt live tha). Commits already time order me hain, to poori history scan karne ki zaroorat nahi — seedha **binary search** se "`T` se chhota-ya-barabar wala latest" pe jump kar jao.
+**What Azure Blob Storage is:** Azure Blob Storage is Azure's object storage service for files such as images, logs, backups, and application data. A blob can be overwritten many times under the same name, but production systems often need a way to recover or inspect older contents. Versioning gives that blob a history instead of only keeping the latest bytes.
 
+**What blob versioning is, and why it's used:** Blob versioning automatically keeps immutable previous versions when a blob is changed or deleted, with each version addressable by its version ID and associated timestamp metadata. It exists for recovery, audit, and accidental-overwrite protection: you can list the versions and choose an older one instead of losing history. If you build an "as of time `T`" read on top of that version list, you need the newest version whose timestamp is `<= T`, not necessarily an exact timestamp match.
+
+**The mapping:** The key in `TimeMap` is the Azure Blob Storage blob name, each `(timestamp, value)` pair is a stored blob version, and `get(key, T)` is an as-of lookup. Because `set` calls append strictly increasing timestamps, the version list is already sorted; when `arr[mid][0] <= T`, save that value and search right for a later still-valid version, and when it is too new, search left. The key insight is to find the floor timestamp — the rightmost version not newer than the requested time.
 ## Approach
 
 Key insight: kyunki timestamps **increasing order me append hote hain**, har key ki list automatically sorted-by-timestamp rehti hai. To `get` ek **"rightmost value with ts <= target"** binary search ban jaata hai — yeh classic *upper bound* / "floor" search hai.

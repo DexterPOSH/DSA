@@ -17,10 +17,11 @@ Given an integer array `nums`, find the **contiguous subarray** (containing at l
 
 ## Real-World Analogy
 
-Socho tum ek road-trip pe ho aur har stretch pe ya to paisa kamate ho (positive) ya kharch karte ho (negative). Tumhe sabse profitable **continuous stretch** dhoondhna hai.
+**What Azure Cost Management plus Azure Monitor is:** Azure Cost Management helps teams understand spending, budgets, and cost trends across Azure resources, while Azure Monitor adds operational signals such as errors, latency, and resource health. Together they can describe a workload's hourly net value: useful business output or savings as positives, waste and incidents as negatives. The goal is to find the strongest continuous operating window, not scattered good hours.
 
-Tum drive karte jaate ho aur ek "running profit" maintain karte ho. Simple rule: **agar abhi tak ka running profit negative ho gaya, to use carry mat karo — wahi se fresh start lo.** Kyun? Kyunki ek negative baggage ko aage le jaane se aane wale har stretch ka total *kam* hi hoga. Better hai ki "abhi tak ka loss bhool jao" aur naya count yahin se shuru karo. Saath hi saath, ab tak ka best-ever profit ek diary me note karte raho. Yahi Kadane's algorithm hai.
+**What rolling net-value windowing is, and why it's used:** A rolling window lets Azure operators compare contiguous periods of workload behavior, such as "which uninterrupted run of hours produced the best net value?" If the current window's total becomes negative, carrying that loss into future hours can only make any future window worse. Dropping the loss-making prefix immediately keeps the analysis focused on windows that can still become optimal.
 
+**The mapping:** Each number is an Azure hour's net value, `cur` is the best continuous window ending at the current hour, and `best` is the strongest window seen anywhere on the dashboard. For each hour, Kadane's choice is either extend the existing window or restart at the current hour if the previous total is baggage. The key insight is that a negative prefix is never worth preserving, so one pass can keep the best contiguous value without checking every window.
 ## Approach
 
 **Brute force** — har possible subarray ka sum (O(n²)): har start `i` se har end `j` tak loop. Slow.

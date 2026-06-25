@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jump Game — Farthest Reach Visualized</title>
+<title>Jump Game — Azure Autoscale Reach Visualized</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -131,12 +131,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Jump Game — farthest <span>reach</span> marker</h1>
-  <p class="subtitle">Track one number — the farthest index reachable so far. If an index ever outruns it, you're stuck.</p>
+  <h1>Jump Game — Azure autoscale <span>reach</span></h1>
+  <p class="subtitle">Track one number — the farthest capacity checkpoint reachable so far. If a checkpoint outruns it, autoscale is stuck.</p>
 
   <div class="analogy">
-    <h3>🪨 Real-world analogy: river stepping-stones</h3>
-    <p>Har stone par likha hai tum max kitna aage chhalang laga sakte ho. Path plan mat karo — bas <b>"abhi tak sabse door kaunsa stone reach kar sakta hu?"</b> track karo. Agar tum ek aise stone pe khade ho jo us reach se aage hai, beech me ek <code>0</code> ne raasta kaat diya.</p>
+    <h3>📈 Azure analogy: VM Scale Set autoscale reach</h3>
+    <p>Azure Monitor autoscale tracks the farthest VM Scale Set capacity reachable from rules already within range. If a capacity checkpoint is beyond <code>reach</code>, no earlier scale decision can get there; once <code>reach</code> covers the target, the deployment is feasible.</p>
   </div>
 
   <div class="card">
@@ -183,7 +183,7 @@
 
   <div class="takeaway">
     <h3>💡 Key takeaway</h3>
-    <p>You don't need the path, only feasibility. One <code>reach</code> pointer captures every index any earlier jump can land on. Outrun it once → a <code>0</code> blocked you → <b>False</b>. Cover the last index → <b>True</b>. O(n) time, O(1) space.</p>
+    <p>Like Azure autoscale reach, you don't need the exact path, only whether each checkpoint is within the farthest reachable capacity. Outrun <code>reach</code> once → impossible; cover the target → feasible.</p>
   </div>
 </div>
 
@@ -200,7 +200,7 @@ const trace = [];
   for (let i = 0; i < n && !done; i++) {
     if (i > reach) {
       trace.push({ i, reach, blocked: true, success: false,
-        desc: `<code>i = ${i}</code> but <code>reach = ${reach}</code> — <b style="color:#ef4444">i &gt; reach</b>. We can't even stand on this stone; a <code>0</code> earlier blocked the path. Return <b>False</b>.` });
+        desc: `<code>i = ${i}</code> but <code>reach = ${reach}</code> — <b style="color:#ef4444">i &gt; reach</b>. This capacity checkpoint is outside autoscale reach; an earlier zero-growth point blocked expansion. Return <b>False</b>.` });
       done = true; break;
     }
     const before = reach;
@@ -212,7 +212,7 @@ const trace = [];
       done = true; break;
     }
     trace.push({ i, reach, blocked: false, success: null,
-      desc: `<code>i = ${i}</code>, nums[i] = ${nums[i]}. ${i <= before ? 'Reachable ✅. ' : ''}reach = max(${before}, ${i} + ${nums[i]}) = <b>${reach}</b>. ${grew ? 'Reach extended.' : 'No improvement — this stone is a <b style="color:#f59e0b">0-value trap</b>.'}` });
+      desc: `<code>i = ${i}</code>, nums[i] = ${nums[i]}. ${i <= before ? 'Reachable ✅. ' : ''}reach = max(${before}, ${i} + ${nums[i]}) = <b>${reach}</b>. ${grew ? 'Reach extended.' : 'No improvement — this checkpoint adds <b style="color:#f59e0b">zero reach</b>.'}` });
   }
 }
 
@@ -269,7 +269,7 @@ function render() {
     v.textContent = '✅ reach covers the last index → return True';
   } else if (s.success === false) {
     const v = $('verdict'); v.className = 'verdict fail';
-    v.textContent = '❌ i > reach → stuck behind a 0 → return False';
+    v.textContent = '❌ i > reach → capacity checkpoint unreachable → return False';
   }
 }
 

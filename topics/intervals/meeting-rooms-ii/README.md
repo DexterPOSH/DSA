@@ -18,17 +18,11 @@ rooms** required so that no two simultaneous meetings share a room.
 
 ## Real-World Analogy
 
-Socho tum ek office manager ho. Meetings start-time ke order me aati hain. Har nayi
-meeting ke liye poochho: **kya koi room abhi free ho chuka hai?** — yaani kya pichhli
-kisi meeting ka end time is nayi meeting ke start se pehle (ya barabar) hai? Iske liye
-tum ek **min-heap of end times** rakhte ho — heap ki jad (root) hamesha woh meeting
-hai jo **sabse pehle khatam** hogi.
+**What Azure Batch is:** Azure Batch is Azure's managed service for running large-scale parallel and high-performance computing workloads on pools of VM compute nodes. You submit jobs and tasks, and Batch places them onto available nodes, with pool size or autoscale settings determining how much capacity exists.
 
-- Nayi meeting aayi → heap ke sabse jaldi-khatam-hone-wale end ko dekho.
-- Agar woh `<= nayi.start` → woh room free ho gaya, **pop** karo (reuse).
-- Phir nayi meeting ka end heap me **push** karo.
+**What pool capacity planning is, and why it's used:** Pool capacity planning asks how many VM nodes are needed so timed reservations can run without waiting for a node to free up. A min-heap of reservation end times models reusable capacity: the top is the node that becomes available first, so it is the first candidate to reuse for the next reservation. This gives a tight capacity estimate instead of blindly provisioning one VM per job.
 
-Heap ka **maximum size** kabhi jo pahuncha — wahi rooms ka answer.
+**The mapping:** Each meeting is an Azure Batch job reservation, and each room is a VM node in the pool. Process reservations by start time, pop the earliest-ending node if it is already free, then push the new end time because that node is now occupied until then. The key insight is that the heap size represents concurrent Azure Batch VM demand, so the peak/final heap size is the minimum pool capacity needed.
 
 ## Approach
 

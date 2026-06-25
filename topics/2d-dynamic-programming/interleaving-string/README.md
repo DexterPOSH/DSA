@@ -18,14 +18,11 @@ A necessary first check: `len(s1) + len(s2)` must equal `len(s3)`.
 
 ## Real-World Analogy
 
-Socho do log ek hi document type kar rahe hain ek shared screen pe — ek bole `s1` ke
-letters apne order me, dusra `s2` ke letters apne order me. Beech-beech me jo combined
-text screen pe banta hai wo `s3` hai. Tumhe verify karna hai: kya `s3` exactly in dono
-ki **typing ko interleave** karke ban sakta hai? Har position pe tum dekhte ho — agla
-`s3` letter kis typist ne maara? Agar wo `s1` ke current letter se match karta hai to
-`s1` aage badha do; agar `s2` se match karta hai to `s2` aage. **Dono se match kar sakta
-hai** to confusion — yahi pe DP zaroori hai, kyunki ek galat choice baad me dead-end de
-sakti hai aur tumhe dono raaste explore karne padte hain bina dobara kaam kiye.
+**What Azure Event Hubs is:** Azure Event Hubs is Azure's high-throughput event ingestion service for telemetry, logs, clickstreams, and audit events. It scales by splitting an event hub into partitions, where each partition preserves the order of events written to that partition. Consumers can then read from multiple partitions and write a merged stream to a downstream store.
+
+**What partition-ordered merging is, and why it's used:** Partitioning exists so Azure Event Hubs can handle much more throughput than a single ordered log, while still preserving order for related events within one partition key. A downstream audit blob may interleave events from two partitions depending on when consumers read them, but it must not reorder events inside either original partition. Verification asks whether the merged stream could have been produced by weaving the two ordered sources together.
+
+**The mapping:** `s1` and `s2` are the two Azure Event Hubs partition streams, `s3` is the merged audit stream, and `dp[i][j]` says whether the first `i + j` merged events can be formed from the first `i` events of `s1` and first `j` events of `s2`. If the next merged event matches `s1[i - 1]`, the answer can come from the cell above; if it matches `s2[j - 1]`, it can come from the cell left. The key insight is that only the per-partition consumption counts matter, so a 2-D state fully captures every valid interleaving choice.
 
 ## Approach
 

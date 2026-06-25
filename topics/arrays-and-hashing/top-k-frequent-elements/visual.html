@@ -236,8 +236,10 @@
   <p class="subtitle">Find the <b>k</b> most frequent numbers in an array — in O(n) time using bucket sort.</p>
 
   <div class="analogy">
-    <h3>🏤 Real-world analogy: the post office</h3>
-    <p>Imagine a wall of <b>PO boxes numbered by how many letters arrived</b>. Box #3 holds names that received exactly 3 letters, box #2 holds names with 2 letters, and so on. To find the most popular recipients you don't sort anyone — you just <b>start reading from the fullest box and walk down</b> until you've collected enough names. That walk <i>is</i> bucket sort.</p>
+    <div class="analogy-icon">🔥</div>
+    <div class="analogy-text">
+      <strong>Real-world analogy:</strong> Azure Blob Storage access tiers put the most frequently used blobs in Hot before cooler tiers. Bucket sort makes one frequency tier per count, then reads from the hottest/highest bucket until <code>k</code> items are found.
+    </div>
   </div>
 
   <div class="problem">
@@ -253,7 +255,7 @@
   <!-- STEP 1 -->
   <div class="step hidden-stage" id="stage1">
     <div class="step-head"><div class="badge">1</div><h2>Build a frequency hashmap</h2></div>
-    <p class="desc">One pass over the array, counting how many times each number appears. This is the "letters arrived" count.</p>
+    <p class="desc">One pass over the array, counting how many times each number appears. This is the per-number frequency count.</p>
     <div class="row" id="inputRow"></div>
     <div style="margin:18px 0 10px; color:var(--muted);">Resulting counts:</div>
     <div class="map" id="mapRow"></div>

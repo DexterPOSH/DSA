@@ -16,11 +16,11 @@ s1 = "ab",  s2 = "eidboaoo"   ->  False   # no window is an anagram of "ab"
 
 ## Real-World Analogy
 
-Socho `s1` ek **recipe** hai jisme fixed quantities chahiye — jaise "2 onions, 1
-tomato". Tum `s2` ki pantry pe ek **fixed-size basket** (window) slide karte ho jiska
-size = recipe me total items. Har position pe poochte ho: "is basket me bilkul wahi
-quantities hain jo recipe maangti hai?" Order matter nahi karta — sirf counts match
-hone chahiye. Ek bhi position pe perfect match mil gaya, to answer `True`.
+**What Azure Stream Analytics with Azure Event Hubs is:** Azure Event Hubs collects a high-volume stream of telemetry events, and Azure Stream Analytics runs continuous queries over that stream. Azure Stream Analytics can keep a bounded active window and update aggregates as one event enters and another expires. That is exactly the kind of engine you want when searching for a short signature inside a long stream.
+
+**What fixed-length signature matching is, and why it's used:** A signature is a required count map of event types, such as "one login, one token refresh, one success," where order inside the window does not matter. The window length is fixed to the signature length, so every slide changes only two counts: the arriving event and the expiring event. This avoids sorting or re-counting every candidate span and lets Azure detect the same multiset even if the events arrive in a different order.
+
+**The mapping:** `s1` is the Azure event-type signature, and `s2` is the Azure Event Hubs stream being scanned. The window over `s2` always has length `len(s1)`, its frequency map is the active Azure Stream Analytics aggregate, and equality with the signature means a permutation has been found. Sliding the window by one updates only the outgoing and incoming character counts. The key insight is that an anagram/permutation is just a fixed-size window with the exact same counts, not the same order.
 
 ## Approach
 

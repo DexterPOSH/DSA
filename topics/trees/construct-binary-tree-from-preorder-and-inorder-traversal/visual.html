@@ -72,8 +72,8 @@
   <p class="subtitle">preorder = [3, 9, 20, 15, 7] · inorder = [9, 3, 15, 20, 7]</p>
 
   <div class="analogy">
-    <h3>🌳 Analogy</h3>
-    <p>Preorder ka <b>pehla naam hamesha root</b>. Inorder me us root ke <b>left wale = left subtree</b>, <b>right wale = right subtree</b>. Root pakdo, inorder ko do parts me todo, dono pe dobara karo.</p>
+    <h3>🏗️ Azure hierarchy reconstruction</h3>
+    <p>An Azure ARM/Bicep export can list a parent scope before its children, while another ordered export shows how children split around that parent. Preorder picks the current root; inorder splits the Azure subtree into left and right child windows.</p>
   </div>
 
   <div class="stage">
@@ -101,7 +101,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Preorder pointer ek-ek root deta hai; inorder me us root ki position left/right subtree windows me todti hai. <b>Left pehle build karo</b> (preorder = root, L, R). A hashmap of inorder indices makes it O(n).</p>
+    <p>The preorder pointer supplies one root at a time; that root's inorder position splits the current window into left and right subtree windows. <b>Build left first</b> because preorder is root, left, right. A hashmap of inorder indices makes it O(n).</p>
   </div>
 </div>
 

@@ -14,13 +14,11 @@ nums = [2, 7, 9, 3, 1]     ->  12    # rob 0, 2, 4 -> 2 + 9 + 1 = 12
 
 ## Real-World Analogy
 
-Socho tum ek chor ho aur ek gali me ghar-ghar loot rahe ho, par har do bagal wale gharon ke alarm aapas me jude hain. Toh har ghar par tumhare paas do hi choices hain: **"is ghar ko loot lo"** (par phir pichhle bagal wale ghar ko chhodna padega) ya **"is ghar ko chhod do"** (toh pichhle ghar tak ki best loot bachi rahegi).
+**What Azure Update Manager is:** Azure Update Manager helps schedule, deploy, and monitor operating-system updates for Azure, on-premises, and multicloud machines. It is used to keep fleets patched while giving teams control over maintenance timing and compliance. Each maintenance window can have a different reliability value depending on the systems it updates.
 
-Har ghar par tum yeh do options ka **max** lete ho:
-- **Loot:** is ghar ka paisa + do-ghar-pehle tak ki best loot (`nums[i] + dp[i-2]`)
-- **Skip:** ekdam pichhle ghar tak ki best loot (`dp[i-1]`)
+**What conflict-aware maintenance-window scheduling is, and why it's used:** In real patch planning, adjacent windows may conflict because updating dependent services too close together can reduce availability or violate change-management rules. Conflict-aware scheduling exists so the planner can choose valuable windows without selecting two risky neighbors. The scheduler keeps the best safe value seen so far instead of reconsidering every previous schedule.
 
-Yeh "take it or leave it" choice DP ka asli flavor hai — har step pe do raaste, dono ka best yaad rakho, aage badho.
+**The mapping:** Window `i` is a house with value `nums[i]`: if Azure Update Manager selects it, the previous compatible value is `dp[i-2]`; if it skips it, the best value remains `dp[i-1]`. The recurrence is `dp[i] = max(dp[i-1], nums[i] + dp[i-2])`. The key insight is that every choice is exactly "take this window and jump back two" or "skip it and keep yesterday's best.
 
 ## Approach
 

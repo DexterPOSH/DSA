@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sum of Two Integers — XOR is the sum, AND-shift is the carry</title>
+<title>Sum of Two Integers — Azure VM vCPU Carry Propagation</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -158,12 +158,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Sum of Two Integers — <span>XOR</span> is the sum, <span style="color:var(--amber)">AND&lt;&lt;1</span> is the carry</h1>
+  <h1>Sum of Two Integers — <span>Azure VM vCPU</span> carry propagation</h1>
   <p class="subtitle">Adding <b>a = 7</b> and <b>b = 5</b> with no <code>+</code> — just XOR, AND and left-shift, looping until the carry is gone.</p>
 
   <div class="analogy">
-    <h3>➕ Real-world analogy</h3>
-    <p>Grade-school binary addition: <b>sum-without-carry = XOR</b> (1+1 gives 0, carry leaves), <b>carry = AND</b> (banta hi tab hai jab dono bits 1 hon) aur carry agle column me jaata hai → <code>&lt;&lt; 1</code>. Repeat jab tak carry 0 na ho.</p>
+    <h3>🖥️ Real-world analogy</h3>
+    <p>Inside an Azure VM, the virtual CPU's adder can split fixed-width addition into two bit operations. <b>XOR</b> gives the partial sum without carry, <b>AND</b> finds where carries are born, and <code>&lt;&lt; 1</code> moves each carry to the next bit column.</p>
   </div>
 
   <div class="card">
@@ -221,7 +221,7 @@
 
   <div class="takeaway">
     <h3>💡 Key takeaway</h3>
-    <p>Addition splits into two independent bit operations: <b>XOR adds without carrying</b>, <b>AND finds where a carry is born</b>, and shifting moves that carry to the next column. Loop until no carry remains. <b>O(1) for fixed-width ints — this is literally how a CPU adder works.</b></p>
+    <p>An Azure VM vCPU adder splits addition into two bit operations: <b>XOR adds without carrying</b>, <b>AND finds where a carry is born</b>, and shifting moves that carry to the next column. Loop until no carry remains. <b>O(1) for fixed-width ints — this mirrors hardware carry propagation.</b></p>
   </div>
 </div>
 
@@ -288,9 +288,9 @@
       paint($('sumBits'), r.newA);
       paint($('carryBits'), r.carry, r.carry, 'shifted');
       stepDesc.innerHTML =
-        `<b>Round ${st.idx + 1}:</b> jahan <code>a</code> aur <code>b</code> dono 1 hain (amber-highlighted) wahan carry banta hai. ` +
+        `<b>Round ${st.idx + 1}:</b> where <code>a</code> and <code>b</code> both have 1 bits (amber-highlighted), the Azure VM vCPU carry is born. ` +
         `<code>a ^ b</code> = partial sum (green), <code>(a &amp; b) &lt;&lt; 1</code> = carry one column left (amber). ` +
-        `Next round me <code>a = ${r.newA}</code>, <code>b = ${r.carry}</code>.`;
+        `Next round uses <code>a = ${r.newA}</code>, <code>b = ${r.carry}</code>.`;
       calcLine.innerHTML =
         `a ^ b = <span class="res">${r.newA}</span> &nbsp;·&nbsp; (a &amp; b)&lt;&lt;1 = <span class="sx">${r.carry}</span>` +
         (r.carry === 0 ? ' &nbsp;→&nbsp; carry is 0, loop ends next' : '');
@@ -300,8 +300,8 @@
       $('sumDec').textContent = '·'; $('carryDec').textContent = '·';
       paint($('sumBits'), 0); paint($('carryBits'), 0);
       stepDesc.innerHTML =
-        `<b>Done!</b> Carry <code>b</code> ab <code>0</code> hai, to loop ruk gaya. ` +
-        `<code>a = ${finalSum}</code> me final sum hai: <code>${A0} + ${B0} = ${finalSum}</code>.`;
+        `<b>Done!</b> Carry <code>b</code> is now <code>0</code>, so propagation stops. ` +
+        `<code>a = ${finalSum}</code> holds the final sum: <code>${A0} + ${B0} = ${finalSum}</code>.`;
       resultBadge.textContent = `return a = ${finalSum}`;
       resultBadge.classList.add('show');
     }

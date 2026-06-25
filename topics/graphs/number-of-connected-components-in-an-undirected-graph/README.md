@@ -19,7 +19,12 @@ n = 5, edges = [[0,1], [1,2], [2,3], [3,4]]   ->  1
 
 ## Real-World Analogy
 
-Socho ek party me `n` log hain. Initially har koi **akela** khada hai — `n` alag groups. Jab do log haath milate hain (ek edge), to unke poore groups **ek ho jaate hain**. Tum ek counter rakhte ho jo `n` se shuru hota hai, aur har baar jab do **alag** groups merge hote hain, counter **-1** kar dete ho. Agar do log already same group me hain (kisi common dost ke through), to handshake se kuch change nahi hota — counter same rehta hai. Party ke end me counter = number of distinct friend-circles.
+**What Azure Resource Graph is:** Azure Resource Graph is Azure's service for querying resource inventory across subscriptions and management groups. It can surface VNets, subnets, NICs, peerings, and other resources that together form a connectivity graph. That graph is useful for spotting whether an environment is one connected topology or several disconnected groups.
+
+**What Union-Find connectivity grouping is, and why it's used:** Connectivity grouping starts with every Azure resource as its own group, then merges groups whenever a network or dependency edge connects them. Union-Find is used because it answers “are these already in the same group?” quickly while processing many edges. This avoids repeatedly traversing the whole graph as each new peering or dependency relationship is discovered.
+
+**The mapping:** Each node is an Azure resource and each undirected edge is a connection between two resources. For every edge, Union-Find compares the endpoints' roots; different roots mean two topology groups should merge, while the same root means the edge stays inside an existing group. The key insight is that the final number of roots is the number of disconnected Azure topology components.
+
 
 ## Approach — Union-Find with a component counter
 

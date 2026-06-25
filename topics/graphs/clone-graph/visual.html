@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Clone Graph — DFS + old→new map</title>
+<title>Clone Graph — Azure VNet topology deep copy</title>
 <style>
   :root{
     --bg:#1a1a2e; --panel:#16213e; --panel2:#202a4d; --text:#e0e0e0; --muted:#9aa4c8;
@@ -65,29 +65,29 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Clone Graph — <span>DFS</span> with an old→new map</h1>
-  <p class="subtitle">Deep-copy a cyclic graph; a hash map "original → clone" stops us re-cloning and breaks cycles.</p>
+  <h1>Clone Graph — <span>Azure VNet topology deep copy</span></h1>
+  <p class="subtitle">Deep-copy a cyclic Azure resource graph; an original→clone map preserves peering links and breaks cycles.</p>
 
   <div class="analogy">
-    <h3>👥 Carbon-copy a friend network</h3>
-    <p>Naya network banao with same friendships. Cycles (A↔B↔C↔A) ki wajah se ek <b>register</b> chahiye — "original banda → uska clone". Pehle register dekho; agar clone bana hai to <b>reuse</b> karo, naya mat banao.</p>
+    <h3>☁️ Azure VNet topology clone</h3>
+    <p>Deep-copy an Azure VNet topology: create new resource objects while preserving every subnet, NIC, and peering edge. The <b>original → clone</b> map prevents duplicate resources and stops cycles through bidirectional peering.</p>
   </div>
 
   <div class="stage">
     <div>
       <div class="graphbox">
         <svg id="origSvg" width="300" height="300" viewBox="0 0 300 300"></svg>
-        <h4>Original graph</h4>
+        <h4>Original Azure topology</h4>
       </div>
     </div>
     <div>
       <div class="graphbox">
         <svg id="cloneSvg" width="300" height="300" viewBox="0 0 300 300"></svg>
-        <h4>Clone (built live)</h4>
+        <h4>Cloned topology (built live)</h4>
       </div>
     </div>
     <div class="panel">
-      <h4>old → new map</h4>
+      <h4>original → clone map</h4>
       <div id="mapList"><span style="color:var(--muted);font-size:.9rem">(empty)</span></div>
       <div class="stack" id="stack">call: —</div>
       <div class="legend">
@@ -110,7 +110,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Register each clone in the map <b>before</b> recursing on neighbours — the map both deduplicates clones and breaks cycles. O(V+E).</p>
+    <p>Register each cloned Azure resource in the map <b>before</b> traversing peering/dependency neighbours — the map deduplicates resources and breaks topology cycles. <b>O(V+E)</b>.</p>
   </div>
 </div>
 
@@ -167,7 +167,7 @@ function buildSteps(){
   }
   snap(null,'start',null,"Start: <code>old_to_new</code> map is empty. Call <code>dfs(1)</code>.");
   dfs(1,null);
-  snap(null,'end',null,"DFS complete. Every original node has exactly one clone, all links rewired to clones. ✅");
+  snap(null,'end',null,"DFS complete. Every original Azure resource has exactly one clone, and all topology links point to cloned resources. ✅");
   return steps;
 }
 

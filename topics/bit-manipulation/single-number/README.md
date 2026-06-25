@@ -15,9 +15,11 @@ Given a non-empty array `nums` where **every element appears exactly twice excep
 
 ## Real-World Analogy
 
-Socho ek dance party hai jahan log **jodi me** aate hain — har banda apne partner ke saath. Ek hi akela aaya hai. Tum unhe pair karwana shuru karte ho: do same log milte hi dono ek doosre ko **cancel** kar dete hain (chale gaye). Last me jo akela bachta hai, wahi tumhara answer.
+**What Azure Blob Storage is:** Azure Blob Storage is Azure's object storage service for unstructured data such as files, backups, logs, and media. Block blobs store large objects as blocks, and Azure stores data redundantly for durability.
 
-XOR exactly yahi "cancel" karta hai: `x ^ x = 0` (same banda apne aap ko cancel kar deta hai) aur `x ^ 0 = x` (akela banda khud reh jaata hai). Poore array ka XOR le lo — saare pairs khud-ba-khud zero ho jaate hain, sirf single number bachta hai.
+**What checksum reconciliation is, and why it's used:** Storage systems use compact checksums, such as MD5 or CRC64, to verify that a block's bytes still match what was written. In a simplified integrity sweep, every healthy block checksum report appears as a matching pair, while one suspect checksum appears without its mate. Reconciliation uses those fingerprints because comparing small checksum values is cheaper than rereading and byte-comparing every full block.
+
+**The mapping:** The XOR accumulator is the Azure Blob Storage sweep's running parity value. Each duplicate checksum cancels itself because `x ^ x = 0`, and starting from zero preserves any checksum that does not find a pair because `x ^ 0 = x`. The key insight is that all paired block fingerprints vanish, leaving the one unpaired checksum that identifies the odd block to investigate.
 
 ## Approach
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Course Schedule II — Building a Topological Order</title>
+<title>Course Schedule II — ARM dependsOn deployment order</title>
 <style>
   :root {
     --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a; --text: #e0e0e0;
@@ -116,16 +116,14 @@
 </head>
 <body>
 
-  <h1>Course Schedule II &mdash; <span>Building a Topological Order</span></h1>
+  <h1>Course Schedule II &mdash; <span>ARM <code>dependsOn</code> Deployment Order</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">🍳</div>
+    <div class="analogy-icon">🚀</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Recipe steps: har step se pehle uske prerequisites done hone chahiye. Tumhe ek aisi
-        <strong>line</strong> chahiye jisme jab bhi koi course aaye, uske saare prereqs already aage aa chuke ho.
-        Repeatedly grab whatever has <strong>0 pending prereqs</strong>, append it, unlock its dependents.
+        An ARM/Bicep template needs a deployment order where each Azure resource appears after its <code>dependsOn</code> resources. Kahn's algorithm repeatedly takes resources with <strong>0 pending dependencies</strong>, appends them, and unlocks their dependent resources.
       </div>
     </div>
   </div>
@@ -133,7 +131,7 @@
   <div class="card">
     <div>
       <div class="section-label">Step description</div>
-      <div class="step-description" id="stepDesc">Press "Next". Compute indegrees, seed the queue with indegree-0 courses, then take them one by one — each goes into the output order.</div>
+      <div class="step-description" id="stepDesc">Press "Next". Compute indegrees, seed the queue with zero-dependency Azure resources, then deploy them one by one into the output order.</div>
     </div>
 
     <div class="layout">
@@ -168,11 +166,7 @@
     <div class="takeaway-icon">💡</div>
     <div>
       <div class="takeaway-label">Key Takeaway</div>
-      <p>
-        Kahn's BFS <strong>builds the order as it goes</strong>: each course you pop (indegree 0) is appended,
-        then its dependents lose a prereq. If all <code>numCourses</code> land in the output → return it;
-        if fewer (a cycle blocks some), return <strong>[]</strong>. <strong>O(V + E)</strong>.
-      </p>
+      <p>Kahn's BFS <strong>builds the ARM deployment order as it goes</strong>: each zero-dependency Azure resource is appended, then its dependent resources lose one blocker. If all resources land in the output, return that order; if a cycle blocks some, return <strong>[]</strong>. <strong>O(V + E)</strong>.</p>
     </div>
   </div>
 
@@ -203,8 +197,8 @@
     for (let i=0;i<N;i++) if (deg[i]===0) q.push(i);
 
     out.push({
-      desc: 'Compute every course\'s <strong>indegree</strong>. Courses with indegree <code>0</code> have no ' +
-            'prerequisites left — seed them into the queue. Here that\'s course <strong>0</strong>.',
+      desc: 'Compute every Azure resource\'s <strong>indegree</strong>. Resources with indegree <code>0</code> have no ' +
+            'dependencies left — seed them into the queue. Here that\'s resource <strong>0</strong>.',
       deg: deg.slice(), queue: q.slice(), order: [], taking: null, relaxed: []
     });
 
@@ -221,8 +215,8 @@
       }
       const combinedQ = q.concat(freed);
       out.push({
-        desc: '<strong>Take course ' + node + '</strong> → append to output. Decrement indegree of its ' +
-              'dependents' + (adj[node].length ? ' (' + adj[node].join(', ') + ')' : ' (none)') +
+        desc: '<strong>Deploy resource ' + node + '</strong> → append to the deployment order. Decrement indegree of its ' +
+              'dependent resources' + (adj[node].length ? ' (' + adj[node].join(', ') + ')' : ' (none)') +
               (freed.length ? '. Newly unlocked: <strong>' + freed.join(', ') + '</strong> → into queue.'
                             : '.'),
         deg: deg.slice(), queue: combinedQ.slice(), order: order.slice(), taking: node, relaxed
@@ -231,7 +225,7 @@
     }
 
     out.push({
-      desc: 'Queue empty and all <code>' + N + '</code> courses are in the output → valid topological order: ' +
+      desc: 'Queue empty and all <code>' + N + '</code> Azure resources are in the output → valid deployment order: ' +
             '<strong>[' + order.join(', ') + ']</strong>. ✅ (Other valid orders exist too.)',
       deg: deg.slice(), queue: [], order: order.slice(), taking: null, relaxed: [], finished: true
     });

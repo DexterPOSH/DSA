@@ -20,13 +20,11 @@ hand = [1,2,3,4,5], groupSize = 4
 
 ## Real-World Analogy
 
-Socho tum **Rummy** khel rahe ho aur tumhe poore haath ko fixed-length
-consecutive "runs" me todna hai — bina koi card bache. Yahan ek hi smart move
-hai: **hamesha sabse chhoti available card uthao.** Wo chhoti card kisi na kisi
-group ka *starting* card banni hi padegi (uske neeche koi card hai hi nahi jo
-use absorb kar le). To agar smallest card `x` hai, to tumhe `x, x+1, x+2, ...`
-poora group banana *zaroori* hai. Wo cards nahi mile? Game over, `False`.
+**What Azure Event Hubs is:** Azure Event Hubs is a high-throughput event-ingestion service for telemetry, logs, clickstreams, and other streaming data. Events are stored in partitions, and within a partition each event has an ordered sequence number so consumers can process the stream predictably. That ordered numbering is what lets downstream jobs reason about contiguous batches instead of random individual messages.
 
+**What sequence-number checkpoint batching is, and why it's used:** Event Hubs consumers record checkpoints — usually offsets or sequence numbers — so they can resume after a crash without replaying everything from the beginning. Many processing jobs also commit work in fixed-size batches because it makes retries, auditing, and progress tracking simpler. If a batch is supposed to cover consecutive sequence numbers, then the smallest unprocessed sequence number is forced to start the next batch; it cannot be hidden in an earlier one.
+
+**The mapping:** Each card value is an Azure Event Hubs sequence number, `groupSize` is the fixed checkpoint-batch size, and the frequency map is how many events with each sequence number still need placement. Greedily take the smallest remaining value `x` and reserve `x, x+1, ...` because no valid batch can start later and still include `x`. If any required sequence number is missing, the stream cannot be partitioned into valid batches — the key insight is that the current minimum creates a forced consecutive group.
 ## Approach
 
 Greedy: **smallest card pehle.** Counts maintain karo, aur baar-baar minimum

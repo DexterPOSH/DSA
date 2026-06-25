@@ -15,10 +15,11 @@ Given an unsigned integer `n`, return the number of `1` bits it has in its binar
 
 ## Real-World Analogy
 
-Socho ek **light board hai jisme 32 bulbs** hain — kuch ON (1), kuch OFF (0). Tumhe ginnna hai kitne bulbs jal rahe hain. Do tareeke:
+**What Azure Service Bus is:** Azure Service Bus is Azure's managed messaging service for reliable queues and publish/subscribe topics. It lets systems exchange messages without both sides being online at the same time, while Azure handles brokered delivery and access control.
 
-- **Seedha tareeka:** ek-ek bulb dekho (32 baar), jo ON hai use count karo.
-- **Smart tareeka (Brian Kernighan):** jaadu ki jhaadu — har jhatke me sabse right wala jalta hua bulb **bujha do**. Jitni baar jhaadu chalani padi, utne hi bulbs jal rahe the. Agar sirf 3 bulbs ON the, to sirf 3 baar kaam — baaki OFF bulbs ko chhua tak nahi.
+**What a Shared Access Policy permission mask is, and why it's used:** A Service Bus Shared Access Policy defines SAS authorization rights such as Listen, Send, and Manage. Those rights can be modeled as a compact permission mask where each 1 bit means a specific right is enabled. The mask exists so permission checks and audits are fast: inspect bit positions instead of parsing a longer permissions structure every time.
+
+**The mapping:** Counting 1 bits is like auditing how many Service Bus rights are enabled in one policy mask. A simple loop checks every possible flag slot, while Brian Kernighan's `n & (n - 1)` clears exactly the lowest enabled right each pass. The key insight is that the optimized loop runs once per enabled permission, not once per possible permission slot.
 
 ## Approach
 

@@ -112,16 +112,16 @@
 <body>
 <div class="wrap">
   <h1>Validate <span>BST</span> — the <span>(low, high)</span> window narrowing</h1>
-  <p class="subtitle">DFS me har node ko ek allowed range me hona chahiye. Range upar se neeche narrow hoti jaati hai.</p>
+  <p class="subtitle">DFS checks every node against an allowed range. The range narrows as bounds flow from ancestors to descendants.</p>
 
   <div class="analogy">
-    <h3>🏢 Analogy</h3>
-    <p>Har node ke paas ek <b>(min, max) allowed range</b> hai — building ke room-number rule jaisa. Left jao to <code>high</code> ko current value se replace karo (left me sab chhote), right jao to <code>low</code>. Koi node apni range se bahar = invalid BST.</p>
+    <h3>🔎 Azure range index bounds</h3>
+    <p>Azure Cosmos DB and Azure Cognitive Search range indexes rely on ordered bounds. Validating a BST passes the inherited <b>(low, high)</b> key window downward, so every node stays inside the range promised by its ancestors.</p>
   </div>
 
   <div class="stage">
     <svg viewBox="0 0 720 360" id="tree"></svg>
-    <div class="caption" id="caption">Press <b>Next ▶</b> to start the DFS. Hum root <code>5</code> se shuru karenge with range <code>(-∞, +∞)</code>.</div>
+    <div class="caption" id="caption">Press <b>Next ▶</b> to start DFS at root <code>5</code> with range <code>(-∞, +∞)</code>.</div>
     <div class="statebar">
       <div class="pill">Current: <b id="cur">—</b></div>
       <div class="pill">Allowed: <b id="range">(-∞, +∞)</b></div>
@@ -138,7 +138,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Sirf immediate children compare karna kaafi nahi — har node ko poore subtree-wide <b>(low, high)</b> range ke against verify karo, aur woh range DFS me upar se neeche propagate karo.</p>
+    <p>Comparing only immediate children is not enough — verify every node against the full subtree-wide <b>(low, high)</b> range, and propagate that range from ancestors to descendants.</p>
   </div>
 </div>
 
@@ -163,15 +163,15 @@ const fmt = v => v === Infinity ? '+∞' : v === -Infinity ? '-∞' : v;
 // Preorder DFS visit order with the (low,high) bounds active at each node.
 const steps = [
   { id:'n5', low:-Infinity, high:Infinity,
-    cap:'Root <code>5</code> with range <code>(-∞, +∞)</code>. Check: <code>-∞ < 5 < +∞</code> ✓. Ab left jao, isliye <b>high = 5</b>.', ok:true },
+    cap:'Root <code>5</code> with range <code>(-∞, +∞)</code>. Check: <code>-∞ < 5 < +∞</code> ✓. Next go left, so <b>high = 5</b>.', ok:true },
   { id:'n1', low:-Infinity, high:5,
-    cap:'Left child <code>1</code>, range <code>(-∞, 5)</code>. <code>-∞ < 1 < 5</code> ✓. Leaf, koi child nahi — backtrack.', ok:true },
+    cap:'Left child <code>1</code>, range <code>(-∞, 5)</code>. <code>-∞ < 1 < 5</code> ✓. Leaf, no children — backtrack.', ok:true },
   { id:'n7', low:5, high:Infinity,
-    cap:'Right child of root: <code>7</code>, range <code>(5, +∞)</code>. <code>5 < 7 < +∞</code> ✓. Ab left jao → <b>high = 7</b>.', ok:true },
+    cap:'Right child of root: <code>7</code>, range <code>(5, +∞)</code>. <code>5 < 7 < +∞</code> ✓. Next go left → <b>high = 7</b>.', ok:true },
   { id:'n6', low:5, high:7,
-    cap:"Node <code>6</code>, range <code>(5, 7)</code> — yaha bounds matter! <code>5 < 6 < 7</code> ✓. Agar yaha <code>4</code> hota to <code>4 &lt; 5</code> → invalid, even though 4 &lt; its parent 7.", ok:true },
+    cap:"Node <code>6</code>, range <code>(5, 7)</code> — inherited bounds matter here! <code>5 < 6 < 7</code> ✓. If this were <code>4</code>, then <code>4 &lt; 5</code> → invalid, even though 4 &lt; its parent 7.", ok:true },
   { id:'n8', low:7, high:Infinity,
-    cap:'Last node <code>8</code>, range <code>(7, +∞)</code>. <code>7 < 8 < +∞</code> ✓. Saare nodes pass — <b>valid BST!</b>', ok:true, done:true },
+    cap:'Last node <code>8</code>, range <code>(7, +∞)</code>. <code>7 < 8 < +∞</code> ✓. All nodes pass — <b>valid BST!</b>', ok:true, done:true },
 ];
 
 const svg = document.getElementById('tree');
@@ -208,7 +208,7 @@ function render() {
   for (let s = 0; s < i; s++) $('c-'+steps[s].id).classList.add('visited');
   if (i < 0) {
     $('caption').className = 'caption';
-    $('caption').innerHTML = 'Press <b>Next ▶</b> to start the DFS. Hum root <code>5</code> se shuru karenge with range <code>(-∞, +∞)</code>.';
+    $('caption').innerHTML = 'Press <b>Next ▶</b> to start DFS at root <code>5</code> with range <code>(-∞, +∞)</code>.';
     $('cur').textContent = '—'; $('range').textContent = '(-∞, +∞)'; $('check').textContent = '—';
     $('prog').textContent = 'Step 0';
   } else {

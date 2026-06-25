@@ -16,9 +16,11 @@ points = [[0,0],[2,2],[3,10],[5,2],[7,0]]
 
 ## Real-World Analogy
 
-Socho tumhe kuch gaon (points) ko bijli ki taar se jodna hai. Har do gaon ke beech taar daalne ka kharch unki doori ke barabar hai. Tum chahte ho **saare gaon connected** ho jaayein, lekin **kam se kam taar** kharch ho — koi fizool ka extra connection nahi.
+**What Azure ExpressRoute and VNet peering are:** Azure ExpressRoute provides private connectivity between customer networks and Microsoft cloud services, while VNet peering connects Azure virtual networks over Microsoft's backbone. Together, they are common building blocks for a private Azure network that spans regions and workloads. Every circuit or peering link has cost and operational overhead, so you usually want enough connectivity to reach everyone without buying every possible connection.
 
-Prim's ka tareeka: ek gaon se shuru karo ( wo "connected" cluster ban gaya). Ab dekho cluster ke kisi bhi gaon se **sabse sasti taar** kis bahar wale gaon tak jaati hai — wahi jodo. Cluster bada hota jaata hai. Har baar sabse sasta agla connection uthao, jab tak saare gaon andar na aa jaayein. Yeh greedy "sabse sasta agla edge" hi Prim's hai.
+**What minimum-spanning connectivity is, and why it's used:** A spanning-tree-style backbone connects all regions while avoiding cycles that do not make any new region reachable. Redundant paths may be useful for resilience in real Azure architecture, but if the problem's goal is minimum total cost with exactly one path between any two locations, a cycle is wasted spend. The mechanism exists to choose the cheapest set of links that still keeps the whole network connected.
+
+**The mapping:** Each point is an Azure region or VNet, and the Manhattan distance is the estimated cost of an ExpressRoute or peering link between two locations. Prim's algorithm keeps a visited set for the already-built backbone, uses the min-heap as the list of candidate boundary links, and repeatedly adds the cheapest link to an unconnected point. Stale heap entries are ignored because that region was already connected more cheaply; the key insight is to grow the network by the cheapest safe edge, not by globally buying all cheap-looking edges.
 
 ## Approach — Prim's MST with a min-heap
 

@@ -67,16 +67,16 @@
 <body>
 <div class="wrap">
   <h1>Kth Smallest in a <span>BST</span> — the <span>inorder</span> walk</h1>
-  <p class="subtitle">Inorder (left → node → right) BST ko sorted order me visit karta hai. Count karo, k pe ruk jao. (k = 3)</p>
+  <p class="subtitle">Inorder (left → node → right) visits a BST in sorted order. Count visits and stop at k. (k = 3)</p>
 
   <div class="analogy">
-    <h3>📚 Analogy</h3>
-    <p>Library me books BST ki tarah arranged hain. Sabse left wali deepest book = smallest. Ek-ek karke gino: 1st, 2nd, 3rd… jaise hi count <b>k</b> pe pahuncha, wahi answer book hai.</p>
+    <h3>🔎 Azure Cosmos DB range index</h3>
+    <p>Azure Cosmos DB range indexes keep keys in sorted order for range seeks. Inorder traversal reads a BST the same way: left keys, current key, right keys, stopping when the kth key is visited.</p>
   </div>
 
   <div class="stage">
     <svg viewBox="0 0 720 380" id="tree"></svg>
-    <div class="caption" id="caption">Press <b>Next ▶</b>. Stack me push karte hue leftmost (smallest) tak utarenge. Target: <code>k = 3</code>.</div>
+    <div class="caption" id="caption">Press <b>Next ▶</b>. Push nodes while walking to the leftmost (smallest) key. Target: <code>k = 3</code>.</div>
     <div class="statebar">
       <div class="pill">k remaining: <b id="krem">3</b></div>
       <div class="pill">Stack: <b id="stack">[ ]</b></div>
@@ -93,7 +93,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>BST ka inorder = sorted sequence. Poori list banane ki zaroorat nahi — bas count karte jao aur <b>kth visited node</b> pe ruk jao. O(h + k) time.</p>
+    <p>BST inorder traversal yields a sorted sequence. No need to build the whole list — count visits and stop at the <b>kth visited node</b>. O(h + k) time.</p>
   </div>
 </div>
 
@@ -163,7 +163,7 @@ function render() {
   clearStates();
   if (i < 0) {
     $('caption').className = 'caption';
-    $('caption').innerHTML = 'Press <b>Next ▶</b>. Stack me push karte hue leftmost (smallest) tak utarenge. Target: <code>k = 3</code>.';
+    $('caption').innerHTML = 'Press <b>Next ▶</b>. Push nodes while walking to the leftmost (smallest) key. Target: <code>k = 3</code>.';
     $('krem').textContent = K; $('stack').textContent = '[ ]'; $('seq').innerHTML = '';
     $('prog').textContent = 'Step 0';
   } else {

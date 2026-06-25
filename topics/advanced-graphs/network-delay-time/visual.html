@@ -64,8 +64,8 @@
   <p class="subtitle">Single-source shortest paths on a non-negative weighted directed graph, with a live min-heap and distance table.</p>
 
   <div class="analogy">
-    <h3>📡 The rumor analogy</h3>
-    <p>Node <b>k</b> se ek afwah phailti hai — har edge ek "dost-ko-batane" ka delay hai. Afwah hamesha sabse <b>tez raaste</b> se pahunchti hai. Min-heap se sabse jaldi pahunchne wala node pop karo, lock karo, neighbours relax karo. Sab tak pahunchne ka <b>max</b> time = network delay.</p>
+    <h3>🌐 The Azure Front Door analogy</h3>
+    <p><strong>Azure Front Door</strong> uses health and latency data to steer traffic toward the fastest reachable backend region. Dijkstra maps that network: each edge is latency, the min-heap commits the currently lowest-latency region, and the final delay is the slowest committed reachability time.</p>
   </div>
 
   <div class="legend">
@@ -99,7 +99,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>The heap always hands you the closest unfinished node — so the first time a node is popped, its distance is final. Network delay = the largest of those final distances.</p>
+    <p>The heap always hands you the lowest-latency unfinished node — so the first time a node is popped, its distance is final. Network delay = the largest of those final distances across the Azure-style topology.</p>
   </div>
 </div>
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Design Twitter — k-way merge of feeds with a max-heap</title>
+<title>Design Twitter — Azure Event Hubs-style k-way merge with a max-heap</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -149,21 +149,21 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Design Twitter — <span>k-way merge</span> of feeds with a max-heap</h1>
-  <p class="subtitle">Har followee ki diary already newest-first sorted — heap se merge karke top-k nikaalo.</p>
+  <h1>Design Twitter — <span>Event Hubs-style k-way merge</span> with a max-heap</h1>
+  <p class="subtitle">Each followed source is an ordered event stream; use a heap to merge current heads into the newest-first feed.</p>
 
   <div class="analogy">
-    <h3>📔 Analogy: merge sorted diaries</h3>
-    <p>Har user ki <b>diary chronological</b> hai (latest upar). Feed = apni + followees ki diaries ka merge. Har diary ka <b>top tweet</b> mez pe rakho, <b>sabse naya</b> uthao, aur <b>usi diary ka agla</b> le aao. Repeat. Yahi heap-based <b>k-way merge</b> hai.</p>
+    <h3>📡 Analogy: Azure Event Hubs partitions</h3>
+    <p>Azure Event Hubs keeps each partition in order. Treat each user feed as one ordered partition: put each current head event in a max-heap by timestamp, emit the newest head, then advance only that partition. That is the same heap-based <b>k-way merge</b> used to build the feed.</p>
   </div>
 
   <div class="problem">
     <b>Problem.</b> User <code>1</code> follows <code>2</code> and <code>3</code>. Return <code>getNewsFeed(1)</code> — the most recent tweets, newest first.
-    <span class="arrow">→</span> merge of three sorted diaries.
+    <span class="arrow">→</span> merge of three ordered event streams.
   </div>
 
   <div class="panel">
-    <p class="sec-title">Per-user diaries (each already newest → oldest). <span style="color:var(--amber)">▸</span> = current head pointer</p>
+    <p class="sec-title">Per-source streams (each already newest → oldest). <span style="color:var(--amber)">▸</span> = current head pointer</p>
     <div class="diaries" id="diaries"></div>
   </div>
 
@@ -190,7 +190,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Because each user's tweets are already time-sorted, a max-heap holding just one head per source merges them into a global newest-first feed — touching only as many tweets as you actually emit.</p>
+    <p>Like merging Azure Event Hubs partitions, a max-heap holding one current head per source emits the global newest-first feed while touching only the events you actually return.</p>
   </div>
 </div>
 
@@ -248,7 +248,7 @@ function buildSteps(){
       pushNote = ` Then pull u${top.uid}'s next-older tweet <code>${nt.id}</code> (t${nt.ts}) into the heap.`;
     } else {
       ptr[top.uid] = nextIdx; // points past end
-      pushNote = ` u${top.uid}'s diary is now exhausted — nothing more to push.`;
+      pushNote = ` u${top.uid}'s source stream is now exhausted — nothing more to push.`;
     }
     snap(`Pop heap top: <b class="tag">${top.id}</b> from u${top.uid} (t${top.ts}) — the newest remaining anywhere. Append to feed.${pushNote}`,
          'pop', top.uid);

@@ -21,12 +21,11 @@ answer = [3, 3, 5, 5, 6, 7]
 
 ## Real-World Analogy
 
-Socho ek **leaderboard** hai jisme sirf "abhi tak relevant aur abhi tak sabse strong"
-players ki ek queue rehti hai, strongest aage. Jab koi naya player aata hai (right se),
-to usse weaker saare players ko peeche se nikaal do — kyunki wo player jab tak window
-me hai, ye naya wala unse bada hai, to wo purane chhote kabhi max nahi banenge. Aur jo
-player window ki time-limit se bahar ho gaya (left se), use front se hata do. Queue ka
-**front hamesha current window ka max** hota hai. Yeh "monotonic decreasing deque" hai.
+**What Azure Stream Analytics with Azure Event Hubs is:** Azure Event Hubs ingests telemetry streams, and Azure Stream Analytics can compute real-time aggregates over those streams. A query can ask for the maximum value seen in each sliding time window, such as peak CPU, latency, or queue depth over the last five minutes. Azure emits a new aggregate as the window moves, while old events eventually expire from the active state.
+
+**What a sliding-window maximum aggregate is, and why it's used:** The `MAX` over a sliding window answers "what is the highest measurement still inside the current window?" It exists because operations teams care about recent peaks, but recomputing the maximum by scanning every event in every overlapping window would waste work. A monotonic candidate list is the data-structure version of that aggregate: keep only values that could still become the maximum, discard expired ones, and discard smaller ones dominated by a newer larger value.
+
+**The mapping:** Each number is an Azure Event Hubs telemetry measurement, and each length-`k` slice is the active Azure Stream Analytics window. The deque front is the current Azure `MAX`; indices falling out of the window are expired from the front, and smaller values at the back are removed when a larger measurement arrives because they can never win any future overlapping window. After the first full window, output the front for each slide. The key insight is that by storing only decreasing candidates, each element is pushed and popped at most once, giving O(n) instead of rescanning every window.
 
 ## Approach
 

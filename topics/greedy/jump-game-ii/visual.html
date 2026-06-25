@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jump Game II — BFS Levels & Boundaries Visualized</title>
+<title>Jump Game II — Azure Autoscale Boundaries Visualized</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -121,12 +121,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Jump Game II — <span>BFS levels</span> &amp; boundaries</h1>
-  <p class="subtitle">Each jump is a BFS level. Track the level boundary <b>cur_end</b> and the <b>farthest</b> reachable index.</p>
+  <h1>Jump Game II — Azure <span>autoscale bands</span> &amp; boundaries</h1>
+  <p class="subtitle">Each scale-out action is a capacity band. Track the band boundary <b>cur_end</b> and the <b>farthest</b> reachable capacity.</p>
 
   <div class="analogy">
-    <h3>🚌 Real-world analogy: bus-route levels</h3>
-    <p>Index 0 se 1 jump me jahan-jahan pahunch sakte ho = <b>level 1 zone</b>. Us zone ke har stop se aage ki combined reach = <b>level 2 zone</b>. Har jump ek BFS level. Hum individual stops visit nahi karte — bas level ka <b>right boundary</b> aur us level ki <b>farthest reach</b> track karte hain.</p>
+    <h3>📈 Azure analogy: fewest VMSS scale-out steps</h3>
+    <p>Each Azure Monitor scale-out action opens a capacity band. Scan the current band to extend <code>farthest</code>, and when <code>i == cur_end</code>, spend one action and move to the next band; the first band covering the target is minimal.</p>
   </div>
 
   <div class="card">
@@ -154,8 +154,8 @@
     <div class="verdict" id="verdict"></div>
 
     <div class="legend">
-      <span><i class="swatch" style="border-color:var(--blue);background:rgba(59,130,246,0.16)"></i> level 1</span>
-      <span><i class="swatch" style="border-color:var(--green);background:rgba(16,185,129,0.16)"></i> level 2</span>
+      <span><i class="swatch" style="border-color:var(--blue);background:rgba(59,130,246,0.16)"></i> scale band 1</span>
+      <span><i class="swatch" style="border-color:var(--green);background:rgba(16,185,129,0.16)"></i> scale band 2</span>
       <span><i class="swatch" style="border-color:var(--amber);background:transparent"></i> farthest</span>
       <span><i class="swatch" style="border-color:#fff;background:transparent"></i> cur_end boundary</span>
     </div>
@@ -179,7 +179,7 @@
 
   <div class="takeaway">
     <h3>💡 Key takeaway</h3>
-    <p>Min-jumps is BFS over levels. <code>farthest</code> absorbs every index in the current level; when <code>i</code> hits <code>cur_end</code>, the level is exhausted — spend one jump and push the boundary to <code>farthest</code>. Stop before the last index to avoid an off-by-one extra jump. O(n) time, O(1) space.</p>
+    <p>Each scale-out band acts like a BFS level. <code>farthest</code> absorbs every checkpoint in the current band; when <code>i</code> hits <code>cur_end</code>, spend one action and push the boundary to <code>farthest</code>.</p>
   </div>
 </div>
 
@@ -206,9 +206,9 @@ const trace = [];
     let desc;
     if (bumped) {
       desc = `<code>i = ${i}</code>: farthest = max(${beforeFar}, ${i}+${nums[i]}) = <b>${farthest}</b>. ` +
-             `<b style="color:#fff">i reached cur_end</b> → spend a jump (<b>jumps = ${jumps}</b>) and advance <code>cur_end → ${cur_end}</code> (next BFS level boundary).`;
+             `<b style="color:#fff">i reached cur_end</b> → spend one scale-out step (<b>jumps = ${jumps}</b>) and advance <code>cur_end → ${cur_end}</code> (next autoscale band boundary).`;
     } else {
-      desc = `<code>i = ${i}</code>: still inside the current level (i &lt; cur_end = ${cur_end}). ` +
+      desc = `<code>i = ${i}</code>: still inside the current autoscale band (i &lt; cur_end = ${cur_end}). ` +
              `Update farthest = max(${beforeFar}, ${i}+${nums[i]}) = <b>${farthest}</b>. No jump spent yet.`;
     }
     trace.push({ i, jumps, cur_end, farthest, bumped, jumpedTo, desc, reachedLast: cur_end >= LAST });
@@ -285,7 +285,7 @@ function render() {
 
   if (s.final) {
     const v = $('verdict'); v.className = 'verdict show';
-    v.textContent = `✅ Last index reached in minimum ${s.jumps} jumps → return ${s.jumps}`;
+    v.textContent = `✅ Target capacity reached in minimum ${s.jumps} scale-out steps → return ${s.jumps}`;
   }
 }
 

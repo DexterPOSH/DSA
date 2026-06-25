@@ -21,7 +21,11 @@ Given the `root` of a binary search tree and an integer `k`, return the **kth sm
 
 ## Real-World Analogy
 
-Socho ek **library** hai jaha books ek BST ki tarah arranged hain — har shelf ke left me chhote call-numbers, right me bade. Tumhe "3rd smallest book" chahiye. Tum sabse left wali deepest book se shuru karte ho (smallest), phir agla, phir agla… ek-ek karke ginte jaate ho. Jaise hi count `k` pe pahunchta hai, wahi tumhari answer book hai. Yeh left → root → right wala disciplined walk hi **inorder traversal** hai, jo BST ko **sorted order** me deta hai.
+**What Azure Cosmos DB is:** Azure Cosmos DB is Azure's globally distributed NoSQL database service for low-latency reads and writes at scale. To answer queries efficiently, it maintains indexes over item properties instead of scanning every document. For ordered comparisons, those indexes can behave like sorted key structures.
+
+**What a range index cursor is, and why it's used:** A range index keeps values in an order that supports operations such as range filters and ordered scans. Rather than materializing every key first, a query engine can advance a cursor through the sorted index stream until it has enough results. This saves work when you only need the kth item or the first page of ordered data.
+
+**The mapping:** A BST's inorder traversal is the Azure Cosmos DB range-index scan in miniature: visit left keys, then the current key, then right keys. Decrement `k` each time a value is emitted, and stop when `k` reaches zero. The key insight is that the BST invariant turns inorder traversal into sorted order, so the kth visit is the kth smallest value.
 
 ## Approach
 

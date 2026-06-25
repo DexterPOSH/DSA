@@ -18,9 +18,11 @@ x = 1534236469 -> 0       # reversed (9646324351) overflows 32-bit -> 0
 
 ## Real-World Analogy
 
-Socho ek **odometer ko ulta padhna** hai. Tum number ke **aakhri digit ko peel** karte ho (`x % 10`), aur use ek naye number ke aage push karte ho (`result * 10 + digit`). Har step me purana number ek digit chhota hota jaata hai (`x // 10`), naya reversed number ek digit bada.
+**What Azure Functions is:** Azure Functions is Azure's serverless compute service for running small pieces of code in response to events such as messages, timers, or HTTP requests. In this analogy, a function normalizes a legacy telemetry code before saving it into Azure SQL Database, Azure's managed relational database service.
 
-Par ek catch hai: tumhare paas ek **fixed-size meter** hai jo sirf `2147483647` tak ja sakta hai. Har digit push karne se *pehle* tumhe poochna padta hai: "agar main ise 10 se multiply karke ek aur digit lagaaun, kya meter phat jaayega?" Agar haan → `0` return karke ruk jao. Yeh **overflow ko pre-emptively** check karna hai, baad me nahi (kyunki tab tak meter already galat value pe ja chuka hoga).
+**What a SQL `INT` boundary check is, and why it's used:** Azure SQL Database's `INT` type is a signed 32-bit value, from `-2,147,483,648` to `2,147,483,647`. The normalizer must validate the reversed code before writing it because the database column enforces that range, and an overflowing value should be rejected rather than treated as valid telemetry. Checking before the next digit push avoids relying on an already-invalid intermediate value.
+
+**The mapping:** The function peels the least-significant decimal digit with `% 10`, appends it to the reversed code with `res * 10 + digit`, and shrinks the input with `// 10` after handling the sign. Before each append, it compares against the 32-bit limits just like the Azure Function validates the Azure SQL `INT` range before insert. The key insight is to reverse one digit at a time while treating overflow as a boundary condition checked during the build, not as a cleanup step at the end.
 
 ## Approach
 

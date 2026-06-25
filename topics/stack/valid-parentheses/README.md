@@ -19,13 +19,11 @@ Given a string `s` containing only the characters `(`, `)`, `{`, `}`, `[`, `]`, 
 
 ## Real-World Analogy
 
-Socho ek **stack of plates** hai sink ke paas. Har baar koi open bracket aata hai
-to tum ek plate rakh dete ho — sabse upar wali plate hamesha "abhi-abhi rakhi gayi"
-wali hoti hai. Jab close bracket aata hai, to tum **sabse upar wali plate hi
-uthaate ho** aur check karte ho: kya yeh us close bracket se match karti hai?
-`(` ke upar `)` aaya — perfect, plate hat gayi. Lekin `(` ke upar `]` aa gaya?
-Mismatch — galat. Yeh **Last-In-First-Out** behaviour exactly stack hai: jo aakhri
-me khula, wahi pehle band hona chahiye.
+**What Azure Resource Manager (ARM) is:** Azure Resource Manager is Azure's deployment and management layer, and Bicep is a higher-level language that compiles to ARM templates. They let you describe a hierarchy of resources and modules so Azure can create or update them consistently. Nested deployments feel a lot like structured brackets: each scope has to start, contain its work, and finish cleanly.
+
+**What nested deployment scope management is, and why it's used:** ARM/Bicep modules can deploy to different scopes, such as a resource group, subscription, management group, or tenant. This scoping exists to keep permissions, parameters, dependencies, and resource names attached to the right deployment context instead of leaking into a sibling or parent context. When a child scope is opened, the active context should close in reverse order; closing a parent before its latest child would leave Azure reasoning about the wrong deployment boundary.
+
+**The mapping:** An opening bracket is Azure entering a new ARM/Bicep scope, so we push the expected closing scope onto the stack. A closing bracket is Azure trying to exit a scope, so it must match the most recently opened one at the stack top; if the stack is empty or the type differs, the template shape is invalid. After the scan, the stack must be empty, meaning every opened deployment scope closed in LIFO order. The key insight is "last opened, first closed": counts alone cannot catch `([)]`, but a stack catches the wrong active context immediately.
 
 ## Approach
 

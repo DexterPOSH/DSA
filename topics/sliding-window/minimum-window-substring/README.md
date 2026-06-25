@@ -17,12 +17,11 @@ s = "a",  t = "aa"                 ->  ""      # only one 'a' available, need tw
 
 ## Real-World Analogy
 
-Socho ek **shopping list** hai (`t`) — jaise "2 eggs, 1 milk". Tum ek lambi aisle
-(`s`) me chal rahe ho aur items uthate jaate ho (right pointer). Jaise hi tumhari
-basket me **poori list cover ho jaati hai**, tum peeche ki taraf (left pointer) se
-extra/duplicate items wapas shelf pe rakhna shuru karte ho — taaki basket **jitni
-chhoti ho sake** par list still poori rahe. Har baar jab list complete hoti hai, us
-chhoti-se-chhoti basket ka size note kar lo. Sabse chhoti valid basket = answer.
+**What Azure Stream Analytics with Azure Event Hubs is:** Azure Event Hubs ingests events from many producers, and Azure Stream Analytics continuously queries those events as they arrive. Instead of storing the entire stream in application code, Azure Stream Analytics maintains query state for the current window and emits results when the window satisfies the query. This is useful for monitoring alert patterns in telemetry streams.
+
+**What required event-type coverage is, and why it's used:** In the existing analogy, the query is looking for the shortest span of Azure events that covers a required multiset of alert types — for example one `A`, one `B`, and one `C`, or duplicates if the rule requires them. Coverage counts matter because "has an A" is not enough when the requirement says "two A events." The mechanism exists to identify the tightest incident window that contains all required evidence, while ignoring extra noise before or after it.
+
+**The mapping:** Characters in `s` are Azure Event Hubs events, and characters in `t` are the required alert types. Expanding `right` adds events and updates `have`; `formed == required` means Azure's active window now covers every needed count. Then advancing `left` removes extra events while coverage still holds, recording the smallest valid span before coverage breaks. The key insight is "expand until complete, then contract until just barely complete" — that is the minimum window.
 
 ## Approach
 

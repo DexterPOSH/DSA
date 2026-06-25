@@ -24,9 +24,11 @@ getNewsFeed(1)        -> [5]
 
 ## Real-World Analogy
 
-Socho har user ki ek **personal diary** hai jisme uske tweets **chronological order** me likhe hote hain (latest sabse upar). Feed banane ke liye tum apni aur apne saare followees ki diaries uthate ho — har diary already newest-first sorted hai. Ab tumhe in **k sorted diaries ko merge** karke top 10 nikalna hai.
+**What Azure Event Hubs is:** Azure Event Hubs is Azure's high-throughput event-ingestion service for telemetry, app logs, clickstreams, and other time-ordered data. Producers append events into a hub, Azure durably buffers them, and consumer apps read those events back from streams. It is built for many independent producers and consumers moving through recent data without scanning one giant combined list.
 
-Tareeka? Har diary ke **sabse upar wale (latest) tweet** ko ek mez pe rakho. Sabse naye wale ko uthao (feed me daalo), aur **usi diary se agla tweet** mez pe le aao. Repeat — 10 baar. Ye "har list ke current top me se best pick karo" wala kaam exactly **min/max-heap se k-way merge** hai. Diary chronological isliye next-newest hamesha just neeche milta hai.
+**What a partitioned ordered stream is, and why it's used:** Event Hubs splits an event hub into **partitions**, and each partition is an ordered append-only log with offsets/sequence numbers. Ordering is guaranteed within a partition, not globally across every partition, because partitioning lets Azure scale ingestion and parallel consumers without forcing every event through one bottleneck. A consumer that needs a combined "latest first" view must merge the heads of several already-ordered streams.
+
+**The mapping:** Treat each followed user's tweet list like one Azure Event Hubs partition: it is already ordered by timestamp, with the newest tweet at that stream's head. `getNewsFeed` seeds a max-heap with one current tweet from each relevant source, pops the newest overall, then advances only that same source and pushes its next tweet. The key insight is that you never sort all tweets; just like merging ordered Azure partitions, one live head per stream plus a heap is enough to produce the top 10 newest items.
 
 ## Approach
 

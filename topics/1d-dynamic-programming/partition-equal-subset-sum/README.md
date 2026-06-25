@@ -15,9 +15,11 @@ Given an integer array `nums` (positive integers), return `True` if you can part
 
 ## Real-World Analogy
 
-Socho ek bag me alag-alag weight ke items hain, aur tumhe dekhna hai ki kya tum **exactly aadha total weight** ek taraf rakh sakte ho. Agar haan, to baaki apne aap doosri taraf barabar ban jaayega. To asli sawaal ek hi hai: **"kya kisi subset ka sum exactly `total/2` ban sakta hai?"**
+**What Azure Resource Manager is:** Azure Resource Manager is Azure's control plane for deploying and managing resources consistently. It processes templates and resource operations so teams can plan infrastructure changes as repeatable deployments. A planning step may need to check whether a set of compute reservations can be balanced across regions.
 
-Ye ek **0/1 knapsack** hai — har item ya to lo (in the subset) ya chhodo, koi half-half nahi. Tum ek checklist banate ho: "kaun-kaun se exact sums achievable hain?" `0` to hamesha achievable (kuch mat lo). Phir har item ko dekhte ho aur jo nayi sums woh unlock karta hai, unhe checklist me tick kar dete ho. Agar `total/2` tick ho gaya — done.
+**What Azure capacity-reservation balancing is, and why it's used:** Azure Capacity Reservations reserve VM capacity in a chosen region or zone so workloads have capacity available when needed. When planning paired-region resilience, teams may want the reserved capacity split evenly so failover or active-active deployments stay balanced. The feasibility question is not every possible grouping; it is whether one subset can reach exactly half the total capacity.
+
+**The mapping:** Each reservation size is a number, half the total is the target regional capacity, and `dp[s]` records whether sum `s` is reachable after considering each reservation once. Scanning sums backward is the ARM planning guardrail that prevents reusing the same reservation twice in one pass. The key insight is that an equal split exists exactly when the half-total subset sum is reachable.
 
 ## Approach
 

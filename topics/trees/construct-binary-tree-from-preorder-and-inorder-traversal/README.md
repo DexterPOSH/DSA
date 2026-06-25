@@ -21,7 +21,11 @@ reconstructs:
 
 ## Real-World Analogy
 
-Socho do log ek **family tree** alag-alag tareeke se bata rahe hain. **Preorder** wala hamesha pehle *mukhiya* (root) ka naam bolta hai, phir poora left family, phir right. To preorder ka **pehla naam = root**, guaranteed. **Inorder** wala mukhiya ko *beech me* bolta hai — to inorder me us root ke **left wale sab log left subtree me**, aur **right wale sab right subtree me**. Bas! Preorder se root pakdo, inorder me usse dhoondho, do hisse karo, aur dono halves pe yahi cheez dobara karo (recursion). Har root milta jaata hai, tree ban jaata hai.
+**What Azure Resource Manager inventory is:** Azure Resource Manager stores the parent/child structure of an Azure estate: Management Groups contain Subscriptions, Subscriptions contain Resource Groups, and Resource Groups contain Resources. Inventory exports or queries describe those scopes so the hierarchy can be audited, compared, or rebuilt in another environment. The same tree can be described in different deterministic orders.
+
+**What paired hierarchy export metadata is, and why it's used:** A preorder-style export is useful because it names the parent scope before the scopes it owns, so the next unread item identifies the root of the current slice. An inorder-style export is useful because, once that root is known, it separates which scopes belong on the left side versus the right side of that root. Together, the two views remove ambiguity that either order alone would leave.
+
+**The mapping:** Rebuilding the tree is like reconstructing an Azure hierarchy from those two inventory views. Take the next preorder value as the current root, find it in the inorder list, and use that index to split the remaining scopes into left and right subtrees. The key insight is that preorder chooses the root, while inorder gives the exact boundary for recursively rebuilding each child branch.
 
 ## Approach
 

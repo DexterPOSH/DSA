@@ -318,9 +318,8 @@
   <div class="subtitle">LeetCode 698. Backtracking se array ko <b>k</b> buckets mein baanto, har bucket ka sum exactly <code>target</code> ho. Pruning ke saath exponential search tractable ban jaati hai.</div>
 
   <div class="analogy">
-    <h3>Real-world analogy</h3>
-    <p>Socho <b>k = 4</b> dost restaurant mein hain aur bill ko exactly equally split karna hai — har dost ko <b>same amount</b> dena hai (yahan amount = <code>target = total / k</code>). Items (dishes) ek-ek karke uthate ho aur har item ko kisi ek dost ke "share" mein daalte ho.</p>
-    <p>Agar kisi dost ka share <code>target</code> se zyada ho jaye → woh combination galat hai, item wapas uthao (<b>backtrack</b>) aur dusre dost ki taraf try karo. Agar saare items baant diye aur sab shares barabar nikle → bill perfectly split ho gaya.</p>
+    <h3>☁️ Real-world analogy: Azure capacity buckets</h3>
+    <p>Azure Capacity Reservations can be treated as <b>k = 4</b> equal capacity buckets, each needing <code>target = total / k</code> vCPUs. Try placing each VM request into a reservation bucket; if it exceeds quota or later blocks a valid layout, roll back that placement and try another bucket.</p>
   </div>
 
   <div class="problem">
@@ -406,7 +405,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Har element ko har bucket mein "try → recurse → backtrack" karo. Teen pruning — <b>capacity overflow skip</b>, <b>identical-empty-bucket skip</b>, aur <b>descending sort</b> — naive <code>O(k·2<sup>n</sup>)</code> ko real inputs pe tezi se solvable bana dete hain.</p>
+    <p>Try each VM-size demand in each Azure capacity bucket: <b>place → recurse → rollback</b>. Capacity overflow, symmetric empty-bucket skips, and descending-demand order prune the exponential search.</p>
   </div>
 </div>
 

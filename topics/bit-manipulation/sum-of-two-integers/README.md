@@ -17,12 +17,11 @@ a = -2, b = 3   ->  1
 
 ## Real-World Analogy
 
-Socho tum grade-school addition kar rahe ho, par har column me sirf **0 ya 1** likh sakte ho (binary). Do bits jodte waqt do cheezein hoti hain:
+**What Azure Virtual Machines are:** Azure Virtual Machines provide on-demand Windows or Linux compute in Azure, with virtual CPUs, memory, disks, and networking managed as cloud resources. Even though the VM is virtualized, arithmetic still ultimately runs on CPU hardware exposed through fixed-width registers.
 
-- **Sum-without-carry** — `1 + 0 = 1`, `1 + 1 = 0` (carry chala gaya), `0 + 0 = 0`. Yeh exactly **XOR** (`^`) hai. XOR bolta hai "in dono bits ka sum, carry ko ignore karke".
-- **Carry** — carry sirf tab banta hai jab **dono** bits 1 hon (`1 + 1`). Yeh exactly **AND** (`&`) hai. Aur carry hamesha **agle column (left) me** jaata hai, to use ek position `<< 1` shift karo.
+**What ALU carry propagation is, and why it's used:** The Arithmetic Logic Unit (ALU) adds binary numbers by separating each bit column's partial sum from its carry. XOR gives the sum bits when carry is ignored, AND finds the columns where two 1s create a carry, and `<< 1` moves those carries to the next higher column. Hardware uses this gate-level idea because addition can be built from simple repeatable signals that settle until no carry remains.
 
-Ab tum baar-baar yeh karte ho: "sum-without-carry nikaalo, carry nikaalo aur left shift karo, phir dono ko dobara jodo" — jab tak carry **0** na ho jaaye. Jaise hand-addition me jab tak koi carry-over bacha hai tab tak agla column add karte raho.
+**The mapping:** The two inputs are the Azure VM's register values. `a ^ b` computes the carry-free partial sum, `(a & b) << 1` computes the carry register, and the loop feeds those two values back into the same process until the carry becomes zero. The key insight is that integer addition is just repeated partial-sum plus shifted-carry work, so we can reproduce `+` with bit operations alone.
 
 ## Approach
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Min Cost Climbing Stairs — a DP row picking the cheaper predecessor</title>
+<title>Min Cost Climbing Stairs — Azure cheapest scale-step DP</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -121,22 +121,22 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Min Cost Climbing Stairs — pick the <span>cheaper predecessor</span></h1>
-  <p class="subtitle">Minimum cost to reach the top of <code>cost = [10, 15, 20, 5, 30, 8]</code>, paying to stand on each step.</p>
+  <h1>Min Cost Climbing Stairs — choose the <span>cheapest Azure scale step</span></h1>
+  <p class="subtitle">Minimum Azure scale cost to reach the target capacity for <code>cost = [10, 15, 20, 5, 30, 8]</code>.</p>
 
   <div class="analogy">
-    <h3>🎟️ Real-world analogy</h3>
-    <p>Har step ek toll booth hai. Step <code>i</code> par do hi raaste aate hain — <b>i-1</b> ya <b>i-2</b> se. Dono raaston ka jo ab tak ka kharcha sasta hai usse chuno, phir apna toll <code>cost[i]</code> jodo: <code>dp[i] = cost[i] + min(dp[i-1], dp[i-2])</code>.</p>
+    <h3>📈 Real-world analogy</h3>
+    <p>Azure Autoscale can reach resize checkpoint <code>i</code> from one or two prior checkpoints, and each checkpoint has a cost. Reuse the cached cheapest prior cost, then add <code>cost[i]</code>.</p>
   </div>
 
   <div class="card">
     <div class="section-label">Step description</div>
-    <div class="step-desc" id="stepDesc">Press <b>Next →</b> to start filling the DP table.</div>
+    <div class="step-desc" id="stepDesc">Press <b>Next →</b> to start filling the Azure cost cache.</div>
 
-    <div class="section-label">cost[i] — toll to stand on step i</div>
+    <div class="section-label">cost[i] — Azure cost at resize checkpoint i</div>
     <div class="cost-row" id="costRow"></div>
 
-    <div class="section-label">dp[i] = min cost to stand on step i</div>
+    <div class="section-label">dp[i] = min Azure cost to reach checkpoint i</div>
     <div class="dp-row" id="dpRow"></div>
 
     <div class="calc-line" id="calcLine"></div>
@@ -161,7 +161,7 @@
 
   <div class="takeaway">
     <h3>💡 Key takeaway</h3>
-    <p>Har cell apne do predecessors me se <b>sasta</b> chunta hai aur apna cost jodta hai. Top last index ke aage hai, toh answer <code>min(dp[n-1], dp[n-2])</code>. <b>O(n) time, O(1) space.</b></p>
+    <p>Each Azure checkpoint chooses the cheaper cached predecessor, then adds its own <code>cost[i]</code>. The target is beyond the last checkpoint, so the answer is <code>min(dp[n-1], dp[n-2])</code>. <b>O(n) time, O(1) space.</b></p>
   </div>
 </div>
 
@@ -175,9 +175,9 @@
 
   const steps = [
     { type:'base', i:0,
-      desc:'<b>Base case:</b> <code>dp[0] = cost[0] = '+cost[0]+'</code>. Start step 0 par free hai, sirf uska toll lagta hai.' },
+      desc:'<b>Base case:</b> <code>dp[0] = cost[0] = '+cost[0]+'</code>. Azure resize checkpoint 0 starts from zero prior cost.' },
     { type:'base', i:1,
-      desc:'<b>Base case:</b> <code>dp[1] = cost[1] = '+cost[1]+'</code>. Start step 1 par bhi free hai (do start options the).' },
+      desc:'<b>Base case:</b> <code>dp[1] = cost[1] = '+cost[1]+'</code>. Azure resize checkpoint 1 is also a valid starting checkpoint.' },
     { type:'compute', i:2 },
     { type:'compute', i:3 },
     { type:'compute', i:4 },
@@ -224,7 +224,7 @@
     const active = cur > 0 ? steps[cur-1] : null;
 
     if (!active) {
-      stepDesc.innerHTML = 'Press <b>Next →</b> to start filling the DP table.';
+      stepDesc.innerHTML = 'Press <b>Next →</b> to start filling the Azure cost cache.';
     } else if (active.type === 'base') {
       const d = $('dp-'+active.i);
       d.classList.remove('filled'); d.classList.add('active');
@@ -243,8 +243,8 @@
       $('dp-'+loseIdx).classList.add('src-lose');
       const winVal = Math.min(a, b), loseVal = Math.max(a, b);
       stepDesc.innerHTML =
-        `<b>Compute dp[${i}]:</b> step ${i} par <code>${i-1}</code> ya <code>${i-2}</code> se aaya ja sakta hai. ` +
-        `Sasta predecessor = <b style="color:#10b981">dp[${winIdx}] = ${winVal}</b>. Usme apna toll <code>cost[${i}] = ${cost[i]}</code> jodo.`;
+        `<b>Compute dp[${i}]:</b> Azure checkpoint ${i} can arrive from <code>${i-1}</code> or <code>${i-2}</code>. ` +
+        `Cheapest cached predecessor = <b style="color:#10b981">dp[${winIdx}] = ${winVal}</b>. Add this checkpoint cost <code>cost[${i}] = ${cost[i]}</code>.`;
       calcLine.innerHTML =
         `dp[${i}] = cost[${i}] + min(<span class="${a<=b?'win':'lose'}">${a}</span>, <span class="${b<a?'win':'lose'}">${b}</span>) ` +
         `= <span class="amb">${cost[i]}</span> + <span class="win">${winVal}</span> = <span class="res">${dp[i]}</span>`;
@@ -252,8 +252,8 @@
       const lastIdx = dp[n-1] <= dp[n-2] ? n-1 : n-2;
       $('dp-'+lastIdx).classList.remove('filled'); $('dp-'+lastIdx).classList.add('done');
       stepDesc.innerHTML =
-        `<b>Done!</b> Top last step ke aage hai, toh answer = <code>min(dp[${n-1}], dp[${n-2}]) = min(${dp[n-1]}, ${dp[n-2]}) = ${answer}</code>. ` +
-        `Cheapest way to reach the top costs <b>${answer}</b>.`;
+        `<b>Done!</b> The Azure target is beyond the last checkpoint, so answer = <code>min(dp[${n-1}], dp[${n-2}]) = min(${dp[n-1]}, ${dp[n-2]}) = ${answer}</code>. ` +
+        `Cheapest scale plan costs <b>${answer}</b>.`;
       calcLine.innerHTML =
         `answer = min(dp[${n-1}], dp[${n-2}]) = min(${dp[n-1]}, ${dp[n-2]}) = <span class="res">${answer}</span>`;
       resultBadge.textContent = `return ${answer}`;

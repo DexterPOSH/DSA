@@ -18,7 +18,12 @@ The middle `O`s are fully surrounded → flipped. The bottom-left `O` touches th
 
 ## Real-World Analogy
 
-Socho ek board game hai jisme tumhe woh `O` territories "capture" karni hain jo poori tarah `X` se gher li gayi hain. Catch: jo `O` board ke **kinaare (border)** ko chhoo raha hai, ya kinaare wale `O` se juda hai, woh **safe** hai — uske paas "bahar bhaagne ka raasta" hai, isliye capture nahi hoga. Smart trick: seedha surrounded `O`s dhoondhne ki jagah, **border se ulta socho** — saare border-touching `O`s ko flood-fill karke "safe" (temporary `#`) mark kar do. Jo bach gaye (still `O`) woh definitely surrounded hain → `X` kar do. Safe wale `#` ko wapas `O` kar do.
+**What Azure Virtual Network is:** Azure Virtual Network (VNet) is Azure's private networking boundary for subnets, routes, NSGs, gateways, and connected workloads. Some subnets may have a route to a VPN Gateway, ExpressRoute circuit, or internet edge, while others may be separated by NSG-denied links or route-table blocks. From a topology view, “open” subnets are useful only if they can still reach an allowed edge.
+
+**What edge-reachable subnet isolation is, and why it's used:** Edge-reachable isolation marks every open Azure subnet that can still escape to a trusted boundary, then treats the remaining open subnets as enclosed. It is used because directly searching for trapped regions is error-prone: a region might look enclosed locally but have a winding path to the edge. By proving which subnets are safe first, you can lock down only the truly surrounded areas without cutting off valid gateway or ExpressRoute paths.
+
+**The mapping:** `O` cells are open Azure subnets, `X` cells are blocked by NSGs/routes, and the board border represents subnets with external reachability. Flood-fill from every border `O` to mark all edge-connected open subnets as safe; after that, any unmarked `O` is enclosed and gets flipped to `X`. The key insight is to search from the boundary of safety, not from every possible trapped region.
+
 
 ## Approach
 

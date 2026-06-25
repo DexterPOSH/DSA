@@ -105,8 +105,8 @@
   <div class="subtitle">For <code>get(key, t)</code> we want the value at the largest timestamp ≤ t. Timestamps are sorted, so we binary-search for the "floor".</div>
 
   <div class="analogy">
-    <h3>Real-world analogy</h3>
-    <p>Socho ek <b>git commit history</b> ek file ki. "Time <code>t</code> pe content kya tha?" ka matlab hai <b><code>t</code> se pehle ka sabse recent commit</b> — kyunki wahi version us waqt live tha. Commits already time-order me hain, to poora history scan mat karo — binary search se seedha floor pe jump karo.</p>
+    <h3>🕒 Analogy: Azure Blob Storage versioning</h3>
+    <p>With <b>Azure Blob Storage versioning</b>, an as-of read at time <code>t</code> returns the newest blob version whose timestamp is ≤ <code>t</code>. The timestamp list is sorted, so binary search saves each valid version and moves right to find the latest still-valid one.</p>
   </div>
 
   <div class="problem">

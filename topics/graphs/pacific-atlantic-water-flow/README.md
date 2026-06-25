@@ -20,7 +20,12 @@ heights = [
 
 ## Real-World Analogy
 
-Socho ek pahaadi ilaaka hai, har cell ki ek height hai, aur paani sirf neeche ya barabar height pe beh sakta hai. Tum poochh rahe ho: "kaun se points se paani **dono** samundar tak pahunch sakta hai?" Seedha approach (har cell se dono ocean tak DFS) bahut mehnga hai. Smart trick: **ulta socho** — samundar ke kinaare se ** upar ki taraf (uphill) paani chadhao**. Pacific ke border cells se shuru karke jahan-jahan paani *chadh* sakta hai (neighbor height >= current) mark karte jaao — ye saare cells "Pacific tak beh sakte hain". Yahi Atlantic ke border se karo. Dono floods ka **intersection** = answer.
+**What Azure paired-region resiliency is:** Azure paired-region resiliency is Azure's practice of grouping region pairs, usually within the same geography, for resilience, planned maintenance sequencing, and disaster-recovery design. In a global topology, you can treat two paired-region boundaries as the two destinations a workload might need to drain, replicate, or fail over toward. Each intermediate resource can have a routing, capacity, or policy level that controls which direction movement is allowed.
+
+**What reverse reachability analysis is, and why it's used:** Reverse reachability asks, “from a destination boundary, which Azure resources could have reached me under the forward movement rule?” It is used because testing every resource outward to both regions would repeat enormous amounts of work in a large topology. Starting at each boundary and walking inward only to equal-or-higher levels gives all resources that could flow back down to that boundary.
+
+**The mapping:** The Pacific and Atlantic edges are the two Azure paired-region boundaries, cells are resources, and heights are the routing/capacity levels. Run DFS/BFS from the first boundary to mark everything that can reach it, run another from the second boundary, then take the intersection of the two visited sets. The key insight is to reverse the direction of the search: two boundary-to-interior floods are cheaper and clearer than launching a separate two-destination search from every cell.
+
 
 ## Approach
 

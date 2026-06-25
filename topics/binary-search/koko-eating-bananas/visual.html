@@ -117,8 +117,8 @@
   <p class="subtitle">Array me kuch nahi dhoond rahe — speed <b>k</b> dhoond rahe. Slowest feasible speed.</p>
 
   <div class="analogy">
-    <h3>🚿 Analogy: shower temperature knob</h3>
-    <p>Dheere (low k) → time zyada. Tez (high k) → jaldi. Ek <b>threshold</b> hai: usse upar har speed feasible (kaam in time), neeche har speed infeasible. Monotonic flip <code>F F F T T T</code> — binary search ke liye perfect. Hum <b>smallest feasible</b> dhoond rahe.</p>
+    <h3>⚙️ Analogy: Azure Cosmos DB RU/s tuning</h3>
+    <p>When tuning <b>Azure Cosmos DB throughput</b>, low RU/s misses the latency SLA and high RU/s passes. The feasible region is monotonic (<code>F F F T T T</code>), so binary search tests midpoint capacity and halves the range to find the minimum RU/s that still meets the SLA.</p>
   </div>
 
   <div class="problem">
@@ -149,7 +149,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Jab "minimum/maximum value such that condition holds" + monotonic ho → binary search on the answer range, ek <code>feasible(k)</code> checker ke saath. O(n·log(max)).</p>
+    <p>When a condition is monotonic, binary-search the answer range with a <code>feasible(k)</code> checker to find the smallest value that passes — O(n·log(max)).</p>
   </div>
 </div>
 

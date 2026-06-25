@@ -17,7 +17,11 @@ Given the `root` of a binary tree, **invert** it (mirror it left-to-right) and r
 
 ## Real-World Analogy
 
-Socho tum ek **family tree ko aaine (mirror) me dekh rahe ho**. Har person abhi bhi wahi hai, but "left wala beta" ab "right wala beta" ban gaya aur ulta bhi. Mirror sirf top node pe lagao to kaafi nahi — har level pe, har node ke do bachche aapas me jagah badal lete hain. Aur jab tum kisi node pe pahunchte ho, to usse neeche ka poora subtree bhi already flip ho chuka hota hai. Bas yahi recursion hai: "mera left aur right swap karo, phir dono ko bolo apne aap ko flip kar lo."
+**What Azure Portal's hierarchy visualization is:** The Azure portal can display the Resource Manager hierarchy so users can browse Management Groups, Subscriptions, Resource Groups, and Resources. The true Azure ownership graph stays the same regardless of how sibling scopes are ordered on screen. A visualization can mirror left and right positions without changing which parent owns which child.
+
+**What child-order mirroring is, and why it's used:** Mirroring a hierarchy view swaps the visual placement of each pair of child branches. It can be useful for alternate layouts, comparisons, or simply showing that left and right are presentation details rather than ownership details. To mirror the whole Azure tree, every nested scope must apply the same swap, not just the root.
+
+**The mapping:** Inverting a binary tree is that recursive Azure rendering flip. At each node, swap `left` and `right`, then recurse into the children so every descendant branch is mirrored too. The key insight is that the parent/child structure remains intact; only each node's two child slots trade places.
 
 ## Approach
 

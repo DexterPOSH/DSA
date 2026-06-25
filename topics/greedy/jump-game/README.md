@@ -15,10 +15,11 @@ You are given an integer array `nums`. You start at index `0`. Each element `num
 
 ## Real-World Analogy
 
-Socho tum stepping-stones pe khade ho ek river paar karne ke liye. Har stone pe likha hai ki tum **maximum** kitne stones aage chhalang laga sakte ho (tum kam bhi laga sakte ho). Sawaal: kya tum aakhri stone tak pahunch sakte ho?
+**What Azure Monitor autoscale for Virtual Machine Scale Sets is:** Azure Monitor autoscale can automatically change the instance count of an Azure Virtual Machine Scale Set based on metrics such as CPU, queue depth, or custom signals. Instead of manually deciding every capacity change, you define rules that let Azure scale out or in while respecting limits. The purpose is to know whether the service can grow far enough to meet demand without planning every possible path.
 
-Smart trick: stone-by-stone planning mat karo. Bas ek number track karo — **"abhi tak ke information se, sabse door kaunsa stone main reach kar sakta hu?"** (called `reach`). Tum left se right chalte ho; har stone pe jisko tum chhoo sakte ho, dekho ki wahan se aur kitna aage jaa sakte the, aur apna `reach` update karo. Agar kabhi tum ek aise stone pe pahunch jao jo tumhare `reach` se aage hai — matlab beech me ek `0` ne raasta kaat diya — to game over, `False`. Agar `reach` aakhri stone tak chhoo le, `True`.
+**What farthest-reachable capacity tracking is, and why it's used:** In autoscale planning, each reachable capacity checkpoint may allow another bounded increase, but exploring every chain of scale decisions would be wasteful. A simpler feasibility check keeps the farthest capacity reachable from any checkpoint already proven reachable. If the next checkpoint is beyond that boundary, no previous rule could have gotten you there, so the target capacity is impossible.
 
+**The mapping:** Each array index is an Azure VMSS capacity checkpoint, `nums[i]` is the maximum additional capacity reachable from that checkpoint, and `reach` is the farthest capacity Azure could have achieved so far. Scanning left to right only processes checkpoints that are within `reach`; each one may extend the boundary with `i + nums[i]`. The moment an index sits beyond `reach` the plan fails, and if `reach` covers the last index the deployment is feasible — the key insight is that reachability needs one boundary, not the exact path.
 ## Approach
 
 **Backtracking / DP** se bhi ho sakta hai (har index se saare jumps try karo), but wo O(n²) ya exponential. Greedy se O(n).

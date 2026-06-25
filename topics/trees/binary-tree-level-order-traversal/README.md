@@ -19,7 +19,11 @@ binary-tree-level-order-traversal(root)  ->  [[3], [9, 20], [15, 7]]
 
 ## Real-World Analogy
 
-Socho ek building me **floor-by-floor** announcement karni hai. Tum ground floor (root) se start karte ho, uske saare logon ko bulate ho, phir unke jo bachche pehli floor pe hain unko ek **line (queue)** me lagate jaate ho. Jab ek floor poora ho jaata hai, tum agli floor pe jaate ho — usi order me jaise wo queue me aaye the (left-se-right). Tum kabhi neeche utar ke beech me se kisi ko nahi bulate; ek poora floor khatam, tabhi agla. Yahi **BFS** hai — ek queue, level dar level.
+**What Azure Resource Manager is:** Azure Resource Manager is Azure's deployment and governance control plane, and it organizes cloud assets into nested scopes. In that tree, a tenant or top Management Group can contain child Management Groups and Subscriptions, Subscriptions contain Resource Groups, and Resource Groups contain Resources. Azure teams often need to inspect that estate one tier at a time instead of diving down one branch first.
+
+**What tier-by-tier inventory is, and why it's used:** A level-based Azure inventory answers questions like "which subscriptions are directly under this management group?" before moving on to the resource groups inside them. This is useful for reporting, access reviews, and rollout planning because every item at the same depth shares similar governance context. A queue is the natural tool: it preserves the order of scopes discovered for the next tier.
+
+**The mapping:** Level-order traversal is that Azure inventory walk. Start by queueing the root scope, snapshot the queue size to define the current tier, pop exactly that many nodes into one result list, and enqueue their children for the following tier. The key insight is to freeze the level boundary before processing it, so newly discovered children never get mixed into the current level.
 
 ## Approach
 

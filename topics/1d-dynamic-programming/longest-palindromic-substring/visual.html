@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Longest Palindromic Substring — Expand Around Center</title>
+<title>Longest Palindromic Substring — Azure stream symmetry scan</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -149,16 +149,14 @@
 </head>
 <body>
 
-  <h1>Longest Palindromic Substring &mdash; <span>Expand Around Center</span></h1>
+  <h1>Longest Palindromic Substring &mdash; <span>Azure Stream Symmetry Scan</span></h1>
 
   <div class="analogy">
-    <div class="ic">🪞</div>
+    <div class="ic">🔍</div>
     <div>
       <div class="label">Real-world analogy</div>
       <div class="analogy-text">
-        Do log <strong>mirror ke saamne back-to-back</strong> khade hain. Ek center se dono
-        bahar ki taraf chalte hain — jab tak chehre (characters) match karte hain, palindrome
-        badhta hai. Mismatch ya deewar aate hi ruk jao. Har center pe yeh karo, sabse lamba yaad rakho.
+        Azure Stream Analytics can validate symmetric telemetry markers around a center. Once the inner window matches, only the next left and right boundary markers must be checked, and the pipeline keeps the longest confirmed window.
       </div>
     </div>
   </div>
@@ -166,7 +164,7 @@
   <div class="card">
     <div>
       <div class="section-label">What's happening</div>
-      <div class="step-desc" id="stepDesc">Press "Next" to begin. We expand from every center in <code class="inline">s = "cabac"</code>.</div>
+      <div class="step-desc" id="stepDesc">Press "Next" to begin. The Azure stream scan expands from every center in <code class="inline">s = "cabac"</code>.</div>
     </div>
 
     <div>
@@ -195,11 +193,7 @@
     <div class="ic">💡</div>
     <div>
       <div class="label">Key Takeaway</div>
-      <p>
-        A palindrome grows symmetrically from a <strong>center</strong>. With <strong>2n−1 centers</strong>
-        (each char for odd, each gap for even) and O(n) expansion each, you scan all palindromes in
-        <strong>O(n²) time, O(1) space</strong> — no DP table needed.
-      </p>
+      <p>An Azure stream symmetry scan grows a confirmed window from a <strong>center</strong>. With <strong>2n−1 centers</strong> and O(n) expansion each, it reuses the known-good inner window while finding the longest match in <strong>O(n²) time, O(1) space</strong>.</p>
     </div>
   </div>
 
@@ -317,7 +311,7 @@
       counter.textContent = `Step ${cur + 1} / ${steps.length}`;
 
       if (cur < 0) {
-        stepDesc.innerHTML = 'Press "Next" to begin. We expand from every center in <code class="inline">s = "cabac"</code>.';
+        stepDesc.innerHTML = 'Press "Next" to begin. The Azure stream scan expands from every center in <code class="inline">s = "cabac"</code>.';
         stepDesc.className = 'step-desc';
         centerNote.innerHTML = '';
         curVal.textContent = '—';

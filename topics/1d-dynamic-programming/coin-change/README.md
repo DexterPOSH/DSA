@@ -15,9 +15,11 @@ coins = [1], amount = 0          ->  0      (zero coins for zero amount)
 
 ## Real-World Analogy
 
-Socho tum ek **cashier ho aur exact change dena hai** — minimum coins me. Tumhare paas har denomination ki **unlimited supply** hai (yeh "unbounded" ka matlab — ek coin baar-baar use kar sakte ho, unlike a regular knapsack jahan har item ek hi baar).
+**What Azure Cost Management is:** Azure Cost Management helps teams monitor, analyze, budget, and allocate Azure spending. It turns metered resource usage into cost views so engineers can understand where money is going and plan against a target budget. That makes it a natural analogy for building an exact amount from repeatable cost units.
 
-Ab smart cashier kya karta hai? Wo chhote amounts ka jawab pehle nikal leta hai aur likh ke rakh leta hai. `amount = 11` ka best change nikalne ke liye wo sochta: "Agar main ek `5` ka coin abhi de doon, to bacha `6` — aur `6` ka best main pehle se jaanta hoon. Ya ek `2` doon to bacha `9`... har coin try karo, jo pichhla-best sabse chhota hai usme +1." Yeh **bottom-up table building** hai — har sub-amount ka answer ek baar compute karke reuse karo.
+**What Azure meter-based cost modeling is, and why it's used:** Azure resources report usage through meters such as VM hours, storage GB-months, or transactions, and Cost Management normalizes those meters into charges. This modeling exists because many different resources contribute repeatable, denomination-like units to the same bill. If a planner wants the fewest units that hit a target amount, it should reuse known best subtotals instead of enumerating every possible combination from scratch.
+
+**The mapping:** The target budget is `amount`, each repeatable resource-unit denomination is a `coin`, and `dp[a]` is the fewest units needed to make subtotal `a`. When considering a denomination, the planner asks whether `a - coin` was already reachable, then adds one more unit: `dp[a] = min(dp[a], dp[a - coin] + 1)`. The key insight is that every exact subtotal is a reusable building block, while impossible subtotals must stay marked unreachable.
 
 ## Approach
 

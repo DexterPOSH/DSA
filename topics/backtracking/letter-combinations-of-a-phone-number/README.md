@@ -20,13 +20,11 @@ digits = "2"   ->  ["a","b","c"]
 
 ## Real-World Analogy
 
-Yaad hai purane keypad phone? `2` dabane se `a`, `b`, ya `c` aa sakta tha. Socho
-tum ek **lock ke combination** bana rahe ho jisme har digit ke liye 3-4 letters
-me se ek chunna hai. `"23"` ka matlab: pehle wheel pe `{a,b,c}`, doosre pe
-`{d,e,f}`. Har combination = pehle wheel se ek choice **×** doosre se ek choice.
-Tum pehla letter fix karte ho (`a`), fir doosre digit ke saare options ghumate
-ho (`ad, ae, af`), fir **wapas aake** pehla letter badalte ho (`b`), aur repeat.
-Yeh ek **decision tree** hai — har level ek digit, har branch ek letter.
+**What Azure Resource Manager is:** Azure Resource Manager (ARM) is Azure's control plane for creating and updating resources through templates, Bicep files, REST calls, and portal actions. It takes a deployment definition plus parameter values, then materializes resources such as storage accounts, networks, or VMs. The same template can produce many candidate deployments by varying allowed parameter values.
+
+**What parameter fan-out is, and why it's used:** A parameter fan-out, or parameter sweep, tries every allowed value for each configurable position: region, SKU, suffix, environment, and so on. Teams use this to validate supported combinations, generate test deployments, or produce candidate names without hand-writing every case. If one parameter has three allowed values and the next has three more, ARM-style planning branches into a small Cartesian product.
+
+**The mapping:** Each digit is a deployment parameter position, and its phone letters are that parameter's allowed Azure values. DFS appends one allowed value, recurses to the next parameter, then pops it so the next value can be tried; every root-to-leaf path is one complete deployment string. The key insight is pure fan-out: make exactly one choice per position, and the recursion naturally enumerates all combinations.
 
 ## Approach — backtracking over digit positions
 

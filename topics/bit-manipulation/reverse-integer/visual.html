@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reverse Integer — peel a digit, push it, guard the 32-bit edge</title>
+<title>Reverse Integer — Azure SQL INT Guard Walkthrough</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -175,12 +175,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Reverse Integer — <span>peel</span> a digit, <span style="color:var(--green)">push</span> it, guard the 32-bit edge</h1>
+  <h1>Reverse Integer — <span>Azure SQL</span> digit reversal with an <span style="color:var(--green)">INT guard</span></h1>
   <p class="subtitle">Reverse the digits of <code>x</code>, returning <code>0</code> if the result escapes <b>[-2³¹, 2³¹-1]</b>.</p>
 
   <div class="analogy">
-    <h3>🔢 Real-world analogy</h3>
-    <p>Odometer ulta padho: aakhri digit <b>peel</b> karo (<code>x % 10</code>), use naye number ke aage <b>push</b> karo (<code>res*10 + digit</code>). Par meter sirf <code>2147483647</code> tak jaata hai — to har push se <i>pehle</i> poocho "kya phat jaayega?" Agar haan → <code>0</code>.</p>
+    <h3>🗃️ Real-world analogy</h3>
+    <p>An Azure Functions telemetry normalizer may reverse a legacy numeric code before storing it in an Azure SQL Database <code>INT</code> column. It peels the last digit with <code>x % 10</code>, pushes it with <code>res*10 + digit</code>, and checks the signed 32-bit cap before each push.</p>
   </div>
 
   <div class="ex-tabs">
@@ -236,7 +236,7 @@
 
   <div class="takeaway">
     <h3>💡 Key takeaway</h3>
-    <p>Reverse a number by repeatedly peeling the last digit (<code>x%10</code>) and pushing it onto <code>res = res*10 + digit</code>. The trick is checking overflow <b>before</b> the multiply — comparing against <code>INT_MAX // 10</code> — so you never actually overflow a fixed-width int. <b>O(number of digits) time, O(1) space.</b></p>
+    <p>For an Azure SQL <code>INT</code> target, reverse a numeric code by repeatedly peeling the last digit (<code>x%10</code>) and pushing it onto <code>res = res*10 + digit</code>. Check overflow <b>before</b> the multiply by comparing against <code>INT_MAX // 10</code>, so the fixed-width value is never corrupted. <b>O(number of digits) time, O(1) space.</b></p>
   </div>
 </div>
 
@@ -309,15 +309,15 @@
       renderDigits($('xDigits'), st.x);
       renderDigits($('resDigits'), 0);
       setMeter(0, 'ok');
-      desc.innerHTML = `Press <b>Next →</b> to peel the last digit of <code>x = ${st.x}</code>.`;
+      desc.innerHTML = `Press <b>Next →</b> to peel the last digit of Azure telemetry code <code>x = ${st.x}</code>.`;
     } else if (st.type === 'push') {
       renderDigits($('xDigits'), st.x, { peelLast: true });
       renderDigits($('resDigits'), st.newRes, { pushFirst: true });
       setMeter(st.newRes, 'ok');
       desc.innerHTML =
-        `<b>Peel & push:</b> last digit <code>${st.digit}</code> ko utha (amber), ` +
-        `phir <code>res = res*10 + ${st.digit}</code> = <code>${st.newRes}</code> (green). ` +
-        `Bachi hui <code>x = ${st.nextX || 0}</code>.`;
+        `<b>Peel & push:</b> take last digit <code>${st.digit}</code> (amber), ` +
+        `then compute <code>res = res*10 + ${st.digit}</code> = <code>${st.newRes}</code> (green). ` +
+        `Remaining <code>x = ${st.nextX || 0}</code>.`;
       calc.innerHTML =
         `guard ok &nbsp;·&nbsp; res = <span class="sx">${st.res}</span>*10 + <span class="sx">${st.digit}</span> = <span class="res">${st.newRes}</span>`;
     } else if (st.type === 'overflow') {
@@ -326,9 +326,9 @@
       setMeter(st.res, 'over');
       desc.classList.add('danger');
       desc.innerHTML =
-        `<b>🛑 Overflow guard fires!</b> Push karne se <i>pehle</i> check: <code>res = ${st.res}</code> already ` +
-        `<code>INT_MAX//10 = ${Math.floor(INT_MAX/10)}</code> se bada/barabar hai aur digit <code>${st.digit} > 7</code>. ` +
-        `<code>res*10 + ${st.digit}</code> 32-bit range ke bahar chala jaata. Return <code>0</code>.`;
+        `<b>🛑 Azure SQL INT guard fires!</b> Before pushing, check that <code>res = ${st.res}</code> is already ` +
+        `at or beyond <code>INT_MAX//10 = ${Math.floor(INT_MAX/10)}</code> and digit <code>${st.digit} > 7</code>. ` +
+        `<code>res*10 + ${st.digit}</code> would exceed the signed 32-bit range, so return <code>0</code>.`;
       calc.innerHTML =
         `<span class="bad">${st.res}*10 + ${st.digit} = ${st.res*10+st.digit} > ${INT_MAX}</span> &nbsp;→&nbsp; overflow`;
     } else if (st.type === 'done') {
@@ -336,7 +336,7 @@
       renderDigits($('resDigits'), st.res);
       setMeter(st.res, 'ok');
       const finalVal = examples[exIdx].x < 0 ? -st.res : st.res;
-      desc.innerHTML = `<b>Done!</b> <code>x</code> khaali ho gaya. Reversed result = <code>${st.res}</code> (sign laga ke <code>${finalVal}</code>).`;
+      desc.innerHTML = `<b>Done!</b> <code>x</code> is empty. Reversed result = <code>${st.res}</code> (after restoring the sign, <code>${finalVal}</code>).`;
     }
 
     // result badge

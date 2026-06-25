@@ -15,9 +15,11 @@ Given the head of a linked list, reverse the nodes **`k` at a time** and return 
 
 ## Real-World Analogy
 
-Socho ek **train** hai jiske dabbe (nodes) ek line me jude hain. Tumhe har **`k` dabbon ka group** uthana hai aur uss group ko **ulta** karke wapas patri pe jod dena hai — but groups ke beech ka connection toota nahi rehna chahiye, train continuous honi chahiye.
+**What Azure Data Factory is:** Azure Data Factory is Azure's data integration and orchestration service for building pipelines that move and transform data. Pipelines are made of activities, such as copy or data-flow steps, connected by dependency conditions. A simple pipeline can look like a linked chain of activities.
 
-Har group ke liye ek shunting-yard worker: pehle wo aage jaake check karta hai ki **poore `k` dabbe bache hain ya nahi**. Agar bache → group reverse karo aur dono taraf se sahi se reconnect karo. Agar `k` se kam bache → unhe chhod do as-is. Asli mehnat hai connections sambhalna: pichle group ki tail naye reversed group ke head se jude, aur reversed group ki tail (jo pehle head thi) agle group se.
+**What activity dependency orchestration is, and why it's used:** Azure Data Factory dependencies specify when an activity should run after another activity succeeds, fails, is skipped, or completes. They exist to make orchestration reliable: each step waits for the right upstream condition, and the designer can express batches, branches, and recovery paths. Rewiring dependencies changes execution order while leaving the activities themselves intact.
+
+**The mapping:** Each linked-list node is one Azure Data Factory activity, and `next` is the success dependency to the next activity. For every full group of `k`, the algorithm checks that the whole batch exists, reverses the links inside that isolated batch, then reconnects the previous batch tail and the next untouched activity. If fewer than `k` nodes remain, it leaves them in original order, so the key insight is to reverse only complete dependency blocks and preserve clean boundaries with the dummy head.
 
 ## Approach
 

@@ -15,9 +15,11 @@ Given an integer array `nums`, return the length of the **longest strictly incre
 
 ## Real-World Analogy
 
-Socho tum **stacking cups** kar rahe ho ek line me — har cup tabhi rakh sakte ho jab uska number pichhle rakhe cup se bada ho. Array me numbers ek-ek aate hain (order fixed), aur tum sabse lambi badhti hui chain banana chahte ho.
+**What Azure Stream Analytics is:** Azure Stream Analytics is a real-time analytics service for processing event streams from sources such as Event Hubs, IoT Hub, and Blob Storage. It runs SQL-like queries over incoming events and writes results to downstream sinks. That makes it useful for detecting trends in telemetry as data arrives.
 
-Har naye number pe poochte ho: "mere se chhote jitne bhi numbers pehle aaye, unme se sabse lambi chain kaunsi thi? Us chain ke peeche main lag jaata hoon, +1." Yani har position pe "yahan **khatam** hone wali sabse lambi increasing chain" yaad rakho. Aakhir me sabse lamba wala answer.
+**What stateful trend aggregation is, and why it's used:** A streaming job can keep state about the best trend ending at earlier events instead of storing and reprocessing the whole stream for every new event. This state exists because real-time systems need low latency: when a new metric arrives, the job should reuse prior aggregates that are already known. For an increasing trend, only earlier lower values can extend into the current event.
+
+**The mapping:** Event `i` is `nums[i]`, and `dp[i]` is the longest strictly increasing trend that ends at that event. Azure Stream Analytics would look back at prior events `j` with lower metric values and reuse their cached lengths, setting `dp[i] = max(dp[j] + 1)`. The key insight is that each subsequence is anchored by its last event, so the best answer ending here is built from the best valid answer ending earlier.
 
 ## Approach
 

@@ -16,15 +16,11 @@ l2: 1 -> 3 -> 4
 
 ## Real-World Analogy
 
-Socho do alag-alag **already-sorted card piles** hain, dono face-up, sabse chhota card upar.
-Tumhe ek single sorted pile banani hai. Tum dono piles ke top cards dekhte ho, jo **chhota
-hai use uthate ho** apni nayi pile pe, aur us pile ka agla card expose ho jaata hai. Yeh
-tab tak repeat karo jab tak ek pile khatam na ho jaye — phir jo bachi hui pile hai use
-**poora ka poora** neeche attach kar do (woh already sorted hai).
+**What Azure Event Hubs is:** Azure Event Hubs is Azure's streaming ingestion service for collecting high-volume events from many producers. It stores events in partitions, where each partition can be read forward in the order events were accepted. A consumer can build a new output stream by reading from partition cursors and appending events in the desired order.
 
-Important trick: nayi pile shuru karne ke liye ek **dummy "placeholder" card** rakh lo. Isse
-"pehla card kaunsa" wali special-case headache khatam — hamesha `tail.next` pe attach karte
-raho, end me `dummy.next` return kar do.
+**What ordered partition reading is, and why it's used:** Within one partition, Event Hubs preserves event order so consumers can replay a reliable sequence for a device, user, or partition key. This is used because many streaming workflows need per-key order, while partitioning still lets the service scale horizontally. When two partitions are already sorted by a comparable key like timestamp, a consumer only needs to compare the current front event from each partition.
+
+**The mapping:** The two linked lists are the two Azure Event Hubs partition streams, and each `next` pointer is advancing that partition cursor. The algorithm compares the two current event keys, appends the smaller node to the output, and advances only the stream that contributed it. The dummy head is the opened destination stream, making every append the same `tail.next` operation, and the key insight is that sorted inputs let you make one local comparison at a time.
 
 ## Approach
 

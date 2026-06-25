@@ -26,7 +26,11 @@ Good nodes: 3(root), 4, 5, and the lower 3.   ->  4
 
 ## Real-World Analogy
 
-Socho ek mountain trek hai root se shuru, aur har node ek **checkpoint ki height** hai. Tum ek checkpoint pe "good" tabhi ho jab tumne abhi tak **apne se ooncha koi checkpoint paar nahi kiya** — yaani tum ab tak ke safar ke **sabse ooncha (ya barabar)** point pe khade ho, naya record ya tie. Jaise hi tum neeche jaate ho, tum apne saath "ab tak ki max height" carry karte ho. Har checkpoint pe poochte ho: "kya main is max se bada/barabar hoon?" Haan → good, aur apni height se max update kar do (agar badi hai). Yeh ek hi top-down walk me ho jaata hai.
+**What Azure Defender for Cloud is:** Azure Defender for Cloud, now Microsoft Defender for Cloud, helps assess and improve the security posture of Azure resources and subscriptions. It surfaces recommendations, alerts, and secure-score-style signals so teams can see which parts of an estate are strongest or weakest. In this analogy, every scope in the Azure hierarchy has a security score.
+
+**What Secure Score path tracking is, and why it's used:** As governance flows from a Management Group down to Subscriptions, Resource Groups, and Resources, a child is often judged in the context of what has already been seen on its inherited path. Carrying the best score so far creates a high-water mark: a scope is notable when it matches or exceeds every ancestor before it. This avoids comparing a node to unrelated branches that do not govern it.
+
+**The mapping:** DFS carries the current Azure high-water score from parent to child. When `node.val >= max_so_far`, count the node as good, then pass `max(max_so_far, node.val)` into both children. The key insight is that each node only needs one piece of path state — the maximum ancestor value — not the full route back to the root.
 
 ## Approach
 

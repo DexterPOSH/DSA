@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Meeting Rooms — can one person attend them all?</title>
+<title>Meeting Rooms — Azure maintenance overlap check</title>
 <style>
   :root{
     --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
@@ -62,17 +62,17 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Meeting Rooms — can <span>one person</span> attend them all?</h1>
-  <p class="subtitle">Sort by start, then just check neighbouring pairs for any overlap. First clash → False.</p>
+  <h1>Meeting Rooms — Azure maintenance <span>overlap check</span></h1>
+  <p class="subtitle">Sort Azure maintenance windows by start, then check neighbouring windows for overlap. First clash → False.</p>
 
   <div class="analogy">
-    <h3>🧍 The one-person analogy</h3>
-    <p>Tum ek hi insaan ho — do jagah ek saath nahi ho sakte. Meetings ko <b>start ke order me line up</b> karo. Bas check karo: koi meeting pichhli ke <b>khatam hone se pehle</b> shuru to nahi ho rahi? Ek bhi clash → <code>False</code>. Sab clear → <code>True</code>.</p>
+    <h3>☁️ Azure Update Manager analogy</h3>
+    <p>Azure Update Manager can schedule one VM into only one maintenance window at a time. Sort windows by start; if a window starts before the previous one ends, the VM is double-booked (<code>False</code>), otherwise the schedule is valid.</p>
   </div>
 
   <div class="problem">
     <b>Input.</b> <code>[[0,30],[5,10],[15,20]]</code>
-    <span class="arrow">→</span> <code>False</code> &nbsp;(meetings collide)
+    <span class="arrow">→</span> <code>False</code> &nbsp;(maintenance windows overlap)
   </div>
 
   <div class="legend">
@@ -97,7 +97,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>After sorting by start, any overlap must be between <i>adjacent</i> intervals — so a single O(n) neighbour scan answers it. Test is <code>cur.start &lt; prev.end</code> (touching is fine).</p>
+    <p>After sorting Azure maintenance windows by start, any overlap must appear between <i>adjacent</i> windows. A single O(n) neighbor scan with <code>cur.start &lt; prev.end</code> detects double-booked Azure maintenance.</p>
   </div>
 </div>
 
@@ -117,16 +117,16 @@ function buildSteps(){
     verdict:o.verdict??verdict, caption:o.caption
   });
 
-  steps.push(snap({caption:`Input: [[0,30],[5,10],[15,20]]. First sort by <b>start</b> so any overlap lands between neighbours.`}));
-  steps.push(snap({sorted:true,caption:`Sorted by start → <b>[[0,30],[5,10],[15,20]]</b>. Now compare each meeting with the one before it.`}));
+  steps.push(snap({caption:`Input Azure windows: [[0,30],[5,10],[15,20]]. First sort by <b>start</b> so any overlap lands between neighbours.`}));
+  steps.push(snap({sorted:true,caption:`Sorted by start → <b>[[0,30],[5,10],[15,20]]</b>. Now compare each Azure window with the one before it.`}));
 
   for(let i=1;i<sorted.length;i++){
     const [ps,pe]=sorted[i-1], [cs,ce]=sorted[i];
-    steps.push(snap({sorted:true,prev:i-1,cur:i,caption:`Pair check: previous <b>[${ps},${pe}]</b> vs current <b>[${cs},${ce}]</b>. Does current start before previous ends? <code>${cs} &lt; ${pe}</code>?`}));
+    steps.push(snap({sorted:true,prev:i-1,cur:i,caption:`Pair check: previous Azure window <b>[${ps},${pe}]</b> vs current <b>[${cs},${ce}]</b>. Does current start before previous ends? <code>${cs} &lt; ${pe}</code>?`}));
     if(cs<pe){
       verdict=false;
       const shade=[cs,Math.min(pe,ce)];
-      steps.push(snap({sorted:true,prev:i-1,cur:i,clash:i,shade,verdict:false,caption:`Yes — <code>${cs} &lt; ${pe}</code>. The two meetings <b>overlap</b> (red zone). One person can't attend both → return <b>False</b>. ✋`}));
+      steps.push(snap({sorted:true,prev:i-1,cur:i,clash:i,shade,verdict:false,caption:`Yes — <code>${cs} &lt; ${pe}</code>. The two Azure maintenance windows <b>overlap</b> (red zone), double-booking the VM → return <b>False</b>. ✋`}));
       return steps;
     }else{
       cleared.add(i);
@@ -134,7 +134,7 @@ function buildSteps(){
     }
   }
   verdict=true;
-  steps.push(snap({sorted:true,verdict:true,caption:`All adjacent pairs clear → no conflicts → return <b>True</b>. ✅`}));
+  steps.push(snap({sorted:true,verdict:true,caption:`All adjacent Azure windows are clear → no maintenance conflicts → return <b>True</b>. ✅`}));
   return steps;
 }
 const steps=buildSteps();
@@ -165,8 +165,8 @@ function drawTimeline(s){
 function drawVerdict(s){
   if(s.verdict===null){$('verdictWrap').innerHTML='';return;}
   $('verdictWrap').innerHTML = s.verdict
-    ? `<div class="verdict t">return True — one person can attend all ✓</div>`
-    : `<div class="verdict f">return False — meetings collide ✗</div>`;
+    ? `<div class="verdict t">return True — Azure schedule is valid ✓</div>`
+    : `<div class="verdict f">return False — Azure windows overlap ✗</div>`;
 }
 function render(){
   const s=steps[cur];

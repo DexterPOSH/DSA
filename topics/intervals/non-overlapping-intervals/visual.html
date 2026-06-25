@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Non-Overlapping Intervals — greedy by earliest end</title>
+<title>Non-Overlapping Intervals — Azure Batch earliest-end greedy</title>
 <style>
   :root{
     --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
@@ -65,17 +65,17 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Non-Overlapping Intervals — <span>greedy</span> by earliest end</h1>
-  <p class="subtitle">Remove the fewest intervals so none overlap. Sort by END and always keep the one that finishes first.</p>
+  <h1>Non-Overlapping Intervals — Azure Batch <span>earliest-end greedy</span></h1>
+  <p class="subtitle">Remove the fewest Azure Batch reservation windows so none overlap. Sort by END and always keep the one that frees capacity first.</p>
 
   <div class="analogy">
-    <h3>🎤 The conference-room analogy</h3>
-    <p>Ek hi room, bahut saari talks. Maximum talks schedule karni hain → hamesha woh talk pick karo jo <b>sabse jaldi khatam</b> ho. Jaldi-khatam talk room ko early free karti hai, isliye aage zyada talks fit hoti hain. Jo nahi fit hotin, unhe remove karo — wahi answer.</p>
+    <h3>⚙️ Azure Batch analogy</h3>
+    <p>Azure Batch reservations compete for a constrained pool slice, so overlapping windows cannot all be accepted. Sort by end time and keep each reservation that starts after the last accepted end; rejecting the rest removes the fewest conflicts because earliest-ending reservations free capacity fastest.</p>
   </div>
 
   <div class="problem">
     <b>Input.</b> <code>[[1,2],[2,3],[3,4],[1,3]]</code>
-    <span class="arrow">→</span> remove <code>1</code> interval (drop <code>[1,3]</code>)
+    <span class="arrow">→</span> remove <code>1</code> reservation (drop <code>[1,3]</code>)
   </div>
 
   <div class="legend">
@@ -104,7 +104,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Sort by <b>end</b>, keep an interval only if it starts at/after the fence (<code>start ≥ prev_end</code>), then push the fence to its end. Everything that fails is a removal — this greedy is provably optimal (activity selection).</p>
+    <p>Sort Azure reservation windows by <b>end</b>, keep one only if it starts at/after the fence (<code>start ≥ prev_end</code>), then move the fence to its end. Every failed check is a removal, and earliest-end greedily preserves the most future Azure capacity.</p>
   </div>
 </div>
 
@@ -125,21 +125,21 @@ function buildSteps(){
     caption:o.caption
   });
 
-  steps.push(snap({caption:`Input: [[1,2],[2,3],[3,4],[1,3]]. The greedy trick is to sort by <b>END</b> time, not start.`}));
-  steps.push(snap({sorted:true,caption:`Sorted by end → <b>[[1,2],[1,3],[2,3],[3,4]]</b>. Fence <code>prev_end = −∞</code>. Sweep left→right.`}));
+  steps.push(snap({caption:`Azure Batch reservations: [[1,2],[2,3],[3,4],[1,3]]. The greedy trick is to sort by <b>END</b> time, not start.`}));
+  steps.push(snap({sorted:true,caption:`Sorted by end → <b>[[1,2],[1,3],[2,3],[3,4]]</b>. Fence <code>prev_end = −∞</code>. Sweep reservations left→right.`}));
 
   for(let i=0;i<sorted.length;i++){
     const [s,e]=sorted[i];
-    steps.push(snap({sorted:true,testing:i,caption:`Test <b>[${s},${e}]</b>: does it start at/after the fence? Check <code>start ${s} ≥ prev_end ${prevEnd===-Infinity?'−∞':prevEnd}</code>.`}));
+    steps.push(snap({sorted:true,testing:i,caption:`Test Azure reservation <b>[${s},${e}]</b>: does it start at/after the fence? Check <code>start ${s} ≥ prev_end ${prevEnd===-Infinity?'−∞':prevEnd}</code>.`}));
     if(s>=prevEnd){
       state[i]='kept'; kept++; prevEnd=e;
-      steps.push(snap({sorted:true,testing:i,caption:`Yes → <b>KEEP</b> [${s},${e}]. Move the fence to its end: <code>prev_end = ${e}</code>.`,fenceShown:true}));
+      steps.push(snap({sorted:true,testing:i,caption:`Yes → <b>KEEP</b> Azure reservation [${s},${e}]. Move the fence to its end: <code>prev_end = ${e}</code>.`,fenceShown:true}));
     }else{
       state[i]='removed'; removed++;
-      steps.push(snap({sorted:true,testing:i,caption:`No — <code>${s} &lt; ${prevEnd}</code>, it overlaps the kept set. <b>REMOVE</b> it (removed = ${removed}). Fence stays at ${prevEnd}.`}));
+      steps.push(snap({sorted:true,testing:i,caption:`No — <code>${s} &lt; ${prevEnd}</code>, it overlaps the kept Azure reservations. <b>REMOVE</b> it (removed = ${removed}). Fence stays at ${prevEnd}.`}));
     }
   }
-  steps.push(snap({sorted:true,caption:`Done. Kept ${kept}, removed <b>${removed}</b>. Minimum removals = <b>${removed}</b>. ✅`}));
+  steps.push(snap({sorted:true,caption:`Done. Kept ${kept} Azure reservations, removed <b>${removed}</b>. Minimum removals = <b>${removed}</b>. ✅`}));
   return steps;
 }
 const steps=buildSteps();

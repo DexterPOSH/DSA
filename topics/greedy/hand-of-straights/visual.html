@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Hand of Straights — Greedy Smallest-First Grouping</title>
+<title>Hand of Straights — Azure Event Hubs Batch Grouping</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -106,17 +106,14 @@
 </head>
 <body>
 
-  <h1>Hand of Straights &mdash; <span>Greedy Smallest-First Grouping</span></h1>
+  <h1>Hand of Straights &mdash; <span>Azure Event Hubs Batching</span></h1>
 
   <div class="analogy">
-    <div class="ic">🃏</div>
+    <div class="ic">📩</div>
     <div>
       <div class="label">Real-world analogy</div>
       <div class="analogy-text">
-        Rummy me poore haath ko fixed-length consecutive runs me todna hai. Trick:
-        <strong>hamesha sabse chhoti card uthao</strong> — uske neeche koi card nahi,
-        to wo kisi run ka <em>head</em> banni hi padegi. Phir <code class="inline">x, x+1, x+2…</code>
-        ka poora group banana zaroori. Nahi mila? <strong>False</strong>.
+        Azure Event Hubs assigns monotonically increasing sequence numbers inside a partition. The smallest unprocessed sequence must start the next fixed-size checkpoint batch, so greedily take <code class="inline">x, x+1, x+2…</code>; any gap means the batch plan is impossible.
       </div>
     </div>
   </div>
@@ -124,28 +121,28 @@
   <div class="card">
     <div>
       <div class="section-label">What's happening</div>
-      <div class="step-desc" id="stepDesc">Press "Next". <code class="inline">hand = [1,2,3,2,3,4]</code>, <code class="inline">groupSize = 3</code>. We greedily form straights starting from the smallest remaining card.</div>
+      <div class="step-desc" id="stepDesc">Press "Next". <code class="inline">hand = [1,2,3,2,3,4]</code>, <code class="inline">groupSize = 3</code>. We greedily form Azure Event Hubs checkpoint batches from the smallest remaining sequence number.</div>
     </div>
 
     <div>
-      <div class="section-label">Hand (cards remaining)</div>
+      <div class="section-label">Sequence numbers remaining</div>
       <div class="hand-row" id="handRow"></div>
     </div>
 
     <div>
-      <div class="section-label">count[value] — frequency map (min-head highlighted)</div>
+      <div class="section-label">count[value] — frequency map (batch head highlighted)</div>
       <div class="counter-row" id="counterRow"></div>
     </div>
 
     <div>
-      <div class="section-label">Straights formed</div>
+      <div class="section-label">Checkpoint batches formed</div>
       <div class="groups" id="groupsRow"><span style="color:var(--muted);font-size:0.85rem">none yet</span></div>
     </div>
 
     <div class="legend">
-      <span><span class="swatch" style="background:#f59e0b"></span> group head (smallest)</span>
+      <span><span class="swatch" style="background:#f59e0b"></span> batch head (smallest sequence)</span>
       <span><span class="swatch" style="background:#3b82f6"></span> value being checked</span>
-      <span><span class="swatch" style="background:#10b981"></span> matched / grouped</span>
+      <span><span class="swatch" style="background:#10b981"></span> matched / batched</span>
       <span><span class="swatch" style="background:#ef4444"></span> missing — fail</span>
     </div>
 
@@ -162,7 +159,7 @@
     <div class="ic">💡</div>
     <div>
       <div class="label">Key takeaway</div>
-      <p>The <strong>smallest remaining card has no choice</strong> — it must start a straight. Pull <code class="inline">groupSize</code> consecutive values from the count map each round; any gap means it's impossible.</p>
+      <p>The <strong>smallest remaining Event Hubs sequence number has no choice</strong> — it must start the next checkpoint batch. Pull <code class="inline">groupSize</code> consecutive values from the count map each round; any gap means the batching plan is impossible.</p>
     </div>
   </div>
 
@@ -183,7 +180,7 @@ function buildSteps() {
     ...extra
   });
 
-  steps.push(snap({ desc: `Count map built. n=${hand.length}, n % groupSize = ${hand.length % groupSize} (divisible ✓). Begin greedy rounds.`, mode:'init', groups: [] }));
+  steps.push(snap({ desc: `Count map built. n=${hand.length}, n % groupSize = ${hand.length % groupSize} (divisible ✓). Begin greedy Azure batch rounds.`, mode:'init', groups: [] }));
 
   const groups = [];
   // min-heap behaviour via sorted distinct keys check each round
@@ -195,22 +192,22 @@ function buildSteps() {
     const start = remaining()[0];
     const grp = [];
     let failed = false;
-    steps.push(snap({ desc: `Smallest remaining card is ${start}. It must be the head of a new straight. Need ${start}…${start+groupSize-1}.`, mode:'start', head:start, active:start, groups: groups.map(g=>[...g]) }));
+    steps.push(snap({ desc: `Smallest remaining sequence number is ${start}. It must be the head of a new checkpoint batch. Need ${start}…${start+groupSize-1}.`, mode:'start', head:start, active:start, groups: groups.map(g=>[...g]) }));
     for (let x = start; x < start + groupSize; x++) {
       if (!count[x]) {
-        steps.push(snap({ desc: `Need value ${x} but count[${x}] = 0 — the consecutive chain breaks. Impossible → return False.`, mode:'fail', head:start, active:x, miss:x, groups: groups.map(g=>[...g]) }));
+        steps.push(snap({ desc: `Need sequence ${x} but count[${x}] = 0 — the checkpoint batch has a gap. Impossible → return False.`, mode:'fail', head:start, active:x, miss:x, groups: groups.map(g=>[...g]) }));
         failed = true; break;
       }
       count[x]--;
       grp.push(x);
-      steps.push(snap({ desc: `Take ${x} for this straight (count[${x}] → ${count[x]}). Partial group: [${grp.join(', ')}].`, mode:'pick', head:start, active:x, pick:x, groups: [...groups.map(g=>[...g]), [...grp]] }));
+      steps.push(snap({ desc: `Take sequence ${x} for this Azure batch (count[${x}] → ${count[x]}). Partial batch: [${grp.join(', ')}].`, mode:'pick', head:start, active:x, pick:x, groups: [...groups.map(g=>[...g]), [...grp]] }));
     }
     if (failed) return { steps, ok:false };
     groups.push([...grp]);
-    steps.push(snap({ desc: `Completed straight [${grp.join(', ')}] ✓. Remove it and look for the next smallest card.`, mode:'done', groups: groups.map(g=>[...g]) }));
+    steps.push(snap({ desc: `Completed checkpoint batch [${grp.join(', ')}] ✓. Commit it and look for the next smallest sequence number.`, mode:'done', groups: groups.map(g=>[...g]) }));
   }
 
-  steps.push(snap({ desc: `All cards consumed — every group is a valid consecutive straight. Return True ✓`, mode:'success', groups: groups.map(g=>[...g]) }));
+  steps.push(snap({ desc: `All sequence numbers consumed — every checkpoint batch is consecutive. Return True ✓`, mode:'success', groups: groups.map(g=>[...g]) }));
   return { steps, ok:true };
 }
 

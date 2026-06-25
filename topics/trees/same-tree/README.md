@@ -19,7 +19,11 @@ Given the roots of two binary trees `p` and `q`, return `True` if they are **str
 
 ## Real-World Analogy
 
-Socho do logon ke paas **same blueprint hone ka claim hai do buildings ka**. Tum kaise verify karoge? Dono ke main gate pe khade ho jao: kya dono buildings hain (ya dono khali plot)? Agar ek building aur doosra khali plot — alag, done. Dono building hain to kya unka naam/number same hai? Phir bolo "left wing andar jao" — wahan bhi same check, aur "right wing andar jao" — wahan bhi. Jab tak har corresponding kamra exactly match na ho, blueprint same nahi. Ek bhi mismatch (ek jagah room hai, doosri jagah nahi, ya value alag) → poora "not same".
+**What Azure Landing Zone architecture is:** An Azure landing zone is a recommended cloud environment structure for organizing subscriptions, networking, identity, policies, and resource groups. Teams often promote landing-zone templates between environments such as dev, test, and prod. Before promotion, they need confidence that two hierarchy definitions describe the same Azure shape.
+
+**What landing-zone shape comparison is, and why it's used:** Comparing only names or counts is not enough because a subscription or resource group in the wrong parent scope changes governance and access. A true comparison checks both the value at each scope and the exact child position beneath it. This catches drift where one Azure export has a missing, extra, or misplaced branch.
+
+**The mapping:** The same-tree check walks both Azure-like hierarchies together. At each pair of nodes, both must be null, or both must exist with equal values and matching left and right subtrees. The key insight is that equality is structural and recursive: one mismatch anywhere means the whole trees are not the same.
 
 ## Approach
 

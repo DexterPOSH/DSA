@@ -21,14 +21,11 @@ word1 = "horse", word2 = "ros"   ->  3
 
 ## Real-World Analogy
 
-Socho tum ek **autocorrect engine** ho. User ne `"horse"` type kiya but uska
-intended word `"ros"` tha. Tumhe minimum *edits* me ek word ko doosre me badalna
-hai — ek letter daal do, ek hata do, ya ek ko replace kar do. Har edit ka cost 1
-hai, aur tumhe sabse sasta raasta dhoondhna hai.
+**What Azure Blob Storage versioning is:** Azure Blob Storage can keep prior versions of a blob when a configuration file or deployment manifest is overwritten. That lets teams inspect, restore, or compare historical content instead of treating every upload as a total replacement. For a deployment review, imagine comparing an old Azure configuration blob with the new version about to be rolled out.
 
-Yeh problem ka asli mazaa yeh hai ki har position pe sirf **suffix** matter karta
-hai: "in dono words ke baaki bache hue hisse ko match karne ka cheapest tareeka kya
-hai?" — aur yahi overlapping sub-problem DP table me cache ho jaata hai.
+**What version-to-version diffing is, and why it's used:** Versioning preserves the two snapshots; a diffing step explains the smallest set of edits needed to turn one snapshot into the other. This is useful because reviewers care whether the change is a tiny setting update, a deletion, or a broad rewrite before they approve or roll back. Insert, delete, and replace are the basic edit operations that describe those changes at the character or token level.
+
+**The mapping:** Rows represent prefixes of the old Azure blob, columns represent prefixes of the new blob, and each DP cell stores the cheapest transformation cost for that prefix pair. Matching characters carry the diagonal cost forward, while a mismatch tries one insert, one delete, or one replace from neighboring cached cells and takes the minimum. The key insight is that a global minimum edit script is built from local prefix comparisons, so the bottom-right cell answers the full diff without re-solving the same prefix pairs.
 
 ## Approach
 

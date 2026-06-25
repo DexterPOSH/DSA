@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Interleaving String — Weaving Two Strings on a DP Grid</title>
+<title>Interleaving String — Prefix DP Grid</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -137,12 +137,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Interleaving String — <span>weaving two strings</span></h1>
+  <h1>Interleaving String — <span>prefix DP grid</span></h1>
   <p class="subtitle">Can <b>s3</b> be formed by interleaving <b>s1</b> and <b>s2</b>, keeping each one's order?</p>
 
   <div class="analogy">
-    <h3>⌨️ Analogy: two typists, one screen</h3>
-    <p>Do typists ek shared screen pe type karte hain — ek apne <b>s1</b> ke letters order me, dusra <b>s2</b> ke. Screen pe bana combined text <b>s3</b> hai. Har grid cell <code>dp[i][j]</code> poochta hai: kya <b>s3</b> ke pehle <code>i+j</code> letters, <code>s1</code> ke pehle <b>i</b> aur <code>s2</code> ke pehle <b>j</b> letters se woven ho sakte hain?</p>
+    <h3>📥 Analogy: Azure Event Hubs ordered streams</h3>
+    <p>Azure Event Hubs preserves order within each partition while consumers may merge events downstream. Each cell checks whether the merged prefix could come from the next event of stream <code>s1</code> (above) or stream <code>s2</code> (left).</p>
   </div>
 
   <div class="problem">

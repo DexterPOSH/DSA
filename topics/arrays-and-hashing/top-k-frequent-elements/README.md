@@ -12,12 +12,11 @@ Example: `nums = [1,1,1,2,2,3], k = 2` → `[1,2]` (1 appears 3×, 2 appears 2×
 
 ## Real-World Analogy
 
-A post office with PO boxes numbered by *how many letters arrived*. Box #3 holds
-people who got 3 letters, Box #2 holds those who got 2, etc. To find the "top 2
-busiest" you just read from the highest-numbered box downward until you have 2
-names — no sorting needed, because the box number *is* the frequency. That's
-bucket sort.
+**What Azure Blob Storage is:** Azure Blob Storage is Azure's service for storing large amounts of unstructured data such as logs, images, backups, and data lake files. It is built to hold many objects while letting teams choose the right cost and access behavior for each object. When you care about the most-used blobs, access frequency becomes the organizing signal.
 
+**What an access tier is, and why it's used:** Blob Storage access tiers such as Hot, Cool, Cold, and Archive classify blobs by how often they are expected to be read and how quickly they must be available. Hot costs more to store but is cheaper and faster to access; cooler tiers trade access speed/cost for lower storage cost. Azure provides tiers so storage systems do not treat frequently used telemetry and rarely touched backups the same way.
+
+**The mapping:** Bucket sort creates a much finer version of those tiers: one bucket for frequency 1, one for frequency 2, all the way up to `n`. After counting values, the algorithm places each number into the bucket matching its exact frequency, then scans from the highest bucket down until it has `k` answers. The key insight is that when frequency is the priority, grouping by frequency lets us read the hottest Azure-style tiers first without sorting every element.
 ## Approach
 
 1. **Frequency count** — build a `Counter`: `{1:3, 2:2, 3:1}`.

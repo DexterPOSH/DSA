@@ -15,9 +15,11 @@ s = "catsandog", wordDict = ["cats","dog","sand","and","cat"] ->  False
 
 ## Real-World Analogy
 
-Socho ek lambi bina-space wali signboard hai: `LEETCODE`. Tumhare paas ek dictionary hai valid words ki. Tum left se chalte ho aur har point pe poochte ho: "kya **yahan tak** ka poora hissa valid words me toot sakta hai?"
+**What Azure App Configuration is:** Azure App Configuration centralizes application settings and feature flags for services running across environments. Applications read known keys and values from it so configuration can change without redeploying code. A client-side validator may need to confirm that a compact setting or connection-string fragment can be segmented into approved tokens.
 
-Trick ye hai: position `i` reachable hai agar koi pichhla reachable point `j` ho **aur** `j` se `i` tak ka substring dictionary me ho. Jaise stepping stones — har patthar pe tabhi khade ho sakte ho jab kisi pichhle patthar se ek valid word-jump karke yahan aaye ho. Start (position 0) hamesha reachable hai (khaali string trivially valid). Aur agar **end** tak pahunch gaye, to answer `True`.
+**What token-based configuration validation is, and why it's used:** Token validation checks whether each segment of a composed configuration value belongs to a known dictionary of allowed keys, labels, or schema tokens. It exists to reject malformed strings early and to avoid trying every possible split repeatedly. Caching reachable boundaries lets the parser reuse prefix decisions as it moves through the value.
+
+**The mapping:** Boundary `i` is reachable if some earlier boundary `j` was already reachable and `s[j:i]` is a known App Configuration token. The DP array stores those reachable split points, so each prefix is evaluated once instead of re-scanning all segmentations. The key insight is that the whole string is valid exactly when the final boundary can be reached through valid dictionary tokens.
 
 ## Approach
 

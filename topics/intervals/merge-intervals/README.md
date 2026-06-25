@@ -16,14 +16,11 @@ the input intervals.
 
 ## Real-World Analogy
 
-Socho timeline pe kuch **highlighter strokes** maare hain — kuch ek doosre ke upar
-chadh gaye hain. Tumhe overlapping strokes ko ek single lambe stroke me **combine**
-karna hai. Sabse pehle strokes ko unke **start point ke order me line up** karo.
-Phir left se right chalo: agla stroke agar current wale ko **chhoo raha ya overlap
-kar raha** hai (`next.start <= current.end`) to dono ko stretch karke jod do (end
-ko `max` tak badha do). Agar gap hai, to current stroke band karo aur naya shuru karo.
+**What Azure Update Manager is:** Azure Update Manager helps Azure operators coordinate update assessment and patch deployment across large fleets of machines. In real organizations, multiple teams may submit planned maintenance windows for the same application fleet, region, or dependency chain.
 
-Sorting is the trick — bina sort kiye overlaps random jagah ho sakte hain.
+**What maintenance-window consolidation is, and why it's used:** Consolidation combines overlapping maintenance windows into the fewest continuous outage periods that need to be communicated and tracked. Sorting by start time brings overlapping windows next to each other, so operators can extend one active window instead of announcing several partially duplicated windows. This produces a cleaner Azure change calendar and avoids double-counting customer-impact periods.
+
+**The mapping:** Each interval is a proposed Azure Update Manager maintenance window. Sort by start time, keep the last consolidated window, and if the next window starts before or at its end, extend the end to the later finish time; otherwise, finalize the current window and start a new one. The key insight is that once Azure maintenance windows are sorted, every overlap is local to the current merged window.
 
 ## Approach
 

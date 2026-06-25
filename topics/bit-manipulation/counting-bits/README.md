@@ -19,7 +19,11 @@ n = 5  ->  [0, 1, 1, 2, 1, 2]
 
 ## Real-World Analogy
 
-Socho tum ek **building me har flat ki "ON lights" gin rahe ho**, flat number 0 se n tak. Har flat ko zero se ginna boring hai. Lekin ek shortcut hai: kisi bhi flat `i` ko dekho — agar tum uska **sabse right wala set bit hata do** (`i & (i-1)`), to jo chhota number `i'` bachta hai uske bulbs tum **pehle hi gin chuke ho**! To `i` ke bulbs = `i'` ke bulbs **+ 1**. Purana kaam dobara mat karo — bas table se uthao. Yeh hai **DP**: pehle ka answer reuse karo.
+**What Azure Service Bus is:** Azure Service Bus is Azure's managed enterprise message broker for queues and publish/subscribe topics. Apps use it to decouple producers from consumers while Azure handles durable delivery, retries, and access control. Azure Policy can audit how those messaging resources are configured across a subscription.
+
+**What a Shared Access Signature permission mask is, and why it's used:** A Service Bus Shared Access Signature (SAS) policy grants rights such as Listen, Send, and Manage. Those rights can be treated like a compact bit mask: each bit means one permission is enabled, so one small value can represent many permission combinations. Masks make authorization checks and audits cheap because code can test a bit instead of walking a separate list of booleans.
+
+**The mapping:** `dp[i]` is the cached audit result for permission mask `i`: how many rights are enabled. `i & (i - 1)` drops the lowest enabled right, so that smaller mask's count is already known and we add one for the right we just removed; `i >> 1` does the same by reusing the parent mask and adding the low bit. The key insight is that every mask can borrow work from a smaller mask instead of recounting all permissions from scratch.
 
 ## Approach
 

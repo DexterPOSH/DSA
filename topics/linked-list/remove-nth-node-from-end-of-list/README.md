@@ -18,9 +18,11 @@ Given the `head` of a singly linked list, remove the **nth node from the end** o
 
 ## Real-World Analogy
 
-Socho ek train hai aur tumhe **end se 2nd dabba** nikaalna hai, but tum platform pe khade ho aur train ke aage-se-peeche poori length nahi dekh sakte. Trick: do scouts bhejo. Pehla scout **2 dabbe aage** chalna shuru karta hai. Phir dono scouts ek saath, same speed se chalte hain. Jab aage waala scout train ke **bilkul end** pe pahunchta hai, tab peeche waala scout **theek us dabbe ke just pehle** khada hota hai jise hatana hai. Bas us dabbe ka coupling skip karke agle se jod do.
+**What Azure Storage is:** Azure Storage is Azure's durable storage platform for blobs, files, queues, and tables. Blob containers can hold huge numbers of objects, so clients usually list them page by page instead of downloading one giant result. A list response includes items plus enough information to continue where the previous response stopped.
 
-Yahi **two-pointer with a gap** technique hai — gap ko `n` set karo, phir saath chalao.
+**What continuation-token paging is, and why it's used:** Azure Storage listing APIs return continuation tokens when more results remain. The token is an opaque bookmark: the client sends it back to retrieve the next page, which prevents large listings from timing out or requiring the service to materialize everything at once. Because the total count may not be known up front, algorithms that need nth-from-the-end behavior must work with cursors rather than random access.
+
+**The mapping:** Treat each linked-list node as one listed Azure Storage item and `next` as following the continuation to the next item. The fast pointer moves `n + 1` steps ahead, creating a fixed gap so that when it falls off the end, the slow pointer is just before the node to delete. The key insight is that the gap converts "from the end" into a one-pass forward traversal, making the splice `slow.next = slow.next.next` possible without first measuring the whole list.
 
 ## Approach
 

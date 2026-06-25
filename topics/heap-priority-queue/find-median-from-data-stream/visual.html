@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Find Median from Data Stream — two heaps balancing a seesaw</title>
+<title>Find Median from Data Stream — Azure Stream Analytics two-heap median</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -155,12 +155,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Find Median from Data Stream — <span>two heaps</span> balancing a seesaw</h1>
-  <p class="subtitle">Left = smaller half (max-heap), right = larger half (min-heap). Median bilkul beech me.</p>
+  <h1>Find Median from Data Stream — <span>two heaps</span> for streaming median</h1>
+  <p class="subtitle">Azure Stream Analytics-style median state: lower half max-heap, upper half min-heap, median at the boundary.</p>
 
   <div class="analogy">
-    <h3>⚖️ Analogy: a balanced seesaw</h3>
-    <p>Left side pe <b>chhoti aadhi</b> numbers (uska <b>max</b> chahiye → max-heap), right side pe <b>badi aadhi</b> (uska <b>min</b> chahiye → min-heap). Har naya number sahi side daalo, phir balance karo. Median = bhaari side ka top (odd) ya dono tops ka average (even).</p>
+    <h3>📊 Analogy: Azure Stream Analytics running median</h3>
+    <p>An Azure Stream Analytics job can track a live median metric by splitting values into two priority queues. The low half uses a max-heap, the high half uses a min-heap, and rebalancing keeps the median at the boundary.</p>
   </div>
 
   <div class="problem">
@@ -208,7 +208,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Keep the smaller half in a max-heap and the larger half in a min-heap, balanced to within one element — the median is always sitting on top, giving O(log n) adds and O(1) median.</p>
+    <p>Like Azure Stream Analytics median state, keep the lower half in a max-heap and the upper half in a min-heap, balanced to within one element — the median stays available in O(1).</p>
   </div>
 </div>
 

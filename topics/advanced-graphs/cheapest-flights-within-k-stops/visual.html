@@ -57,15 +57,15 @@
 <body>
 <div class="wrap">
   <h1>Cheapest Flights Within K Stops — <span>Bellman-Ford</span></h1>
-  <p class="subtitle">Relax every edge once per round; round R = paths using at most R flights. The snapshot copy enforces the hop limit.</p>
+  <p class="subtitle">Relax every edge once per round; round R = paths using at most R network links. The snapshot copy enforces the hop limit.</p>
 
   <div class="analogy">
-    <h3>✈️ The round-by-round analogy</h3>
-    <p>Sasti flight dhoondho <b>src→dst</b> me, par zyada se zyada <b>k layovers</b>. Har <b>round</b> me ek aur flight (hop) lene ki ijaazat do — Round 1: direct flights, Round 2: ek aur hop aage, … <code>k+1</code> rounds tak. Har round ka update pichhle round ki <b>copy</b> se, taaki ek round me do hops na ho jaayein.</p>
+    <h3>🌐 The Azure hop-budget analogy</h3>
+    <p>In <strong>Azure Traffic Manager</strong>, each region-to-region link has a latency or cost. Bellman-Ford rounds act like allowing one more hop in the route budget, while the snapshot prevents a candidate from using more than the allowed <code>k+1</code> links.</p>
   </div>
 
   <div class="legend">
-    <span><i class="dot" style="background:#3a4a78"></i>city</span>
+    <span><i class="dot" style="background:#3a4a78"></i>region</span>
     <span><i class="dot" style="background:var(--amber)"></i>src</span>
     <span><i class="dot" style="background:var(--green)"></i>dst</span>
     <span><i class="dot" style="width:18px;height:4px;border-radius:2px;background:var(--purple)"></i>relaxing edge</span>
@@ -75,13 +75,13 @@
     <svg id="graph" viewBox="0 0 420 300"></svg>
     <div class="side">
       <div class="panel-box">
-        <h4>prices[] across rounds</h4>
+        <h4>cost[] across rounds</h4>
         <table id="ptable"></table>
       </div>
     </div>
   </div>
 
-  <div class="caption" id="caption">Press <b>Next</b>. Goal: cheapest 0→3 with at most k=1 stop (≤2 flights).</div>
+  <div class="caption" id="caption">Press <b>Next</b>. Goal: lowest-cost route 0→3 with at most k=1 intermediate hop (≤2 links).</div>
   <div class="controls">
     <button id="prev" class="ghost">‹ Prev</button>
     <button id="next">Next ›</button>
@@ -91,7 +91,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>K stops = K+1 edges = K+1 relaxation rounds. Updating from a per-round <i>snapshot</i> guarantees each path gains exactly one hop per round — so the cheapest-but-too-long path can't sneak in.</p>
+    <p>The max-hop limit maps to K+1 edges and K+1 relaxation rounds. Updating from a per-round <i>snapshot</i> guarantees each route gains exactly one hop per round, so a cheaper-but-too-long route cannot sneak in.</p>
   </div>
 </div>
 
@@ -116,16 +116,16 @@ function buildSteps(){
     updIdx:o.updIdx??null,
     curRow:o.curRow??null
   });
-  steps.push(snap({caption:`Initialize: prices = [0, ∞, ∞, ∞]. Only src (city 0) costs 0.`,cur:[...prices]}));
+  steps.push(snap({caption:`Initialize: prices = [0, ∞, ∞, ∞]. Only the source region 0 costs 0.`,cur:[...prices]}));
   for(let r=0;r<K+1;r++){
     let tmp=[...prices];
-    steps.push(snap({caption:`<b>Round ${r+1}</b> of ${K+1}: copy prices into a snapshot <code>tmp</code>. We relax all edges against the <i>frozen</i> previous round.`,cur:[...tmp],roundLabel:`round ${r+1}`,curRow:true}));
+    steps.push(snap({caption:`<b>Round ${r+1}</b> of ${K+1}: copy prices into a snapshot <code>tmp</code>. We relax all network links against the <i>frozen</i> previous round.`,cur:[...tmp],roundLabel:`round ${r+1}`,curRow:true}));
     for(const [u,v,w] of flights){
       if(prices[u]!==INF && prices[u]+w<tmp[v]){
         tmp[v]=prices[u]+w;
-        steps.push(snap({caption:`Edge ${u}→${v} (${w}): prices[${u}]+${w} = ${prices[u]+w} &lt; tmp[${v}]. Update <b>tmp[${v}] = ${tmp[v]}</b>.`,cur:[...tmp],relaxEdge:[u,v],updIdx:v,roundLabel:`round ${r+1}`,curRow:true}));
+        steps.push(snap({caption:`Link ${u}→${v} (${w}): prices[${u}]+${w} = ${prices[u]+w} &lt; tmp[${v}]. Update <b>tmp[${v}] = ${tmp[v]}</b>.`,cur:[...tmp],relaxEdge:[u,v],updIdx:v,roundLabel:`round ${r+1}`,curRow:true}));
       } else {
-        steps.push(snap({caption:`Edge ${u}→${v} (${w}): no improvement (${prices[u]===INF?'src ∞':prices[u]+w} ≥ tmp[${v}]=${tmp[v]===INF?'∞':tmp[v]}). Skip.`,cur:[...tmp],relaxEdge:[u,v],roundLabel:`round ${r+1}`,curRow:true}));
+        steps.push(snap({caption:`Link ${u}→${v} (${w}): no improvement (${prices[u]===INF?'src ∞':prices[u]+w} ≥ tmp[${v}]=${tmp[v]===INF?'∞':tmp[v]}). Skip.`,cur:[...tmp],relaxEdge:[u,v],roundLabel:`round ${r+1}`,curRow:true}));
       }
     }
     prices=tmp;
@@ -133,7 +133,7 @@ function buildSteps(){
     steps.push(snap({caption:`End of round ${r+1}: commit <code>prices = tmp</code>. Now prices = [${fmt(prices).join(', ')}].`,cur:[...prices],roundLabel:`round ${r+1}`}));
   }
   const ans=prices[DST]===INF?-1:prices[DST];
-  steps.push(snap({caption:`After ${K+1} rounds, prices[${DST}] = <b>${ans}</b>. Path 0→1→3 = 700 (1 stop). 0→1→2→3 = 400 needs 2 stops — too many, correctly excluded. ✅`}));
+  steps.push(snap({caption:`After ${K+1} rounds, prices[${DST}] = <b>${ans}</b>. Route 0→1→3 = 700 uses one intermediate hop. Route 0→1→2→3 = 400 uses too many hops, so it is correctly excluded. ✅`}));
   return steps;
 }
 const steps=buildSteps();

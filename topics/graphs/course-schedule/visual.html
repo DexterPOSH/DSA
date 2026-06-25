@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Course Schedule — Kahn's Topological Sort & Cycle Detection</title>
+<title>Course Schedule — ARM dependsOn cycle detection</title>
 <style>
   :root {
     --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a; --text: #e0e0e0;
@@ -117,16 +117,14 @@
 </head>
 <body>
 
-  <h1>Course Schedule &mdash; <span>Kahn's Topo Sort &amp; Cycle Detection</span></h1>
+  <h1>Course Schedule &mdash; <span>ARM <code>dependsOn</code> Cycle Detection</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">🎓</div>
+    <div class="analogy-icon">🚀</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Subah ready hote waqt: socks se pehle pant, pant se pehle... ek <strong>direction</strong> me chale
-        to valid order milta. Par agar "A se pehle B" <em>aur</em> "B se pehle A" — to kabhi shuru hi nahi kar
-        paoge. Wahi <strong>cycle = deadlock</strong>. Repeatedly take whatever has <strong>0 pending prereqs</strong>.
+        ARM/Bicep deploys Azure resources only after every <code>dependsOn</code> prerequisite is complete. Kahn's algorithm keeps deploying resources with <strong>0 pending dependencies</strong>; if a cycle remains, the deployment is deadlocked.
       </div>
     </div>
   </div>
@@ -139,7 +137,7 @@
   <div class="card">
     <div>
       <div class="section-label">Step description</div>
-      <div class="step-description" id="stepDesc">Press "Next". We compute each course's indegree (pending prereqs), then repeatedly take any course with indegree 0.</div>
+      <div class="step-description" id="stepDesc">Press "Next". We compute each Azure resource's indegree (pending dependencies), then repeatedly deploy any resource with indegree 0.</div>
     </div>
 
     <div class="layout">
@@ -148,14 +146,14 @@
       </div>
       <div class="side">
         <div class="stat-box">
-          <div class="stat-row"><span class="k">courses taken</span><span class="v" id="takenVal">0 / 4</span></div>
+          <div class="stat-row"><span class="k">resources deployed</span><span class="v" id="takenVal">0 / 4</span></div>
         </div>
         <div class="stat-box">
           <div class="section-label">queue (indegree 0)</div>
           <div class="chips" id="queueRow"><span class="empty-hint">empty</span></div>
         </div>
         <div class="stat-box">
-          <div class="section-label">taken order</div>
+          <div class="section-label">deployment order</div>
           <div class="chips" id="orderRow"><span class="empty-hint">none yet</span></div>
         </div>
       </div>
@@ -173,11 +171,7 @@
     <div class="takeaway-icon">💡</div>
     <div>
       <div class="takeaway-label">Key Takeaway</div>
-      <p>
-        Take courses with <strong>indegree 0</strong>, decrement their dependents, repeat. If every course
-        gets taken → <strong>no cycle, True</strong>. If some courses stay stuck with indegree &gt; 0,
-        they form a <strong>cycle → False</strong>. <strong>O(V + E)</strong>.
-      </p>
+      <p>Deploy Azure resources with <strong>indegree 0</strong>, decrement their dependent resources, and repeat. If every resource deploys, the ARM dependency graph has no cycle; if some stay blocked, a <code>dependsOn</code> loop makes deployment impossible. <strong>O(V + E)</strong>.</p>
     </div>
   </div>
 
@@ -214,8 +208,8 @@
     for (let i = 0; i < N; i++) if (deg[i] === 0) q.push(i);
 
     out.push({
-      desc: 'Compute <strong>indegree</strong> for each course (how many prereqs still point at it). ' +
-            'Seed the queue with every course at indegree <code>0</code> — these have no blockers.',
+      desc: 'Compute <strong>indegree</strong> for each Azure resource (how many dependencies still point at it). ' +
+            'Seed the queue with every resource at indegree <code>0</code> — these have no deployment blockers.',
       deg: deg.slice(), queue: q.slice(), order: [], taking: null,
       relaxed: [], cls: ''
     });
@@ -237,8 +231,8 @@
       // remaining queue + newly freed
       const combinedQ = q.concat(newQ);
       out.push({
-        desc: '<strong>Take course ' + node + '</strong> (indegree 0). Mark done, then drop the indegree of ' +
-              'its dependents' + (adj[node].length ? ' (' + adj[node].join(', ') + ')' : '') +
+        desc: '<strong>Deploy resource ' + node + '</strong> (indegree 0). Mark done, then drop the indegree of ' +
+              'its dependent resources' + (adj[node].length ? ' (' + adj[node].join(', ') + ')' : '') +
               '. Any that hit <code>0</code> join the queue.',
         deg: deg.slice(), queue: combinedQ.slice(), order: order.slice(), taking: node,
         relaxed: relaxedEdges, cls: ''
@@ -249,7 +243,7 @@
     // verdict
     if (taken === N) {
       out.push({
-        desc: 'All <code>' + N + '</code> courses taken → <strong>no cycle</strong>. A valid order exists. ' +
+        desc: 'All <code>' + N + '</code> resources deployed → <strong>no cycle</strong>. A valid ARM deployment order exists. ' +
               'Return <strong>True</strong>. ✅',
         deg: deg.slice(), queue: [], order: order.slice(), taking: null,
         relaxed: [], cls: '', done: true, verdict: true
@@ -258,7 +252,7 @@
       const stuck = [];
       for (let i = 0; i < N; i++) if (deg[i] > 0) stuck.push(i);
       out.push({
-        desc: 'Queue is empty but only <code>' + taken + '/' + N + '</code> taken. Courses <strong>' +
+        desc: 'Queue is empty but only <code>' + taken + '/' + N + '</code> resources deployed. Resources <strong>' +
               stuck.join(', ') + '</strong> never reach indegree 0 — they sit in a <strong>cycle</strong>. ' +
               'Return <strong>False</strong>. ❌',
         deg: deg.slice(), queue: [], order: order.slice(), taking: null,

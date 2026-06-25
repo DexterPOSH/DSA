@@ -15,8 +15,11 @@ nums1 = [1, 3], nums2 = [2, 7]     ->  2.5     # merged = [1,2,3,7], avg(2,3)
 
 ## Real-World Analogy
 
-Socho do already-sorted **lines of people by height** hain, aur tumhe combined group ka median height nikalna hai — bina dono lines ko ek line me merge kiye. Trick: ek **kainchi (partition line)** kalpana karo jo dono lines ko ek saath kaat-ti hai — `nums1` me `i` logon ko left side bhejti hai, `nums2` me `j` logon ko, aise ki **left side me exactly half total log** aa jaaye. Median tabhi sahi hai jab partition "clean" ho: left ka sabse lamba banda right ke sabse chhote bande se chhota-ya-barabar ho — **dono taraf**. Tum chhoti line pe binary search karke `i` ko sahi jagah slide karte ho; `j` automatically derive ho jaata hai. Ek bhi side cross-violate kare → kainchi shift karo.
+**What Azure Cosmos DB is:** Azure Cosmos DB is a distributed NoSQL database that can store related data across multiple physical partitions. Cross-partition queries coordinate results from those partitions, and ordered queries may have to combine already-sorted streams. When the goal is a percentile such as global P50 latency, the important value is an order statistic, not the full merged list.
 
+**What a sorted cross-partition merge is, and why it's used:** In a normal cross-partition `ORDER BY`-style query, the query engine can read sorted results from each partition and merge them so the client sees one globally ordered stream. That is useful, but fully materializing the stream can waste RUs and time if you only need the middle value. A smarter approach is to find a partition cut: enough items on the left to cover half the combined data, with every left boundary value less than or equal to every right boundary value.
+
+**The mapping:** The two sorted arrays are two Azure Cosmos DB partition streams, and binary search chooses a cut `i` in the smaller stream while deriving `j = half - i` in the other. `Aleft`, `Aright`, `Bleft`, and `Bright` are the boundary records around the cut; if `Aleft > Bright`, the cut in `A` is too far right, and if `Bleft > Aright`, it is too far left. The key insight is that once the boundary checks pass, the median comes from those four edge values, so no full merge is needed.
 ## Approach
 
 Hum **chhoti array pe binary search** karte hain. Maan lo `A` = chhoti, `B` = badi. Ek partition `i` (A me) choose karo; tab `j = half - i` (B me), jahan `half = (m + n + 1) // 2`. Yeh ensure karta hai left half me exactly `half` elements aayein.

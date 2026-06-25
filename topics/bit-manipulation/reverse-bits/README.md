@@ -16,7 +16,11 @@ Output: 00111001011110000010100101000000   (964176192)
 
 ## Real-World Analogy
 
-Socho ek **32 logon ki line hai** jo ek conveyor belt pe khade hain — har banda ek bit (0 ya 1). Tumhe poori line **ulti** karni hai: pehla banda last position pe, last banda first position pe. Tum ek-ek karke line ke **right wale banda** ko uthate ho aur use ek nayi khaali line ke **left** me daalte ho, phir nayi line ko ek kadam right shift kar dete ho jagah banane ke liye. 32 baar yeh karne ke baad nayi line ekdum mirror-image ban jaati hai.
+**What Azure Accelerated Networking is:** Azure Accelerated Networking is an Azure VM networking feature that uses SR-IOV to give the VM a more direct path to the physical NIC. It reduces latency, jitter, and CPU overhead for network-heavy workloads. At that hardware/software boundary, components exchange fixed-width packet metadata rather than flexible application-level values.
+
+**What bit-order conversion is, and why it's used:** Packet headers and NIC metadata often reserve fixed-width flag fields where each bit position has a specific meaning. When a 32-bit flag field crosses a boundary that expects the opposite bit order or serialized representation, the converter must mirror the bits without dropping leading zeros. The fixed width matters because those zeros are still real protocol positions, not optional formatting.
+
+**The mapping:** The incoming 32-bit field is the original Azure networking flag word, and the outgoing word is the boundary format that expects the mirror image. Each iteration peels the least-significant flag with `n & 1`, shifts the result left to make room, and ORs that flag into place; the earliest peeled flag receives the most shifts and lands at the most-significant end. The key insight is to process all 32 positions explicitly so the packed field becomes a true bit-for-bit mirror.
 
 ## Approach
 

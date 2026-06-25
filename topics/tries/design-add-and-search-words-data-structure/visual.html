@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Add &amp; Search Words — Wildcard DFS over a Trie</title>
+<title>Add &amp; Search Words — Azure Search Wildcard Trie</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -123,12 +123,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Add &amp; Search Words — the <span>wildcard</span> DFS</h1>
+  <h1>Add &amp; Search Words — Azure Search <span>wildcard</span> branching</h1>
   <p class="subtitle">Stored: <code>bad</code>, <code>dad</code>, <code>mad</code>, <code>bat</code>. Watch how <code>.</code> branches into every child.</p>
 
   <div class="analogy">
-    <h3>🧩 Analogy: a crossword clue with blanks</h3>
-    <p>Fixed letter? <b>Ek hi raasta</b> lo. Blank <code>.</code>? <b style="color:var(--amber)">Saari branches</b> try karo — jis se aage poora pattern match ho jaaye. Ek branch successful → turant <span style="color:var(--green)">True</span>, baaki dekhna band.</p>
+    <h3>🔍 Analogy: Azure Cognitive Search wildcard query</h3>
+    <p>In an <strong>Azure Cognitive Search index</strong>, fixed characters follow one prefix branch. A wildcard <code>.</code> fans out across every child branch at that depth, and the first branch that finishes on an indexed word returns <span style="color:var(--green)">True</span>.</p>
   </div>
 
   <div class="panel">
@@ -155,7 +155,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>A fixed char follows <b>one</b> path; a <code>.</code> recurses into <b>every</b> child. The first branch that reaches the end with <b>is_end = True</b> returns True — that branching DFS is the whole trick.</p>
+    <p>Like an <b>Azure Cognitive Search wildcard query</b>, fixed chars follow <b>one</b> prefix path, while <code>.</code> fans out through <b>every</b> child until a branch reaches <b>is_end = True</b>.</p>
   </div>
 </div>
 

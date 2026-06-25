@@ -15,7 +15,11 @@ text1 = "abc",   text2 = "def"   ->  0    # nothing common
 
 ## Real-World Analogy
 
-Socho do log apni **playlist** compare kar rahe hain. Dono ke gaane ek fixed order me hain (shuffle nahi). Tum dhoondh rahe ho: sabse lambi list of songs jo **dono playlists me same order me** aaye — beech me doosre gaane aa sakte hain, koi baat nahi, bas order na tute. Ab har gaane pe socho: dono ke current gaane same hain? **Match!** Dono me ek-ek aage badho aur count +1. Agar same nahi? To ya `text1` ka gaana skip karo, ya `text2` ka — jisme aage jaake lambi match mile wo lo. Yeh "match karo ya kisi ek ko skip karo" hi LCS ki poori kahaani hai, aur hum ise ek **2-D table** me yaad rakhte hain taaki same comparison baar-baar na karna pade.
+**What Azure Cognitive Search is:** Azure Cognitive Search, now Azure AI Search, is a managed search service that indexes documents so applications can retrieve relevant content quickly. Its analyzers break text into tokens and the index can retain token positions for ordered queries such as phrase or proximity searches. In this analogy, two indexed documents are being compared to find the longest shared ordered trail of tokens.
+
+**What ordered token comparison is, and why it's used:** Two Azure search documents may discuss the same workflow while adding extra words, sections, or metadata in different places. An ordered comparison preserves the sequence of shared evidence without requiring the tokens to be adjacent. That is useful when you care about common structure or narrative, not just whether the same words appear somewhere in both documents.
+
+**The mapping:** Document A and document B are the two strings, and each DP cell compares one prefix of A with one prefix of B. When the current tokens match, the cell extends the diagonal subsequence by one; when they differ, it keeps the better cached result from dropping a token from A or dropping a token from B. The key insight is that LCS allows skips but never reorders, so the bottom-right cell gives the longest Azure-style ordered evidence trail shared by both indexed documents.
 
 ## Approach
 

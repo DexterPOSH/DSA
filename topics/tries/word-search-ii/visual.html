@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Word Search II — Trie-guided Grid DFS</title>
+<title>Word Search II — Azure AI Content Safety Trie Scan</title>
 <style>
   :root {
     --bg:#1a1a2e; --panel:#16213e; --panel2:#232342;
@@ -122,12 +122,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Word Search II — one <span>trie-guided</span> grid DFS</h1>
+  <h1>Word Search II — Azure AI <span>trie-guided</span> content scan</h1>
   <p class="subtitle">Words: <code>oath</code>, <code>eat</code>, <code>pea</code>, <code>rain</code>. The trie prunes every direction that can't spell a word.</p>
 
   <div class="analogy">
-    <h3>🎲 Analogy: Boggle with a GPS</h3>
-    <p>Saare words ek <b>trie</b> me daal do. Board pe <b>ek hi DFS</b> chalao, trie ko saath le ke chalte hue. Board ka char trie node ke children me hai tabhi aage badho — <b style="color:var(--red)">warna turant ruk jao</b> (us direction me koi word ban hi nahi sakta).</p>
+    <h3>🛡️ Analogy: Azure AI Content Safety dictionary scan</h3>
+    <p><strong>Azure AI Content Safety</strong> can model a blocked-term dictionary as a trie while scanning OCR characters in a grid. The DFS advances only when the current cell is a trie child; otherwise that prefix is <b style="color:var(--red)">pruned immediately</b>.</p>
   </div>
 
   <div class="panel">
@@ -164,7 +164,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Merging all words into a <b>single trie</b> turns N separate board searches into <b>one DFS</b> — and every board cell whose letter isn't a trie child is pruned instantly, so you only ever walk paths that are real word prefixes.</p>
+    <p>Like an <b>Azure AI Content Safety</b> blocked-term trie, merging all words into one prefix tree turns many scans into <b>one DFS</b>, pruning any grid path that is not a real target-word prefix.</p>
   </div>
 </div>
 

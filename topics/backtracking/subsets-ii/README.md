@@ -19,12 +19,11 @@ Given an integer array `nums` that **may contain duplicates**, return all possib
 
 ## Real-World Analogy
 
-Socho tum guests ke liye gift-bags bana rahe ho aur tumhare paas do **bilkul identical** blue
-pens hain (aur ek red pen). "Ek blue pen waala bag" ek hi tarah ka bag hai — chahe tumne
-pehla blue uthaaya ho ya doosra, guest ko farak nahi padta. To same multiset ko ek hi baar
-count karna hai. Trick: identical items ko **side-by-side rakho (sort)**, aur jab ek hi level
-pe doosra identical item dobara uthane lago, to **skip** kar do — kyunki uska subset pehle
-hi ban chuka.
+**What Azure landing-zone catalogs are:** Azure landing-zone catalogs collect reusable ARM or Bicep modules for standard environments, such as networking, Private Endpoints, monitoring, and security baselines. They help teams assemble consistent Azure deployments without rebuilding the same resource patterns each time. Sometimes a catalog contains equivalent entries that produce the same resource shape.
+
+**What duplicate-equivalent module handling is, and why it's used:** Duplicate-equivalent modules can appear because two teams publish the same option, two versions are temporarily identical, or two catalog entries represent separate but matching capacity. For enumeration, choosing the first identical Private Endpoint module or the second at the same decision level would create the same ARM deployment footprint. Sorting the catalog and skipping same-level duplicates removes repeated footprints, while still allowing a branch that intentionally includes multiple copies when the input contains them.
+
+**The mapping:** Each item is an Azure landing-zone module option, sorted so equivalent modules sit next to each other. Backtracking chooses an option, recurses past it, then pops it; when a duplicate appears as a sibling choice at the same depth, it is skipped because that deployment shape was already explored. The key insight is to skip duplicates only among sibling branches, not down a chosen path, so the result set is unique without losing valid multi-copy selections.
 
 ## Approach — sort + skip-duplicates-at-same-level
 

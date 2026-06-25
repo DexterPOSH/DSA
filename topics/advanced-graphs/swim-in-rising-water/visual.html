@@ -63,8 +63,8 @@
   <p class="subtitle">Find the path from top-left to bottom-right that minimizes its highest cell. Cost-so-far = max elevation on the path, not the sum.</p>
 
   <div class="analogy">
-    <h3>🌊 The rising-flood analogy</h3>
-    <p>Har cell ki ek height hai; tum tabhi us cell me ja sakte ho jab paani us height tak chadhe. Kam se kam waqt me door ke darwaze tak pahunchna hai — matlab aisa raasta jiska <b>sabse uncha cell</b> jitna kam ho sake. Min-heap se hamesha sabse kam "max-so-far" cell pop karo; neighbour ka naya cost = <code>max(current, neighbour_height)</code>.</p>
+    <h3>🌐 The Azure Virtual WAN bottleneck analogy</h3>
+    <p>In <strong>Azure Virtual WAN</strong>, a route across hubs can be judged by its worst latency hop rather than its total latency. This Dijkstra variant stores the best bottleneck so far: entering a neighbor costs <code>max(current, hop_latency)</code>, so the first destination pop minimizes the worst hop.</p>
   </div>
 
   <div class="legend">
@@ -97,7 +97,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Swap Dijkstra's <code>+w</code> for <code>max(cost, height)</code> and you get the bottleneck (minimax) path. The first time the destination is popped, that max <i>is</i> the least time the water must rise.</p>
+    <p>Swap Dijkstra's <code>+w</code> for <code>max(cost, height)</code> and you get the bottleneck (minimax) path. The first time the destination is popped, that max <i>is</i> the smallest possible worst-hop cost.</p>
   </div>
 </div>
 
@@ -127,7 +127,7 @@ function buildSteps(){
     frontier:new Set(heap.map(h=>key(h[1],h[2]))),
     done:o.done??false
   });
-  steps.push(snap({caption:`Seed the heap with the start cell: cost = grid[0][0] = ${grid[0][0]}. You can only enter (0,0) once water reaches its height.`}));
+  steps.push(snap({caption:`Seed the heap with the start cell: cost = grid[0][0] = ${grid[0][0]}. This is the starting bottleneck value for the route.`}));
   let answer=null;
   while(heap.length){
     const [cost,r,c]=heap[0];

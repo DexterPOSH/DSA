@@ -20,16 +20,11 @@ intervals = [[1,4],[2,4],[3,6],[4,4]],  queries = [2,3,4,5]
 
 ## Real-World Analogy
 
-Socho har query ek **point on a timeline** hai, aur har interval ek **blanket** jo
-us timeline ke ek hisse ko dhakta hai. Har point ke liye tum **sabse chhota blanket**
-chahte ho jo use cover kare.
+**What Azure Service Health is:** Azure Service Health is Azure's personalized health and advisory service for incidents, advisories, and planned maintenance that may affect your subscriptions and resources. It gives teams event timelines, impact details, and alerts so they can explain what was happening at a particular time.
 
-Trick: queries ko **chote se bade** order me process karo. Jaise jaise query point
-aage badhta hai, jin blankets ka `left` query tak pahunch gaya unhe ek **min-heap
-(size ke order me)** me daal do — yeh "abhi available" candidates hain. Lekin jo
-blankets query point ke **pehle hi khatam** ho gaye (`right < q`) unhe heap ke top se
-nikaalte raho. Bacha hua sabse chhota blanket = answer. Offline processing — queries
-ko sort karke jeet jaate hain.
+**What planned-maintenance event matching is, and why it's used:** A planned-maintenance event has a start time, an end time, and an impact window duration. When many alert timestamps need explanations, matching each timestamp by scanning every event is slow; instead, sort timestamps and events, then keep only events that have started and have not yet ended. A min-heap keyed by duration surfaces the shortest active Azure maintenance window, which is usually the most specific explanation for that timestamp.
+
+**The mapping:** Intervals are Azure Service Health planned-maintenance events, and queries are alert timestamps. Sweep timestamps in sorted order, push every event whose start is at or before the timestamp into a duration heap, lazily remove heap entries whose end is before the timestamp, and read the heap top as the smallest covering window. The key insight is that sorted offline processing plus lazy heap cleanup answers many Azure timestamp queries without rechecking every event each time.
 
 ## Approach
 

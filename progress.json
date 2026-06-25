@@ -35,6 +35,13 @@
       "quiz_total": null,
       "pytest_passed": true,
       "completed_at": "2026-06-07"
+    },
+    "top-k-frequent-elements": {
+      "status": "done",
+      "quiz_score": null,
+      "quiz_total": null,
+      "pytest_passed": true,
+      "completed_at": "2026-06-18"
     }
   },
   "category_summary": {}

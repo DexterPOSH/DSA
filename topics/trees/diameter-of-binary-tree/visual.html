@@ -79,8 +79,8 @@
   <p class="subtitle">At each node: <code>diameter = max(diameter, leftH + rightH)</code>, but return <code>1 + max(leftH, rightH)</code>.</p>
 
   <div class="analogy">
-    <h3>🛣️ Sabse lambi drive</h3>
-    <p>Longest path kisi ek node pe "mudta" hai — us node ke neeche jo do sabse gehri branches, unki heights jod do (in edges). Har node pe check karo, global max rakho. Upar sirf <b>ek</b> branch ki height jaati hai.</p>
+    <h3>☁️ Azure hierarchy diameter</h3>
+    <p>In an Azure management hierarchy, the longest relationship chain between two scopes may bend at their nearest shared Management Group. Each scope returns one child height upward, while <code>leftH + rightH</code> updates the best chain through that scope.</p>
   </div>
 
   <div class="stage">

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Palindrome Partitioning — Cut & Backtrack</title>
+<title>Palindrome Partitioning — Azure Policy-Gated Backtracking</title>
 <style>
   :root {
     --bg: #1a1a2e; --panel: #16213e; --panel2: #1e293b;
@@ -68,17 +68,13 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Palindrome Partitioning &mdash; <span>Cut &amp; Backtrack</span></h1>
+  <h1>Palindrome Partitioning &mdash; <span>Azure Policy-Pruned Cuts</span></h1>
 
   <div class="analogy">
-    <div class="icon">🎀</div>
+    <div class="icon">🛡️</div>
     <div>
       <div class="label">Real-world analogy</div>
-      <p>The string is a ribbon. Make a cut: the first piece must be a
-      <strong>palindrome</strong>. If so, lock it and recurse on the rest. Try
-      <strong>every</strong> cut length; when the ribbon is fully consumed you've
-      found one valid partition, then <strong>reopen the last cut</strong> and try
-      the next.</p>
+      <p>Azure Policy can act like the palindrome gate for each proposed resource-name segment. Try a segment, lock it only if validation passes, prune failed segments immediately, and roll back the last accepted segment to test the next cut.</p>
     </div>
   </div>
 
@@ -115,11 +111,7 @@
     <div class="icon">💡</div>
     <div>
       <div class="label">Key takeaway</div>
-      <p>At each <code>start</code> we try every prefix; only
-      <strong>palindrome</strong> prefixes get locked and recursed on. Reaching
-      the end records a partition. <code>path.append → recurse → path.pop</code>
-      is the backtracking spine. For <code>"aab"</code> → <code>[a,a,b]</code> and
-      <code>[aa,b]</code>.</p>
+      <p>At each <code>start</code>, try every prefix and recurse only when the Azure Policy-style gate passes. Reaching the end records a partition; <code>path.append → recurse → path.pop</code> is the rollback loop.</p>
     </div>
   </div>
 </div>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Implement Trie — Prefix Tree, Step by Step</title>
+<title>Implement Trie — Azure Cognitive Search Autocomplete</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -137,12 +137,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Implement <span>Trie</span> — a prefix tree, step by step</h1>
+  <h1>Implement <span>Trie</span> — Azure Cognitive Search autocomplete</h1>
   <p class="subtitle">Watch <code>insert</code>, <code>search</code>, and <code>startsWith</code> walk the same tree char by char.</p>
 
   <div class="analogy">
-    <h3>📚 Analogy: shelf-of-shelves dictionary</h3>
-    <p>Har node ek dabba hai jiske andar agle 26 chhote dabbe (<code>a…z</code>). Word rakhne ke liye char-by-char dabbe kholte jao; jis node pe word khatam ho uspe ek <b style="color:var(--green)">green end-flag</b> laga do. <code>startsWith</code> sirf raasta dhoondhta hai, <code>search</code> raasta + end-flag dono.</p>
+    <h3>🔎 Analogy: Azure Cognitive Search autocomplete</h3>
+    <p>In an <strong>Azure Cognitive Search suggester</strong>, autocomplete terms reuse shared character-prefix paths. Adding <code>app</code>, <code>apple</code>, and <code>apt</code> extends or reuses branches, while <code>startsWith</code> checks the prefix path and <code>search</code> also requires the stored end marker.</p>
   </div>
 
   <div class="panel">
@@ -168,7 +168,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>All three operations are the <b>same O(L) char-by-char walk</b> from the root — <code>search</code> just also checks the <b>is_end</b> flag, which is exactly why <code>search("app")</code> can be False while <code>startsWith("app")</code> is True.</p>
+    <p>Like an <b>Azure Cognitive Search suggester</b>, trie operations are the <b>same O(L) prefix walk</b>; exact search also checks the <b>is_end</b> marker, so a suggestion prefix and a full indexed word stay distinct.</p>
   </div>
 </div>
 

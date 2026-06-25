@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Last Stone Weight — Max-Heap Smash Simulation</title>
+<title>Last Stone Weight — Azure Batch max-heap workload simulation</title>
 <style>
   :root {
     --bg: #1a1a2e; --panel: #16213e; --panel2: #1e2a4a;
@@ -106,11 +106,11 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Last Stone Weight &mdash; <span>Max-Heap Smash Simulation</span></h1>
+  <h1>Last Stone Weight &mdash; <span>Azure Batch max-heap workload simulation</span></h1>
 
   <div class="analogy">
-    <div class="label">Real-world analogy</div>
-    <p>Ek <b>gladiator arena</b>: har round me do <b>sabse strong</b> gladiators fight karte hain. Equal? Dono mar gaye. Warna chhota mara, bada <code>(bada − chhota)</code> strength ke saath bach gaya aur wapas pool me. Baar-baar "top-2 strongest" chahiye → <b>max-heap</b>.</p>
+    <div class="label">⚙️ Azure analogy</div>
+    <p>In an Azure Batch workload queue, repeatedly selecting the two largest pending jobs is a max-heap operation. After comparing those two workloads, equal sizes drain completely; otherwise the leftover demand is requeued, just like pushing the remaining stone weight back.</p>
   </div>
 
   <div class="problem">
@@ -154,7 +154,7 @@
 
   <div class="takeaway">
     <div class="label">Key takeaway</div>
-    <p>A <b>max-heap</b> hands you the two heaviest stones in <b>O(log n)</b> each round. Smash, push the remnant back, repeat. No re-sorting the pile every turn.</p>
+    <p>Like an Azure Batch largest-workload-first queue, a <b>max-heap</b> hands you the two heaviest items in <b>O(log n)</b> each round; process them, push any remainder back, and repeat.</p>
   </div>
 </div>
 

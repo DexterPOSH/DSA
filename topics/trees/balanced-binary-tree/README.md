@@ -17,7 +17,11 @@ Given the `root` of a binary tree, return `True` if it is **height-balanced**. A
 
 ## Real-World Analogy
 
-Socho ek **mobile hanging sculpture** (chhat se latki hui, dono taraf weights). Balanced tabhi rahega jab har joint pe dono taraf ki "lambai" lagभग barabar ho — koi ek taraf bahut zyada lamba latak gaya to poora tedha ho jaata. Important baat: sirf top joint dekh kar nahi keh sakte balanced hai ya nahi — **har joint** pe check karna padta hai. Ek bhi joint imbalanced (ek side 2+ level zyada gehri) to poori sculpture "unbalanced". Aur jaise sculpture ko neeche se assemble karte ho, waise hi hum neeche se heights compute karke upar check karte jaate hain.
+**What Azure Resource Manager's management hierarchy is:** Azure Resource Manager (ARM) is Azure's control plane for creating, organizing, and governing cloud resources. Its scopes form a tree: tenant/root Management Group, child Management Groups, Subscriptions, Resource Groups, and finally Resources. That hierarchy lets governance decisions and rollups travel from children back to parents.
+
+**What bottom-up health rollup is, and why it's used:** In a large Azure estate, a parent scope should not recompute every descendant from scratch when it only needs a compact summary like maximum depth, compliance state, or health. Each child can report a small result upward, and a special failure signal can stop unnecessary work once a bad branch is found. For a balance check, the useful summary is branch height; the failure signal is "this subtree is already unbalanced."
+
+**The mapping:** The recursive function acts like an ARM scope rollup. Each node asks its left and right child scopes for their heights, returns `max(left, right) + 1` when they differ by at most one, and returns `-1` when the local scope is unbalanced. The key insight is that height and validity can be computed in the same postorder pass, with `-1` carrying the bad-news signal all the way to the root.
 
 ## Approach
 

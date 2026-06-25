@@ -19,12 +19,11 @@ you can make. If no profit is possible, return `0` (you simply don't trade).
 
 ## Real-World Analogy
 
-Socho tum ek shopkeeper ho aur har din ka stock-rate ek diary me note kar rahe ho.
-Tumhe **sabse sasta din yaad rakhna hai jo ab tak guzar chuka hai** ("ab tak ka
-lowest"), aur har naye din pe sochna hai: "agar main aaj bechu, to us sabse saste
-din wale rate pe khareed kar kitna profit hota?" Tum future me nahi jhaank sakte —
-sirf aaj tak ka sabse sasta din pata hai. Diary me ek hi cheez track karo: **ab tak
-ka minimum price**, aur uske against har din ka profit compute karte raho.
+**What Azure Monitor is:** Azure Monitor is Azure's observability platform for collecting metrics, logs, traces, and alerts from resources like Azure App Service. For App Service, it records timestamped measurements such as response time, request count, CPU, and failures so you can see how the application behaves over time. Because metrics arrive as a time-ordered stream, many useful questions are answered by comparing each new point with what has already happened.
+
+**What metric time-series baselining is, and why it's used:** A simple Azure Monitor-style baseline is the best known "healthy" value seen so far in a metric stream — in this analogy, the lowest latency observed before the current point. Operators use baselines to detect regressions: "how much worse is this latency than the best earlier latency?" Keeping the baseline incrementally avoids rescanning every earlier datapoint and, just as importantly, never uses a future datapoint to explain the past.
+
+**The mapping:** Each stock price is an Azure Monitor latency datapoint. `min_price` is the running lowest baseline observed so far, and `price - min_price` is today's potential regression/profit if we "sell" now after buying at that earlier low. When a new lower price arrives, update the baseline; otherwise update `max_profit` with the largest rise from that baseline. The key insight is that for any sell day, the only buy day that matters is the cheapest Azure datapoint seen before it.
 
 ## Approach
 

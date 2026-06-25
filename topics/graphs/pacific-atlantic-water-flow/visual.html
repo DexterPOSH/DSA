@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Pacific Atlantic Water Flow — reverse multi-source flood</title>
+<title>Pacific Atlantic Water Flow — Azure paired-region reachability</title>
 <style>
   :root{
     --bg:#1a1a2e; --panel:#16213e; --panel2:#202a4d; --text:#e0e0e0; --muted:#9aa4c8;
@@ -76,12 +76,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Pacific Atlantic Water Flow — <span>reverse multi-source flood</span></h1>
-  <p class="subtitle">Flow uphill from each ocean's border; cells reached by both oceans are the answer.</p>
+  <h1>Pacific Atlantic Water Flow — Azure paired-region <span>reachability</span></h1>
+  <p class="subtitle">Trace inward from each paired-region boundary; cells reached from both boundaries are resources that can reach both regions.</p>
 
   <div class="analogy">
-    <h3>🌊 Flip the flow</h3>
-    <p>Har cell se dono ocean tak trace karna mehnga hai. Ulta socho — <b>ocean ke kinaare se uphill</b> (neighbor height ≥ current) flood karo. Pacific-reachable aur Atlantic-reachable sets ka <b>intersection</b> = answer.</p>
+    <h3>🌎 Azure paired-region reachability</h3>
+    <p>Use Azure paired regions as the two boundary sets in a topology. Instead of testing every resource outward, flood inward from each boundary along valid reverse links; the intersection is the set of resources that can reach both paired regions.</p>
   </div>
 
   <div class="board-wrap">
@@ -105,7 +105,7 @@
     </div>
   </div>
 
-  <div class="caption" id="caption">Press <b>Next</b> to flood uphill from the Pacific border.</div>
+  <div class="caption" id="caption">Press <b>Next</b> to trace inward from the Pacific region boundary.</div>
 
   <div class="controls">
     <button class="ghost" id="prevBtn" disabled>◀ Prev</button>
@@ -116,7 +116,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>When asked "which cells reach multiple sinks", <b>reverse the direction</b>: flood from each sink's border, then intersect the reachable sets — O(m·n).</p>
+    <p>When asked which resources reach multiple Azure region boundaries, <b>reverse the direction</b>: traverse from each boundary, then intersect the reachable sets — <b>O(m·n)</b>.</p>
   </div>
 </div>
 
@@ -167,19 +167,19 @@ function buildSteps(){
           }
         }
         snap(phase,[cr,cc],stack.map(s=>s),
-          `${oceanName}: water at <b>(${cr},${cc})</b> h=${H[cr][cc]} can drain to ${oceanName}. Climb to neighbours with height ≥ ${H[cr][cc]}.`);
+          `${oceanName}: resource at <b>(${cr},${cc})</b> threshold=${H[cr][cc]} can reach ${oceanName}. Traverse to neighbours with threshold ≥ ${H[cr][cc]}.`);
       }
     }
   }
 
-  snap(0,null,[],"Heights shown in each cell. Phase 1: flood <b>uphill</b> from the <span style='color:var(--pac)'>Pacific</span> border (top row + left col).");
+  snap(0,null,[],"Each cell shows a routing threshold. Phase 1: trace inward from the <span style='color:var(--pac)'>Pacific</span> region boundary (top row + left col).");
 
   // Pacific sources: top row + left col
   const pacSrc=[];
   for(let c=0;c<COLS;c++) pacSrc.push([0,c]);
   for(let r=0;r<ROWS;r++) pacSrc.push([r,0]);
   flood(pac,pacSrc,'Pacific',1);
-  snap(1,null,[],"Pacific flood done — all blue cells can drain to the Pacific. Now flood from the <span style='color:var(--atl)'>Atlantic</span> border (bottom row + right col).");
+  snap(1,null,[],"Pacific boundary traversal done — all blue cells can reach the Pacific boundary. Now trace from the <span style='color:var(--atl)'>Atlantic</span> boundary (bottom row + right col).");
 
   // Atlantic sources: bottom row + right col
   const atlSrc=[];
@@ -188,7 +188,7 @@ function buildSteps(){
   flood(atl,atlSrc,'Atlantic',2);
 
   const both=[...pac].filter(k=>atl.has(k));
-  snap(3,null,[],`Both floods done. Cells in <b>both</b> sets reach both oceans: <b>${both.map(k=>'('+k+')').join(', ')}</b>. ✅`);
+  snap(3,null,[],`Both boundary traversals done. Cells in <b>both</b> sets can reach both Azure region boundaries: <b>${both.map(k=>'('+k+')').join(', ')}</b>. ✅`);
   return steps;
 }
 

@@ -17,9 +17,11 @@ The same task (`A`) is always ≥ 2 slots apart. We needed 2 idle slots, so tota
 
 ## Real-World Analogy
 
-Socho ek **gym instructor** hai jo same muscle group ko back-to-back train nahi karne deta — biceps ke baad **kam se kam `n` din rest** chahiye before biceps again. Tumhare paas kuch exercises hain, kuch ki reps zyada hain (jaise biceps 3 baar karni hai), kuch ki kam. Smart instructor har din **woh exercise pick karta hai jiski sabse zyada reps bachi hain** — kyunki wahi tumhe future me phasayega. Agar koi available nahi (sab cooldown me hain), to **rest day (idle)** lo. Goal: poora plan minimum dino me khatam karna.
+**What Azure Batch is:** Azure Batch is Azure's service for running large-scale parallel and high-performance computing workloads across managed pools of VMs. You submit jobs made of tasks, and Azure Batch handles dispatching runnable work onto available compute nodes. In a real scheduler, some work types can be more urgent because they have larger backlogs, while others may need spacing to avoid overusing a constrained dependency.
 
-Yahan "sabse zyada reps bachi hain" = **max-heap**, aur "cooldown ke din" = ek **waiting queue** jo time aane par task ko wapas heap me bhej deti hai.
+**What cooldown-aware priority scheduling is, and why it's used:** A cooldown-aware scheduler repeatedly chooses the most backlogged available task type, then temporarily withholds that same type before it can run again. The priority part keeps workers focused on the largest remaining backlog; the cooldown queue protects shared resources, rate limits, locks, or hot partitions from being hit again too soon. If no task type is currently available because everything is cooling down, the worker must idle even though unfinished work still exists.
+
+**The mapping:** The max-heap is the Azure Batch-style ready queue, ordered by remaining count so the most urgent available task runs first. After one copy runs, its remaining count goes into a FIFO cooldown queue with the time when it can re-enter the heap. Each clock tick either pops from the heap, waits idle, or moves cooled tasks back to ready. The key insight is to separate "highest priority right now" from "not allowed to run yet" using a heap plus a cooldown queue.
 
 ## Approach
 

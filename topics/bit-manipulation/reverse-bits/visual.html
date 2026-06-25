@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Reverse Bits — Extract & Place Walkthrough</title>
+<title>Reverse Bits — Azure Network Flag Reordering</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -122,16 +122,15 @@
 </head>
 <body>
 
-  <h1>Reverse Bits &mdash; <span>Extract Right, Place Left</span></h1>
+  <h1>Reverse Bits &mdash; <span>Azure Network Flag Reordering</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">🔁</div>
+    <div class="analogy-icon">🌐</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Ek line ko <strong>ulta</strong> karna hai. Har baar <strong>n ka rightmost bit uthao</strong>
-        (<code>n &amp; 1</code>) aur use <strong>result ke left</strong> me daalo &mdash; result ko pehle
-        <code>&lt;&lt; 1</code> shift karke jagah banao. 8 baar me poora mirror ban jaata.
+        Azure Accelerated Networking may need to adapt a packed packet flag field between opposite bit orders at a boundary.
+        Each step extracts the low flag with <code>n &amp; 1</code>, shifts the outgoing field left, and ORs the flag into its mirrored position.
       </div>
     </div>
   </div>
@@ -181,8 +180,8 @@
     <div>
       <div class="takeaway-label">Key Takeaway</div>
       <p>
-        Peel the <strong>lowest</strong> bit off <strong>n</strong>, shift <strong>result</strong> left,
-        and OR it in. The first bit out gets the most shifts &rarr; lands at the MSB &mdash; an exact
+        For an Azure network flag field, peel the <strong>lowest</strong> bit off <strong>n</strong>, shift <strong>result</strong> left,
+        and OR it in. The first flag out gets the most shifts &rarr; lands at the MSB &mdash; an exact
         mirror. Fixed 32 (here 8) iterations &rarr; <strong>O(1) time, O(1) space</strong>.
       </p>
     </div>
@@ -201,7 +200,7 @@
   steps.push({
     nVal: n, rVal: result, placedCount: 0, extractBit: null, phase: 'start',
     desc: `Start: <strong>n = ${START}</strong> (<code>${bitsOf(START).join('')}</code>), result = 0. ` +
-          `8 iterations me n ke bits ulte daalenge.`
+          `In 8 iterations, the incoming Azure network flags are emitted in reverse order.`
   });
   for (let k = 0; k < WIDTH; k++) {
     const eb = n & 1;
@@ -210,9 +209,9 @@
     const nAfter = n >>> 1;
     steps.push({
       nVal: nAfter, nBefore: n, rVal: result, prevResult, placedCount: k + 1, extractBit: eb, phase: 'place',
-      desc: `Iteration ${k + 1}: n ka rightmost bit = <strong style="color:#f59e0b">${eb}</strong>. ` +
-            `result &lt;&lt; 1 (sab left khiske), phir | ${eb}. ` +
-            `result = <code>${bitsOf(result).join('')}</code> (${result}). Phir n &gt;&gt;= 1.`
+      desc: `Iteration ${k + 1}: the rightmost incoming flag is <strong style="color:#f59e0b">${eb}</strong>. ` +
+            `Shift result left to make room, then OR in ${eb}. ` +
+            `result = <code>${bitsOf(result).join('')}</code> (${result}). Then shift n right.`
     });
     n = nAfter;
   }

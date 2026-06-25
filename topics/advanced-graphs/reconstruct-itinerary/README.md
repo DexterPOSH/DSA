@@ -21,9 +21,11 @@ tickets = [["JFK","SFO"],["JFK","ATL"],["SFO","ATL"],["ATL","JFK"],["ATL","SFO"]
 
 ## Real-World Analogy
 
-Socho tum ek courier ho jise har gali (edge) se **exactly ek baar** guzarna hai, aur saari deliveries karke ghar wapas aana hai. Tum bas chalte raho — jahaan se aage raasta hai wahaan jao. Lekin ek trick hai: jab tum kisi **dead-end** (jahaan se aage koi unused ticket nahi) pe phaste ho, to wo airport tumhare final route ka **end** ban jaata hai. Tum usse ek stack pe daal dete ho aur peechhe lautte ho, baaki bachi galiyon ko khaate hue. Aakhir me stack ko **ulta** padho — wahi sahi itinerary hai.
+**What Azure Network Watcher is:** Azure Network Watcher is Azure's network monitoring and troubleshooting service. It helps operators inspect topology, test connectivity, capture packets, analyze NSG flow logs, and understand next-hop behavior for Azure virtual networks. In practice, it is the tool you reach for when you need a clear, auditable view of how network resources are connected.
 
-Yeh ulti-soch (route ko reverse me banana) hi Hierholzer ka core jugaad hai.
+**What topology link auditing is, and why it's used:** When auditing VNet peerings or ExpressRoute circuit connections, every link should be checked exactly once so the report does not miss a connection or double-count one. A deterministic traversal order makes the audit reproducible; if several outbound links are available, choosing the alphabetically smallest region/name first is like a stable tie-breaker. The mechanism exists to turn many local links into one complete inspection trail.
+
+**The mapping:** Airports are Azure hubs or regions, tickets are directed peering/circuit links, and the per-node min-heap stores the next unused link in lexical order. Hierholzer's DFS consumes outbound links until a hub has none left, then appends that dead-end during backtracking because it belongs near the end of the final audit trail. Reversing the post-order list gives one continuous route that uses every Azure network link exactly once; the key insight is that this is an edge-usage problem, not a node-visit problem.
 
 ## Approach — Hierholzer's algorithm (post-order DFS)
 

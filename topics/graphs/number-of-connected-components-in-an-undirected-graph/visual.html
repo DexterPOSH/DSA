@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Connected Components — Union-Find counts the clusters</title>
+<title>Connected Components — Azure Resource Graph clusters</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -114,19 +114,19 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Connected Components — <span>Union-Find</span> counts the clusters</h1>
-  <p class="subtitle">Start with <b>n</b> lonely nodes. Every edge that merges two <i>distinct</i> groups drops the count by one.</p>
+  <h1>Connected Components — Azure Resource Graph <span>clusters</span></h1>
+  <p class="subtitle">Start with <b>n</b> Azure resources. Every network/dependency edge that merges two distinct groups drops the component count by one.</p>
 
   <div class="analogy">
-    <h3>🤝 Real-world analogy: handshakes at a party</h3>
-    <p>Sab log akele = <b>n</b> groups. Do alag groups ke log haath milaye → merge, counter <b>-1</b>. Already same circle me ho → kuch nahi badalta. End me counter = number of friend-circles.</p>
+    <h3>🔎 Azure Resource Graph components</h3>
+    <p>Azure Resource Graph can model resources as nodes and peering/dependency links as edges. Union-Find starts every resource alone, merges distinct roots, and leaves the count unchanged for links already inside one component.</p>
   </div>
 
   <div class="panel">
     <div class="topbar">
       <div><b>Input.</b> <code>n = 6</code>, <code>edges = [[0,1],[1,2],[3,4],[2,1],[4,5]]</code> <span class="arrow">→</span> answer <code>2</code></div>
       <div class="counter">
-        <span class="label">components</span>
+        <span class="label">Azure components</span>
         <span class="num" id="counter">6</span>
       </div>
     </div>
@@ -135,7 +135,7 @@
 
     <svg id="graph" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid meet"></svg>
 
-    <div class="caption" id="caption">Press <b>Next</b> to process edges. Counter starts at <code>n = 6</code>.</div>
+    <div class="caption" id="caption">Press <b>Next</b> to process Azure topology links. Counter starts at <code>n = 6</code>.</div>
 
     <div class="controls">
       <button class="ghost" id="prevBtn">‹ Prev</button>
@@ -147,7 +147,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Initialize <code>count = n</code>; each successful union (two different roots) decrements it. A redundant edge inside one cluster changes nothing — the survivors are your connected components.</p>
+    <p>Initialize <code>count = n</code> Azure resources; each successful union across two different roots decrements it. A redundant internal link changes nothing — the survivors are disconnected Azure topology components.</p>
   </div>
 </div>
 
@@ -171,7 +171,7 @@ function buildSteps() {
   const steps = [];
   let count = n;
   steps.push({ idx: -1, parent: [...parent], count, done: [], merged: false,
-    cap: `Everyone is alone. <code>parent[i] = i</code>, <code>count = ${n}</code>. ${n} singleton components.` });
+    cap: `Each Azure resource starts alone. <code>parent[i] = i</code>, <code>count = ${n}</code>. ${n} singleton components.` });
   for (let i = 0; i < edges.length; i++) {
     const [u, v] = edges[i];
     const ru = find(u), rv = find(v);
@@ -180,11 +180,11 @@ function buildSteps() {
       parent[ru] = rv; count--;
       prevDone.push(i);
       steps.push({ idx: i, u, v, ru, rv, parent: [...parent], count, done: prevDone, merged: true,
-        cap: `Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=${ru}</code> ≠ <code>find(${v})=${rv}</code> — two different groups. <b class="g">Union</b> and <b class="g">count → ${count}</b>.` });
+        cap: `Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=${ru}</code> ≠ <code>find(${v})=${rv}</code> — two different Azure topology groups. <b class="g">Union</b> and <b class="g">count → ${count}</b>.` });
     } else {
       prevDone.push(i);
       steps.push({ idx: i, u, v, ru, rv, parent: [...parent], count, done: prevDone, merged: false, noop: true,
-        cap: `Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=find(${v})=${ru}</code> — <b class="p">already same group</b>. No merge, count stays <b class="p">${count}</b>.` });
+        cap: `Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=find(${v})=${ru}</code> — <b class="p">already same Azure component</b>. No merge, count stays <b class="p">${count}</b>.` });
     }
   }
   return steps;

@@ -71,8 +71,8 @@
   <p class="subtitle">Adjacent sorted words leak the hidden letter order. Build a precedence graph, then peel off in-degree-zero letters.</p>
 
   <div class="analogy">
-    <h3>📖 The hidden-alphabet analogy</h3>
-    <p>Shabd sorted hain par alphabet ka order unknown. Do <b>lagatar words</b> compare karo — pehla differing char ek clue deta hai: jaise <code>"wrt"</code> phir <code>"wrf"</code> → <b>t aata hai f se pehle</b> → edge <code>t→f</code>. Phir yeh dependency graph topo-sort karo. Cycle bana = invalid → <code>""</code>.</p>
+    <h3>🧩 The Azure deployment-order analogy</h3>
+    <p>An <strong>Azure Resource Manager/Bicep</strong> deployment uses <code>dependsOn</code> rules to derive a safe resource order. Each alien-word comparison adds one precedence edge, and topological sort deploys only letters whose prerequisites are already satisfied.</p>
   </div>
 
   <div class="legend">
@@ -115,7 +115,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Only the <i>first</i> differing character between adjacent words gives an ordering edge. Repeatedly removing in-degree-zero letters yields a valid order — if any letters remain, there's a cycle and the input is contradictory.</p>
+    <p>Only the <i>first</i> differing character between adjacent words gives an ordering edge. Like an Azure dependency graph, repeatedly removing in-degree-zero items yields a valid order — if any remain, the rules contain a cycle.</p>
   </div>
 </div>
 

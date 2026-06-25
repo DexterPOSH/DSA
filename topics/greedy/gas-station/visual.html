@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gas Station — Running Tank & Start Reset Visualized</title>
+<title>Gas Station — Azure Regional Failover Start Visualized</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -120,12 +120,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Gas Station — running <span>tank</span> &amp; start reset</h1>
-  <p class="subtitle">Drive the circle once. Whenever the tank dips below zero, the whole prefix is disqualified — restart at the next station.</p>
+  <h1>Gas Station — Azure regional <span>failover</span> start</h1>
+  <p class="subtitle">Scan the region ring once. Whenever capacity balance dips below zero, the whole prefix is disqualified — restart at the next region.</p>
 
   <div class="analogy">
-    <h3>⛽ Real-world analogy: the circular road-trip</h3>
-    <p>Har pump pe <code>gas[i]</code> milta hai, agle pump tak <code>cost[i]</code> lagta hai. Do sach: (1) total gas &lt; total cost → koi start nahi, <code>-1</code>. (2) total gas ≥ total cost → valid start zaroor hai. Jahan running <b>tank</b> negative ho, us start se yahan tak ka poora prefix invalid → next pump ko naya candidate maano.</p>
+    <h3>🌐 Azure analogy: regional failover capacity ring</h3>
+    <p>In an Azure Front Door/Traffic Manager failover ring, each region adds spare capacity and each handoff consumes capacity. If the running balance goes negative, that candidate region and every region in its failed prefix cannot be the start, so greedily reset to the next region.</p>
   </div>
 
   <div class="card">
@@ -136,7 +136,7 @@
       Feasibility: <code>sum(gas) = 15</code>, <code>sum(cost) = 15</code> → press Next to evaluate…
     </div>
 
-    <div class="section-label">Stations &nbsp;<code style="color:#5a6a90;font-size:0.75rem;font-family:monospace">gas=[1,2,3,4,5]  cost=[3,4,5,1,2]</code> &nbsp;— shown value is net = gas − cost</div>
+    <div class="section-label">Regions / stations &nbsp;<code style="color:#5a6a90;font-size:0.75rem;font-family:monospace">gas=[1,2,3,4,5]  cost=[3,4,5,1,2]</code> &nbsp;— shown value is net = gas − cost</div>
     <div class="stations" id="stationsRow"></div>
 
     <div class="stats">
@@ -173,7 +173,7 @@
 
   <div class="takeaway">
     <h3>💡 Key takeaway</h3>
-    <p>Two independent things: a global feasibility check (<code>sum(gas) ≥ sum(cost)</code>), and a running tank that, whenever it goes negative, proves no station in the failed prefix can be the start — so jump <code>start</code> past it. When feasible, the final reset point is the unique answer. O(n) time, O(1) space.</p>
+    <p>Two independent checks: global spare capacity must cover global handoff demand, and any prefix with negative running balance cannot contain the Azure failover start. When feasible, the final reset point is the answer.</p>
   </div>
 </div>
 
@@ -216,7 +216,7 @@ if (feasible) {
       trace.push({
         kind: 'ok', i, start, tank, candidate: start,
         desc: `Station ${i}: tank = ${before} ${net[i] >= 0 ? '+' : '−'} ${Math.abs(net[i])} = <b style="color:#10b981">${tank}</b> ≥ 0. ` +
-              `Still alive from candidate start ${start}. Keep driving.`
+              `Capacity stays nonnegative from candidate start ${start}. Keep this candidate.`
       });
     }
   }
@@ -283,7 +283,7 @@ function render() {
       $('s'+s.start).classList.add('candidate');
       $('flag'+s.start).textContent = 'START';
       const v = $('verdict'); v.className = 'verdict show';
-      v.textContent = `✅ Answer: start at station ${s.start}`;
+      v.textContent = `✅ Answer: start at region/station ${s.start}`;
     }
     return;
   }

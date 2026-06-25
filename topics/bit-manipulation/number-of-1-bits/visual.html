@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Number of 1 Bits — Brian Kernighan Walkthrough</title>
+<title>Number of 1 Bits — Azure Permission Flag Popcount</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -115,16 +115,15 @@
 </head>
 <body>
 
-  <h1>Number of 1 Bits &mdash; <span>Brian Kernighan's Trick</span></h1>
+  <h1>Number of 1 Bits &mdash; <span>Azure Permission Flag Popcount</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">💡</div>
+    <div class="analogy-icon">🔐</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Ek board pe kuch <strong>bulbs ON</strong> hain. Har jhatke me <code>n &amp; (n-1)</code>
-        se <strong>sabse right wala ON bulb bujha do</strong>. Jitni baar jhaadu chalani padi,
-        utne hi bulbs jal rahe the &mdash; OFF bulbs ko chhua tak nahi.
+        An Azure Service Bus SAS policy can be represented as a compact permission mask, with set bits for enabled rights.
+        Each <code>n &amp; (n-1)</code> pass clears the lowest enabled right, so the loop count equals the number of active permissions.
       </div>
     </div>
   </div>
@@ -172,9 +171,9 @@
     <div>
       <div class="takeaway-label">Key Takeaway</div>
       <p>
-        <strong>n &amp; (n - 1)</strong> clears exactly the lowest set bit each time. Loop until
-        <strong>n = 0</strong> and the iteration count is the popcount &mdash; it does work
-        proportional to the <strong>number of 1s</strong>, not all 32 bit positions.
+        For an Azure permission mask, <strong>n &amp; (n - 1)</strong> clears exactly one enabled right each time.
+        Loop until <strong>n = 0</strong> and the iteration count is the popcount &mdash; work is proportional
+        to the <strong>number of active flags</strong>, not all 32 bit positions.
       </p>
     </div>
   </div>
@@ -196,7 +195,7 @@
   let n = START, count = 0;
   steps.push({ n: START, m: START - 1, count: 0, lowIdx: lowestSetIndex(START), phase: 'start',
     desc: `Start: <strong>n = ${START}</strong> (<code>${toBits(START).join('')}</code>), count = 0. ` +
-          `Sabse right wala set bit highlighted hai &mdash; usse clear karenge.` });
+          `The lowest enabled permission flag is highlighted &mdash; that is the one this pass clears.` });
   while (n) {
     const before = n;
     const m = n - 1;

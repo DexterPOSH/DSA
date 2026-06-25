@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Decode Ways — 1-D DP Table Fill</title>
+<title>Decode Ways — Azure tokenization DP</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -106,17 +106,14 @@
 </head>
 <body>
 
-  <h1>Decode Ways &mdash; <span>1-D DP Table Fill</span></h1>
+  <h1>Decode Ways &mdash; <span>Azure Tokenization DP</span></h1>
 
   <div class="analogy">
-    <div class="ic">🪜</div>
+    <div class="ic">⚙️</div>
     <div>
       <div class="label">Real-world analogy</div>
       <div class="analogy-text">
-        Like climbing stairs where each step you take <strong>1 or 2 digits</strong> — but a jump is
-        only allowed if the digit(s) form a valid letter: single must be <code class="inline">1–9</code>,
-        pair must be <code class="inline">10–26</code>. Ways to reach position <em>i</em> =
-        ways from <em>i−1</em> (single) + ways from <em>i−2</em> (pair).
+        An Azure App Configuration parser tokenizes a compact settings stream where one- or two-character tokens may be valid. <code class="inline">dp[i]</code> caches the number of valid parses for each prefix, then later prefixes reuse those split counts.
       </div>
     </div>
   </div>
@@ -124,20 +121,20 @@
   <div class="card">
     <div>
       <div class="section-label">What's happening</div>
-      <div class="step-desc" id="stepDesc">Press "Next". We decode <code class="inline">s = "226"</code> by filling <code class="inline">dp</code> left to right.</div>
+      <div class="step-desc" id="stepDesc">Press "Next". We parse Azure token stream <code class="inline">s = "226"</code> by filling <code class="inline">dp</code> left to right.</div>
     </div>
 
     <div>
-      <div class="section-label">Encoded string &nbsp;<code class="inline">s = "226"</code></div>
+      <div class="section-label">Azure token stream &nbsp;<code class="inline">s = "226"</code></div>
       <div class="str-row" id="strRow"></div>
     </div>
 
     <div>
-      <div class="section-label">dp[i] = #ways to decode first i chars</div>
+      <div class="section-label">dp[i] = #ways to tokenize first i chars</div>
       <div class="dp-wrap"><div class="dp-table" id="dpTable"></div></div>
     </div>
 
-    <div class="recur" id="recurBox">dp[0] = 1 &nbsp;(empty string has one decoding — the base case)</div>
+    <div class="recur" id="recurBox">dp[0] = 1 &nbsp;(empty Azure token stream has one parse — the base case)</div>
 
     <div class="legend">
       <span><span class="swatch" style="background:#10b981"></span> single-digit source (dp[i-1])</span>
@@ -158,11 +155,7 @@
     <div class="ic">💡</div>
     <div>
       <div class="label">Key Takeaway</div>
-      <p>
-        A <strong>Fibonacci-style recurrence with validity gates</strong>:
-        <code class="inline">dp[i] = dp[i-1]·(single ok) + dp[i-2]·(pair ok)</code>.
-        One pass, <strong>O(n) time</strong>; only the last two dp values matter, so <strong>O(1) space</strong> is possible.
-      </p>
+      <p>An Azure-token parser uses a <strong>Fibonacci-style recurrence with validity gates</strong>: <code class="inline">dp[i] = dp[i-1]·(single ok) + dp[i-2]·(pair ok)</code>. Each prefix is computed once and cached, so one pass is <strong>O(n) time</strong>; only the last two dp values are needed for <strong>O(1) space</strong>.</p>
     </div>
   </div>
 
@@ -177,9 +170,9 @@
     // base
     steps.push({
       type: 'base', i: 0, dp: [1], active: 0,
-      desc: `<b>Base case.</b> <code class="inline">dp[0] = 1</code> — the empty prefix has exactly one (empty) decoding.`,
+      desc: `<b>Base case.</b> <code class="inline">dp[0] = 1</code> — the empty Azure token prefix has exactly one empty parse.`,
       descClass: 'ok',
-      recur: `dp[0] = <span class="g">1</span>  (empty string base case)`
+      recur: `dp[0] = <span class="g">1</span>  (empty Azure token stream base case)`
     });
 
     // dp[1]
@@ -191,8 +184,8 @@
       type: 'first', i: 1, dp: dp.slice(), active: 1,
       digit: 0,
       desc: first === '0'
-        ? `<b>dp[1]:</b> first char is '0' — invalid as a letter, so <code class="inline">dp[1] = 0</code>.`
-        : `<b>dp[1]:</b> first char '${first}' is valid (1–9), so <code class="inline">dp[1] = 1</code>.`,
+        ? `<b>dp[1]:</b> first token char is '0' — invalid, so <code class="inline">dp[1] = 0</code>.`
+        : `<b>dp[1]:</b> first token char '${first}' is valid (1–9), so <code class="inline">dp[1] = 1</code>.`,
       descClass: first === '0' ? 'bad' : 'ok',
       recur: `dp[1] = <span class="g">${dp1}</span>  (s[0]='${first}' ${first==='0'?'invalid':'valid 1–9'})`
     });
@@ -237,7 +230,7 @@
 
     steps.push({
       type: 'done', i: n, dp: dp.slice(), active: n,
-      desc: `✅ <b>Done.</b> <code class="inline">dp[${n}] = ${dp[n]}</code> — there are <b>${dp[n]}</b> ways to decode "${s}".`,
+      desc: `✅ <b>Done.</b> <code class="inline">dp[${n}] = ${dp[n]}</code> — there are <b>${dp[n]}</b> valid Azure tokenizations of "${s}".`,
       descClass: 'ok',
       recur: `Answer = dp[${n}] = <span class="r">${dp[n]}</span>`,
       done: true
@@ -289,9 +282,9 @@
       counter.textContent = `Step ${cur + 1} / ${steps.length}`;
 
       if (cur < 0) {
-        stepDesc.innerHTML = 'Press "Next". We decode <code class="inline">s = "226"</code> by filling <code class="inline">dp</code> left to right.';
+        stepDesc.innerHTML = 'Press "Next". We parse Azure token stream <code class="inline">s = "226"</code> by filling <code class="inline">dp</code> left to right.';
         stepDesc.className = 'step-desc';
-        recurBox.innerHTML = 'dp[0] = 1 &nbsp;(empty string has one decoding — the base case)';
+        recurBox.innerHTML = 'dp[0] = 1 &nbsp;(empty Azure token stream has one parse — the base case)';
         prevBtn.disabled = true; nextBtn.disabled = false;
         return;
       }

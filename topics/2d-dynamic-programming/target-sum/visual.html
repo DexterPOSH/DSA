@@ -141,8 +141,8 @@
   <p class="subtitle">Assign <b>+</b> or <b>−</b> to every number; count the ways to hit the target.</p>
 
   <div class="analogy">
-    <h3>🪙 Analogy: two pockets</h3>
-    <p>Har coin ko <b>left pocket (+)</b> ya <b>right pocket (−)</b> me daalo. End me running sum exactly <code>target</code> chahiye. Alag sign-choices jab <b>same running sum</b> pe milein, aage ka kaam identical — to unhe ek count me merge karo. Yahi 2-D DP: rows = "kitne numbers process kiye", columns = "running sum abhi kya hai".</p>
+    <h3>🔁 Analogy: Azure Synapse budget-state matrix</h3>
+    <p>In an Azure Synapse Mapping Data Flow, each step can add or subtract units from a running resource budget. The DP row for each number shifts counts to <code>+num</code> and <code>−num</code> states, merging paths that reach the same column.</p>
   </div>
 
   <div class="problem">

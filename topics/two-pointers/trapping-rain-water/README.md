@@ -19,16 +19,11 @@ the tallest bars to its left/right.
 
 ## Real-World Analogy
 
-Socho ek pahaadi jaisa terrain hai — kuch oonche peaks, kuch gaddhe (valleys).
-Baarish ke baad paani **gaddhon** me ruk jaata hai. Kisi ek point pe kitna paani
-rukega? Wo us point ke **dono taraf ki sabse oonchi deewar** pe depend karta —
-paani utna hi bhar sakta jitni **chhoti wali boundary** allow kare (warna woh side
-se beh jaayega). Us point ke khud ki height ghata do, jo bacha woh trapped water.
+**What Azure Monitor is:** Azure Monitor collects metrics, logs, and traces from Azure resources so teams can see capacity, latency, backlog, and health over time. For a zone-redundant service, those time-series metrics help capacity planners understand how much bursty traffic each interval can absorb. The elevation bars in this problem are like those per-slot capacity samples.
 
-Two-pointer insight: do log dono ends se andar aate hain. Har step pe **jis side
-ki abhi tak ki max wall chhoti hai, wahi side process karo** — kyunki us side ka
-trapped water uski apni side ke max se hi decide ho jaata, doosri side guaranteed
-usse oonchi (ya barabar) hai.
+**What a capacity watermark is, and why it's used:** A capacity watermark is the strongest boundary capacity seen so far from one side of the timeline. Backlog sitting in a valley can be buffered only up to the lower of the left and right watermarks, because traffic spills past the smaller boundary even if the other side is higher. Scanning from both ends is useful because when one watermark is lower, the opposite side already guarantees a boundary at least that high, so that lower side can be resolved immediately.
+
+**The mapping:** `height[i]` is an Azure Monitor capacity sample, `left_max` and `right_max` are the running watermarks, and the trapped water at a slot is the buffered backlog above local capacity. If `left_max < right_max`, add `left_max - height[l]`; otherwise add `right_max - height[r]`. The key insight is that the smaller known watermark is the limiting boundary, so you can process that side safely without precomputing every future maximum.
 
 ## Approach
 

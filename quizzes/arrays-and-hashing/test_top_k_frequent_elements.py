@@ -12,12 +12,25 @@ Target: O(n) time using a frequency Counter + bucket sort by frequency
 Run: dsa-buddy quiz check top-k-frequent-elements
   or: pytest quizzes/arrays-and-hashing/test_top_k_frequent_elements.py
 """
-
+from collections import Counter
 
 def topKFrequent(nums: list[int], k: int) -> list[int]:
     # TODO: implement (Counter + bucket sort by frequency).
-    pass
+    counter = Counter(nums)
 
+    # we want a bucket of len(nums) + 1 to use the index as the occurrence counter
+    frequency = [[] for i in range(len(nums) +1)]
+    
+    for no, freq in counter.items():
+        frequency[freq].append(no)
+
+    result = []
+    for i in range(len(frequency) -1, 0, -1):
+        for num in frequency[i]:
+            result.append(num)
+            if len(result) == k:
+                return result
+        
 
 # ---------- Tests (don't modify) ----------
 
@@ -48,3 +61,32 @@ def test_top_k_frequent(nums, k, expected_set):
     assert len(result) == k, f"expected {k} elements, got {len(result)}"
     assert len(set(result)) == k, "elements must be distinct"
     assert set(result) == expected_set
+
+
+def test_two_element_array():
+    # Smallest non-trivial case: distinct counts, k pulls the more frequent one.
+    result = topKFrequent([5, 5, 9], 1)
+    assert set(result) == {5}
+
+
+def test_large_input_stays_linear():
+    # 100k elements: a correct O(n) bucket-sort solution returns instantly.
+    # An accidental O(n^2) approach (nested scans) would crawl here.
+    nums = [i % 1000 for i in range(100_000)] + [42] * 50_000
+    result = topKFrequent(nums, 1)
+    assert set(result) == {42}
+
+
+def test_approach_avoids_full_sort():
+    # Soft nudge: the intended solution is Counter + bucket sort (O(n)),
+    # not a full comparison sort. Discourage sorted()/.sort() on the data.
+    import inspect
+
+    src = inspect.getsource(topKFrequent)
+    body = "\n".join(
+        line for line in src.splitlines() if not line.strip().startswith("#")
+    )
+    assert "sorted(" not in body and ".sort(" not in body, (
+        "Try the O(n) bucket-sort approach instead of a full sort — "
+        "bucket numbers by their frequency and scan high to low."
+    )

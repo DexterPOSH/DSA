@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Number of Islands — DFS Flood Fill</title>
+<title>Number of Islands — Azure VNet component flood fill</title>
 <style>
   :root{
     --bg:#1a1a2e; --panel:#16213e; --panel2:#202a4d; --text:#e0e0e0; --muted:#9aa4c8;
@@ -62,31 +62,31 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Number of Islands — <span>DFS flood fill</span> on a grid</h1>
-  <p class="subtitle">Scan the grid; every fresh land cell starts a new island and we sink its whole component.</p>
+  <h1>Number of Islands — Azure VNet <span>component flood fill</span></h1>
+  <p class="subtitle">Scan the topology grid; every unvisited Azure resource cell starts a new connected component and DFS/BFS marks the whole group visited.</p>
 
   <div class="analogy">
-    <h3>🛰️ Satellite-photo analogy</h3>
-    <p>Land (<code>1</code>) vs water (<code>0</code>). Jaise hi ek bina-paint kiya land cell mile → "naya island!" — fir usse juda har land cell ko <b>flood-fill karke sink</b> (visited) kar do, taaki dobara count na ho.</p>
+    <h3>🌐 Azure VNet component flood-fill</h3>
+    <p>Treat <code>1</code> cells as Azure resources/subnets and adjacency as subnet or peering connectivity. Each unvisited resource starts one DFS/BFS flood-fill that marks every reachable resource in that connected component.</p>
   </div>
 
   <div class="board-wrap">
     <div class="grid" id="grid"></div>
     <div class="panel">
-      <h4>Islands found</h4>
+      <h4>Components found</h4>
       <div class="counter" id="counter">0</div>
       <div class="stack" id="stack">DFS stack: —</div>
       <div class="legend">
         <div><span class="sw" style="background:var(--water)"></span> water <code>0</code></div>
-        <div><span class="sw" style="background:var(--panel2)"></span> unvisited land <code>1</code></div>
+        <div><span class="sw" style="background:var(--panel2)"></span> unvisited resource <code>1</code></div>
         <div><span class="sw" style="background:rgba(245,158,11,.6)"></span> current cell</div>
         <div><span class="sw" style="background:rgba(59,130,246,.6)"></span> on DFS stack</div>
-        <div><span class="sw" style="background:rgba(16,185,129,.5)"></span> sunk (visited)</div>
+        <div><span class="sw" style="background:rgba(16,185,129,.5)"></span> visited resource</div>
       </div>
     </div>
   </div>
 
-  <div class="caption" id="caption">Press <b>Next</b> to start scanning the grid row by row.</div>
+  <div class="caption" id="caption">Press <b>Next</b> to start scanning the Azure topology grid row by row.</div>
 
   <div class="controls">
     <button class="ghost" id="prevBtn" disabled>◀ Prev</button>
@@ -97,7 +97,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Count connected components by scanning for unvisited land; each seed triggers one DFS/BFS flood that sinks the whole island — <b>O(m·n)</b> total.</p>
+    <p>Count Azure connected components by scanning for unvisited resource cells; each seed triggers one DFS/BFS traversal that marks the whole component — <b>O(m·n)</b> total.</p>
   </div>
 </div>
 
@@ -134,12 +134,12 @@ function buildSteps(){
       caption
     });
   }
-  snap(null,[],"Start: scan row by row, left to right, looking for land (<b>1</b>) we haven't sunk yet.");
+  snap(null,[],"Start: scan row by row, left to right, looking for a resource cell (<b>1</b>) we have not visited yet.");
   for(let r=0;r<ROWS;r++){
     for(let c=0;c<COLS;c++){
       if(grid[r][c]===1 && !status[key(r,c)]){
         count++;
-        snap([r,c],[[r,c]],`Found fresh land at <b>(${r},${c})</b> → <b>new island #${count}</b>. Start DFS flood-fill from here.`);
+        snap([r,c],[[r,c]],`Found unvisited Azure resource at <b>(${r},${c})</b> → <b>new component #${count}</b>. Start DFS flood-fill from here.`);
         // iterative DFS to produce frontier-by-frontier snapshots
         const stack=[[r,c]];
         const onStack=new Set([key(r,c)]);
@@ -155,13 +155,13 @@ function buildSteps(){
             }
           }
           const stkArr=stack.map(s=>s);
-          snap([cr,cc],stkArr,`Sink <b>(${cr},${cc})</b> (mark visited). Push its unvisited land neighbours onto the DFS stack.`);
+          snap([cr,cc],stkArr,`Visit <b>(${cr},${cc})</b> and mark it. Push its unvisited connected resource neighbours onto the DFS stack.`);
         }
-        snap(null,[],`Island #${count} fully flooded. Resume the row-scan from where we left off.`);
+        snap(null,[],`Component #${count} fully traversed. Resume the row-scan from where we left off.`);
       }
     }
   }
-  snap(null,[],`Scan complete. No more fresh land. Total islands = <b>${count}</b>. ✅`);
+  snap(null,[],`Scan complete. No more unvisited resources. Total components = <b>${count}</b>. ✅`);
   return steps;
 }
 

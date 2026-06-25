@@ -14,11 +14,14 @@ strs = ["eat", "tea", "tan", "ate", "nat", "bat"]
 
 ## Real-World Analogy
 
-Socho tum ek library me kaam karte ho aur tumhare paas Scrabble tiles ke bag pade hain. Har bag me kuch letters hain. Tumhe sare bags ko aise groups me daalna hai ki ek group ke saare bags me **bilkul same letters same count me** hon. Kaise pehchanoge? Har bag ke tiles ko **alphabet order me laga do** — `eat`, `tea`, `ate` teeno sort karne pe `aet` ban jaate hain. Yeh sorted form ek **fingerprint** hai: jin bags ki fingerprint same, woh ek group. Tum ek shelf banate ho jiska label `"aet"` hai aur usme `eat`, `tea`, `ate` rakh dete ho. Yeh shelf-by-fingerprint system hi hamara **hash map (key -> list)** hai.
+**What Azure Cosmos DB is:** Azure Cosmos DB is Azure's globally distributed NoSQL database for storing JSON-like documents with low-latency reads and writes. It scales by spreading data across partitions while still letting related items be found through a chosen key. For grouping anagrams, we want every word with the same letter inventory to route to the same group.
 
+**What a partition key is, and why it's used:** A Cosmos DB partition key is a value taken from each item that determines its logical partition. Items with the same partition key live together logically, which makes targeted reads efficient and avoids expensive fan-out across many partitions. The key must be stable and meaningful, because it is the routing label Cosmos DB uses to decide where related data belongs.
+
+**The mapping:** For each word, create a canonical signature — either sorted letters like `aet` or a 26-count tuple — and treat that signature like the Cosmos DB partition key. `eat`, `tea`, and `ate` all produce the same key, so the hash map appends them to the same list. The key insight is that the original word order can vary, but a canonical partition key makes equivalent anagrams land in one Azure-style bucket.
 ## Approach
 
-Har word ke liye ek **canonical key** banao jo anagrams ke liye same ho, phir us key pe words ko group karo (hash map me `key -> list of words`).
+For each word, build a **canonical key** that is the same for anagrams, then group words by that key in a hash map (`key -> list of words`).
 
 **Approach 1 — sorted string as key** (simple, O(n·k log k)):
 
@@ -35,7 +38,7 @@ def group_anagrams(strs):
 
 **Approach 2 — char-count tuple as key** (optimal, O(n·k)):
 
-Sorting har word pe `O(k log k)` lagta hai. Usse bachne ke liye key ko **26-length count array** se banao — har lowercase letter ka count. Same anagrams ka count vector identical hoga. Tuple banao taaki wo dictionary key ban sake (lists hashable nahi hoti).
+Sorting each word costs `O(k log k)`. To avoid that, build the key from a **26-length count array** — one count per lowercase letter. Anagrams have identical count vectors. Convert it to a tuple so it can be used as a dictionary key (lists are not hashable).
 
 ```python
 from collections import defaultdict
@@ -54,21 +57,21 @@ Pattern: **hash map keyed by a canonical signature**.
 
 ## Complexity
 
-Maan lo `n` = number of words, `k` = max word length.
+Assume `n` = number of words and `k` = max word length.
 
-- **Sorted key:** Time **O(n·k log k)** — har word ko sort karna padta hai. Space **O(n·k)** map ke liye.
-- **Count key (optimal):** Time **O(n·k)** — har word ko ek baar scan karke count nikalte hain, sorting nahi. Space **O(n·k)**.
+- **Sorted key:** Time **O(n·k log k)** — each word must be sorted. Space **O(n·k)** for the map.
+- **Count key (optimal):** Time **O(n·k)** — scan each word once to compute counts, with no sorting. Space **O(n·k)**.
 
 ## Common Pitfalls
 
-- **List ko dictionary key banane ki koshish** — Python me list unhashable hai, isliye count array ko `tuple(count)` me convert karo.
-- **`dict` use karke `KeyError`** — plain `dict[key].append(...)` crash karega agar key pehli baar aa rahi hai. `defaultdict(list)` ya `setdefault` use karo.
-- **Sorted form ko output samajhna** — `"aet"` sirf ek internal key hai; output me original words (`eat`, `tea`) return karne hain, sorted version nahi.
-- **Case / non-lowercase assume** — agar uppercase ya unicode aa sakti hai to 26-size array kaafi nahi; tab `sorted()` ya general `Counter` key zyada safe hai.
+- **Trying to use a list as a dictionary key** — lists are unhashable in Python, so convert the count array to `tuple(count)`.
+- **Getting a `KeyError` with a plain `dict`** — `dict[key].append(...)` crashes the first time a key appears. Use `defaultdict(list)` or `setdefault`.
+- **Treating the sorted form as the output** — `"aet"` is only an internal key; return the original words (`eat`, `tea`), not the sorted version.
+- **Assuming lowercase-only input** — if uppercase or Unicode can appear, a 26-slot array is not enough; then `sorted()` or a general `Counter` key is safer.
 
 ## When to Use This Pattern
 
-Jab dikhe *"items ko un groups me baanto jo kisi transform/normalization ke baad equal ho jaate hain"* — socho **canonical key + hash map of lists**. Anagrams, "same digits ke numbers", "rotation/normalization ke baad equal strings" — sabme trick yahi hai: ek aisa signature banao jo group ke saare members ke liye identical ho, aur us signature pe bucket kar do.
+When you see *"split items into groups that become equal after a transform or normalization"* — think **canonical key + hash map of lists**. Anagrams, numbers with the same digits, and strings that match after rotation/normalization all use the same trick: build a signature that is identical for every member of a group, then bucket by that signature.
 
 ## Visual
 

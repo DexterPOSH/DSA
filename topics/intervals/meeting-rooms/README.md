@@ -17,14 +17,11 @@ meetings overlap**, else `False`.
 
 ## Real-World Analogy
 
-Tum **ek hi insaan** ho aur saari meetings attend karni hain — par tum ek time pe
-do jagah nahi ho sakte. Saari meetings ko unke **start time ke order me line up**
-karo (timeline pe). Ab bas check karo: kya koi meeting **pichhli wali ke khatam hone
-se pehle** shuru ho jaati hai? Agar haan → clash, tum dono attend nahi kar sakte →
-`False`. Agar har meeting peechle ke end ke baad (ya barabar) hi shuru hoti hai →
-sab clear → `True`.
+**What Azure Update Manager is:** Azure Update Manager is Azure's centralized way to manage OS update compliance and scheduled patching for machines. For a single Azure VM, only one maintenance operation should own the machine at a time; overlapping patch windows create confusing ownership, noisy alerts, and avoidable downtime risk.
 
-Bas adjacent pairs check karne hain (sort ke baad).
+**What maintenance-window conflict checking is, and why it's used:** Conflict checking validates a proposed set of maintenance windows before they are accepted for the same VM or fleet. Sorting by start time is used because once windows are chronological, any double-booking must appear between neighboring windows; a later window cannot hide a conflict behind an earlier non-overlapping one. This avoids expensive pair-by-pair comparisons while still catching every overlap.
+
+**The mapping:** Each meeting interval is an Azure Update Manager maintenance window for the same VM. Sort the windows by start time, then compare each window's start with the previous window's end; if `start < previous_end`, the VM would be double-booked and the schedule is invalid. The key insight is that sorting turns a global Azure scheduling question into a simple adjacent-window check.
 
 ## Approach
 

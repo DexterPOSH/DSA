@@ -19,7 +19,12 @@ grid = [
 
 ## Real-World Analogy
 
-Socho ek satellite photo hai jisme zameen (`1`) aur paani (`0`) dikh raha hai. Tumhe ginna hai kitne alag-alag landmass (islands) hain. Tum upar se neeche, baaye se daaye scan karte ho. Jaise hi ek aisa land cell milta hai jise tumne abhi tak **paint nahi kiya**, tum bolte ho "naya island mila!" — aur fir us cell se shuru karke **flood-fill** kar dete ho: us se juda har connected land cell ko paint karke `visited` mark kar dete ho, taaki wahi island dobara count na ho. Jitni baar tumhe "naya land" mila, utne islands.
+**What Azure Resource Graph is:** Azure Resource Graph is Azure's large-scale inventory and query service for resources across subscriptions. You can imagine its results projected onto a grid where present resources or subnets are marked and empty or blocked locations are not. The question then becomes how many separate topology islands exist in that inventory.
+
+**What flood-fill component discovery is, and why it's used:** Flood-fill component discovery starts a search from one unvisited Azure resource and marks every adjacent resource reachable through allowed links. It is used to avoid double-counting: once an entire connected island is marked, later grid scans can skip all of its cells. This is the same idea teams use when separating disconnected network segments or resource groups before analyzing ownership, routing, or blast radius.
+
+**The mapping:** Each `1` is an Azure resource/subnet, each `0` is absent or blocked space, and adjacent `1`s belong to the same connected island. Scanning the grid finds the first unvisited `1`, increments the island count, and DFS/BFS marks the entire Azure island before the scan continues. The key insight is that the answer is the number of times you must start a new flood-fill, not the number of resource cells.
+
 
 ## Approach
 

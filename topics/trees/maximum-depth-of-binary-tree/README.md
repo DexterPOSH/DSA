@@ -19,7 +19,11 @@ Empty tree (`root = None`) ka depth `0` hai.
 
 ## Real-World Analogy
 
-Socho ek **company ka org chart** hai — CEO top pe, neeche managers, unke neeche reports, aur aage. "Maximum depth" matlab sabse lambi reporting chain kitni gehri hai: CEO se le kar sabse junior intern tak kitne log. Tum CEO se nahi gin sakte directly — tumhe har branch neeche tak follow karni padti hai. Trick yeh hai: har manager bas apne **sabse gehre report ki depth + 1 (khud)** return karta hai. CEO ko dono taraf se jo bada number aaye, wahi answer.
+**What Azure Resource Manager's management hierarchy is:** Azure Resource Manager gives Azure resources a nested governance structure: Management Group → Subscription → Resource Group → Resource. Large organizations may add multiple Management Group layers above subscriptions to model business units or environments. The number of scopes on the longest chain tells you how deep the estate goes.
+
+**What hierarchy depth is, and why it's used:** Depth matters because policies, RBAC assignments, budgets, and operational ownership often flow through these Azure scopes. A shallow branch may end at a subscription quickly, while another branch may pass through several management-group layers before reaching a resource. Measuring maximum depth identifies the longest path that governance or inventory traversal must follow.
+
+**The mapping:** Each recursive call asks an Azure child scope for its deepest descendant length. A leaf returns `1`, an empty child returns `0`, and a parent returns `1 + max(left_depth, right_depth)`. The key insight is that the deepest branch completely determines the maximum depth; shorter sibling branches do not affect the answer.
 
 ## Approach
 

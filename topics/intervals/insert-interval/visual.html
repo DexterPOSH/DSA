@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Insert Interval — three-phase sweep on a timeline</title>
+<title>Insert Interval — Azure maintenance-window sweep</title>
 <style>
   :root{
     --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
@@ -73,12 +73,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Insert Interval — <span>three-phase</span> linear sweep</h1>
-  <p class="subtitle">Slot a new interval into a sorted, non-overlapping list and merge where it touches — in one pass.</p>
+  <h1>Insert Interval — Azure maintenance <span>three-phase sweep</span></h1>
+  <p class="subtitle">Slot a new Azure maintenance window into a sorted, non-overlapping schedule and merge where it touches — in one pass.</p>
 
   <div class="analogy">
-    <h3>📅 The calendar analogy</h3>
-    <p>Sorted meetings me ek nayi meeting ghusao. Jo poori tarah <b>pehle</b> khatam ho gayi → waise hi rakho. Jo naye block ko <b>touch/overlap</b> kare → usme <b>merge</b> kar do (min start, max end). Jo poori tarah <b>baad</b> me ho → waise hi add. Ek pass, kyunki list already sorted hai.</p>
+    <h3>🛠️ Azure Update Manager analogy</h3>
+    <p>An Azure Update Manager schedule is already sorted and non-overlapping, and a new VM maintenance window arrives. Keep windows that end before it, merge every window that touches it by taking the earliest start and latest end, then append the later windows unchanged.</p>
   </div>
 
   <div class="problem">
@@ -87,8 +87,8 @@
   </div>
 
   <div class="legend">
-    <span><i class="dot" style="background:#586387"></i>existing interval</span>
-    <span><i class="dot" style="background:var(--blue);border-style:dashed"></i>new interval</span>
+    <span><i class="dot" style="background:#586387"></i>existing Azure window</span>
+    <span><i class="dot" style="background:var(--blue);border-style:dashed"></i>new Azure window</span>
     <span><i class="dot" style="background:var(--green)"></i>added to result</span>
     <span><i class="dot" style="background:var(--amber)"></i>merging now</span>
   </div>
@@ -114,7 +114,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>A sorted list needs no re-sort: skip-before, merge-overlapping, append-rest. The overlap test is just <code>interval.start ≤ new.end</code> in one clean linear pass.</p>
+    <p>A sorted Azure maintenance schedule needs no re-sort: skip-before, merge-overlapping, append-rest. The overlap test is <code>window.start ≤ new.end</code> in one clean linear pass.</p>
   </div>
 </div>
 
@@ -137,12 +137,12 @@ function buildSteps(){
     done:o.done??false
   });
 
-  steps.push(snap({phase:0,caption:`Start. <b>newInterval = [${newI[0]},${newI[1]}]</b> (dashed blue). List is already sorted by start, so we sweep left→right in three phases.`}));
+  steps.push(snap({phase:0,caption:`Start. <b>new Azure window = [${newI[0]},${newI[1]}]</b> (dashed blue). The schedule is already sorted by start, so we sweep left→right in three phases.`}));
 
   // Phase 1
-  steps.push(snap({phase:1,caption:`<b>Phase 1:</b> copy every interval that ends strictly before new.start (<b>${newI[0]}</b>) — these can't touch the new block.`}));
+  steps.push(snap({phase:1,caption:`<b>Phase 1:</b> copy every Azure window that ends strictly before new.start (<b>${newI[0]}</b>) — these can't touch the new window.`}));
   while(i<intervals.length && intervals[i][1] < newI[0]){
-    steps.push(snap({phase:1,active:i,caption:`<b>[${intervals[i][0]},${intervals[i][1]}]</b> ends at ${intervals[i][1]} &lt; ${newI[0]} → no overlap, keep as-is.`}));
+    steps.push(snap({phase:1,active:i,caption:`<b>[${intervals[i][0]},${intervals[i][1]}]</b> ends at ${intervals[i][1]} &lt; ${newI[0]} → no Azure overlap, keep as-is.`}));
     res.push({iv:[...intervals[i]],isNew:false});
     steps.push(snap({phase:1,caption:`Added <b>[${intervals[i][0]},${intervals[i][1]}]</b> to result.`}));
     i++;
@@ -151,7 +151,7 @@ function buildSteps(){
     steps.push(snap({phase:1,active:i,caption:`<b>[${intervals[i][0]},${intervals[i][1]}]</b> ends at ${intervals[i][1]} ≥ ${newI[0]} → Phase 1 stops here.`}));
 
   // Phase 2
-  steps.push(snap({phase:2,newLive:true,caption:`<b>Phase 2:</b> merge every interval that overlaps the new block (its start ≤ new.end = <b>${newI[1]}</b>). Expand new by min-start / max-end.`}));
+  steps.push(snap({phase:2,newLive:true,caption:`<b>Phase 2:</b> merge every Azure window that overlaps the new window (its start ≤ new.end = <b>${newI[1]}</b>). Expand by min-start / max-end.`}));
   while(i<intervals.length && intervals[i][0] <= newI[1]){
     const before=[newI[0],newI[1]];
     newI[0]=Math.min(newI[0],intervals[i][0]);
@@ -160,17 +160,17 @@ function buildSteps(){
     i++;
   }
   res.push({iv:[...newI],isNew:true});
-  steps.push(snap({phase:2,newLive:false,caption:`No more overlap (next start &gt; ${newI[1]}). Push the merged block <b>[${newI[0]},${newI[1]}]</b> into the result.`}));
+  steps.push(snap({phase:2,newLive:false,caption:`No more overlap (next start &gt; ${newI[1]}). Push the merged Azure window <b>[${newI[0]},${newI[1]}]</b> into the result.`}));
 
   // Phase 3
-  steps.push(snap({phase:3,caption:`<b>Phase 3:</b> append all remaining intervals — they start after new.end, so no merging needed.`}));
+  steps.push(snap({phase:3,caption:`<b>Phase 3:</b> append all remaining Azure windows — they start after new.end, so no merging is needed.`}));
   while(i<intervals.length){
-    steps.push(snap({phase:3,active:i,caption:`<b>[${intervals[i][0]},${intervals[i][1]}]</b> is fully after the merged block → add as-is.`}));
+    steps.push(snap({phase:3,active:i,caption:`<b>[${intervals[i][0]},${intervals[i][1]}]</b> is fully after the merged Azure window → add as-is.`}));
     res.push({iv:[...intervals[i]],isNew:false});
     steps.push(snap({phase:3,caption:`Added <b>[${intervals[i][0]},${intervals[i][1]}]</b>.`}));
     i++;
   }
-  steps.push(snap({phase:3,done:true,caption:`Done! Result = <b>[${res.map(r=>`[${r.iv[0]},${r.iv[1]}]`).join(', ')}]</b>. One linear pass, no re-sort. ✅`}));
+  steps.push(snap({phase:3,done:true,caption:`Done! Result = <b>[${res.map(r=>`[${r.iv[0]},${r.iv[1]}]`).join(', ')}]</b>. One linear Azure schedule pass, no re-sort. ✅`}));
   return steps;
 }
 const steps=buildSteps();

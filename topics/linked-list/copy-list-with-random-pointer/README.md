@@ -16,9 +16,11 @@ Copy:       A'-> B'-> C'       random: A'.random = C', B'.random = A', C'.random
 
 ## Real-World Analogy
 
-Socho tumhare paas dosto ka ek **circle** hai. Har dost ke paas ek "next friend" (line me agla) aur ek "best friend" (koi bhi, kahin bhi) hai. Tumhe is poore circle ka ek **duplicate group** banana hai jisme rishte bilkul same ho — but duplicates ke best-friend bhi *duplicates* hi hone chahiye, original log nahi.
+**What Azure Resource Manager is:** Azure Resource Manager (ARM) is Azure's control plane for creating, updating, and organizing resources such as virtual machines, storage accounts, and networks. Every resource has a stable resource ID, and ARM deployments can create resources in a target resource group while tracking how they relate to each other. Cloning a resource set is not just copying names; the references between resources must be rebuilt too.
 
-Sabse seedha tareeka: ek **phonebook (hash map)** rakho jo har original dost ke saamne uska clone likhe — `original -> clone`. Pehle sab clones bana lo (bina rishte jode). Phir dobara ghoomo aur har clone ke `next` / `best-friend` ko phonebook me lookup karke set kar do. "Original ke best friend ka clone kaun?" → phonebook bata dega.
+**What ARM reference rewriting is, and why it's used:** ARM resources refer to each other by resource IDs and declare dependencies so Azure knows which resources must exist before another resource can be configured. These references allow a VM to point at a NIC, a NIC to point at a subnet, or a setting to point at some other resource without embedding the whole resource. When you clone into a new resource group, old IDs cannot be reused because the clone must be independent of the original graph.
+
+**The mapping:** The first pass through the list is like creating every cloned Azure Resource Manager resource and storing an `old ID -> new ID` table, while leaving references unresolved. The second pass is where `next` and `random` are rewired by looking up each original target in that table. The key insight is that a random pointer is just a cross-resource reference: it must point to the clone of the target, not the original target, so the map is what preserves graph shape without sharing nodes.
 
 ## Approach
 

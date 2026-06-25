@@ -18,14 +18,11 @@ s = "ababcbacadefegdehijhklij"
 
 ## Real-World Analogy
 
-Socho ek **road trip** hai aur har shehar (letter) ke kuch friends raaste me
-bikhre hue hain. Tum tab tak ek "leg" (segment) close nahi kar sakte jab tak us
-leg me jitne bhi shehar visit kiye, un sabka **aakhri occurrence** cross na ho
-jaaye — warna koi friend agle leg me chhoot jaayega aur ek hi shehar do legs me
-aa jaayega. To chalte chalo, ek **running "farthest I must still go" marker**
-rakho. Jaise hi current position us marker tak pahunch jaye — matlab is leg ke
-saare shehar khatam — leg yahin cut kar do aur naya start karo.
+**What Azure Event Hubs export to Azure Blob Storage is:** Azure Event Hubs can be paired with Azure Blob Storage to land streaming data durably for replay, analytics, or archival. Event Hubs Capture writes partition data into blob files, and custom export jobs often add their own segmentation rules for downstream consumers. The important idea is that an ordered stream is being cut into durable blob windows.
 
+**What checkpoint windowing by partition key is, and why it's used:** Suppose an export job must seal blob segments so every partition key's records stay inside exactly one segment for a clean downstream replay contract. To do that safely, the job needs to know the last offset where each key appears; otherwise it might close a blob and later discover the same key again. Tracking the farthest last offset among keys already seen tells the exporter the earliest safe place to seal the current window.
+
+**The mapping:** Each character is an Azure Event Hubs partition key in the export stream, `last[ch]` is that key's final offset, and `end` is the farthest final offset required by keys in the current blob window. As you scan, seeing a key may stretch `end`; when the current index reaches `end`, no key in the window appears later, so the segment can be sealed greedily. The key insight is that overlapping key ranges must stay together, and the first point where the running farthest end closes gives the smallest valid partition.
 ## Approach
 
 Pehle har letter ka **last index** nikaalo. Phir ek pass me chalo, ek `end`

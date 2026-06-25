@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Counting Bits — DP Table Walkthrough</title>
+<title>Counting Bits — Azure Permission Mask DP</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -124,16 +124,15 @@
 </head>
 <body>
 
-  <h1>Counting Bits &mdash; <span>DP: dp[i] = dp[i&gt;&gt;1] + (i&amp;1)</span></h1>
+  <h1>Counting Bits &mdash; <span>Azure Permission Mask DP</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">🏢</div>
+    <div class="analogy-icon">🔐</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Har flat <code>i</code> ke ON-bulbs ginnne ke liye, uska <strong>half</strong>
-        (<code>i &gt;&gt; 1</code>, last bit gira ke) pehle hi gina hua hai &mdash; table se uthao.
-        Bas wapas se gira hua last bit (<code>i &amp; 1</code>) add kar do. Purana kaam dobara nahi.
+        Azure Policy can cache how many Azure Service Bus SAS rights are enabled for every permission mask.
+        For mask <code>i</code>, reuse the cached count for <code>i &gt;&gt; 1</code> and add whether the dropped low flag <code>i &amp; 1</code> was enabled.
       </div>
     </div>
   </div>
@@ -176,9 +175,9 @@
     <div>
       <div class="takeaway-label">Key Takeaway</div>
       <p>
-        Each <strong>dp[i]</strong> reuses an already-computed smaller answer
-        (<strong>dp[i&gt;&gt;1]</strong>) plus the dropped low bit (<strong>i&amp;1</strong>).
-        One O(1) lookup per number &rarr; <strong>O(n) total</strong>, beating O(n log n) naive popcount.
+        Each Azure permission mask count <strong>dp[i]</strong> reuses an already-computed smaller mask
+        (<strong>dp[i&gt;&gt;1]</strong>) plus the dropped low flag (<strong>i&amp;1</strong>).
+        One O(1) lookup per mask &rarr; <strong>O(n) total</strong>, beating O(n log n) repeated popcount.
       </p>
     </div>
   </div>
@@ -196,20 +195,20 @@
   // steps: 0..N, each reveals dp[i]
   const steps = [];
   steps.push({ i: -1, filled: 0, desc:
-    'Start: <strong>dp[0] = 0</strong> (number 0 ke zero set bits). Ab i = 1 se aage bharo.' });
+    'Start: <strong>dp[0] = 0</strong>; mask 0 has no enabled permission flags. Fill the table from i = 1 onward.' });
   for (let i = 1; i <= N; i++) {
     const src = i >> 1;
     const low = i & 1;
     steps.push({
       i, src, low, filled: i,
       desc: `<strong>i = ${i}</strong> (<code>${toBits(i).join('')}</code>). i &gt;&gt; 1 = ${src} ` +
-            `(last bit gira do → <code>${toBits(src).join('')}</code>), uska dp pehle se = <strong style="color:#10b981">${dp[src]}</strong>. ` +
+            `(drop the low flag → <code>${toBits(src).join('')}</code>), whose dp value is already <strong style="color:#10b981">${dp[src]}</strong>. ` +
             `Dropped low bit i &amp; 1 = <strong style="color:#f59e0b">${low}</strong>. ` +
             `So dp[${i}] = ${dp[src]} + ${low} = <strong>${dp[i]}</strong>.`
     });
   }
   steps.push({ i: N + 1, filled: N + 1, done: true, desc:
-    `Poora table bhar gaya: <strong style="color:#10b981">[${dp.join(', ')}]</strong>. Har value ek lookup + add me &mdash; O(n).` });
+    `The full Azure permission-mask table is filled: <strong style="color:#10b981">[${dp.join(', ')}]</strong>. Each value used one lookup plus one add &mdash; O(n).` });
 
   const TOTAL = steps.length;
   let cur = 0, auto = null;

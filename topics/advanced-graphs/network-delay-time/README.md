@@ -18,9 +18,11 @@ times = [[2,1,1],[2,3,1],[3,4,1]], n = 4, k = 2
 
 ## Real-World Analogy
 
-Socho node `k` se ek **afwah (rumor)** phailti hai. Har edge ek dost-ko-batane ka delay hai. Afwah hamesha sabse **tez raaste** se kisi tak pahunchti hai. Tum ek priority queue (min-heap) rakhte ho jisme "abhi tak ka sabse jaldi pahunchne wala node" upar rehta hai. Usse pop karo, uske dosto ko ( neighbours) thoda aur delay jod ke push karo. Jis node tak afwah pehli baar pahunchti hai, wahi uska shortest time hai — lock kar do.
+**What Azure Front Door is:** Azure Front Door is Azure's global HTTP/HTTPS entry point that uses Microsoft's edge network to route users to application origins. It provides features like TLS termination, Web Application Firewall integration, health probes, and origin-group routing. The service is built to get each request to a healthy backend with low latency and reliable failover.
 
-Saare nodes tak afwah pahunchne me jitna time laga, uska **maximum** hi network delay hai (kyunki sabse aakhri banda jab sunta hai tabhi "sab" cover hue).
+**What latency-aware routing is, and why it's used:** Front Door continuously considers origin health and latency so it can avoid sending users toward slow or unhealthy backends. In a network model, each edge location, region, or segment has a non-negative latency, and total arrival time accumulates as traffic moves through segments. Latency-aware routing exists because the best next hop is not enough; Azure needs the smallest end-to-end time from the entry point to each reachable location.
+
+**The mapping:** Nodes are Azure edge locations or backend regions, directed edges are network segments, and `w` is the segment latency. Dijkstra's min-heap is Front Door's “next fastest known arrival” queue: pop the smallest time, lock that node's shortest delay, then relax its outgoing segments with `t + w`. The final answer is the maximum locked arrival time, because Azure has fully propagated the signal only when the slowest reachable node receives it; if any node never locks, return `-1`.
 
 ## Approach — Dijkstra with a min-heap
 

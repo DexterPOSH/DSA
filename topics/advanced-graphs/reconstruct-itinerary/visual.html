@@ -66,26 +66,26 @@
 <body>
 <div class="wrap">
   <h1>Reconstruct Itinerary — <span>Hierholzer's</span> Eulerian path</h1>
-  <p class="subtitle">Use every ticket (edge) exactly once. DFS down the smallest unused edge, append airports post-order at dead-ends, then reverse.</p>
+  <p class="subtitle">Use every directed edge exactly once. DFS down the smallest unused edge, append nodes post-order at dead-ends, then reverse.</p>
 
   <div class="analogy">
-    <h3>📮 The courier analogy</h3>
-    <p>Har gali (ticket) se exactly ek baar guzarna hai. Chalte raho — sabse chhota available raasta lo. Jab <b>dead-end</b> pe phaso (aage koi unused ticket nahi), wo airport route ke <b>end</b> me jaata hai (stack pe push). Peechhe laut ke bachi galiyaan khaate jao. Aakhir me stack <b>ulta</b> padho = sahi itinerary.</p>
+    <h3>🛰️ The Azure Network Watcher analogy</h3>
+    <p>Imagine <strong>Azure Network Watcher</strong> auditing a topology by traversing every VNet peering or ExpressRoute link exactly once. Hierholzer follows unused links until a hub has none left, appends that hub on backtrack, then reverses the appends to reconstruct the full link-coverage route.</p>
   </div>
 
   <div class="legend">
-    <span><i class="dot" style="background:#3a4a78"></i>airport</span>
-    <span><i class="dot" style="background:var(--amber)"></i>current / flying</span>
+    <span><i class="dot" style="background:#3a4a78"></i>node / region</span>
+    <span><i class="dot" style="background:var(--amber)"></i>current link</span>
     <span><i class="dot" style="background:var(--green)"></i>appended to route</span>
-    <span><i class="dot" style="width:18px;height:4px;border-radius:2px;background:#4a5a88"></i>unused ticket</span>
-    <span><i class="dot" style="width:18px;height:4px;border-radius:2px;background:#2c3a63;opacity:.5"></i>used</span>
+    <span><i class="dot" style="width:18px;height:4px;border-radius:2px;background:#4a5a88"></i>unused edge</span>
+    <span><i class="dot" style="width:18px;height:4px;border-radius:2px;background:#2c3a63;opacity:.5"></i>used edge</span>
   </div>
 
   <div class="stage">
     <svg id="graph" viewBox="0 0 440 280"></svg>
     <div class="side">
       <div class="panel-box">
-        <h4>Adjacency (min-heaps)</h4>
+        <h4>Adjacency (sorted outgoing links)</h4>
         <div id="heaps"></div>
       </div>
       <div class="panel-box">
@@ -100,7 +100,7 @@
     <div class="route" id="route"><span class="empty">empty</span></div>
   </div>
 
-  <div class="caption" id="caption">Press <b>Next</b>. DFS starts at JFK, always taking the lexically smallest unused ticket.</div>
+  <div class="caption" id="caption">Press <b>Next</b>. DFS starts at JFK, always taking the lexically smallest unused outgoing edge.</div>
   <div class="controls">
     <button id="prev" class="ghost">‹ Prev</button>
     <button id="next">Next ›</button>
@@ -110,7 +110,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>A node is appended to <code>route</code> only after all its edges are exhausted (post-order). Dead-ends land at the end; reversing the route lifts them back into the correct continuous Eulerian path.</p>
+    <p>A node is appended to <code>route</code> only after all its outgoing links are exhausted (post-order). Dead-ends land at the end; reversing the route produces the continuous Eulerian path.</p>
   </div>
 </div>
 
@@ -147,7 +147,7 @@ function buildSteps(){
   });
   // iterative Hierholzer mirroring recursion
   stack.push('JFK');
-  steps.push(snap({caption:`Push <b>JFK</b> onto the stack (start). Its tickets: [${graph['JFK'].join(', ')}].`}));
+  steps.push(snap({caption:`Push <b>JFK</b> onto the stack (start). Its outgoing links: [${graph['JFK'].join(', ')}].`}));
   while(stack.length){
     const node=stack[stack.length-1];
     if(graph[node].length>0){
@@ -157,11 +157,11 @@ function buildSteps(){
       graph[node].shift();
       usedEdges.add(usedKey(node,nxt,edgeId++));
       stack.push(nxt);
-      steps.push(snap({caption:`At <b>${node}</b>: take smallest unused ticket <b>${node}→${nxt}</b>. Push ${nxt}. (${node} now: [${graph[node].join(', ')||'none'}])`,flying:[node,nxt]}));
+      steps.push(snap({caption:`At <b>${node}</b>: take the smallest unused edge <b>${node}→${nxt}</b>. Push ${nxt}. (${node} now: [${graph[node].join(', ')||'none'}])`,flying:[node,nxt]}));
     } else {
       // dead end
       route.push(node);
-      steps.push(snap({caption:`<b>${node}</b> has no tickets left → dead-end. Pop it and <b>append to route</b> → [${route.join(', ')}].`}));
+      steps.push(snap({caption:`<b>${node}</b> has no outgoing links left → dead-end. Pop it and <b>append to route</b> → [${route.join(', ')}].`}));
       stack.pop();
     }
   }

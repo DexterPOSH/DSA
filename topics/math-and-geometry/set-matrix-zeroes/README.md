@@ -17,7 +17,11 @@ The single `0` at `(1,1)` zeroes out row 1 and column 1.
 
 ## Real-World Analogy
 
-Socho ek spreadsheet hai aur jis cell me galti (0) milti hai, us cell ki **poori row aur poori column** ko cross-out karna hai. Naive aadmi har 0 milte hi turant row/column zero kar deta — par phir woh naye zeroes ko bhi "original 0" samajh ke aur rows/columns wipe kar deta. Galat chain reaction! Smart accountant pehle **ek notebook me note** karta hai "kaun si rows aur columns clear karni hain", poora scan complete karta hai, phir baad me ek saath cross-out karta hai. Aur sabse clever wala: alag notebook lene ke bajaye, matrix ki **pehli row aur pehli column ko hi notebook** bana leta hai — zero extra space.
+**What Azure Resource Graph is:** Azure Resource Graph is Azure's service for querying resource inventory and configuration across subscriptions at scale. Teams can turn those query results into health matrices, such as availability zones by dependency type, to see where infrastructure problems are concentrated. The service helps reason over many resources without manually inspecting each one.
+
+**What in-place fault marking is, and why it's used:** In a health matrix built from Azure Resource Graph data, a failed cell may imply that an entire zone row and dependency column should be flagged for action. But if you zero the row and column immediately, newly written zeroes look like original failures and create a false cascade. Marker storage exists to separate discovery from mutation: record which rows and columns are affected first, then clear them later.
+
+**The mapping:** Each original `0` is an Azure health fault. The first row and first column become the marker storage for which rows and columns must be zeroed, while two booleans remember whether those marker lines were originally faulty themselves. After marking, the second pass clears marked cells, then handles the marker row and column, and the key insight is to reuse the matrix's own edge metadata to avoid extra space while preventing derived zeroes from triggering more zeroes.
 
 ## Approach
 

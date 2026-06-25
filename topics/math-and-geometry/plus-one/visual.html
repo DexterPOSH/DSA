@@ -63,7 +63,7 @@
     box-shadow: 0 6px 20px rgba(0,0,0,0.25);
   }
 
-  /* odometer selector */
+  /* example selector */
   .examples { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 22px; }
   .ex-btn {
     background: var(--panel2); color: var(--text);
@@ -144,11 +144,11 @@
 <body>
 <div class="wrap">
   <h1>Plus One — <span>carry</span> travels right to left</h1>
-  <p class="subtitle">Increment a number stored as a digit array, handling the carry exactly like an odometer.</p>
+  <p class="subtitle">Increment a number stored as a digit array, carrying across chunks like Azure Blob range offset math.</p>
 
   <div class="analogy">
-    <h3>🚗 Odometer analogy</h3>
-    <p>Ones place se shuru karo. Digit <code>&lt; 9</code> hai? Bas <b>+1</b>, done. Digit <code>9</code> hai? Wo <b>0</b> ban jaata hai aur carry <b>left</b> chala jaata hai. Saare 9 the? Carry bahar nikalta hai → naya leading <code>1</code> (<code>999 → 1000</code>).</p>
+    <h3>🧱 Azure Blob analogy</h3>
+    <p>Think of an Azure Blob offset too large for one native integer, stored as chunks. Add one at the least significant chunk; a <code>9</code> resets to <code>0</code> and carries left, while all <code>9</code>s create a new leading <code>1</code>.</p>
   </div>
 
   <div class="problem">

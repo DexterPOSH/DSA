@@ -24,13 +24,11 @@ getMin()  ->  -2
 
 ## Real-World Analogy
 
-Socho ek **stack of receipts** hai aur har receipt ke saath tum ek chhota
-sticky-note bhi chipka dete ho jisme likha hai: *"is receipt tak ka sabse sasta
-amount"*. Jab nayi receipt rakhte ho, to uska sticky-note banta hai =
-`min(nayi receipt ka amount, neeche wali receipt ka sticky-note)`. Ab kabhi bhi
-"sabse sasta kitna?" puchho — bas **sabse upar wala sticky-note** padh lo, O(1).
-Aur jab receipt uthaoge, uska sticky-note bhi saath chala jayega, to neeche wala
-sticky-note automatically sahi minimum dikhayega. Koi scan nahi, koi search nahi.
+**What Azure Resource Manager (ARM) is:** Azure Resource Manager is Azure's control plane for deploying and updating resources from templates, Bicep files, CLI calls, and SDKs. During a deployment, ARM coordinates many resource operations, tracks their status, and exposes deployment-operation history so you can audit and debug what happened. Think of the active deployment work as a LIFO stack of operations being entered and then unwound.
+
+**What deployment-operation tracking is, and why it's used:** ARM deployment operations record details such as the target resource, operation type, status, timing, and errors. That tracking exists because when a deployment fails, you need to know not just the latest action, but the context around the work that was active at that moment. In this analogy, we attach one extra piece of metadata to that operation history: the lowest priority/risk score seen so far, maintained in a separate running-minimum stack rather than recomputed by scanning all active operations.
+
+**The mapping:** The main stack stores the Azure ARM operations in normal LIFO order, while `min_stack` stores the minimum score that was true after each corresponding push. On `push(val)`, append the operation and also append `min(val, previous_min)`; on `pop()`, remove both entries together so the previous minimum is restored automatically. `top()` reads the current operation, and `getMin()` reads the top of the auxiliary stack in O(1). The key insight is lock-step metadata: every stack depth carries its own minimum snapshot, so unwinding never needs a full scan.
 
 ## Approach
 

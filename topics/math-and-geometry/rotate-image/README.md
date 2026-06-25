@@ -17,7 +17,11 @@ Notice the first **column** (1,4,7), read bottom-to-top, becomes the first **row
 
 ## Real-World Analogy
 
-Socho ek photo frame deewar pe ulta-seedha tanga hai aur usko tumhe 90° clockwise ghumana hai — bina deewar pe doosri keel thoke (no extra matrix). Photo studio wala ek neat trick use karta hai: pehle photo ka **mirror diagonal pe fold** karta hai (rows aur columns swap — transpose), phir har row ko **horizontally flip** karta hai. Do simple foldings ka combination = perfect 90° rotation. Koi naya frame nahi chahiye, sab kuch usi frame ke andar ho jaata hai.
+**What Azure AI Vision is:** Azure AI Vision is Azure's image-understanding service, and Azure Machine Learning often hosts the preprocessing pipelines that prepare image tensors for models. Those tensors can be large batches of pixels, so duplicating a full image just to rotate it can waste memory and bandwidth. The important Azure idea here is transforming the same image buffer in place when possible.
+
+**What in-place tensor rotation is, and why it's used:** In an Azure Machine Learning preprocessing step, a 90-degree clockwise image rotation can be decomposed into simple axis operations instead of allocating a second tensor. Transpose swaps row and column axes across the diagonal, then reversing each row flips pixels into the final orientation. This exists because two structured passes are cheaper and safer than building an entirely new image matrix.
+
+**The mapping:** The matrix is the Azure image tensor. The first nested loop swaps `matrix[i][j]` with `matrix[j][i]`, matching the transpose; the second pass reverses every row, matching the horizontal flip. The key insight is that a 90-degree clockwise rotation is not a mysterious four-way shuffle — it is transpose plus row reverse, so the algorithm uses O(1) extra space.
 
 ## Approach
 

@@ -16,13 +16,11 @@ s = "AABABBA", k = 1   ->  4    # window "ABBA": replace the lone A -> "BBBB"
 
 ## Real-World Analogy
 
-Socho ek deewar pe tiles laggi hain alag-alag colors ki, aur tumhare paas sirf `k`
-**repaint stickers** hain. Tum ek lagatar stretch (window) choose karte ho aur uske
-andar **majority color** ko rehne dete ho, baaki tiles ko repaint kar dete ho — par
-sirf tabhi jab repaint karne waali tiles `k` se zyada na ho. Tumhe sabse lambi aisi
-stretch chahiye jise tum ek hi color me badal sako. Window me jitne tiles "majority
-nahi" hain (`window_len - max_count`), utne repaints chahiye — wo `k` se zyada hue
-to window ko chhota karo.
+**What Azure Stream Analytics with Azure Event Hubs is:** Azure Event Hubs is Azure's high-throughput event ingestion service, and Azure Stream Analytics is the managed query engine that reads those events continuously. Together they let you process telemetry, clicks, or logs while the stream is still arriving instead of waiting for a batch job. Azure Stream Analytics keeps state for the active window so it can aggregate counts as events enter and leave.
+
+**What windowed event-type normalization is, and why it's used:** In the existing analogy, Azure Stream Analytics groups the current window by event type and asks: "If we wanted this whole window to look like one dominant event type, how many events would need correction?" The dominant type's count is `max_count`, and every other event in the window is a mismatch. A budget `k` models a rule such as "we can normalize at most k noisy/outlier events"; if the mismatch count exceeds that budget, the window must slide forward because it is too mixed to treat as one clean segment.
+
+**The mapping:** Each character is an Azure Event Hubs telemetry event type. Expanding `right` is Azure Stream Analytics accepting the next event, the frequency map is the per-type group state, and `window_len - max_count` is the number of events that would need replacement. When that number is greater than `k`, advancing `left` expires old Azure events until the active window is affordable again. The key insight is that the best window is the longest span where all non-majority characters fit within the replacement budget.
 
 ## Approach
 

@@ -22,13 +22,11 @@ why a sub-linear search like KMP works rather than reciting it from memory).
 
 ## Real-World Analogy
 
-Socho ek proofreader ek manuscript padh raha hai aur usse har jagah "Fox" word
-ko "Cat" se badalna hai. Wo left-se-right ek hi baar poora page scan karta hai.
-Jab "F" dikhta hai to wo agle few letters peek karta hai — kya yeh poora "Fox"
-banta hai? Agar haan, to "Cat" likh deta hai apni clean copy me aur original me
-"Fox" ke aage jump kar jaata hai. Agar nahi (sirf "F" tha but aage "Fox" nahi
-bana), to wo wahi original letter clean copy me likh deta hai aur ek step aage
-badh jaata hai. Ek hi pass, koi dobara-padhai nahi (ideally).
+**What Azure Stream Analytics is:** Azure Stream Analytics is Azure's real-time stream-processing service for reading events from sources like Event Hubs, IoT Hub, or Blob Storage and writing transformed results to sinks. It is built for continuous cleanup, filtering, enrichment, and routing while events keep flowing. Conceptually, it reads an input stream and emits a separate output stream.
+
+**What a stream transformation is, and why it's used:** A stream transformation applies a rule at the current input offset, emits the transformed value, and then advances past the input it consumed. For token replacement, the job checks whether the next bytes match the target token; on a full match it emits the replacement, and on a mismatch it copies the current byte/event field through. Writing to a separate Azure output sink is important because the replacement text is not fed back into the scanner, which prevents overlapping replacements and infinite growth when `repl` contains `find`.
+
+**The mapping:** `orig` is the Event Hubs input payload, `find` is the token the Azure Stream Analytics-style rule is looking for, and `repl` is what gets written to the cleaned output stream. Pointer `i` checks a window: match means append `repl` and jump by `len(find)`; mismatch means append `orig[i]` and move one step. The key insight is to consume input exactly once while building a separate result, so replacements are non-overlapping by construction.
 
 ## Approach (clean O(n·m) scan — the safe interview answer)
 

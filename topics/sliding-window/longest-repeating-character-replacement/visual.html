@@ -68,17 +68,14 @@
 </head>
 <body>
 
-  <h1>Longest Repeating Character Replacement &mdash; <span>k Repaints Allowed</span></h1>
+  <h1>Longest Repeating Character Replacement &mdash; <span>k Replacements Allowed</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">🎨</div>
+    <div class="analogy-icon">📡</div>
     <div class="analogy-body">
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Tiles ki ek deewar, aur sirf <strong>k repaint stickers</strong>. Ek lagatar
-        stretch choose karo, usme <strong style="color:#3b82f6">majority color</strong>
-        rakho aur baaki <strong style="color:#f59e0b">repaint</strong> karo. Repaints
-        (window_len − max_count) jab k se zyada ho jaaye, window slide karo.
+        Azure Stream Analytics over Event Hubs keeps counts by event type for the active window. The dominant type is <strong>max_count</strong>; if <code>window_len - max_count</code> exceeds the allowed correction budget <code>k</code>, shrink the window.
       </div>
     </div>
   </div>

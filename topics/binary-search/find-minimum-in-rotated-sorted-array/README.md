@@ -15,8 +15,11 @@ A sorted (ascending, distinct) array has been **rotated** between `1` and `n` ti
 
 ## Real-World Analogy
 
-Socho ek **ghadi (clock face)** pe numbers 1→12 likhe hain, phir kisi ne dial ko thoda ghuma diya. Ab ek hi "**cliff**" (giraav) hai jahan bada number ke turant baad sabse chhota aata hai — jaise `7` ke baad `0`. Woh cliff ka bottom hi minimum hai. Tumhe pure circle pe ghoomne ki zaroorat nahi: beech me dekho aur poochho — "kya mai abhi cliff ke pehle wale (oonche) part me hoon, ya baad wale (neeche) part me?" Jis taraf cliff hai, usi taraf jao. Har step me aadha kaat do.
+**What Azure Cosmos DB is:** Azure Cosmos DB is a distributed NoSQL database that spreads data across partitions so it can scale storage and throughput. A partition key is hashed into an ordered effective-partition-key space, and Cosmos DB uses that map to route reads and writes to the right physical partition. Because partitions can split as data grows, the service needs a precise map of which key ranges live where.
 
+**What a partition key range map is, and why it's used:** A partition key range map records contiguous hash ranges, like `0000...` through `3fff...`, and the physical partition responsible for each range. It exists so the query router can jump directly to the partition that owns a key range instead of broadcasting every request everywhere. If you display that ordered map starting from an arbitrary point on the hash ring, it looks rotated: high hash ranges appear first, then one wrap point jumps back to the lowest range.
+
+**The mapping:** The rotated `nums` array is that Azure Cosmos DB range map shown from the middle of the ring, and the minimum value is the first low hash range after the wrap. Comparing `nums[mid]` with `nums[hi]` tells which side of the wrap `mid` is on: if `nums[mid] > nums[hi]`, the minimum must be to the right; otherwise `mid` is already in the sorted tail, so the minimum is at `mid` or to its left. The key insight is that the right endpoint gives a stable reference for finding the rotation boundary without scanning.
 ## Approach
 
 Pattern: **binary search using the "which half is sorted" invariant**. Rotated array do sorted halves me bata hota hai. Trick: `nums[mid]` ko **`nums[hi]`** (right end) se compare karo — `lo` se nahi.

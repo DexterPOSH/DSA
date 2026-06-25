@@ -17,14 +17,11 @@ matrix = [[9, 9, 4],
 
 ## Real-World Analogy
 
-Socho ye grid ek **terrain ka height-map** hai — har cell ki value uski altitude.
-Tum ek hiker ho jo hamesha **upar ki taraf hi chalta hai** (strictly increasing
-altitude), aur sirf 4 padosi cells me ja sakta hai. Sawaal: sabse lambi uphill trail
-kitni lambi ho sakti hai? Ab key insight: kisi bhi ek cell se shuru karke "yahaan se
-aage sabse lambi uphill trail kitni lambi hai" ka jawab **fixed** hai — wo cell ke
-neighbours pe depend karta hai, aur koi cycle possible nahi (kyunki altitude strictly
-badhti hai, tum kabhi wapas usi cell pe nahi aa sakte). To har cell ka answer ek baar
-compute karke **yaad rakh lo (memo)** — dobara mat chalo.
+**What Azure regional failover routing is:** Azure applications are often deployed across multiple regions, and an operations plan can describe which neighboring region traffic may move to during recovery. In this analogy, every Azure region on the grid has a readiness score, such as health, capacity, or compliance readiness. A valid route is only allowed to move to a neighboring region with a strictly higher score.
+
+**What strict readiness-based failover is, and why it's used:** Requiring each hop to improve the readiness score prevents traffic from cycling between equally good or worse regions. That kind of monotonic rule gives operators a predictable escalation path: every move is a clear improvement, and eventually no higher-scored neighbor remains. The strict increase matters because it turns the regional routing graph into an acyclic dependency graph.
+
+**The mapping:** Each matrix cell is an Azure region, edges point only to higher-scored neighboring regions, and DFS asks for the best remaining route starting from that cell. Once the best route length from a region is computed, memoization stores it there so every inbound route reuses the same suffix instead of recalculating it. The key insight is that strict increase removes cycles, so each cell's answer can be cached once and reused to find the global longest path.
 
 ## Approach
 

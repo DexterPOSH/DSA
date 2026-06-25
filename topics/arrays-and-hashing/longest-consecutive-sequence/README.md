@@ -14,17 +14,20 @@ nums = [0, 3, 7, 2, 5, 8, 4, 6, 0, 1]  ->  9   # 0..8
 
 ## Real-World Analogy
 
-Socho ek bag me bohot saare numbered tickets bikhre pade hain, random order me. Tumhe sabse lambi unbroken chain dhoondhni hai (jaise `5,6,7,8`). Sort karna ek option hai par O(n log n). Smart tareeka: pehle saare tickets ko ek bade table pe daal do taaki **ek nazar me pata chale ki koi number maujood hai ya nahi** (yeh hash set hai). Ab chain dhoondhne ke liye sirf un tickets se shuru karo jo **chain ke "start" hain** — yaani jinka *ek kam wala* (`n-1`) table pe maujood hi nahi. Aise hi ek start mila, to `n, n+1, n+2…` count karte jao jab tak agla number table pe milta rahe. Sirf starts se chalne ki wajah se har number maximum ek hi baar visit hota hai — isliye poora kaam O(n) me.
+**What Azure Resource Graph is:** Azure Resource Graph is Azure's service for querying resource inventory across subscriptions at scale. Instead of calling each VM, NIC, or virtual network one by one, teams can run a Kusto-style query and get a current view of resources and properties. For IP analysis, that means collecting the private addresses currently allocated to NICs in a VNet.
 
+**What a resource inventory query is, and why it's used:** A Resource Graph query turns scattered Azure resources into a searchable set of records, such as all allocated private IP addresses. This exists because cloud estates are too large to inspect manually or by repeated per-resource API calls. Once the addresses are in a set, range detection becomes a membership problem: "does the previous or next address exist?"
+
+**The mapping:** Put every number into a hash set just like collecting every allocated IP from Azure Resource Graph. Only start counting from a number whose predecessor is missing, because that number is the beginning of a consecutive range; then keep checking `num + 1`, `num + 2`, and so on until lookup fails. The key insight is that by walking only from true range starts, each value belongs to one scan, so fast membership checks keep the work linear.
 ## Approach
 
-Naive: sort karke adjacent compare karo → O(n log n). Hum O(n) chahte hain.
+Naive: sort and compare adjacent values → O(n log n). We want O(n).
 
 **Optimal — hash set + start-of-run detection** (O(n)):
 
-1. Saare numbers ko ek `set` me daalo → O(1) membership checks.
-2. Har number `n` ke liye check karo: kya `n - 1` set me **nahi** hai? Agar nahi hai, to `n` kisi run ka **start** hai.
-3. Sirf starts se forward count karo: `n, n+1, n+2…` jab tak `set` me milta hai. Length track karo, max update karo.
+1. Put all numbers into a `set` → O(1) membership checks.
+2. For each number `n`, check whether `n - 1` is **not** in the set. If it is not, then `n` is the **start** of a run.
+3. Count forward only from starts: `n, n+1, n+2…` as long as each value exists in the `set`. Track the length and update the maximum.
 
 ```python
 def longest_consecutive(nums):
@@ -40,24 +43,24 @@ def longest_consecutive(nums):
     return longest
 ```
 
-Crucial: inner `while` sirf tab chalta hai jab `n` ek start ho. Isliye har number ke aage poori chain me ek hi baar walk hota hai — overall O(n), n² nahi. Pattern: **hash set + only-extend-from-boundaries**.
+Crucial: the inner `while` loop runs only when `n` is a start. That means each full chain is walked only once overall — O(n), not n². Pattern: **hash set + only-extend-from-boundaries**.
 
 ## Complexity
 
-- **Time:** O(n) — set banana O(n); har number ka `n-1` check O(1); aur inner while loop total milake har element ko at most ek baar touch karta hai (kyunki sirf run-starts se chalta hai).
-- **Space:** O(n) — saare numbers set me.
+- **Time:** O(n) — building the set is O(n); each `n-1` check is O(1); and across all starts, the inner while loop touches each element at most once.
+- **Space:** O(n) — all numbers are stored in the set.
 
 ## Common Pitfalls
 
-- **Start-check chhod dena** — agar har number se forward count karoge (start-check ke bina), to inner loop bar-bar overlapping chains chalega → **O(n²)**. `if n - 1 not in set` hi O(n) banata hai.
-- **Sorting kar dena** — sahi answer deta hai par O(n log n); interviewer aksar O(n) explicitly maangta hai.
-- **Duplicates** — `set` automatically dedupe kar deta hai, isliye duplicate numbers length inflate nahi karte. (List use karoge to bug.)
-- **Empty array** — `longest = 0` se shuru karo taaki empty input pe `0` mile.
-- **`while n + length in num_set` me index/value confuse karna** — yahan `n + length` *value* hai jo set me dhoondhte hain, koi array index nahi.
+- **Skipping the start check** — if you count forward from every number without the start check, the inner loop repeatedly walks overlapping chains → **O(n²)**. `if n - 1 not in set` is what makes it O(n).
+- **Sorting** — it gives the correct answer, but it is O(n log n); interviewers often explicitly ask for O(n).
+- **Duplicates** — `set` automatically deduplicates values, so duplicates do not inflate the length. (Using a list can cause bugs.)
+- **Empty array** — start with `longest = 0` so empty input returns `0`.
+- **Confusing index vs value in `while n + length in num_set`** — here, `n + length` is the *value* you are looking for in the set, not an array index.
 
 ## When to Use This Pattern
 
-Jab unsorted data me **"longest consecutive / contiguous run"** ya **"kya elements ek continuous range banate hain"** dhoondhna ho bina sort kiye — socho **hash set + extend-only-from-boundaries**. Trick yahi hai: O(1) membership ke liye set me daalo, aur kaam sirf boundaries (run-starts) se shuru karke har element ko ek hi baar process karo.
+When you need to find the **"longest consecutive / contiguous run"** in unsorted data, or determine whether elements form a continuous range without sorting, think **hash set + extend-only-from-boundaries**. The trick is to put values in a set for O(1) membership, then start work only from boundaries (run starts) so each element is processed once.
 
 ## Visual
 

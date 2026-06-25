@@ -20,15 +20,11 @@ triplets = [[3,4,5],[4,5,6]], target = [3,2,5]
 
 ## Real-World Analogy
 
-Socho tum **3 alag skill scores** (coding, design, communication) ka exact
-target hire-bar match karna chahte ho, aur har candidate ke paas teeno me kuch
-score hai. Merge ka matlab — do candidates ko "team up" karao, team ka har skill
-me **best of the two** count hota hai. Ek dikkat: agar kisi candidate ka koi
-skill target se **zyada** hai (over-qualified in that axis), to wo team me aate
-hi us axis ko overshoot kara dega — wo candidate **useless** hai, skip karo.
-Bache hue "safe" candidates me se, kya har skill axis pe **koi na koi** candidate
-exactly target tak pahunchta hai? Agar teeno axes covered → target ban jaayega.
+**What Azure Advisor is:** Azure Advisor is an Azure service that analyzes deployed resources and gives best-practice recommendations across areas like cost, reliability, security, performance, and operational excellence. For infrastructure planning, you can think of its recommendations as candidate configuration improvements for dimensions such as CPU, memory, and disk. The target profile is the exact capacity shape you want to assemble safely.
 
+**What recommendation filtering by target dimensions is, and why it's used:** When configuration changes combine by taking the maximum available value per dimension, any recommendation that exceeds the target on CPU, memory, or disk is dangerous: later merges cannot lower it back down. Filtering those overshooting recommendations first prevents an irreversible over-provisioned profile. Among the safe recommendations, you only need to know whether each target dimension is hit exactly by at least one candidate.
+
+**The mapping:** Each triplet is an Azure Advisor-style configuration recommendation, the target triplet is the desired CPU/memory/disk profile, and merging is component-wise max. Any triplet with a component above target is skipped because max-based merging would preserve that overshoot forever. Safe triplets can cover different dimensions independently; once all three target positions have exact hits, merging them forms the target — the key insight is that monotonic max operations make overshoot irreversible and per-dimension coverage sufficient.
 ## Approach
 
 Max merge ka ek pyara property hai: **galat (over-target) triplets ko ignore

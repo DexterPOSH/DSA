@@ -16,7 +16,11 @@ cost = [1, 100, 1, 1, 1, 100, 1, 1, 100, 1]  ->  6
 
 ## Real-World Analogy
 
-Socho ek seedhi ke har step pe ek toll booth lagi hai — us step pe pao rakha to utna paisa dena padega. Tum 1 ya 2 step chadh sakte ho, aur tumhe sabse upar (chhat ke uss paar) sabse saste me pahunchna hai. Har step pe khade hoke tum sochte ho: "Yahan tak main do hi tareeko se aa sakta tha — neeche wale (i-1) step se, ya uske bhi neeche (i-2) wale se. Dono raaston ka jo total ab tak ka kharcha tha, usme se **sasta wala chuno**, aur uske upar apna current toll jodo." Bas yahi har step pe dohraate jao — har step ka cheapest-arrival cost yaad rakho.
+**What Azure Autoscale is:** Azure Autoscale is an Azure Monitor capability that adjusts resource capacity based on metrics, schedules, or rules. It is used to keep services responsive while avoiding unnecessary cost. A controller can think of the path to a target capacity as a sequence of allowed resize steps, each with a known cost.
+
+**What Azure Cache for Redis memoization is, and why it's used:** Azure Cache for Redis is a managed, low-latency Redis service for storing key-value state close to applications. A scale controller can use the same memoization idea by caching the cheapest known cost to reach each intermediate capacity, so repeated planning queries do not recalculate every route. The cache exists because many future decisions ask for the same predecessor costs.
+
+**The mapping:** Step `i` is an intermediate Azure Autoscale capacity with cost `cost[i]`. To land there, the controller can come from `i-1` or `i-2`, so `dp[i] = cost[i] + min(dp[i-1], dp[i-2])`, and the top is reached by choosing the cheaper of the last two cached states. The key insight is that the optimal path to a capacity only needs the cheapest optimal paths to the two capacities that can directly precede it.
 
 ## Approach
 

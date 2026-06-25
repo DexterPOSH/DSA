@@ -23,7 +23,12 @@ Output: a brand-new graph with the same shape, zero shared node objects.
 
 ## Real-World Analogy
 
-Socho tumhare paas ek dosti-network hai: har banda ek node, aur uske friends uske neighbors. Tumhe iska **bilkul naya carbon-copy** banana hai — naye log, par exactly wahi friendships. Problem ye hai ki network me **cycles** hain (A ka friend B, B ka friend wapas A). Agar tum bina yaad rakhe naye-naye copies banate jaaoge to ek hi banda baar-baar copy hoga aur tum infinite loop me phans jaaoge. Solution: ek **register (map)** rakho — "original banda → uska naya clone". Jab bhi kisi original banda pe pahuncho, pehle register dekho: agar clone pehle se bana hai to wahi reuse karo, naya mat banao. Yahi `visited` map cycles ko todta hai.
+**What Azure Virtual Network is:** Azure Virtual Network (VNet) is Azure's private networking boundary for cloud resources, where subnets, NICs, VMs, private endpoints, gateways, and peering relationships define how traffic can move. A real Azure environment is not just a flat list of resources; it is a topology of objects that point to and depend on each other. When teams copy an environment for testing, disaster recovery, or migration, they need the same shape without reusing the original production objects.
+
+**What topology cloning is, and why it's used:** Cloning a VNet topology means creating brand-new resource definitions while recreating every relationship: subnet membership, NIC-to-VM links, route associations, and VNet peerings. It exists because a shallow copy would leave the new environment pointing back to the old one, while blindly walking relationships can duplicate shared resources or loop forever through bidirectional peerings. The safe pattern is to keep a translation map from each original Azure resource to its cloned resource as soon as the clone is created.
+
+**The mapping:** In Clone Graph, each node is an Azure resource and each neighbor edge is a networking or dependency link. DFS/BFS creates the cloned node, stores it in the map, then walks neighbors and connects to their clones; if a neighbor is already mapped, reuse that clone instead of recursing again. The key insight is that the visited map is both cycle protection and the original-to-copy wiring diagram, so the clone has the same topology with entirely new nodes.
+
 
 ## Approach
 

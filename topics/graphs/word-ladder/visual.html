@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Word Ladder — BFS finds the shortest transformation</title>
+<title>Word Ladder — Azure deployment-state BFS</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -115,12 +115,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Word Ladder — <span>BFS</span> finds the shortest transformation</h1>
-  <p class="subtitle">Each word is a node; an edge joins words differing by exactly one letter. BFS fans out level by level — the first ripple to touch the target wins.</p>
+  <h1>Word Ladder — Azure deployment-state <span>BFS</span></h1>
+  <p class="subtitle">Each word is a state node; an edge is one valid change. BFS explores states level by level, so first reaching the target gives the shortest path.</p>
 
   <div class="analogy">
-    <h3>🌊 Real-world analogy: ripples in a word-maze</h3>
-    <p>Paani <b>hit</b> pe giraao — ripples ek-letter-door wale rooms me ek saath failte hain. Jo ripple sabse pehle <b>cog</b> ko chhuye, wahi shortest path. DFS ek raasta andar tak ghuste rehta — shortest guarantee nahi.</p>
+    <h3>🧭 Azure ARM state transformation</h3>
+    <p>Model an ARM/Bicep migration as valid Azure deployment states connected by one safe configuration change. BFS tries all one-change states before two-change states, so the first target state found uses the fewest changes.</p>
   </div>
 
   <div class="panel">
@@ -138,14 +138,14 @@
     <div class="stage-grid">
       <svg id="graph" viewBox="0 0 460 420" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="side">
-        <h4>BFS queue (word, dist)</h4>
+        <h4>BFS queue (state, dist)</h4>
         <div class="queue" id="queue"></div>
         <h4>visited</h4>
         <div class="visited" id="visited"></div>
       </div>
     </div>
 
-    <div class="caption" id="caption">Press <b>Next</b> to run BFS from <code>hit</code> (distance 1).</div>
+    <div class="caption" id="caption">Press <b>Next</b> to run BFS from the starting state <code>hit</code> (distance 1).</div>
 
     <div class="controls">
       <button class="ghost" id="prevBtn">‹ Prev</button>
@@ -157,7 +157,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>On an unweighted graph, BFS dequeues nodes in non-decreasing distance order — so the moment <code>endWord</code> comes off the queue, its distance is provably the shortest. That's why it's BFS, never DFS.</p>
+    <p>On an unweighted Azure state graph, BFS dequeues states in non-decreasing distance order — so the moment the target state comes off the queue, its distance is provably shortest. That is why this pattern uses BFS, not DFS.</p>
   </div>
 </div>
 

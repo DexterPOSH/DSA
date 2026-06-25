@@ -21,9 +21,11 @@ cache.get(2)    -> -1  # 2 was evicted
 
 ## Real-World Analogy
 
-Socho ek chhoti si **study table** hai jisme sirf 2 kitaabein aa sakti hain. Jab bhi tum koi kitaab padhte ho (get) ya nayi rakhte ho (put), tum usse **table ke top pe** rakh dete ho — "abhi-abhi use ki". Jab table full ho aur nayi kitaab aaye, tum **sabse neeche padi kitaab** (jise sabse purana chhua tha) hata dete ho.
+**What Azure Cache for Redis is:** Azure Cache for Redis is Azure's managed Redis service for keeping hot data in memory close to applications. It is used for fast reads, sessions, rate limits, leaderboards, and other workloads where going back to the database on every request is too slow. Because memory is finite, the cache needs a policy for deciding what to remove when it fills up.
 
-Ab do cheezein chahiye: (1) kisi bhi kitaab ko naam se turant dhoondhna — yeh kaam **hashmap** karta hai (`key -> node`). (2) "kaun sabse recent, kaun sabse purana" ka order maintain karna aur kisi bhi kitaab ko beech se nikaal ke top pe daalna — yeh kaam **doubly linked list** karti hai. Dono milke har operation O(1) bana dete hain.
+**What LRU-style eviction is, and why it's used:** Redis supports LRU-style eviction policies such as `allkeys-lru` and `volatile-lru`, which prefer removing keys that have not been accessed recently. This exists because recently used data is often more likely to be requested again, so keeping it improves hit rate under a fixed memory budget. Redis's production implementation is approximate for efficiency, but the idea is the same recency ordering this problem models exactly.
+
+**The mapping:** The hash map is the Azure Cache for Redis key index: it finds a cache entry in O(1) for `get` or `put`. The doubly linked list is the recency chain: every access moves that node to the most-recently-used front, while eviction removes the least-recently-used node at the tail. The key insight is to separate lookup from recency management, so both reads/updates and capacity eviction stay O(1).
 
 ## Approach
 

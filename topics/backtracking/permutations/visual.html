@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Permutations — Pick-an-Unused Recursion Tree</title>
+<title>Permutations — Azure Update Order Recursion Tree</title>
 <style>
   :root {
     --bg:#1a1a2e; --panel:#16213e; --panel2:#232342; --text:#e0e0e0; --muted:#9a9ac0;
@@ -71,12 +71,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Permutations — pick an <span>unused</span> element each level</h1>
-  <p class="subtitle">Order matters, all elements used. A <code>used[]</code> set prevents placing the same runner twice.</p>
+  <h1>Permutations — pick an <span>unscheduled</span> VM each level</h1>
+  <p class="subtitle">Order matters, all VMs are scheduled once. A <code>used[]</code> set prevents scheduling the same VM twice.</p>
 
   <div class="analogy">
-    <h3>🏅 Real-world analogy: race podium orders</h3>
-    <p>3 runners, har possible gold-silver-bronze order chahiye. Gold pick karo → silver sirf bache huo me se → bronze automatic. Phir <b>backtrack</b> karke doosre orders. <code>used</code> set ek runner ko do positions pe aane se rokta hai.</p>
+    <h3>🔄 Real-world analogy: Azure Update Manager schedules</h3>
+    <p>Azure Update Manager can patch a fixed VM set in many possible orders. Pick one unscheduled VM for the next slot, mark it used, recurse, then unmark it when rolling back so it can appear in a different schedule.</p>
   </div>
 
   <div class="panel">
@@ -85,7 +85,7 @@
   </div>
 
   <div class="panel">
-    <h2>Recursion tree — each level picks one unused element</h2>
+    <h2>Recursion tree — each level picks one unscheduled VM</h2>
     <div class="treewrap"><svg id="tree" width="900" height="360" viewBox="0 0 900 360"></svg></div>
   </div>
 
@@ -110,7 +110,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Loop over <b>all</b> indices, skip <code>used[i]</code>, place + mark, recurse, then <b>un-mark</b>. When <code>len(path)==n</code>, record. <code>n!</code> leaves total.</p>
+    <p>Loop over <b>all</b> VM indices, skip <code>used[i]</code>, schedule + mark, recurse, then <b>un-mark</b>. When <code>len(path)==n</code>, record one Azure maintenance order.</p>
   </div>
 </div>
 
@@ -224,17 +224,17 @@ function render(){
 
   const cap=$('caption'); cap.className='caption';
   if(st.type==='visit')
-    cap.innerHTML=`At a node — loop over all indices, place the first <b class="g">unused</b> one.`;
+    cap.innerHTML=`At a node — loop over all indices, schedule the first <b class="g">unused</b> VM.`;
   else if(st.type==='skip')
     cap.innerHTML=`Index ${st.idx} (<code>${nums[st.idx]}</code>) is already <b class="r">used</b> → <code>continue</code>, skip it.`;
   else if(st.type==='pick')
-    cap.innerHTML=`<b class="g">PICK</b> <code>${nums[st.idx]}</code> → push to path, mark <code>used[${st.idx}]=True</code>, recurse.`;
+    cap.innerHTML=`<b class="g">PICK</b> VM <code>${nums[st.idx]}</code> → push to schedule, mark <code>used[${st.idx}]=True</code>, recurse.`;
   else if(st.type==='leaf'){ cap.classList.add('done');
-    cap.innerHTML=`<b class="g">len(path) == n</b> 🎯 — a complete permutation <b class="p">[${st.path.join(',')}]</b>.`; }
+    cap.innerHTML=`<b class="g">len(path) == n</b> 🎯 — a complete Azure update order <b class="p">[${st.path.join(',')}]</b>.`; }
   else if(st.type==='record'){ cap.classList.add('done');
     cap.innerHTML=`<b class="a">Record</b> a copy: <b class="a">[${st.recorded.join(',')}]</b>. ✅`; }
   else if(st.type==='back'){ cap.classList.add('back');
-    cap.innerHTML=`<b class="a">BACKTRACK</b> — <code>path.pop()</code> + <code>used[${st.idx}]=False</code>. Free <code>${nums[st.idx]}</code> for other branches.`; }
+    cap.innerHTML=`<b class="a">BACKTRACK</b> — <code>path.pop()</code> + <code>used[${st.idx}]=False</code>. Release VM <code>${nums[st.idx]}</code> for other branches.`; }
 
   $('counter').textContent=`step ${cur+1} / ${steps.length}`;
   $('prevBtn').disabled=cur===0; $('nextBtn').disabled=cur===steps.length-1;

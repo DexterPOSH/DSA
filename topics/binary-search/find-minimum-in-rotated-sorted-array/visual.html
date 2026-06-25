@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Find Minimum in Rotated Sorted Array — which half holds the cliff?</title>
+<title>Find Minimum in Rotated Sorted Array — which half contains the wrap point?</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -45,7 +45,7 @@
   .panel { background: var(--panel); border-radius: 14px; padding: 24px 22px 28px; border: 1px solid rgba(255,255,255,0.07); box-shadow: 0 6px 20px rgba(0,0,0,0.25); margin-bottom: 26px; }
   .sectlabel { font-size:.8rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:0 0 6px; }
 
-  /* array as a "stepped" line to evoke the cliff */
+  /* array as a stepped line to show the rotated range map */
   .array { display:flex; justify-content:center; gap:9px; flex-wrap:wrap; align-items:flex-end; margin: 46px 0 10px; }
   .cellwrap { position:relative; }
   .cell {
@@ -104,12 +104,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Find Minimum in Rotated Sorted Array — <span>which half holds the cliff?</span></h1>
+  <h1>Find Minimum in Rotated Sorted Array — <span>which half contains the wrap point?</span></h1>
   <p class="subtitle">Compare <code>nums[mid]</code> with <code>nums[hi]</code> to decide which half to keep.</p>
 
   <div class="analogy">
-    <h3>🕐 Analogy: a nudged clock face</h3>
-    <p>Numbers ek hi "cliff" pe girte hain — bade ke turant baad sabse chhota (jaise 7 → 0). Cliff ka bottom hi minimum hai. Beech me dekho: "mai cliff ke pehle (oonche) part me hoon ya baad (neeche) wale me?" — usi taraf jao, aadha kaato.</p>
+    <h3>🔄 Analogy: Azure Cosmos DB partition ring wrap</h3>
+    <p>An <b>Azure Cosmos DB partition key range map</b> is ordered around a hash ring, but a rotated view has one wrap point from high hashes back to low hashes. Comparing <code>nums[mid]</code> with <code>nums[hi]</code> tells which half can still contain that wrap, so the search halves the ring each step.</p>
   </div>
 
   <div class="problem">
@@ -134,13 +134,13 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Rotated array me <code>nums[mid] &gt; nums[hi]</code> → min right me (<code>lo = mid+1</code>); warna min mid par ya left me (<code>hi = mid</code>). Loop <code>lo &lt; hi</code>, answer <code>nums[lo]</code>.</p>
+    <p>If <code>nums[mid] &gt; nums[hi]</code>, the wrap point and minimum are to the right, so set <code>lo = mid + 1</code>; otherwise the minimum is at <code>mid</code> or to its left, so set <code>hi = mid</code>.</p>
   </div>
 </div>
 
 <script>
 const nums = [4, 5, 6, 7, 0, 1, 2];
-const heights = nums.map(v => 40 + v * 4); // taller bar = bigger value, evokes the cliff
+const heights = nums.map(v => 40 + v * 4); // taller bar = larger range value before the wrap
 
 function buildSteps() {
   const steps = [];
@@ -151,7 +151,7 @@ function buildSteps() {
     const mid = Math.floor((lo + hi) / 2);
     if (nums[mid] > nums[hi]) {
       steps.push({ lo, hi, mid, kind:'right',
-        text: `<code>nums[mid]=${nums[mid]} &gt; nums[hi]=${nums[hi]}</code>. The cliff is to the right, so the min is strictly right of mid → discard left, <code>lo = mid + 1 = ${mid+1}</code>.` });
+        text: `<code>nums[mid]=${nums[mid]} &gt; nums[hi]=${nums[hi]}</code>. The wrap point is to the right, so the min is strictly right of mid → discard left, <code>lo = mid + 1 = ${mid+1}</code>.` });
       lo = mid + 1;
     } else {
       steps.push({ lo, hi, mid, kind:'left',
@@ -200,7 +200,7 @@ function render() {
     cmp.innerHTML =
       `<span class="a">nums[mid]=${nums[s.mid]}</span><span class="op">${gt ? '&gt;' : '≤'}</span><span class="b">nums[hi]=${nums[s.hi]}</span>` +
       `<span class="note">${gt
-        ? 'mid is in the high (pre-cliff) part → the minimum lies further right.'
+        ? 'mid is in the high pre-wrap segment → the minimum lies further right.'
         : 'mid…hi is already sorted → the minimum is mid itself or to its left.'}</span>`;
   } else {
     cmp.style.display = 'none';

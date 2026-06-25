@@ -17,9 +17,11 @@ nums = [3, 2, 3, 1, 2, 4, 5, 5, 6], k = 4  -> 4
 
 ## Real-World Analogy
 
-Socho ek **exam ke baad rank nikalni hai — tumhe 4th-highest scorer chahiye**, poori class ko full-rank kiye bina. Do tareeke:
-- **Min-heap of size k:** ek chhoti "leaderboard" rakho jisme sirf top-k scorers hain. Naya score top-k me ghuse to leaderboard ka lowest gir jaata hai. Antt me leaderboard ka **lowest hi kth largest** hai.
-- **Quickselect:** ek random pivot pakdo, sabko "pivot se bade" / "chhote" me baant do (partition). Pivot apni final sorted position pe baith jaata hai. Agar wo position exactly kth largest ki hai — mil gaya! Warna sirf ek hi side me dobara dhoondo (poora sort nahi).
+**What Azure Monitor is:** Azure Monitor is Azure's observability service for collecting metrics, logs, and traces from cloud resources and applications. For example, it can hold a fixed batch of VM CPU samples from a time range that an operator wants to inspect. Sometimes the operator needs a rank boundary, like the kth busiest VM, rather than a complete sorted report.
+
+**What bounded top-k metric selection is, and why it's used:** A bounded top-k query keeps only the k largest metric values encountered while scanning a batch. This is useful because sorting every VM sample is unnecessary when smaller values cannot affect the kth-largest answer once the current top-k boundary is known. A min-heap of size k makes that boundary cheap to check: the root is the smallest value still inside the current top-k.
+
+**The mapping:** Each number in `nums` is an Azure Monitor CPU sample from the fixed query result. Heapify the first k samples, then scan the rest: if a sample is larger than `heap[0]`, replace the root; if it is smaller or equal, it cannot change the kth-largest boundary. After one pass, `heap[0]` is the kth largest. The key insight is that the answer is the boundary of the top-k set, so maintaining that boundary beats sorting the whole array.
 
 ## Approach
 

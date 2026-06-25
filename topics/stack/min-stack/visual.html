@@ -76,12 +76,10 @@
   <h1>Min Stack &mdash; <span>Two Parallel Stacks</span></h1>
 
   <div class="analogy">
-    <div class="icon">🧾</div>
+    <div class="icon">📉</div>
     <div>
       <div class="label">Real-world analogy</div>
-      <p>Stack receipts, but stick a <strong>sticky-note</strong> on each one saying
-      <em>"cheapest amount down to here"</em>. A new note = <code style="color:#ffd479">min(this value, note below)</code>.
-      Ask "cheapest so far?" → just read the <strong>top note</strong>. O(1).</p>
+      <p>Think of an Azure ARM deployment-operation stack with a parallel running-minimum stack for priority or risk score. Each push records <code style="color:#ffd479">min(new, previous)</code>, so reading the top gives the current minimum in <strong>O(1)</strong>.</p>
     </div>
   </div>
 

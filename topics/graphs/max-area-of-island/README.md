@@ -19,7 +19,12 @@ grid = [
 
 ## Real-World Analogy
 
-Same satellite-photo wali kahani jaise Number of Islands — par ab tumhe islands **ginne** nahi, sabse bade island ka **area naapna** hai. Socho har island ko flood-fill karte waqt tum ek counter rakhte ho: jitne land cells us flood me doobte hain, utna us island ka area. Har naye island ka area nikaalo, aur ab tak ka **maximum** yaad rakho. Akhir me jo sabse bada blob mila, wahi answer.
+**What Azure Resource Graph is:** Azure Resource Graph is Azure's inventory-query service for finding resources and their metadata across subscriptions at scale. It helps teams answer topology questions like which subnets, NICs, gateways, and dependencies belong together. In an incident or architecture review, that topology can reveal the size of each connected blast-radius segment.
+
+**What connected-component sizing is, and why it's used:** Connected-component sizing groups adjacent Azure resources that can reach or affect one another, then measures how large each group is. It is used because the biggest group often represents the largest potential blast radius, routing island, or operational unit to inspect first. A flood-fill is a natural way to do this: start from one unvisited resource, traverse every allowed adjacency, and count everything reached before moving to the next group.
+
+**The mapping:** Each `1` cell is an Azure resource or subnet that exists, each `0` is empty space or a blocked boundary, and up/down/left/right adjacency is a permitted link. DFS/BFS starts at an unvisited `1`, marks the whole component, counts its area, and updates the maximum seen so far. The key insight is that the problem is not counting all resources—it is finding the largest connected Azure component by fully exhausting one component before starting another.
+
 
 ## Approach
 

@@ -19,7 +19,11 @@ amount = 0, coins = [anything]  ->  1    # one way: pick nothing
 
 ## Real-World Analogy
 
-Socho cashier ko exactly ₹5 ka change banana hai, paas me ₹1, ₹2, ₹5 ke unlimited sikke. Sawaal: **kitne alag tareeke** se ban sakta hai — par `2+1+1+1` aur `1+2+1+1` ko **same** ginna hai (order matter nahi karta). Order ka double-counting rokne ka trick: **ek-ek coin denomination ko poora process karo phir agli pe jao**. Yaani "pehle decide karo ₹1 sikke kitne use karne hain (har possible count), phir ₹2 ke saath sab combos, phir ₹5". Is "outer loop coins, inner loop amount" order se har combination exactly ek baar hi count hoti hai — kyunki coins ek fixed sequence me consider hote hain.
+**What Azure Cost Management is:** Azure Cost Management helps teams monitor, analyze, and plan cloud usage so deployments stay within budget and capacity expectations. A common planning question is, "Using only approved Azure VM SKUs, how many deployment mixes can satisfy this exact vCPU target?" Each SKU has a vCPU size, and you may use multiple instances of the same SKU.
+
+**What SKU-based capacity planning is, and why it's used:** Approved-SKU planning restricts architects to known VM sizes so cost, quota, security, and support policies remain predictable. Counting combinations matters because `2 + 4` vCPUs and `4 + 2` vCPUs are the same deployment mix, not two different architectures. Processing SKUs in a fixed order prevents the same mix from being counted again just because the instances were listed differently.
+
+**The mapping:** Rows are the Azure VM SKU types allowed so far, columns are target vCPU totals, and each cell counts valid mixes for that partial catalog and budget. "Skip this SKU" comes from the row above, while "use one more of this SKU" comes from the same row at a smaller vCPU total because a SKU can repeat. The key insight is that Coin Change II counts unordered combinations, so the DP must choose by coin/SKU type order rather than by the sequence in which instances are added.
 
 ## Approach
 

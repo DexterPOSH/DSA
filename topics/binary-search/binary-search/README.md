@@ -14,8 +14,11 @@ nums = [-1, 0, 3, 5, 9, 12], target = 2   ->  -1
 
 ## Real-World Analogy
 
-Socho ek **dictionary** me word dhoond rahe ho. Tum page 1 se ek-ek page nahi palatte. Tum seedha **beech me kholte ho** — agar tumhara word us page se aage aata hai (alphabetically), to aadha dictionary (left half) bhul jao, aage wale half me dekho. Phir us half ke beech me kholo, phir uske... har baar **search space aadha** kat jaata hai. 1000 pages? Sirf ~10 jumps me word mil jaata hai. Yahi binary search hai — sorted data pe "beech me dekho, aadha kaato".
+**What Azure Cosmos DB is:** Azure Cosmos DB is Microsoft's globally distributed NoSQL database for applications that need low-latency reads and writes at scale. Data is stored as documents/items, and queries are charged in request units (RUs), so avoiding unnecessary reads matters. A sorted index lets Cosmos DB answer a lookup by navigating the ordered keys instead of scanning every item.
 
+**What a range index is, and why it's used:** A Cosmos DB range index keeps comparable property values, like numbers or strings, in an ordered index structure that supports equality, range filters, and ordered queries. It exists because a point query such as `age = 42` or a range query such as `age > 42` should not burn RUs by checking every document. Since the index keys are sorted, one comparison can prove that an entire lower or upper slice cannot contain the target.
+
+**The mapping:** The sorted `nums` array is the Azure Cosmos DB range index, `lo` and `hi` are the current slice of indexed keys, and `mid` is the key we probe. If `nums[mid]` equals the target, the document is found; if it is smaller, every key to the left is too small, so `lo = mid + 1`; if it is larger, every key to the right is too large, so `hi = mid - 1`. The key insight is that sorted order turns one comparison into permission to discard half the search space.
 ## Approach
 
 Pattern: **classic binary search** — do pointers `lo` aur `hi` jo search window ke ends mark karte hain. Har step me `mid` nikaalo, target se compare karo, aur ek half discard kar do.

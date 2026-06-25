@@ -26,15 +26,11 @@ wd.search("b..")   -> True    # "b.." matches bad
 
 ## Real-World Analogy
 
-Socho ek **crossword puzzle ka clue** hai: `_ a d` — pehla letter blank, baaki "ad".
-Agar tumhare paas ek normal dictionary (trie) ho, to fixed letters pe to seedha
-chalo, par jahan **blank `_`** aaye wahan tum **saari possible branches try karte
-ho** — `a` wali branch dekho, `b` wali, `c` wali... jis bhi branch se aage poora
-pattern match ho gaya, answer mil gaya.
+**What Azure Cognitive Search is:** Azure Cognitive Search is Azure's managed search engine for building indexes over application content and querying them with full-text, filtered, and pattern-based searches. Instead of reading every document at query time, Azure uses the index's term structure to jump directly to candidate terms. That makes it a good analogy for a word dictionary that must answer many searches after words are added.
 
-Yahi trie + recursion ka core hai: fixed char pe **ek hi raasta** lo, `.` pe **saare
-children pe ek saath ghuso** (branching search). Ek branch successful hua to turant
-`True` return karo — baaki dekhne ki zaroorat nahi.
+**What wildcard query matching is, and why it's used:** Azure Cognitive Search supports wildcard-style term queries in its full Lucene query syntax, such as a single-character wildcard (`?`) when one character is unknown. Our problem uses `.` for that same idea: exactly one unknown letter, not zero or many. Wildcards exist because users often know a word's shape but not every character; the search engine can follow fixed letters narrowly and branch only where the unknown slot appears, pruning branches that cannot finish the pattern.
+
+**The mapping:** `addWord(word)` builds the Azure-like term index as a trie. During `search`, a literal character is one exact child edge, while `.` is the wildcard slot that fans out to every child at that depth and runs DFS on each possibility. When the pattern is consumed, `is_end` confirms a stored word really ends there; the key insight is that wildcard search is normal trie traversal until an unknown character forces controlled branching.
 
 ## Approach
 

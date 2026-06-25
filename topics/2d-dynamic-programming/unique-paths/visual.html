@@ -147,11 +147,11 @@
 <body>
 <div class="wrap">
   <h1>Unique Paths — <span>filling the DP grid</span> cell by cell</h1>
-  <p class="subtitle">A robot moves only <b>right</b> or <b>down</b>. Count distinct paths from top-left to bottom-right.</p>
+  <p class="subtitle">A route moves only <b>right</b> or <b>down</b>. Count distinct paths from top-left to bottom-right.</p>
 
   <div class="analogy">
-    <h3>🤖 Analogy: one-way city streets</h3>
-    <p>Har intersection tak pahunchne ke tareeke = (upar wale corner ke tareeke) + (left wale corner ke tareeke). Robot sirf wahin se aa sakta hai. Bas har cell ko apne <b>top + left</b> ka sum bana do.</p>
+    <h3>🌐 Analogy: Azure regional routing grid</h3>
+    <p>Azure Virtual WAN can model allowed routes across regions as a grid with only east/south hops. Each cell's route count is cached from its north and west neighbors, exactly like <code>dp[r][c] = top + left</code>.</p>
   </div>
 
   <div class="problem">

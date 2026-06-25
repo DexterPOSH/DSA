@@ -357,14 +357,12 @@
 
   <!-- Analogy -->
   <div class="analogy">
-    <div class="analogy-icon">🚪</div>
+    <div class="analogy-icon">🔑</div>
     <div class="analogy-body">
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        A <strong>bouncer at a club</strong> checks each arriving guest's name against a list.
-        The first time a name appears, they let the person in and note it down.
-        The moment they see a name that's <em>already on the list</em>, they know
-        there's a duplicate — no need to read the rest of the queue.
+        Azure Cache for Redis can use <code>SETNX</code> as a hash-set check for VM IDs.
+        The first write records the key; if the key already exists, the duplicate is found immediately.
       </div>
     </div>
   </div>

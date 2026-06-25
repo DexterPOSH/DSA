@@ -93,13 +93,10 @@
   <h1>Generate Parentheses &mdash; <span>Backtracking Stack</span></h1>
 
   <div class="analogy">
-    <div class="icon">🌳</div>
+    <div class="icon">🧱</div>
     <div>
       <div class="label">Real-world analogy</div>
-      <p>Build the string one char at a time with two rules: add <code style="color:#ffd479">(</code>
-      only while <strong>open &lt; n</strong>, add <code style="color:#ffd479">)</code> only while
-      <strong>close &lt; open</strong>. The path itself is a <strong>stack</strong> — push a char,
-      recurse, then <strong>pop (backtrack)</strong> to try the other branch.</p>
+      <p>Building combinations is like composing Azure ARM/Bicep nested deployments: open a child scope only while quota remains, close only when a scope is active. Push a scope, recurse into it, then <strong>pop</strong> back to try a sibling.</p>
     </div>
   </div>
 

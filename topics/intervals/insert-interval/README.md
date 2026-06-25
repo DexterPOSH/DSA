@@ -17,16 +17,11 @@ intervals = [[1,2],[3,5],[6,7],[8,10],[12,16]], newInterval = [4,8]
 
 ## Real-World Analogy
 
-Socho ek **calendar** hai jisme meetings already pari hain, time ke order me, koi
-overlap nahi. Ab boss ek nayi meeting de deta hai `[4,8]`. Tum upar se neeche scan
-karte ho:
+**What Azure Update Manager is:** Azure Update Manager is Azure's service for assessing, scheduling, and orchestrating OS updates across Azure VMs, on-prem machines, and multicloud servers connected through Azure Arc. Instead of patching whenever an update appears, operators define controlled maintenance periods so changes happen during approved windows with predictable impact.
 
-- Jo meetings naye block ke **poori tarah pehle** khatam ho jaati hain (`end < newStart`) → unhe waise hi rakh do, koi tension nahi.
-- Jo meetings naye block ko **touch ya overlap** karti hain → unhe naye block ke
-  saath **chipka do (merge)** — start ka minimum lo, end ka maximum.
-- Jo meetings naye block ke **poori tarah baad** shuru hoti hain (`start > newEnd`) → bachi hui sab waise ki waise add kar do.
+**What a maintenance window is, and why it's used:** A maintenance window is a start/end block during which updates are allowed to run for a target set of machines. Keeping these windows sorted and non-overlapping gives operators a clean timeline: past windows stay untouched, overlapping approvals become one larger maintenance period, and future windows remain in order. This prevents the same fleet from being represented by duplicate patch windows and makes the schedule easy to reason about.
 
-Ek hi pass, kyunki list already sorted hai.
+**The mapping:** The existing Azure Update Manager schedule is the sorted interval list, and the incoming approval is `newInterval`. Copy every window that ends before the new one starts, merge every window that overlaps it by taking the earliest start and latest end, then insert the merged block before the first future window. The key insight is that sorted, non-overlapping Azure maintenance windows make all conflicts with the new window contiguous, so one left-to-right pass is enough.
 
 ## Approach
 

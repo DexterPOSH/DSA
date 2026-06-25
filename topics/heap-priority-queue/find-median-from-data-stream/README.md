@@ -20,11 +20,11 @@ addNum(3)            findMedian() -> 2.0
 
 ## Real-World Analogy
 
-Socho ek **seesaw (balance scale)** hai. Left side pe **chhoti aadhi** numbers baithi hain, right side pe **badi aadhi**. Median hamesha bilkul **beech** me hota hai — yaani seesaw ke pivot pe.
+**What Azure Stream Analytics is:** Azure Stream Analytics is Azure's real-time analytics service for processing continuous event streams from sources like Event Hubs, IoT Hub, and Azure Monitor telemetry. It lets teams compute live operational metrics such as latency, throughput, and error trends as data arrives. For a live median, the system needs to know the middle of the stream without re-sorting all historical values on every query.
 
-Trick: left side ko aise rakho ki uska **sabse bada** element easily mile (uska top), aur right side ka **sabse chhota** element easily mile. Beech ke do candidates yahi hain. Har naya number aane par usse sahi side pe daalo, phir **dono sides ko balance** karo taaki size me 1 se zyada farak na ho. Median = ya to bhaari side ka top (odd total), ya dono tops ka average (even total).
+**What stateful streaming median aggregation is, and why it's used:** A stateful streaming aggregation keeps compact, continuously updated state so each incoming metric can be incorporated quickly. For an exact median, the useful state is two balanced halves: the lower half needs fast access to its maximum, and the upper half needs fast access to its minimum. This exists because the median is determined only by the boundary between the halves, not by the full sorted order of every value.
 
-"Left ka max chahiye" = **max-heap**. "Right ka min chahiye" = **min-heap**. Bas dono ko balanced rakhna hai.
+**The mapping:** The `small` max-heap is the lower half of Azure Stream Analytics-style latency values, and the `large` min-heap is the upper half. `addNum` routes the new value, fixes any cross-boundary ordering issue, then rebalances so the heaps differ in size by at most one. `findMedian` reads one or two heap tops. The key insight is that if the two halves are balanced and ordered, their boundary is the median, so queries become O(1).
 
 ## Approach — two heaps
 

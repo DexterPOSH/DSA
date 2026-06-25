@@ -111,8 +111,8 @@
   <div class="subtitle">Binary-search a cut on the shorter array; the cut on the other is derived so the left half holds exactly half the elements.</div>
 
   <div class="analogy">
-    <h3>Real-world analogy</h3>
-    <p>Ek <b>kainchi (partition line)</b> dono sorted arrays ko ek saath kaat-ti hai: <code>A</code> me <code>i</code> elements left, <code>B</code> me <code>j</code> left — aise ki left side me exactly aadha total aaye. Cut "clean" tab hai jab left ka max ≤ right ka min, <b>dono taraf</b> (<code>Aleft ≤ Bright</code> aur <code>Bleft ≤ Aright</code>). Chhoti array pe binary search se <code>i</code> slide karo.</p>
+    <h3>📊 Analogy: Azure Cosmos DB sorted partition percentile</h3>
+    <p>An <b>Azure Cosmos DB query over two sorted physical partitions</b> can find a global median without fully merging both streams. Binary-search the cut in the smaller partition, derive the cut in the other, and validate that the left boundary values are no greater than the right boundary values.</p>
   </div>
 
   <div class="problem">

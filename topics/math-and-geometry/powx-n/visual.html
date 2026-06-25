@@ -141,12 +141,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Pow(x, n) — climb the <span>squaring ladder</span></h1>
+  <h1>Pow(x, n) — use <span>exponent halving</span></h1>
   <p class="subtitle">Compute x<sup>n</sup> in O(log n) by reading n's binary bits and squaring as we go.</p>
 
   <div class="analogy">
-    <h3>🪜 Squaring-ladder analogy</h3>
-    <p>Har step pe <code>x</code> ko <b>square</b> karo: x → x² → x⁴ → x⁸ … exponent har baar <b>double</b>. <code>n</code> ke binary me jahan bit <b class="amb">1</b> ho, wahan current rung ko answer me multiply karo. <code>13 = 1101 = 8+4+1</code> → <code>x¹³ = x⁸·x⁴·x¹</code>.</p>
+    <h3>📈 Azure autoscale analogy</h3>
+    <p>An Azure VM Scale Sets planner can test powers-of-two capacity tiers instead of one unit at a time. Fast exponentiation does the same: square the current factor, halve <code>n</code>, and apply that tier only when the binary bit is <b class="amb">1</b>.</p>
   </div>
 
   <div class="problem">

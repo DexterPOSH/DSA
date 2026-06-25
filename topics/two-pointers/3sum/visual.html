@@ -115,13 +115,11 @@
   <h1>3Sum &mdash; <span>Fix an Anchor</span>, Two-Pointer the Rest</h1>
 
   <div class="analogy">
-    <div class="analogy-icon">⚓</div>
+    <div class="analogy-icon">📊</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Ek number ko <strong>anchor</strong> (a) bana ke fix karo, fir baaki sorted array me
-        <strong>Two Sum II wala taraazu</strong> chalao &mdash; do aise numbers dhundo jinka sum = <code>-a</code>.
-        Sorted hone se duplicate triplets skip karna bhi aasaan.
+        In Azure Data Explorer, sort telemetry deltas, fix one delta as the query anchor, then run a two-cursor range scan for two remaining values that sum to <code>-a</code>. Sorted order makes pointer moves predictable and keeps duplicate triplets adjacent for skipping.
       </div>
     </div>
   </div>

@@ -21,8 +21,11 @@ target = 13   ->  False
 
 ## Real-World Analogy
 
-Dekho, woh do conditions ka matlab hai: agar tum matrix ki saari rows ko **end-to-end jod do, to ek single fully-sorted list** ban jaati hai — `[1,3,5,7,10,11,16,20,23,30,34,60]`. Yeh ek **library ki shelf** jaisa hai jahan books strictly serial-number order me lagi hain, bas alag-alag racks (rows) me. Tumhe pata hai book #16 kis rack me, kis position pe hogi — bina poora ghoome. Bas ek sorted list pe binary search, lekin index ko 2D coordinates me decode kar lena hai.
+**What Azure Cosmos DB is:** Azure Cosmos DB is a distributed NoSQL database that partitions data for scale while indexing items inside each partition for fast lookup. A query often has two levels of narrowing: route to the relevant partition key range, then use the local index to find the item. That keeps a lookup from becoming a scan across every partition and every document.
 
+**What a two-level index seek is, and why it's used:** A two-level seek means the router first uses ordered partition-range metadata to choose the right shard of data, then the storage engine uses that shard's index to seek to the position inside it. It exists because distributed databases need both global routing and local lookup efficiency. When each partition range starts after the previous one ends, the ranges form one globally ordered view even though the data is physically grouped.
+
+**The mapping:** Each matrix row is an Azure Cosmos DB partition range, each column position is an offset inside that range, and the row-major rule makes all cells one virtual sorted index. Binary search probes a flat `mid`, decodes it with `row = mid // n` and `col = mid % n`, then compares `matrix[row][col]` with the target. The key insight is that you do not need to flatten the matrix; index arithmetic gives the same ordered seek while letting each comparison discard half of the virtual index.
 ## Approach
 
 Pattern: **binary search on a flattened virtual 1D array** — hum matrix ko physically flatten nahi karte (waste of space), bas index `mid` (0 se `m*n - 1`) ko on-the-fly row/col me convert karte hain:

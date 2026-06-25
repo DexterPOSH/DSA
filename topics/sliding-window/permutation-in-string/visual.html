@@ -74,14 +74,11 @@
   <h1>Permutation in String &mdash; <span>Fixed Window Anagram Check</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">🧺</div>
+    <div class="analogy-icon">🔍</div>
     <div class="analogy-body">
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        <strong>s1</strong> ek recipe hai with fixed quantities. Ek
-        <strong>fixed-size basket</strong> (window = len(s1)) ko s2 pe slide karo.
-        Har position pe poocho: basket ke counts recipe ke counts se bilkul match karte?
-        Order matter nahi — sirf counts.
+        Azure Stream Analytics can scan an Event Hubs stream with a fixed-size window looking for a required event-count signature. Each hop adds one event and expires one; when window counts match the signature, the permutation exists.
       </div>
     </div>
   </div>

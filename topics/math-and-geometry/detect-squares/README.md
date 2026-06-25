@@ -25,19 +25,11 @@ count([14, 8])   ->  0     # no matching square
 
 ## Real-World Analogy
 
-Socho ek **graph paper** pe pins thok rahe ho. Koi tumhe ek query pin `(qx, qy)` deta hai
-aur poochta hai: "is pin ko ek corner maan ke, kitne perfect (axis-aligned) square ban sakte
-hain baaki thoke gaye pins se?"
+**What Azure Maps is:** Azure Maps is Azure's geospatial service for building map, routing, search, and location-aware experiences. Apps can send point locations such as GPS pings or asset positions and ask spatial questions quickly. For this problem, the important idea is not drawing a map; it's keeping coordinate data organized so a query point can be matched against other exact points.
 
-Smart move: ek axis-aligned square ka **diagonally opposite corner** hi sab kuch decide kar
-deta hai. Agar query corner `(qx, qy)` hai aur diagonal corner `(px, py)` hai, to square hone
-ke liye us diagonal ka **horizontal aur vertical span barabar** hona chahiye —
-`|px - qx| == |py - qy|` aur dono non-zero (warna line ban jaayegi, square nahi). Diagonal fix
-ho gaya to baaki **do corners apne-aap** decide ho jaate hain: `(qx, py)` aur `(px, qy)`. Bas
-ginna hai kitni baar wo do corners pehle add hue.
+**What coordinate-indexed geofence checking is, and why it's used:** A geofence is a virtual boundary around a real-world area, and Azure Maps-style location workflows need fast ways to decide which stored points line up with that boundary. Indexing events by exact coordinate and also by x-coordinate avoids scanning every location every time a square-shaped boundary is tested. Duplicate pings at the same coordinate are kept as counts because repeated events at a corner create multiple valid square combinations.
 
-To strategy: har **same column** wale point `(qx, py)` ko diagonal candidate ki tarah dekho,
-phir check karo baaki teen corners exist karte hain ya nahi, aur unke counts multiply kar do.
+**The mapping:** `add(point)` stores Azure Maps location-event counts by coordinate, while `count(qx, qy)` treats the query point as one square corner. Every stored point in the same x-column chooses a vertical side length; once that length is known, the two possible horizontal columns are forced, and hash lookups check the other two corners. Multiplying the three corner counts accounts for repeated events, and the key insight is that one aligned corner fixes the entire square, so coordinate counts make the search fast.
 
 ## Approach
 

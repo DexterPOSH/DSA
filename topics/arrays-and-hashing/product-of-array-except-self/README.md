@@ -15,18 +15,21 @@ output = [24, 12, 8, 6]
 
 ## Real-World Analogy
 
-Socho ek classroom me bachche ek line me khade hain, har ek ke haath me ek number. Har bachche ko ek aisa badge chahiye jis pe likha ho **"meri left ki taraf ke sabka product × meri right ki taraf ke sabka product"** — yaani mujhe chhod ke sabka product. Ab teacher do baar walk karti hai. **Pehli walk left-se-right:** har bachche ke kaan me whisper karti hai "tujhse pehle wale sabka product itna hai" (prefix product). **Doosri walk right-se-left:** ab whisper karti hai "tere baad wale sabka product itna hai" (suffix product) aur badge pe dono ko multiply kar deti hai. Bas — kisi ka apna number kabhi badge me nahi aata, aur division ki zaroorat hi nahi padi. Do passes, har bachche ka jawab tayyar.
+**What Azure Data Factory/Synapse pipeline processing is:** Azure Data Factory orchestrates data movement and transformation pipelines, while Azure Synapse runs large-scale analytics jobs over ordered datasets. Together, they are often used to process rows in a defined order and write derived columns for downstream consumers. For this problem, each row needs context from everything before it and everything after it, but not from itself.
 
+**What an ordered aggregate pass is, and why it's used:** An ordered aggregate pass walks a partition in sequence and carries a running value, such as a cumulative total or product, from one row to the next. Pipelines use this pattern when a row's output depends on neighboring history without needing an expensive self-join for every row. Running one pass forward and one pass backward also avoids division, which matters when zeros make division-based shortcuts unsafe.
+
+**The mapping:** The forward Azure-style pass writes the product of all numbers to the left of each index; the backward pass multiplies in the product of all numbers to the right. Since the current row is skipped in both carried values, its own number never contaminates its answer. The key insight is to split "everything except me" into two ordered aggregates — prefix and suffix — then combine them in place.
 ## Approach
 
-Brute force me har `i` ke liye baaki sab multiply karte = O(n²). Division use kar lo to total product / nums[i] — par **zero ke saath fatega** aur problem ne division mana kiya hai.
+In brute force, for each `i` you multiply every other element = O(n²). You might think of using division with total product / nums[i] — but that **breaks when zeros are present**, and the problem forbids division.
 
 **Optimal — prefix × suffix products** (O(n) time, O(1) extra space):
 
-Har `output[i]` = (i se pehle sab ka product) × (i ke baad sab ka product). Do passes:
+Each `output[i]` = (product of everything before `i`) × (product of everything after `i`). Use two passes:
 
-1. **Left-to-right:** `output[i]` me i ke **left** ka running product bhar do.
-2. **Right-to-left:** ek `suffix` variable rakho, `output[i]` ko us suffix se multiply karo, phir suffix update karo.
+1. **Left-to-right:** store the running product of everything to the **left** of `i` in `output[i]`.
+2. **Right-to-left:** keep a `suffix` variable, multiply `output[i]` by that suffix, then update the suffix.
 
 ```python
 def product_except_self(nums):
@@ -46,24 +49,24 @@ def product_except_self(nums):
     return output
 ```
 
-Output array ko hi prefix store karne ke liye reuse karte hain, isliye extra space O(1) (output ko nahi ginte). Pattern: **prefix/suffix accumulation**.
+Reuse the output array to store prefixes, so extra space is O(1) (the output array does not count). Pattern: **prefix/suffix accumulation**.
 
 ## Complexity
 
-- **Time:** O(n) — sirf do linear passes, koi nested loop nahi.
-- **Space:** O(1) extra — output array ke alawa sirf do scalar variables (`prefix`, `suffix`). (Output array count nahi hota.)
+- **Time:** O(n) — just two linear passes, with no nested loop.
+- **Space:** O(1) extra — only two scalar variables (`prefix`, `suffix`) besides the output array. (The output array does not count.)
 
 ## Common Pitfalls
 
-- **Division use karna** — explicitly banned, aur array me **zero** ho to crash/galat (kis se divide karoge?). Prefix/suffix approach zero ko naturally handle karta hai.
-- **Suffix pass me output reset kar dena** — second pass me `output[i] *= suffix` karo (multiply), `=` nahi — warna pehle pass ka prefix mit jaayega.
-- **prefix/suffix ko 1 se shuru na karna** — multiply ka identity `1` hai. `0` se shuru karoge to sab zero ho jayega.
-- **Extra prefix/suffix arrays banana** — chalta hai par O(n) space leta hai; output array ko reuse karke O(1) extra me ho jaata hai.
-- **Single suffix variable ki jagah array** — beginner aksar do full arrays banate hain; ek running scalar kaafi hai.
+- **Using division** — it is explicitly banned, and if the array contains **zero**, division breaks or gives the wrong result. The prefix/suffix approach handles zeros naturally.
+- **Resetting output during the suffix pass** — in the second pass, use `output[i] *= suffix` (multiply), not `=`; otherwise, you erase the prefix from the first pass.
+- **Not starting prefix/suffix at 1** — the multiplicative identity is `1`. If you start at `0`, everything becomes zero.
+- **Building extra prefix/suffix arrays** — it works, but costs O(n) space; reusing the output array keeps extra space at O(1).
+- **Using an array instead of a single suffix variable** — beginners often build two full arrays, but one running scalar is enough.
 
 ## When to Use This Pattern
 
-Jab har index ke liye answer **"is index ko chhod ke baaki sab ka aggregate"** ya **"left ka kuch combined with right ka kuch"** ho — socho **prefix + suffix scan**. Range products/sums, "running totals from both ends", "har position pe before-and-after info chahiye" — ye sab do directional passes se O(n) me ho jaate hain.
+When each index needs **"the aggregate of everything except this index"** or **"some left-side information combined with some right-side information"** — think **prefix + suffix scan**. Range products/sums, running totals from both ends, and before-and-after information at each position all become O(n) with two directional passes.
 
 ## Visual
 

@@ -22,17 +22,11 @@ words = ["oath","pea","eat","rain"]
 
 ## Real-World Analogy
 
-Socho ek **Boggle board** hai aur tumhare paas ek lambi word-list. Naive tareeka:
-har word ke liye poora board pe alag-alag DFS chalao — par agar 10,000 words hain
-aur bahut saare same prefix se start hote hain (`"app"`, `"apple"`, `"apply"`), to
-tum baar-baar wahi `a→p→p` raasta dobara explore karoge. **Bekaar mehnat.**
+**What Azure AI Content Safety is:** Azure AI Content Safety is Azure's moderation service for detecting harmful or policy-violating content in text and images. In a real content pipeline, OCR can turn text inside an image into characters or tokens that need to be checked before the content is published. Azure can also use custom blocklists so teams can catch organization-specific prohibited terms, not just broad safety categories.
 
-Ab socho saare words ko ek **single trie** me daal do. Ab board pe sirf **ek hi DFS**
-chalao, par har step pe trie ko saath-saath neeche le jao. Board ka current letter
-agar trie node ke children me hai tabhi aage badho — **warna turant ruk jao** (us
-direction me koi word ban hi nahi sakta). Trie tumhara "saare words ek saath" wala
-GPS ban jaata hai: ek traversal me poori word-list check ho jaati hai, aur dead
-directions pehle hi kat jaate hain.
+**What trie-backed blocklist scanning is, and why it's used:** A blocked-term dictionary stores every term the moderation pipeline must detect. If OCR text is arranged like a grid, checking each blocked word separately from each cell would repeat a huge amount of work, especially when terms share prefixes. A trie-backed scan reuses those prefixes: as Azure explores neighboring OCR cells, the current trie node tells whether the path is still a possible blocked term, and a missing child means that path can be pruned immediately.
+
+**The mapping:** The `words` list is Azure's custom blocklist, and building the trie stores all blocked terms in one shared prefix structure. The `board` is the OCR grid; DFS starts from each cell, moves to neighboring cells, marks cells as visited so one OCR cell is not reused in the same term, and carries a trie pointer along the path. When a trie child is missing we stop early, and when an end marker is reached we report the word; the key insight is that trie prefix pruning lets one grid traversal find all target words instead of running a separate search for every word.
 
 ## Approach
 

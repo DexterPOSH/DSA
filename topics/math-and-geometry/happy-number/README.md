@@ -19,7 +19,11 @@ n = 2   ->  False   (4 -> 16 -> 37 -> 58 -> 89 -> 145 -> 42 -> 20 -> 4 -> ... lo
 
 ## Real-World Analogy
 
-Socho tum ek city me ghoom rahe ho aur har chauraahe pe ek fixed rule batata hai ki **agla kahaan jaana hai** (digit-square-sum). Do hi possibilities hain: ya to tum manzil "1" pe pahunch jaaoge (happy), ya phir ek **roundabout me phans jaaoge** jahaan se baar-baar wahi chauraahe aate rehte hain (loop, never reaching 1). Sawaal sirf yeh hai: kya tum kabhi pehle dekhe hue chauraahe pe **dobara** aa gaye? Agar haan — tum ek cycle me ho, 1 kabhi nahi milega. Yeh exactly **cycle detection** hai, jaise linked list me.
+**What Azure Durable Functions is:** Azure Durable Functions is Azure's serverless workflow service for long-running orchestrations. It coordinates functions across waits, retries, timers, and external calls while persisting enough history to recover if a worker restarts. A durable workflow moves from one deterministic state to the next until it reaches a terminal state.
+
+**What deterministic orchestration replay is, and why it's used:** Durable Functions replays orchestration history to rebuild workflow state instead of keeping everything only in memory, so orchestrator logic must behave deterministically. If the same state transition keeps reappearing, the workflow is cycling through history rather than making progress toward success. Replay exists to make Azure workflows reliable and resumable, and loop detection tells you when a deterministic process will never reach its success state.
+
+**The mapping:** The number `n` is the Azure orchestration state, and replacing it with the sum of squared digits is the deterministic transition to the next state. Reaching `1` is the terminal success state; seeing a previous number again means the workflow is stuck in a cycle. Floyd's slow and fast pointers act like two replay cursors moving through the same state history, and the key insight is that a deterministic process either reaches `1` or repeats, so a cycle proves the number is not happy without storing every state.
 
 ## Approach
 

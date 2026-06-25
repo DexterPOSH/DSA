@@ -16,7 +16,12 @@ In graph terms: the question is simply **"does this directed graph have a cycle?
 
 ## Real-World Analogy
 
-Socho tum subah ready ho rahe ho. "Shoes pehnne se pehle socks pehno", "socks se pehle pant pehno" — ye sab **dependencies** hain. Jab tak chain ek direction me chalti hai, koi dikkat nahi: ek valid order nikal aata hai. Lekin agar koi keh de "A se pehle B" aur saath hi "B se pehle A" — to tum **kabhi shuru hi nahi kar paoge**. Yeh circular dependency hi cycle hai. Course Schedule basically poochta hai: kya is dependency graph me koi aisa deadlock loop hai?
+**What Azure Resource Manager is:** Azure Resource Manager (ARM) is Azure's control-plane deployment system, and Bicep is the language many teams use to describe ARM deployments. A resource often cannot exist by itself: a VM needs a NIC, a NIC needs a subnet, and an app may need an identity or storage account. ARM uses that dependency graph to decide what can deploy now and what must wait.
+
+**What `dependsOn` cycle detection is, and why it's used:** `dependsOn` declares that one Azure resource cannot start until another resource exists, and ARM can also infer dependencies from references. Cycle detection exists because circular waits make deployment impossible: if a storage account waits for a function app while that function app waits for the storage account, neither can ever be first. ARM/Bicep must reject that loop instead of hanging or choosing an invalid deployment start point.
+
+**The mapping:** Each course is an Azure resource, and each prerequisite is a `dependsOn` edge. Course Schedule asks whether every resource can eventually be processed by repeatedly removing nodes with no pending prerequisites; if some nodes never become available, they are trapped in a dependency cycle. The key insight is that we do not need the actual deployment order here—we only need to prove the graph can be fully unlocked, which is exactly proving it is acyclic.
+
 
 ## Approach
 

@@ -9,8 +9,11 @@ Given two strings `s` and `t`, return `True` if `t` is an anagram of `s`, and `F
 
 ## Real-World Analogy
 
-Two bags of **Scrabble tiles**. Dump both bags on the table and count each letter. If bag A has three E's, one R, and one T — and bag B has the exact same counts — they're anagrams. You don't care about order, just that the inventory matches.
+**What Azure Cache for Redis is:** Azure Cache for Redis is Azure's managed in-memory Redis service, commonly used for fast shared state such as counters, session data, rate limits, and caches. It is useful when many tiny updates need to be recorded quickly without rewriting a whole document. For an anagram check, the shared state is a compact inventory of characters.
 
+**What a Redis hash counter is, and why it's used:** A Redis hash stores many small fields under one key, like `letter -> count`. `HINCRBY` atomically increments or decrements one field, so a client can update a single counter without fetching, editing, and saving the whole hash. Azure apps use this kind of counter when the exact balance matters, because it prevents lost updates and keeps the inventory cheap to maintain.
+
+**The mapping:** The first string increments the Redis-style counter for every character; the second string decrements the same counters. If the strings are true anagrams, every field returns to zero, meaning the character inventory matches even though the order changed. The key insight is that anagrams are not about sequence — they are about balanced counts, just like a Redis hash whose per-letter counters all net out.
 ## Approach
 
 **Sort approach** (O(n log n)):

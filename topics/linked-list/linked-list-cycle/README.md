@@ -17,14 +17,11 @@ Given the `head` of a singly linked list, return `True` if the list has a **cycl
 
 ## Real-World Analogy
 
-Socho do log ek **circular running track** pe daudh rahe hain — ek **slow jogger** aur ek
-**fast sprinter**. Agar track sach me circular (loop) hai, to fast wala chakkar kaat ke
-**kabhi na kabhi slow wale ko peeche se aa ke pakad lega** — dono ek hi point pe mil jaayenge.
-Lekin agar track seedha hai aur ek **dead-end (None)** pe khatam ho jaata hai, to fast wala
-pehle hi end pe pahunch ke ruk jaayega — kabhi mil nahi paayenge.
+**What Azure Virtual Network is:** Azure Virtual Network (VNet) is Azure's private networking boundary for cloud resources, and Azure Route Server can exchange routes between that VNet and network appliances using BGP. Together they let traffic follow a series of next-hop decisions across peerings, gateways, or appliances. A healthy path eventually reaches its destination instead of looping.
 
-Yahi **Floyd's Tortoise and Hare** hai: `slow` ek step, `fast` do step. Loop hai → kabhi
-`slow == fast`. Loop nahi hai → `fast` `None` pe gir jaayega.
+**What next-hop routing is, and why it's used:** Each route tells Azure where to send a packet next, such as to a virtual appliance, gateway, peered VNet, or the internet. Next hops make large networks manageable because each component only needs to know the next step, not the full physical journey. But if a route points back to an earlier hop, traffic can cycle forever unless the loop is detected.
+
+**The mapping:** Each linked-list node is one Azure routing hop, and `next` is the route's next-hop pointer. Floyd's `slow` probe follows one hop at a time while `fast` follows two; if the path loops, the faster probe must eventually lap the slower probe inside the cycle. If `fast` reaches `None`, the route terminates cleanly, so the key insight is that unequal-speed probes detect cycles without storing every visited hop.
 
 ## Approach
 

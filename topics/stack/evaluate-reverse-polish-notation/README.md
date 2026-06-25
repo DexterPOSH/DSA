@@ -21,23 +21,22 @@ In RPN the operator comes *after* its two operands, so there are no parentheses:
 
 ## Real-World Analogy
 
-Socho ek **cafeteria tray-stack** hai. Jab number aata hai, tum ek tray (us number
-ke saath) stack pe rakh dete ho. Jab koi **operator** aata hai — jaise `+` — to wo
-ek instruction hai: *"upar wali do trays utha, unpe yeh operation laga, aur result ko
-ek nayi single tray bana ke wapas rakh do"*. Bas yahi. Stack hamesha "abhi tak ke
-adhoore results" ko hold karta hai. Aakhir me jab saare tokens khatam ho jaate hain,
-stack me **theek ek tray** bachti hai — wahi final answer hai.
+**What Azure Data Factory is:** Azure Data Factory is Azure's data integration and orchestration service for building pipelines that move and transform data across systems. Pipelines contain activities, parameters, variables, and dynamic expressions so a workflow can decide file paths, filters, retries, and activity inputs at run time. That means the pipeline runtime needs a reliable way to reduce many small expression pieces into one final value.
+
+**What the expression engine is, and why it's used:** Azure Data Factory's expression language lets you call functions and operators over pipeline values such as parameters, variables, activity outputs, and trigger metadata. The engine resolves the inputs first, then applies the function/operator, because dynamic pipelines must calculate values from already-known context rather than hard-coded strings. This exists so the same pipeline can adapt to different runs while still producing one deterministic output for each expression.
+
+**The mapping:** In Reverse Polish Notation, each number token is like an already resolved Azure Data Factory value, so we push it onto the evaluator stack. When an operator token appears, the two most recent values are the complete inputs for that operation: pop right, pop left, compute `left op right`, then push the result back as a new resolved value. After all tokens, one value remains, just like one evaluated pipeline expression. The key insight is that postfix order makes parentheses unnecessary because every operator appears exactly when its operands are ready.
 
 ## Approach
 
-Pattern: **stack** of operands. RPN ki khoobsurti yeh hai ki precedence/parentheses
-ka jhanjhat hi nahi — left-to-right ek hi pass kaafi hai.
+Pattern: **stack** of operands. The beauty of RPN is that there is no precedence or
+parentheses hassle — one left-to-right pass is enough.
 
-1. Token **number** hai → stack pe **push** karo (int me convert karke).
-2. Token **operator** hai → top do operands **pop** karo. Dhyaan: pehla pop
-   **right** operand hai, dusra pop **left** (order `-` aur `/` ke liye matter karta).
-   `left op right` compute karo aur result **push** karo.
-3. Saare tokens ke baad stack pe bacha akela element = answer.
+1. If the token is a **number** → convert it to int and **push** it onto the stack.
+2. If the token is an **operator** → **pop** the top two operands. Important: the first pop
+   is the **right** operand and the second pop is the **left** operand (order matters for
+   `-` and `/`). Compute `left op right` and **push** the result.
+3. After all tokens are processed, the single remaining stack element is the answer.
 
 ```python
 def eval_rpn(tokens):
@@ -60,30 +59,30 @@ def eval_rpn(tokens):
 
 ## Complexity
 
-- **Time:** O(n) — har token exactly ek baar; push/pop O(1).
-- **Space:** O(n) — worst case sab numbers pehle aate (jaise `["1","2","3",...]`) to
-  poora stack bhar jaata before any operator.
+- **Time:** O(n) — each token is processed exactly once; push/pop are O(1).
+- **Space:** O(n) — in the worst case, all numbers appear before any operator (such as
+  `["1","2","3",...]`), so the whole stack fills up.
 
 ## Common Pitfalls
 
-- **Operand order ulta karna** — `a - b` me first-pop **b** (right) hai aur
-  second-pop **a** (left). `left - right` likhna sahi; `right - left` `-` aur `/`
-  pe galat answer dega. `+`/`*` commutative hain to wahan farak nahi padta — isliye
-  bug chhup jaata hai.
-- **Division truncation galat** — Python ka `//` *floor* karta hai (`-7 // 2 == -4`),
-  problem **toward-zero** truncation maangta (`-7 / 2 -> -3`). Isliye `int(a / b)` use
-  karo, `a // b` nahi.
-- **Negative numbers ko operator samajhna** — `"-11"` ek operand hai, operator nahi.
-  Check "is this in ops?" karo, na ki "kya pehla char `-` hai?".
-- **int conversion bhulna** — tokens strings hain; `"2" + "1"` string concat dega
-  (`"21"`), arithmetic nahi.
+- **Reversing operand order** — in `a - b`, the first pop is **b** (right) and the
+  second pop is **a** (left). Writing `left - right` is correct; `right - left` gives
+  the wrong answer for `-` and `/`. `+`/`*` are commutative, so the issue may be hidden
+  there.
+- **Wrong division truncation** — Python's `//` does *floor* division (`-7 // 2 == -4`),
+  but the problem requires **toward-zero** truncation (`-7 / 2 -> -3`). Use
+  `int(a / b)`, not `a // b`.
+- **Treating negative numbers as operators** — `"-11"` is an operand, not an operator.
+  Check "is this in ops?", not "does the first character equal `-`?".
+- **Forgetting int conversion** — tokens are strings; `"2" + "1"` performs string
+  concatenation (`"21"`), not arithmetic.
 
 ## When to Use This Pattern
 
-Jab expression evaluation, postfix/prefix parsing, ya "ek operation latest results pe
-lagao aur result wapas rakho" dikhe → **operand stack**. Cousins: infix→postfix
+When expression evaluation, postfix/prefix parsing, or "apply an operation to the
+latest results and push the result back" appears → use an **operand stack**. Cousins: infix→postfix
 (Shunting-yard), basic calculator, monotonic-stack expression problems. Cue:
-*"operator apne operands ke baad/aas-paas hai, results ko fold karna hai"* → stack.
+*"the operator appears after/near its operands, and results need to be folded"* → stack.
 
 ## NeetCode Link
 

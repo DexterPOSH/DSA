@@ -299,9 +299,11 @@
   <div class="subtitle">Knuth–Morris–Pratt finds a pattern <code style="color:#fbbf24">P</code> inside a text <code style="color:#fbbf24">T</code> in <b>O(n + m)</b> by never re-reading a text character. The trick is a precomputed <b>LPS</b> table (Longest proper Prefix that is also a Suffix). Two linked animations below: first <b>build LPS</b>, then <b>search</b>.</div>
 
   <div class="analogy">
-    <h3>Real-world analogy — proofreading a manuscript</h3>
-    <p>You're hunting for the phrase <code style="color:#fbbf24">"ABABCABAB"</code> in a long manuscript. You read along and match <code>ABAB…</code> then hit a wrong letter. The naive proofreader jumps the finger back to where the phrase started and re-reads every letter. <b>Wasteful.</b></p>
-    <p>The KMP proofreader remembers: "the part I already matched, <code>ABAB</code>, ends in <code>AB</code> — which is also how my phrase <i>begins</i>." So instead of restarting, the finger slides forward just enough that the already-confirmed <code>AB</code> lines up — and keeps reading from the <b>same spot in the manuscript</b>. The <b>LPS table is that memory</b>: for every position it records "longest already-matched prefix I can fall back to."</p>
+    <h3>Real-world analogy — Azure WAF signature scanning</h3>
+    <div class="analogy-icon">🛡️</div>
+    <div class="analogy-text">
+      <p>Azure Web Application Firewall scans a request body for a signature using a fallback table: after a partial match fails, it reuses the longest matched prefix that is also a suffix. The payload pointer keeps moving forward, just like KMP's text pointer.</p>
+    </div>
   </div>
 
   <div class="problem">

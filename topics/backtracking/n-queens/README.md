@@ -24,14 +24,11 @@ n = 4  ->  two solutions:
 
 ## Real-World Analogy
 
-Socho tum ek **seating arrangement** bana rahe ho jahan har row me exactly ek
-"diva" guest baithegi, lekin koi do divas ek doosre ko **direct line-of-sight**
-(same column ya same diagonal) me nahi dekh sakti — warna drama ho jaata. Tum
-row-by-row chalte ho: row 0 me koi safe column chuno, fir row 1 me aisa column jo
-pichli divas se clash na kare, aur aage. Agar kisi row me **koi safe column nahi
-bacha**, to seating dead-end hai — **pichli diva ko utha ke (backtrack)** dusri
-seat pe baithao aur dobara try karo. Saari rows fill ho gayin → ek valid
-arrangement mila.
+**What Azure VM placement planning is:** Azure compute placement decides where VM or VM Scale Set instances land across physical infrastructure and logical failure boundaries such as Availability Zones, fault domains, and update domains. The goal is to keep an application available even if one rack, host group, or zone has a problem. A good placement is therefore not just any open spot; it must also avoid conflicts with placements already made.
+
+**What anti-affinity constraint tracking is, and why it's used:** Anti-affinity rules spread related instances so one failure or maintenance event does not take down every replica. Tracking occupied placement domains lets an Azure-style planner reject unsafe candidates immediately instead of building an invalid layout and discovering the conflict later. Fast constraint checks are the reason backtracking can explore a hard placement space without scanning the whole board every time.
+
+**The mapping:** Each queen is a VM instance, each row is the next application tier to place, and the column/diagonal sets are the Azure placement constraints already occupied. A candidate square is accepted only if it does not collide with those sets; after recursing, backtracking removes the queen and clears the markers so another domain can be tried. The key insight is that the board becomes manageable when conflicts are stored as sets and rejected before recursion.
 
 ## Approach — row-by-row placement with O(1) attack checks
 

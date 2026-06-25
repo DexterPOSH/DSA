@@ -13,15 +13,11 @@ Given the `head` of a singly linked list, reverse the list and return the new he
 
 ## Real-World Analogy
 
-Socho ek line me kuch log khade hain, aur har banda **sirf apne aage wale ke kandhe pe haath**
-rakh ke "aage" ko point kar raha hai. Tumhe poori line ulti karni hai — bina kisi ko jagah se
-hilaye, sirf haath ki direction badalni hai. Tum ek-ek karke har bande ke paas jaate ho aur
-bolte ho "ab tu peeche wale ki taraf point kar". Bas dhyaan ek hi cheez ka — agle bande ka
-haath chhodne se pehle yaad rakhna ki aage kaun tha, warna line ka baaki hissa kho doge.
+**What Azure Logic Apps is:** Azure Logic Apps is Azure's workflow automation service for building processes out of connected actions. Each workflow definition records which actions depend on other actions, so the service can run them in the right order and resume reliably. A simple straight-line workflow behaves like a linked list of actions.
 
-Yahi `next` pointer ko reassign karna hai. Teen "haath" track karne padte hain: `prev`
-(peeche wala), `curr` (jiska haath abhi ghuma rahe ho), aur `nxt` (aage wala — taaki link
-torne ke baad bhi raasta yaad rahe).
+**What `runAfter` dependency modeling is, and why it's used:** In Azure Logic Apps, `runAfter` declares that an action should wait for one or more earlier actions to finish with specific statuses, such as `Succeeded` or `Failed`. This explicit dependency model makes ordering visible in the workflow JSON and supports branching instead of hiding control flow inside code. In a simple chain, changing those dependency edges changes which action is considered next.
+
+**The mapping:** Each node is one Azure Logic Apps action, and the linked-list `next` pointer is the chain edge represented by the workflow dependency relationship. Reversing the list means walking the chain once and rewiring the current action to point back to the previous action instead of forward. Before overwriting that edge you save the original next action as `nxt`, so the key insight is to preserve the remaining chain before flipping each pointer.
 
 ## Approach
 

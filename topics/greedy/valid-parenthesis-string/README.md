@@ -18,15 +18,11 @@ every `')'` has a matching `'('` before it, and they nest correctly.
 
 ## Real-World Analogy
 
-Socho ek **accountant** ek ledger left-se-right padh raha hai jahan har `'('` ek
-"open IOU" hai aur `')'` ek IOU close karta hai. Problem ye ki har `'*'` ek
-**wildcard** hai — pata nahi open hai, close hai, ya kuch nahi. To accountant do
-counters chalata hai: **`low`** = "kam-se-kam kitne IOU abhi open ho sakte hain"
-aur **`high`** = "zyada-se-zyada kitne open ho sakte hain". Wildcard dono ko
-alag-alag direction me khींchta hai. Agar kabhi `high` negative ho gaya — matlab
-optimistic case me bhi zyada `)` aa gaye — game over. Aur end pe agar `low` `0`
-tak aa sakta hai, to ek valid interpretation exist karta hai.
+**What Azure API Management is:** Azure API Management is Azure's gateway service for publishing, securing, transforming, and observing APIs. Teams configure gateway behavior with XML-based policies for things like authentication, rate limiting, header rewrites, and backend routing. Those policy documents must remain structurally valid XML for the gateway to apply them safely.
 
+**What policy XML fragment validation is, and why it's used:** API Management policy fragments let teams reuse optional policy snippets across APIs instead of copying the same XML everywhere. During assembly, a fragment may effectively contribute an opening scope, a closing scope, or nothing depending on whether it is included and how it is parameterized. Branching through every possible expansion is expensive, so a validator can track the minimum and maximum possible number of unclosed scopes after each token.
+
+**The mapping:** `'('` is an Azure API Management opening policy scope, `')'` is a closing scope, and `'*'` is an optional fragment that could open, close, or disappear. `low` is the fewest unclosed scopes still possible, while `high` is the most; if `high` drops below zero, every interpretation has too many closings, and if `low` can be clamped to zero, extra optional closings can be treated as empty. The string is valid only when zero remains possible at the end — the key insight is to keep a feasible range instead of enumerating every fragment expansion.
 ## Approach
 
 Brute force (har `*` ke 3 choices) exponential hai. Smart greedy: ek **range

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Graph Valid Tree — connected + acyclic via Union-Find</title>
+<title>Graph Valid Tree — Azure VNet peering tree check</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -129,12 +129,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Graph Valid Tree — <span>connected</span> + <span>acyclic</span></h1>
-  <p class="subtitle">A tree needs <b>exactly n-1 edges</b>, <b>no cycle</b>, and <b>one component</b>. Union-Find checks all three in one pass.</p>
+  <h1>Graph Valid Tree — <span>Azure VNet peering tree check</span></h1>
+  <p class="subtitle">A valid VNet peering tree has <b>n-1 links</b>, <b>no peering loop</b>, and <b>one connected topology</b>. Union-Find checks all three in one pass.</p>
 
   <div class="analogy">
-    <h3>🏢 Real-world analogy: a clean org chart</h3>
-    <p>Har employee CEO tak ek hi chain se jude (<b>connected</b>), aur koi circular reporting na ho (<b>no cycle</b>). Shortcut: a tree always has <b>n-1 edges</b> — warna seedha reject.</p>
+    <h3>🌐 Azure VNet peering tree</h3>
+    <p>A VNet peering topology is a tree when every VNet is connected and no peering loop exists. With <b>n-1 links</b>, Union-Find rejects any new peering whose endpoints already share a root.</p>
   </div>
 
   <div class="panel">
@@ -147,7 +147,7 @@
     <div class="checks">
       <div class="check" id="chkCount">
         <span class="mark" id="chkCountMark">○</span>
-        <span class="txt"><b>Edge count = n-1 ?</b><span id="chkCountTxt">—</span></span>
+        <span class="txt"><b>Peering link count = n-1 ?</b><span id="chkCountTxt">—</span></span>
       </div>
       <div class="check" id="chkCycle">
         <span class="mark" id="chkCycleMark">○</span>
@@ -159,7 +159,7 @@
 
     <svg id="graph" viewBox="0 0 640 330" preserveAspectRatio="xMidYMid meet"></svg>
 
-    <div class="caption" id="caption">Pick a case above, then press <b>Next</b> to walk Union-Find over the edges.</div>
+    <div class="caption" id="caption">Pick a case above, then press <b>Next</b> to walk Union-Find over the peering links.</div>
     <div class="verdict" id="verdict"></div>
 
     <div class="controls">
@@ -172,7 +172,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>If <code>len(edges) == n-1</code> and no union ever joins two already-connected nodes, the graph is forced to be connected and acyclic — a valid tree.</p>
+    <p>If an Azure VNet topology has <code>n-1</code> peering links and no union joins two already-connected VNets, the graph is forced to be connected and acyclic — a valid peering tree.</p>
   </div>
 </div>
 
@@ -202,8 +202,8 @@ function buildSteps(c) {
     kind: 'count', parent: Array.from({length:n},(_,i)=>i), processed: [], n, edges,
     countOk, cycle: false,
     cap: countOk
-      ? `<b class="g">Edge count check:</b> <code>${edges.length} edges == n-1 = ${n-1}</code> ✓ — could still be a tree. Now run Union-Find.`
-      : `<b class="r">Edge count check:</b> <code>${edges.length} edges ≠ n-1 = ${n-1}</code> ✗ — ${edges.length > n-1 ? 'too many (must contain a cycle)' : 'too few (must be disconnected)'}. <b class="r">Not a tree</b>.`
+      ? `<b class="g">Peering count check:</b> <code>${edges.length} links == n-1 = ${n-1}</code> ✓ — could still be a peering tree. Now run Union-Find.`
+      : `<b class="r">Peering count check:</b> <code>${edges.length} links ≠ n-1 = ${n-1}</code> ✗ — ${edges.length > n-1 ? 'too many (must contain a peering loop)' : 'too few (must be disconnected)'}. <b class="r">Not a peering tree</b>.`
   });
   if (!countOk) {
     out[0].terminal = true; out[0].verdict = false;
@@ -218,7 +218,7 @@ function buildSteps(c) {
     if (ru===rv){
       out.push({ kind:'cycle', parent:[...parent], processed:processed.slice(), curEdge:i, u, v, n, edges,
         countOk:true, cycle:true, terminal:true, verdict:false,
-        cap:`Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=find(${v})=${ru}</code> — already connected! <b class="r">Cycle detected → Not a tree</b>.` });
+        cap:`Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=find(${v})=${ru}</code> — already connected! <b class="r">Peering loop detected → Not a tree</b>.` });
       return out;
     } else {
       parent[ru]=rv; processed=processed.concat(i);
@@ -230,7 +230,7 @@ function buildSteps(c) {
   // all good
   out.push({ kind:'done', parent:[...parent], processed:processed.slice(), curEdge:-1, n, edges,
     countOk:true, cycle:false, terminal:true, verdict:true,
-    cap:`All <code>${edges.length}</code> edges processed with no cycle, and <code>n-1</code> unions joined everything into <b class="g">one component</b>. <b class="g">Valid tree ✓</b>.` });
+    cap:`All <code>${edges.length}</code> peering links processed with no loop, and <code>n-1</code> unions joined every VNet into <b class="g">one component</b>. <b class="g">Valid peering tree ✓</b>.` });
   return out;
 }
 

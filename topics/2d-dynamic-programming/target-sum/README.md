@@ -16,13 +16,11 @@ nums = [1, 1, 1, 1, 1], target = 3   ->  5
 
 ## Real-World Analogy
 
-Socho tumhare paas 5 coins hain aur har coin ko ya to **left pocket** (`+`) me
-daalna hai ya **right pocket** (`-`) me. Game ye hai: end me `(left ka sum) - (right ka
-sum)` exactly `target` aana chahiye. Sawaal "kitne tareeke" ka hai — ginti karni hai,
-koi ek answer nahi. Brute force me har coin ke 2 choices → `2^n` expressions. Lekin
-dhyaan do: alag-alag sign assignments often **same running sum** pe pohochte hain. Jab
-do raaste same intermediate sum pe milte hain, aage ka kaam bilkul identical hai — to
-unhe alag-alag mat gino, ek hi count me merge kar do. Yahi DP ka core hai.
+**What Azure Synapse Mapping Data Flow is:** Azure Synapse Mapping Data Flow is a visual, Spark-backed data transformation feature for building ETL pipelines without hand-writing all the distributed processing code. It lets teams define a sequence of transformations that derive columns, aggregate values, and route records through different logic. In this analogy, each transformation contributes a capacity delta to a running resource-balance column.
+
+**What branching budget-delta transformation is, and why it's used:** A planning flow may need to evaluate scenarios where the same Azure resource delta can be treated as an increase or a decrease, such as capacity added versus capacity offset elsewhere. Branching each step into `+delta` and `-delta` explores those alternatives, while grouping by the running balance merges scenarios that become equivalent. This avoids carrying every full expression forward when only the current balance matters for the remaining transformations.
+
+**The mapping:** Each number is an Azure Synapse transformation delta, each row is one more processed delta, and each column is a possible running balance. For every existing count, the DP sends that count to both `sum + num` and `sum - num`, adding counts together when different histories land on the same balance. The key insight is that many sign assignments share the same future once their running sum matches, so the algorithm counts states by balance instead of enumerating every expression separately.
 
 ## Approach
 

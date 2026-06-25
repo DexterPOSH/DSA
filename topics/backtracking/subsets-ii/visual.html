@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Subsets II — Sort + Skip-Duplicate Recursion Tree</title>
+<title>Subsets II — Bicep Duplicate-Skip Tree</title>
 <style>
   :root {
     --bg:#1a1a2e; --panel:#16213e; --panel2:#232342; --text:#e0e0e0; --muted:#9a9ac0;
@@ -73,18 +73,18 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Subsets II — sort, then <span>skip duplicates</span> at the same level</h1>
-  <p class="subtitle">Red dashed branches are the duplicate-skip (<code>i &gt; start &amp;&amp; nums[i]==nums[i-1]</code>) that would have made repeat subsets.</p>
+  <h1>Subsets II — sort modules, then <span>skip duplicates</span> at the same level</h1>
+  <p class="subtitle">Red dashed branches are the duplicate-skip (<code>i &gt; start &amp;&amp; nums[i]==nums[i-1]</code>) that would have made repeat Azure module sets.</p>
 
   <div class="analogy">
-    <h3>🎁 Real-world analogy: two identical blue pens</h3>
-    <p>"Ek blue pen waala bag" ek hi type ka hai — kaunsa blue pen uthaaya, farak nahi. Identical items ko sort karke side-by-side rakho; same level pe doosra identical item uthane lago to <b>skip</b> — uska subset already ban chuka.</p>
+    <h3>🧩 Real-world analogy: duplicate Bicep modules</h3>
+    <p>An Azure module catalog may list two equivalent Private Endpoint modules that create the same deployment shape. Sort equivalent modules together, skip the second one at the same recursion level, and roll back each selection before trying the next unique option.</p>
   </div>
 
   <div class="panel">
     <h2>Input (sorted so duplicates sit adjacent)</h2>
     <div class="nums" id="nums"></div>
-    <div class="sortnote">Original <code>[1, 2, 2]</code> → sorted <code>[1, 2, 2]</code>. The two <code>2</code>s are highlighted amber.</div>
+    <div class="sortnote">Original <code>[1, 2, 2]</code> → sorted <code>[1, 2, 2]</code>. The two <code>2</code>s represent equivalent Azure modules and are highlighted amber.</div>
   </div>
 
   <div class="panel">
@@ -116,7 +116,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Sorting groups duplicates; <code>if i &gt; start and nums[i]==nums[i-1]: continue</code> drops the <b>sibling</b> repeat while still allowing <code>[2,2]</code> down the <i>same</i> branch.</p>
+    <p>Sorting groups equivalent Azure modules; <code>if i &gt; start and nums[i]==nums[i-1]: continue</code> drops the sibling duplicate. The same branch can still include both copies when the deployment actually needs two.</p>
   </div>
 </div>
 
@@ -237,13 +237,13 @@ function render(){
 
   const cap=$('caption'); cap.className='caption';
   if(st.type==='record'){ cap.classList.add('rec');
-    cap.innerHTML=`Enter a node → <b class="g">record</b> its subset <b class="g">[${st.recorded.join(',')}]</b>. Every node counts.`; }
+    cap.innerHTML=`Enter a node → <b class="g">record</b> its Azure module set <b class="g">[${st.recorded.join(',')}]</b>. Every node counts.`; }
   else if(st.type==='pick')
-    cap.innerHTML=`<b class="bl">Include</b> <code>${nums[st.idx]}</code> (index ${st.idx}) → recurse with <code>start=${st.idx+1}</code>.`;
+    cap.innerHTML=`<b class="bl">Include</b> module <code>${nums[st.idx]}</code> (index ${st.idx}) → recurse with <code>start=${st.idx+1}</code>.`;
   else if(st.type==='skip'){ cap.classList.add('skip');
-    cap.innerHTML=`<b class="r">SKIP</b> index ${st.idx}: <code>i &gt; start</code> and <code>nums[${st.idx}]==nums[${st.idx-1}]</code>. This branch would re-make a subset already built by its left sibling. ✂️`; }
+    cap.innerHTML=`<b class="r">SKIP</b> index ${st.idx}: <code>i &gt; start</code> and <code>nums[${st.idx}]==nums[${st.idx-1}]</code>. This branch would re-make an Azure module set already built by its left sibling. ✂️`; }
   else if(st.type==='back'){ cap.classList.add('back');
-    cap.innerHTML=`<b class="a">BACKTRACK</b> — <code>path.pop()</code> removes <code>${nums[st.idx]}</code>, try the next index.`; }
+    cap.innerHTML=`<b class="a">BACKTRACK</b> — <code>path.pop()</code> removes module <code>${nums[st.idx]}</code>, try the next index.`; }
 
   $('counter').textContent=`step ${cur+1} / ${steps.length}`;
   $('prevBtn').disabled=cur===0; $('nextBtn').disabled=cur===steps.length-1;

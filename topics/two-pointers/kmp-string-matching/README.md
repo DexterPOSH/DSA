@@ -16,12 +16,11 @@ matched.
 
 ## Real-World Analogy
 
-Tum text me pattern `"ABABC"` dhoondh rahe ho. Tum ne `"ABAB"` match kar liya,
-phir agla char mismatch. Naive bola: pattern ko 1 step slide karke poora dobara
-compare karo. Bewakoofi — kyunki tujhe pata hai last 4 chars `"ABAB"` the, aur
-uska **end `"AB"` already pattern ke start `"AB"` se match karta hai**. To pattern
-ko aise align karo ki woh `"AB"` reuse ho — comparison `"AB"` ke aage se, scratch
-se nahi. "Prefix bhi hai aur suffix bhi" — yahi KMP ka dil.
+**What Azure Web Application Firewall is:** Azure Web Application Firewall (WAF) protects web apps running behind services such as Azure Application Gateway and Azure Front Door. It inspects HTTP requests for common attack patterns like SQL injection, cross-site scripting, and protocol anomalies before traffic reaches the app. Because this happens on live request paths, scanning must be fast and avoid unnecessary rewinds.
+
+**What signature-based request scanning is, and why it's used:** WAF rules often look for malicious signatures across URLs, headers, cookies, and request bodies. Conceptually, when a partial signature matches and the next character fails, an efficient scanner should not restart the request body from the beginning; it should reuse the part of the signature that could still be a valid prefix. KMP's LPS table is that reusable fallback knowledge: it preserves security coverage while keeping request inspection linear instead of repeatedly rescanning the same bytes.
+
+**The mapping:** The Azure WAF request payload is the `text`, the malicious signature is the `pattern`, and the LPS array is the rule-engine-style fallback table. Pointer `i` over the payload never moves backward; pointer `j` over the signature either advances on matches or jumps to `lps[j - 1]` on mismatches. The key insight is to shift the pattern using what was already matched, so every request byte is processed a constant number of times.
 
 ## The LPS array (failure function) — the engine
 

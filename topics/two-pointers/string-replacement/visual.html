@@ -291,8 +291,11 @@
   <div class="subtitle">Implement <code style="color:#fbbf24">replace(orig, find, repl)</code> by hand — no <code style="color:#fbbf24">str.replace</code>, no regex. Walk a single pointer across the string, try to match <code style="color:#fbbf24">find</code> at each spot, and build a fresh result.</div>
 
   <div class="analogy">
-    <h3>Real-world analogy</h3>
-    <p>You're a <b>proofreader</b> sweeping a finger across a manuscript looking for the phrase "Fox" to swap with "Cat". At each letter you peek ahead: do the next few letters spell "Fox"? If <b>yes</b>, you write "Cat" onto a clean sheet and skip your finger <i>past</i> the whole phrase. If <b>no</b>, you copy the single letter under your finger and nudge forward by one. The clean sheet you build up is the answer.</p>
+    <h3>Real-world analogy — Azure Stream Analytics pipeline</h3>
+    <div class="analogy-icon">🔁</div>
+    <div class="analogy-text">
+      <p>An Azure Stream Analytics job reads an Event Hubs payload once and writes a cleaned output stream. On a full token match it emits the replacement and jumps past the consumed bytes; otherwise it copies one byte and advances.</p>
+    </div>
   </div>
 
   <div class="problem">

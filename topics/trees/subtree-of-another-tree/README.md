@@ -29,7 +29,11 @@ result  ->  False  # structure differs, the 0 has no counterpart
 
 ## Real-World Analogy
 
-Socho tumhare paas ek bada **family tree** hai aur ek chhota family tree — kisi cousin ka. Tum check karna chahte ho ki kya wo chhota tree, bade tree me **exactly waise hi** kahin baitha hai: same log, same parent-child rishta, bilkul wahi shape. Tum bade tree ke har person pe rukte ho aur poochte ho: "agar main yahin se neeche poora dekhun, to kya yeh hu-ba-hu wahi chhota tree banta hai?" Agar kisi ek bhi jagah perfect match mil gaya — done. Bas dhyaan rakhna: match ka matlab hai **us node se neeche ka poora peड़**, beech me se aadha-adhura nahi.
+**What Azure Landing Zone architecture is:** Azure landing zones provide reusable patterns for structuring Azure environments with management groups, subscriptions, policies, networking, and resource groups. Large estates often repeat a standard pattern for each business unit or workload. That reusable pattern can appear as a smaller hierarchy inside a much larger Azure tree.
+
+**What landing-zone pattern matching is, and why it's used:** Platform teams may need to verify that a required Azure structure exists exactly under some scope, not merely that a few similarly named resources appear. Pattern matching checks the candidate root and every descendant so governance, ownership, and layout all match the approved design. This is stronger than checking for a partial prefix or a single resource name.
+
+**The mapping:** DFS scans every node in the large Azure-like hierarchy as a possible starting scope. At each candidate, run a same-tree comparison against the desired subtree, requiring equal values and equal child structure all the way down. The key insight is that subtree detection is two problems combined: find possible roots, then prove an exact structural match.
 
 ## Approach
 

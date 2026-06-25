@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Climbing Stairs — a DP row that fills left to right</title>
+<title>Climbing Stairs — Azure scale-state DP row</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -147,19 +147,19 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Climbing Stairs — a <span>DP row</span> that fills left to right</h1>
-  <p class="subtitle">Count distinct ways to climb <b>n = 5</b> steps, taking 1 or 2 steps at a time.</p>
+  <h1>Climbing Stairs — an <span>Azure scale-state DP row</span></h1>
+  <p class="subtitle">Count distinct Azure scale workflows to reach <b>n = 5</b> capacity checkpoints using +1 or +2 resize actions.</p>
 
   <div class="analogy">
-    <h3>🪜 Real-world analogy</h3>
-    <p>Step <code>i</code> tak pahunchne ke sirf do raaste the: <b>i-1</b> se ek chhoti chhalaang, ya <b>i-2</b> se badi chhalaang. Toh <code>dp[i] = dp[i-1] + dp[i-2]</code> — seedha Fibonacci.</p>
+    <h3>☁️ Real-world analogy</h3>
+    <p>An Azure Virtual Machine Scale Set can reach capacity <code>i</code> from capacity <b>i-1</b> or <b>i-2</b> when the runbook allows one- or two-instance resize actions. Cache each capacity count, then reuse <code>dp[i-1]</code> and <code>dp[i-2]</code> to fill <code>dp[i]</code>.</p>
   </div>
 
   <div class="card">
     <div class="section-label">Step description</div>
-    <div class="step-desc" id="stepDesc">Press <b>Next →</b> to start filling the DP table.</div>
+    <div class="step-desc" id="stepDesc">Press <b>Next →</b> to start filling the Azure DP cache.</div>
 
-    <div class="section-label">dp[i] = number of ways to reach step i</div>
+    <div class="section-label">dp[i] = cached workflows to reach Azure capacity i</div>
     <div class="dp-row" id="dpRow"></div>
 
     <div class="calc-line" id="calcLine"></div>
@@ -183,7 +183,7 @@
 
   <div class="takeaway">
     <h3>💡 Key takeaway</h3>
-    <p>Har cell apne pichhle do cells ka jod hai. Bade sawaal ko chhote, already-solved sawaalon par tikaana — yahi 1-D DP ka dil hai. <b>O(n) time, O(1) space.</b></p>
+    <p>Each Azure capacity cell reuses the two cached prior capacity counts: <code>dp[i-1]</code> and <code>dp[i-2]</code>. Compute each subproblem once, cache it, and build the scale-state count left to right. <b>O(n) time, O(1) space.</b></p>
   </div>
 </div>
 
@@ -196,9 +196,9 @@
   // type: 'base' (fill base cell), 'compute' (fill dp[i] from i-1 and i-2), 'done'
   const steps = [
     { type:'base', i:0,
-      desc:'<b>Base case:</b> <code>dp[0] = 1</code>. Step 0 pe ek hi (khaali) way hota hai — tum already wahan ho.' },
+      desc:'<b>Base case:</b> <code>dp[0] = 1</code>. Capacity 0 has one empty Azure scale workflow: do nothing.' },
     { type:'base', i:1,
-      desc:'<b>Base case:</b> <code>dp[1] = 1</code>. Step 1 tak pahunchne ka ek hi tareeka — ek single step.' },
+      desc:'<b>Base case:</b> <code>dp[1] = 1</code>. Capacity 1 has one workflow: one resize action.' },
     { type:'compute', i:2 },
     { type:'compute', i:3 },
     { type:'compute', i:4 },
@@ -252,7 +252,7 @@
     }
 
     if (!active) {
-      stepDesc.innerHTML = 'Press <b>Next →</b> to start filling the DP table.';
+      stepDesc.innerHTML = 'Press <b>Next →</b> to start filling the Azure DP cache.';
     } else if (active.type === 'base') {
       const box = $('box-'+active.i);
       box.classList.remove('filled'); box.classList.add('active');
@@ -266,8 +266,8 @@
       $('box-'+(i-1)).classList.add('source');
       $('box-'+(i-2)).classList.add('source');
       stepDesc.innerHTML =
-        `<b>Compute dp[${i}]:</b> step ${i} pe pahunchne ke ways = ` +
-        `(${i-1} se aaye) + (${i-2} se aaye) = <code>dp[${i-1}] + dp[${i-2}]</code>.`;
+        `<b>Compute dp[${i}]:</b> Azure capacity ${i} can be reached from ${i-1} or ${i-2}. ` +
+        `Reuse cached counts: <code>dp[${i-1}] + dp[${i-2}]</code>.`;
       calcLine.innerHTML =
         `dp[${i}] = <span class="src">dp[${i-1}]</span> + <span class="src">dp[${i-2}]</span> ` +
         `= <span class="src">${dp[i-1]}</span> + <span class="src">${dp[i-2]}</span> ` +
@@ -276,7 +276,7 @@
       $('box-'+n).classList.remove('filled');
       $('box-'+n).classList.add('done');
       stepDesc.innerHTML =
-        `<b>Done!</b> <code>dp[${n}] = ${dp[n]}</code> — there are <b>${dp[n]}</b> distinct ways to climb ${n} steps.`;
+        `<b>Done!</b> <code>dp[${n}] = ${dp[n]}</code> — there are <b>${dp[n]}</b> distinct Azure scale workflows to reach capacity ${n}.`;
       resultBadge.textContent = `return dp[${n}] = ${dp[n]}`;
       resultBadge.classList.add('show');
     }

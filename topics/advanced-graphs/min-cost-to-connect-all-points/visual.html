@@ -60,8 +60,8 @@
   <p class="subtitle">Grow a tree one cheapest edge at a time until every point is connected. Edge weight = Manhattan distance.</p>
 
   <div class="analogy">
-    <h3>🔌 The villages-and-wires analogy</h3>
-    <p>Kuch gaon ko bijli ki taar se jodna hai, kam se kam kharch me. Ek gaon se shuru karo (cluster). Har baar cluster se <b>sabse sasti taar</b> jo kisi bahar wale gaon tak jaati hai — wahi jodo. Cluster badhta jaata hai jab tak sab andar na aa jaayein.</p>
+    <h3>🔗 The Azure backbone analogy</h3>
+    <p>Design an <strong>Azure ExpressRoute/VNet peering</strong> backbone where every region must be connected and each candidate link has a cost. Prim's algorithm grows the connected backbone by always taking the cheapest link to an unconnected region, avoiding redundant cycles.</p>
   </div>
 
   <div class="legend">
@@ -96,7 +96,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Always pulling the cheapest edge that reaches a <i>new</i> point grows a minimum spanning tree. Stale heap entries (to already-connected points) are simply skipped.</p>
+    <p>Always pulling the cheapest link that reaches a <i>new</i> node grows a minimum spanning tree, like a least-cost Azure backbone. Stale heap entries to already-connected nodes are simply skipped.</p>
   </div>
 </div>
 

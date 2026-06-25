@@ -18,9 +18,11 @@ add(4)  -> 8
 
 ## Real-World Analogy
 
-Socho ek **VIP lounge hai jisme sirf top-3 highest spenders ki seats hain**. Naya customer aata hai apne bill ke saath. Agar uska bill lounge ke sabse chhote (kamzor) member se bada hai, to wo andar aa jata hai aur sabse chhota member bahar nikal diya jaata hai — lounge hamesha exactly 3 logo ka rehta hai. Aur "kth largest" ka jawab? Wo hamesha lounge ka **sabse chhota member** hota hai — kyunki lounge me top-k log baithe hain, to unme sabse neeche wala hi kth largest hai.
+**What Azure Stream Analytics is:** Azure Stream Analytics is Azure's real-time stream-processing service for turning continuous telemetry into dashboards, alerts, and downstream outputs. In this analogy, Azure Monitor supplies live resource metrics such as VM CPU, request counts, latency, and error rates, while Stream Analytics represents the processor that updates results as each metric arrives. Together, they model a stream where every new value may change a "top k" view immediately.
 
-Wo "sabse chhota nikaalo" wala lounge ek **min-heap of size k** hai.
+**What a streaming top-k boundary is, and why it's used:** A streaming top-k dashboard only needs the largest k values seen so far, not a sorted history of every metric ever received. Keeping a bounded min-heap of size k makes the smallest value inside that top-k set instantly visible; that value is the cutoff for whether a new metric matters. This exists to keep per-event work small and memory bounded while still updating the kth-largest answer after every arrival.
+
+**The mapping:** The constructor loads the initial Azure Monitor-style metric samples into a min-heap and trims it to k values. Each `add(val)` is a new telemetry point: push it, evict the smallest if the heap grew too large, and then read `heap[0]`. The key insight is that the root is not the largest value; it is the weakest value that still qualifies for the top-k, which is exactly the kth largest so far.
 
 ## Approach
 

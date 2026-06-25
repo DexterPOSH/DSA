@@ -17,12 +17,11 @@ Given a string `s`, return the length of the **longest substring** that contains
 
 ## Real-World Analogy
 
-Socho ek **conveyor belt** pe characters aa rahe hain aur tum ek box (window) me unhe
-collect kar rahe ho — par rule ye hai ki box me **koi character do baar nahi aana
-chahiye**. Tum right side se naya character daalte jaate ho. Jaise hi koi character
-aaya jo box me pehle se hai, tum left side se characters phenkna shuru karte ho — tab
-tak jab tak wo duplicate nikal na jaaye. Box ka **maximum size jo kabhi achieve hua**,
-wahi tumhara answer hai.
+**What Azure Stream Analytics with Azure Event Hubs is:** Azure Event Hubs gives Azure a durable, ordered stream of incoming events, and Azure Stream Analytics can run continuous queries over that stream. An Azure Stream Analytics job often keeps a small amount of state for the current window, such as IDs, counts, or timestamps, instead of loading the whole history. That makes it suitable for online checks like uniqueness while data is still moving.
+
+**What windowed de-duplication is, and why it's used:** Real event pipelines can receive duplicate IDs because producers retry, network calls are replayed, or downstream consumers reprocess checkpoints. Windowed de-duplication tracks IDs only inside the active window and evicts old IDs as the window start moves, keeping memory bounded. It exists to answer "is this current span clean of duplicates?" without permanently remembering every ID ever seen.
+
+**The mapping:** Each character is an Azure Event Hubs event ID. Moving `right` adds the next ID to the active Azure Stream Analytics window and the `seen` set records IDs currently inside it. If the ID is already present, `left` advances and removes old IDs until the duplicate disappears; then the window is valid again. The key insight is that the longest substring is the largest active Azure window whose state contains no duplicate IDs.
 
 ## Approach
 

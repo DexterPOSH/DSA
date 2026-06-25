@@ -106,13 +106,12 @@
   <h1>Find the Duplicate Number &mdash; <span>Floyd&rsquo;s Cycle on an Array</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">🔁</div>
+    <div class="analogy-icon">🛣️</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Array ko <strong>chhupi linked list</strong> maano: node <code>i</code> ka next = <code>nums[i]</code>.
-        Duplicate value hone se do index <em>same node</em> par point karte hain &rarr; <strong>cycle</strong> ban jaata hai,
-        aur <strong>cycle ka entry hi duplicate</strong> hai. Bas Tortoise &amp; Hare lagao.
+          Treat <code>index → nums[index]</code> like an <strong>Azure Route Server</strong> next-hop chain. A duplicate next hop creates a routing loop, and slow/fast probes find the loop entry — the duplicate value.
+
       </div>
     </div>
   </div>

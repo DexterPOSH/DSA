@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Valid Parenthesis String — Low/High Open Range</title>
+<title>Valid Parenthesis String — Azure APIM Policy Range</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -120,18 +120,14 @@
 </head>
 <body>
 
-  <h1>Valid Parenthesis String &mdash; <span>Low/High Open Range</span></h1>
+  <h1>Valid Parenthesis String &mdash; <span>Azure APIM Policy Range</span></h1>
 
   <div class="analogy">
-    <div class="ic">🧾</div>
+    <div class="ic">📜</div>
     <div>
       <div class="label">Real-world analogy</div>
       <div class="analogy-text">
-        Accountant ledger padh raha hai: <code class="inline">(</code> = open IOU,
-        <code class="inline">)</code> = close, <code class="inline">*</code> = wildcard.
-        Do counters: <strong>low</strong> = kam-se-kam open, <strong>high</strong> =
-        zyada-se-zyada open. <code class="inline">high &lt; 0</code> → fail.
-        End me <code class="inline">low == 0</code> reachable → valid.
+        Azure API Management policy XML may include optional fragments that act like an opener, closer, or empty snippet. Track the feasible range of unclosed policy scopes with <strong>low</strong>/<strong>high</strong>; if <code class="inline">high &lt; 0</code> fail, and if zero remains reachable at the end the policy can be valid.
       </div>
     </div>
   </div>
@@ -139,7 +135,7 @@
   <div class="card">
     <div>
       <div class="section-label">What's happening</div>
-      <div class="step-desc" id="stepDesc">Press "Next". <code class="inline">s = "(*))"</code>. We track the range of possible open-bracket counts. Bar shows <code class="inline">[low, high]</code>.</div>
+      <div class="step-desc" id="stepDesc">Press "Next". <code class="inline">s = "(*))"</code>. We track the range of possible unclosed Azure policy scopes. Bar shows <code class="inline">[low, high]</code>.</div>
     </div>
 
     <div>
@@ -148,7 +144,7 @@
     </div>
 
     <div>
-      <div class="section-label">Possible open-bracket count — range [low, high]</div>
+      <div class="section-label">Possible unclosed policy scopes — range [low, high]</div>
       <div class="track-wrap">
         <div class="track" id="track"></div>
         <div class="axis" id="axis"></div>
@@ -161,9 +157,9 @@
     </div>
 
     <div class="legend">
-      <span><span class="swatch" style="background:#93c5fd"></span> '(' open</span>
-      <span><span class="swatch" style="background:#fca5a5"></span> ')' close</span>
-      <span><span class="swatch" style="background:#d8b4fe"></span> '*' wildcard</span>
+      <span><span class="swatch" style="background:#93c5fd"></span> '(' opens scope</span>
+      <span><span class="swatch" style="background:#fca5a5"></span> ')' closes scope</span>
+      <span><span class="swatch" style="background:#d8b4fe"></span> '*' optional fragment</span>
       <span><span class="swatch" style="background:#10b981"></span> range valid</span>
       <span><span class="swatch" style="background:#ef4444"></span> high &lt; 0 fail</span>
     </div>
@@ -181,7 +177,7 @@
     <div class="ic">💡</div>
     <div>
       <div class="label">Key takeaway</div>
-      <p>Instead of branching on every <code class="inline">*</code>, track the <strong>range of reachable open-counts</strong>. <code class="inline">high&lt;0</code> kills the optimistic path; clamp <code class="inline">low</code> at 0; finish valid iff <strong>low can reach 0</strong>.</p>
+      <p>Instead of expanding every optional APIM policy fragment, track the <strong>range of reachable unclosed-scope counts</strong>. <code class="inline">high&lt;0</code> kills the optimistic path; clamp <code class="inline">low</code> at 0; finish valid iff zero is reachable.</p>
     </div>
   </div>
 
@@ -193,23 +189,23 @@ const CELL = 40;            // px per unit on the track
 function buildSteps() {
   const steps = [];
   let low = 0, high = 0;
-  steps.push({ desc:`Start: low=0, high=0. Range of possible open '(' counts is just {0}.`, i:-1, low, high, status:'init' });
+  steps.push({ desc:`Start: low=0, high=0. Range of possible unclosed Azure policy scopes is just {0}.`, i:-1, low, high, status:'init' });
   for (let i=0; i<s.length; i++) {
     const ch = s[i];
     let act;
-    if (ch === '(') { low++; high++; act = `'(' → low++, high++ (definitely one more open).`; }
-    else if (ch === ')') { low--; high--; act = `')' → low--, high-- (close one open).`; }
-    else { low--; high++; act = `'*' → low-- (if ')') and high++ (if '(') — range widens.`; }
+    if (ch === '(') { low++; high++; act = `'(' → low++, high++ (definitely one more open scope).`; }
+    else if (ch === ')') { low--; high--; act = `')' → low--, high-- (close one open scope).`; }
+    else { low--; high++; act = `'*' → low-- (if closing), high++ (if opening), or empty — range widens.`; }
 
     let status = 'scan';
     let desc = `i=${i}, char '${ch}': ${act} Now low=${low}, high=${high}.`;
     if (high < 0) {
-      desc += ` high < 0 → even the most-open reading has surplus ')'. Return False ✗`;
+      desc += ` high < 0 → even the most-open APIM expansion has too many closing scopes. Return False ✗`;
       steps.push({ desc, i, low, high, status:'fail' });
       return steps;
     }
     if (low < 0) {
-      desc += ` low went below 0 → clamp to 0 (can't have negative open; treat extra '*' as empty).`;
+      desc += ` low went below 0 → clamp to 0 (can't have negative open scopes; treat extra optional fragments as empty).`;
       low = 0;
       status = 'clamp';
     }
@@ -217,8 +213,8 @@ function buildSteps() {
   }
   const ok = low === 0;
   steps.push({ desc: ok
-    ? `End: low=0 is reachable → some interpretation closes every bracket. Return True ✓`
-    : `End: low=${low} > 0 → every reading leaves unmatched '('. Return False ✗`,
+    ? `End: low=0 is reachable → some APIM policy expansion closes every scope. Return True ✓`
+    : `End: low=${low} > 0 → every APIM expansion leaves an unclosed scope. Return False ✗`,
     i:-1, low, high, status: ok?'success':'fail' });
   return steps;
 }
@@ -269,8 +265,8 @@ function render() {
   // counters
   const badHigh = st.high < 0;
   $('counters').innerHTML = `
-    <div class="cnt low"><div class="k">low (min open)</div><div class="v">${st.low}</div></div>
-    <div class="cnt high ${badHigh?'bad':''}"><div class="k">high (max open)</div><div class="v">${st.high}</div></div>`;
+    <div class="cnt low"><div class="k">low (min scopes)</div><div class="v">${st.low}</div></div>
+    <div class="cnt high ${badHigh?'bad':''}"><div class="k">high (max scopes)</div><div class="v">${st.high}</div></div>`;
 
   $('stepCounter').textContent = `step ${idx+1} / ${steps.length}`;
   $('prevBtn').disabled = idx === 0;

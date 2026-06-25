@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Subsets — Include / Exclude Decision Tree</title>
+<title>Subsets — ARM/Bicep Include / Exclude Tree</title>
 <style>
   :root {
     --bg: #1a1a2e; --panel: #16213e; --panel2: #232342;
@@ -103,12 +103,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Subsets — the <span>include / exclude</span> decision tree</h1>
-  <p class="subtitle">Har element pe ek sawaal: "andar aaun ya na aaun?" — 2<sup>n</sup> paths, 2<sup>n</sup> subsets.</p>
+  <h1>Subsets — the <span>ARM/Bicep include / exclude</span> tree</h1>
+  <p class="subtitle">For each optional Azure module, choose include or exclude — 2<sup>n</sup> paths, 2<sup>n</sup> deployment footprints.</p>
 
   <div class="analogy">
-    <h3>🍕 Real-world analogy: pizza toppings</h3>
-    <p>3 toppings, har ek ke liye haan/na. Mushroom × olive × capsicum = 8 possible pizzas — plain cheese (<code>[]</code>) bhi ek hai. Subsets = har element pe yahi <b>include/exclude</b> choice.</p>
+    <h3>☁️ Real-world analogy: ARM/Bicep optional modules</h3>
+    <p>An Azure landing-zone deployment can toggle optional Bicep modules such as Monitor, Key Vault, DNS, or Bastion. For each module, include it or exclude it, recurse, then roll back the include to explore the other deployment footprint.</p>
   </div>
 
   <div class="panel">
@@ -142,7 +142,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Power set = a binary decision tree of depth <b>n</b>. Include the element (go left), recurse, then <b>backtrack</b> and exclude it (go right). Every leaf is one subset → 2<sup>n</sup> total.</p>
+    <p>Power set = an Azure module include/exclude tree of depth <b>n</b>. Include a module, recurse, then <b>backtrack</b> and exclude it; every leaf is one deployment footprint.</p>
   </div>
 </div>
 
@@ -272,19 +272,19 @@ function render() {
   const cap = $('caption');
   cap.className = 'caption';
   if (st.type === 'root') {
-    cap.innerHTML = `Start at the root with an <b class="bl">empty path</b>. We'll decide each element left→right.`;
+    cap.innerHTML = `Start at the root with an <b class="bl">empty deployment</b>. We'll decide each Azure module left→right.`;
   } else if (st.type === 'inc') {
     cap.classList.add('inc');
-    cap.innerHTML = `<b class="g">INCLUDE</b> <code>${nums[st.i-1]}</code> → push it onto the path. Path is now <b class="bl">[${st.path.join(',')}]</b>.`;
+    cap.innerHTML = `<b class="g">INCLUDE</b> module <code>${nums[st.i-1]}</code> → push it onto the path. Deployment path is now <b class="bl">[${st.path.join(',')}]</b>.`;
   } else if (st.type === 'exc') {
     cap.classList.add('exc');
-    cap.innerHTML = `<b class="r">EXCLUDE</b> this element → leave the path as <b class="bl">[${st.path.join(',')||' '}]</b> and recurse deeper.`;
+    cap.innerHTML = `<b class="r">EXCLUDE</b> this module → leave the path as <b class="bl">[${st.path.join(',')||' '}]</b> and recurse deeper.`;
   } else if (st.type === 'record') {
     cap.classList.add('record');
-    cap.innerHTML = `Reached a leaf (<code>i == n</code>) → <b class="a">record</b> a copy of the path: <b class="a">[${st.recorded.join(',')}]</b>. ✅`;
+    cap.innerHTML = `Reached a leaf (<code>i == n</code>) → <b class="a">record</b> this Azure deployment footprint: <b class="a">[${st.recorded.join(',')}]</b>. ✅`;
   } else if (st.type === 'backtrack') {
     cap.classList.add('exc');
-    cap.innerHTML = `<b class="r">BACKTRACK</b> — <code>path.pop()</code> undoes the include. Path back to <b class="bl">[${st.path.join(',')||' '}]</b>, ready to try the exclude branch.`;
+    cap.innerHTML = `<b class="r">BACKTRACK</b> — <code>path.pop()</code> removes the module. Path back to <b class="bl">[${st.path.join(',')||' '}]</b>, ready to try the exclude branch.`;
   }
 
   $('counter').textContent = `step ${cur+1} / ${steps.length}`;

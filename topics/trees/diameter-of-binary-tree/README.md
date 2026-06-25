@@ -19,7 +19,11 @@ Path `4 -> 2 -> 5` ka length 2 hai, but `4 -> 2 -> 1 -> 3` ka length 3 — wahi 
 
 ## Real-World Analogy
 
-Socho ek **road network hai jisme har junction se do hi sadkein neeche jaati hain**. Tumhe poore network me sabse lambi possible drive nikalni hai — kahin se shuru, kahin khatam. Yeh longest drive kisi ek junction pe "mudti" hai: us junction ke neeche jo do sabse gehri branches hain, unki lambai jod do — wahi us junction se guzarne wali sabse lambi road. Har junction pe yeh check karo, sabse bada answer rakh lo. Lekin upar wale junction ko report karte waqt har junction sirf **ek hi (gehri) branch** ki height batata hai — kyunki upar jaane wala path dono niche-branches ko ek saath use nahi kar sakta.
+**What Azure Resource Manager's management hierarchy is:** Azure Resource Manager organizes Azure estates into a parent/child scope tree: Management Groups, Subscriptions, Resource Groups, and Resources. Any two leaf resources are connected by walking up from one leaf to a shared parent scope and then down to the other leaf. That makes the hierarchy a good analogy for measuring the longest relationship path.
+
+**What cross-scope path analysis is, and why it's used:** Operators sometimes need to understand the widest distance across an estate, such as the longest chain between resources under different subscriptions. The path can bend at the nearest shared Management Group or Subscription, so looking only at root-to-leaf depth misses the true maximum. Each scope needs to know its deepest child branch, while the estate-wide answer checks every possible bend point.
+
+**The mapping:** The DFS returns one Azure branch height upward because a parent can extend a path through only one child. At each node, we compute `left_height + right_height` as the path that bends through that scope and update a global diameter. The key insight is that height is the value returned to the parent, while diameter is the best two-branch path observed anywhere.
 
 ## Approach
 

@@ -17,14 +17,11 @@ cost = [3, 4, 3]         ->  -1     # no valid start
 
 ## Real-World Analogy
 
-Socho ek circular road-trip hai. Har petrol-pump pe kuch litre milta hai (`gas[i]`), aur agle pump tak pahunchne me kuch litre lagta hai (`cost[i]`). Tum chahte ho ek aisa pump jahan se shuru karke poora circle bina tank empty hue complete ho jaye.
+**What Azure Front Door / Traffic Manager is:** Azure Front Door and Azure Traffic Manager are global routing services that help send users to the right healthy region instead of hard-coding one destination. Front Door works as an HTTP(S) edge entry point with origin health checks, while Traffic Manager uses DNS-based routing methods like priority, weighted, or performance. In both cases, the goal is to keep traffic moving around the globe even when one region cannot safely carry the next handoff.
 
-Do simple sachchaiyan:
-1. **Agar total petrol < total cost, to koi bhi start kaam nahi karega** — itna fuel hi nahi hai. Turant `-1`.
-2. **Agar total petrol ≥ total cost, to ek valid start zaroor hoga** (problem guarantee). Ab sirf *kaunsa* dhoondhna hai.
+**What regional failover capacity planning is, and why it's used:** A regional failover runbook asks, "If this region receives traffic, does it have enough spare capacity to serve users and then hand off overflow or recovery work to the next region?" Health probes tell Azure which endpoints are usable, but operators still need capacity math so failover does not push a region into overload. The total spare capacity across regions must cover total demand; otherwise no routing order can complete the circle.
 
-Trick ye hai: ek running `tank` rakho jaise tum drive kar rahe ho. Jis pal `tank` negative ho jaata hai — matlab current start se yahan tak nahi pahunche — to ek **important insight** kaam aata hai: us start aur is failure-point ke beech ka koi bhi pump valid start nahi ho sakta. Kyun? Kyunki agar wo bhi `tank ≥ 0` rakhte hue idhar tak nahi la paaye (aur tum unse pehle se positive tank le kar aaye the, phir bhi fail hue), to wo akele aur bhi jaldi fail honge. To poora prefix skip karo aur **next station ko naya candidate start** maan lo. Ek hi forward pass me answer mil jaata hai.
-
+**The mapping:** Each station is an Azure region, `gas[i]` is spare capacity gained there, and `cost[i]` is the capacity spent handing traffic to the next region. The running `tank` is the capacity balance for the current candidate start; if it drops below zero, that start and every region in the failed prefix are invalid because they could not survive the same accumulated handoffs. Once total capacity is feasible, resetting to the next region after each negative dip leaves the only valid start — the key insight is that a failed prefix never needs to be reconsidered.
 ## Approach
 
 **Brute force** — har station ko start maano aur poora circle simulate karo: O(n²).

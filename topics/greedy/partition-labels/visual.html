@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Partition Labels — Running End-Marker Scan</title>
+<title>Partition Labels — Azure Checkpoint Windows</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -108,18 +108,14 @@
 </head>
 <body>
 
-  <h1>Partition Labels &mdash; <span>Running End-Marker Scan</span></h1>
+  <h1>Partition Labels &mdash; <span>Azure Checkpoint Windows</span></h1>
 
   <div class="analogy">
-    <div class="ic">🛣️</div>
+    <div class="ic">📦</div>
     <div>
       <div class="label">Real-world analogy</div>
       <div class="analogy-text">
-        Road trip me har shehar (letter) ke friends raaste me bikhre hain. Ek "leg"
-        tab tak close nahi kar sakte jab tak us leg me visit kiye shehar ka
-        <strong>aakhri occurrence</strong> cross na ho. Ek running
-        <strong>"farthest I must still go" marker</strong> rakho — jaise hi
-        <code class="inline">i == end</code>, leg yahin cut.
+        When exporting Azure Event Hubs data to Azure Blob Storage, a checkpoint window can be sealed only after every partition key seen in it has reached its last offset. Keep the farthest last offset as <code class="inline">end</code>; when <code class="inline">i == end</code>, greedily commit the smallest safe segment.
       </div>
     </div>
   </div>
@@ -127,11 +123,11 @@
   <div class="card">
     <div>
       <div class="section-label">What's happening</div>
-      <div class="step-desc" id="stepDesc">Press "Next". <code class="inline">s = "abacdcd"</code>. We stretch <code class="inline">end</code> to each char's last index; when <code class="inline">i == end</code>, we cut a partition.</div>
+      <div class="step-desc" id="stepDesc">Press "Next". <code class="inline">s = "abacdcd"</code>. We stretch <code class="inline">end</code> to each key's last offset; when <code class="inline">i == end</code>, we commit a checkpoint window.</div>
     </div>
 
     <div>
-      <div class="section-label">String (current char highlighted, ⟂ = end marker)</div>
+      <div class="section-label">Stream keys (current offset highlighted, ⟂ = end marker)</div>
       <div class="str-wrap"><div class="str-row" id="strRow"></div></div>
     </div>
 
@@ -141,14 +137,14 @@
     </div>
 
     <div>
-      <div class="section-label">Partition sizes (result)</div>
+      <div class="section-label">Checkpoint window sizes (result)</div>
       <div class="sizes" id="sizesRow"><span style="color:var(--muted);font-size:0.85rem">none yet</span></div>
     </div>
 
     <div class="legend">
       <span><span class="swatch" style="background:#3b82f6"></span> current index i</span>
       <span><span class="swatch" style="background:#f59e0b"></span> end marker</span>
-      <span><span class="swatch" style="background:#10b981"></span> closed partition (cut)</span>
+      <span><span class="swatch" style="background:#10b981"></span> committed checkpoint window</span>
     </div>
 
     <div class="controls">
@@ -164,7 +160,7 @@
     <div class="ic">💡</div>
     <div>
       <div class="label">Key takeaway</div>
-      <p>Each char defines an interval <code class="inline">[i, last[ch]]</code>. Keep <code class="inline">end = max(end, last[ch])</code>; the moment <strong>i catches up to end</strong>, every letter seen so far is fully contained — cut here.</p>
+      <p>Each key defines an Azure export interval <code class="inline">[i, last[key]]</code>. Keep <code class="inline">end = max(end, last[key])</code>; the moment <strong>i catches up to end</strong>, every key seen so far is contained, so commit the segment.</p>
     </div>
   </div>
 
@@ -177,26 +173,26 @@ function buildSteps() {
   const steps = [];
   let start = 0, end = 0;
   const sizes = [];           // {len, lo, hi}
-  steps.push({ desc:`last index of each letter: ${Object.entries(last).map(([k,v])=>`${k}→${v}`).join(', ')}. Begin scan with start=0, end=0.`, i:-1, end:0, start:0, sizes:[], status:'init' });
+  steps.push({ desc:`last offset of each Azure key: ${Object.entries(last).map(([k,v])=>`${k}→${v}`).join(', ')}. Begin scan with start=0, end=0.`, i:-1, end:0, start:0, sizes:[], status:'init' });
 
   for (let i=0; i<s.length; i++) {
     const ch = s[i];
     const stretched = last[ch] > end;
     end = Math.max(end, last[ch]);
     const cut = (i === end);
-    let desc = `i=${i}, char '${ch}', last['${ch}']=${last[ch]}. end = max(end, ${last[ch]}) = ${end}.`;
-    if (stretched) desc += ` Partition must now reach at least index ${end}.`;
+    let desc = `i=${i}, key '${ch}', last['${ch}']=${last[ch]}. end = max(end, ${last[ch]}) = ${end}.`;
+    if (stretched) desc += ` Checkpoint window must now reach at least offset ${end}.`;
     if (cut) {
       const len = end - start + 1;
       sizes.push({ len, lo:start, hi:end });
-      desc += ` i == end → close partition [${start}..${end}], size ${len}. Reset start=${i+1}.`;
+      desc += ` i == end → commit checkpoint window [${start}..${end}], size ${len}. Reset start=${i+1}.`;
       steps.push({ desc, i, end, start, sizes: sizes.map(x=>({...x})), status:'cut' });
       start = i + 1;
     } else {
       steps.push({ desc, i, end, start, sizes: sizes.map(x=>({...x})), status: stretched?'stretch':'scan' });
     }
   }
-  steps.push({ desc:`Scan complete. Partition sizes = [${sizes.map(x=>x.len).join(', ')}]. Each letter lives in exactly one part ✓`, i:-1, end, start, sizes: sizes.map(x=>({...x})), status:'success' });
+  steps.push({ desc:`Scan complete. Checkpoint window sizes = [${sizes.map(x=>x.len).join(', ')}]. Each Azure key lives in exactly one committed segment ✓`, i:-1, end, start, sizes: sizes.map(x=>({...x})), status:'success' });
   return steps;
 }
 

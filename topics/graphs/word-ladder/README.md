@@ -19,7 +19,12 @@ wordList  = ["hot","dot","dog","lot","log","cog"]
 
 ## Real-World Analogy
 
-Socho ek **word-maze** hai. Har word ek room hai, aur do rooms ke beech darwaza tabhi hai jab wo words **sirf ek letter** me alag ho. Tumhe `beginWord` room se `endWord` room tak **sabse chhote raaste** se pahunchna hai. Maze me shortest path dhoondhne ka classic tareeka: **BFS — level by level fan out**, jaise paani ek jagah girao aur ripples sab directions me ek saath failte hain. Jo ripple sabse pehle `endWord` ko chhuye, wahi shortest path. DFS yahan galat hai — wo ek raasta poora andar tak jaata hai, shortest guarantee nahi.
+**What Azure Resource Manager is:** Azure Resource Manager (ARM) is Azure's deployment engine, and Bicep is a common way to describe the desired Azure resource configuration. A migration from one deployment shape to another often cannot be done as one giant unsafe jump. Teams instead move through valid intermediate states, such as changing an SKU, enabling a private endpoint, or adjusting a route while the deployment remains deployable.
+
+**What incremental deployment state transition is, and why it's used:** An incremental state transition is one allowed Azure configuration change that turns one valid deployment state into another valid state. It is used to reduce risk: every step can be reviewed, deployed, and rolled back independently, and invalid intermediate configurations are excluded. The collection of valid states and single-change transitions forms an unweighted graph of possible migration paths.
+
+**The mapping:** Each word is an Azure deployment state, the word list is the set of valid states, and a one-letter change is one safe configuration transition. BFS starts from the current state, explores all one-change states before two-change states, and stops when it reaches the target deployment state. The key insight is that because every transition costs one step, BFS gives the shortest safe Azure migration path.
+
 
 ## Approach — BFS shortest path
 

@@ -76,8 +76,8 @@
   <p class="subtitle">Tree → string → exact same tree. Null markers (<code style="color:#ef4444">#</code>) make the shape unambiguous.</p>
 
   <div class="analogy">
-    <h3>📦 Analogy</h3>
-    <p>Origami ko ek flat strip me fold karo (serialize) with clear "child hai / khaali hai (<b style="color:#ef4444">#</b>)" instructions. Doosri taraf same order me kholo → exactly wahi structure wapas. Null markers ke bina shape recover hi nahi hoti.</p>
+    <h3>📦 ARM/Bicep export and import</h3>
+    <p>An ARM or Bicep export serializes an Azure resource hierarchy so it can be rebuilt later. Preorder tokens plus <b style="color:#ef4444">#</b> null markers preserve every missing child slot, letting deserialization rehydrate the same tree.</p>
   </div>
 
   <div class="phase-tabs">
@@ -88,7 +88,7 @@
   <div class="stage">
     <svg viewBox="0 0 720 320" id="tree"></svg>
     <div class="tokens" id="tokens"></div>
-    <div class="caption" id="caption">Press <b>Next ▶</b>. Phase 1: preorder DFS — value likho, null pe <code>#</code> likho.</div>
+    <div class="caption" id="caption">Press <b>Next ▶</b>. Phase 1: preorder DFS — emit values and emit <code>#</code> for nulls.</div>
   </div>
 
   <div class="controls">
@@ -226,7 +226,7 @@ function render() {
     if (i < 0) {
       buildTokens(-1, -1, -1);
       $('caption').className = 'caption';
-      $('caption').innerHTML = 'Press <b>Next ▶</b>. Phase 1: preorder DFS — value likho, null pe <code>#</code> likho.';
+      $('caption').innerHTML = 'Press <b>Next ▶</b>. Phase 1: preorder DFS — emit values and emit <code>#</code> for nulls.';
       $('prog').textContent = 'Step 0';
     } else {
       const st = PHASE_A[i];

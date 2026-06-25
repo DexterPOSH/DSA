@@ -17,15 +17,11 @@ s = "rabbbit", t = "rabbit"   ->  3
 
 ## Real-World Analogy
 
-Socho `s` ek lambi sentence hai aur `t` ek chhota target word. Tum `s` ke characters ko
-left-se-right padhte ho aur ek **highlighter** se kuch letters select karte ho taaki
-selected letters exactly `t` ban jaayein (order me). Sawaal: aise **kitne alag
-highlighting patterns** possible hain? Jab `s` ka current letter `t` ke current target
-letter se match karta hai, tumhare paas **do choices** hain: is letter ko highlight karo
-(dono aage badho), ya ise chhod do (sirf `s` me aage badho, shaayad aage same letter
-phir milega). Dono cases ke counts **add** hote hain. Match nahi karta? To highlight kar
-hi nahi sakte — bas `s` me aage skip karo. Multiple matching letters (jaise teen `b`)
-hi multiple distinct patterns dete hain.
+**What Azure Blob Storage versioning is:** Azure Blob Storage stores objects such as configuration files, manifests, and policy documents, and versioning can preserve previous versions whenever a blob is overwritten. That gives teams an audit trail and a recovery point instead of losing the old content. In this analogy, an audit job reads a long versioned configuration blob and asks how many ordered ways a shorter policy snippet appears inside it.
+
+**What an ordered subsequence audit is, and why it's used:** The audit does not require the policy characters or tokens to be adjacent; it only requires them to appear in the same order. That is useful when a required policy pattern may be separated by comments, whitespace, or extra settings in a real Azure configuration blob. Counting all possible alignments exposes how repeated characters create overlapping evidence paths that a simple first-match scan would miss.
+
+**The mapping:** The source string is the long Azure blob version, the target string is the policy snippet, and the 2-D table compares every source prefix with every target prefix. When the current characters match, the cell adds the count for using that source character from the diagonal and the count for skipping it from the row above; when they differ, only skipping is possible. The key insight is that once prefix lengths are fixed, the remaining choices no longer care how you got there, so repeated subsequence choices collapse into cached counts.
 
 ## Approach
 

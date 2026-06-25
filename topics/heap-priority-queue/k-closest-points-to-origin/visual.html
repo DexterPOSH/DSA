@@ -118,8 +118,8 @@
   <h1>K Closest Points to Origin &mdash; <span>Max-Heap of Size k</span></h1>
 
   <div class="analogy">
-    <div class="label">Real-world analogy</div>
-    <p>Ek <b>delivery dispatcher</b> ko 2 sabse paas wale riders chahiye. Board pe sirf 2 "current closest" rakhe jaate hain, aur <b>sabse door wala top pe</b> dikhta hai. Naya rider closer hua to door wale ko hatao. Wo board ek <b>max-heap of size k</b> hai — root = farthest, evict karne ke liye ready.</p>
+    <div class="label">🗺️ Azure analogy</div>
+    <p>Azure Maps nearest-resource selection can keep only the k closest depots to a request location. The size-k max-heap stores those candidates, with the farthest accepted depot at the root so a closer newcomer can evict it immediately.</p>
   </div>
 
   <div class="problem">
@@ -161,7 +161,7 @@
 
   <div class="takeaway">
     <div class="label">Key takeaway</div>
-    <p>Keep a <b>max-heap of size k</b> ordered by <code>dist²</code>. The root is the farthest kept point, so a closer newcomer instantly evicts it. Result: the k closest in <b>O(n log k)</b> — and never compute a <code>sqrt</code>.</p>
+    <p>Like Azure Maps filtering nearest resources, keep a <b>max-heap of size k</b> ordered by <code>dist²</code>; the root is the farthest accepted point, so closer candidates can evict it in <b>O(log k)</b>.</p>
   </div>
 </div>
 

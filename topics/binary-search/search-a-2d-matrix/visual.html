@@ -145,8 +145,8 @@
   <p class="subtitle">Row-major sorted matrix = ek lambi sorted list. Index ko on-the-fly row/col me decode karo.</p>
 
   <div class="analogy">
-    <h3>📚 Analogy: serial-numbered library shelf</h3>
-    <p>Saari rows jod do to ek fully-sorted list ban jaati hai. Books strictly serial order me, bas alag racks (rows) me. Ek hi binary search — bas flat index ko <code>row = mid // n</code>, <code>col = mid % n</code> se decode karo.</p>
+    <h3>🧭 Analogy: Azure Cosmos DB two-level index seek</h3>
+    <p>An <b>Azure Cosmos DB two-level seek</b> first chooses the ordered partition range, then the offset inside that partition's local index. A flat <code>mid</code> maps to <code>row = mid // n</code> and <code>col = mid % n</code>, so each probe halves the virtual sorted index.</p>
   </div>
 
   <div class="problem">
@@ -173,7 +173,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Row-major sorted matrix ko flatten samjho: <code>matrix[mid // n][mid % n]</code> se decode karke ek hi binary search — O(log(m·n)), no extra space.</p>
+    <p>Treat the row-major matrix as one virtual sorted index: decode <code>mid</code> with <code>matrix[mid // n][mid % n]</code>, compare, and halve the range — O(log(m·n)), no extra space.</p>
   </div>
 </div>
 

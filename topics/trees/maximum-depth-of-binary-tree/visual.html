@@ -68,8 +68,8 @@
   <p class="subtitle"><code>depth(node) = 1 + max(depth(left), depth(right))</code> · base case: <code>None → 0</code></p>
 
   <div class="analogy">
-    <h3>🏢 Org-chart wali analogy</h3>
-    <p>Har manager bas apne <b>sabse gehre report ki depth + 1 (khud)</b> upar batata hai. CEO ko jo dono taraf se bada number aaye, wahi poori company ki sabse lambi reporting chain.</p>
+    <h3>☁️ Azure management hierarchy</h3>
+    <p>Azure scopes form a real depth chain: Management Group → Subscription → Resource Group → Resource. Each child reports its deepest branch length upward, and the root's maximum report is the hierarchy depth.</p>
   </div>
 
   <div class="stage">

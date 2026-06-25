@@ -19,12 +19,11 @@ prices = [1, 2, 3, 0, 2]   ->  3
 
 ## Real-World Analogy
 
-Socho tum ek trader ho aur har subah tum exactly **teen me se ek** mood me ho:
-- **HOLD** — tumhare paas share hai, abhi pakde hue ho.
-- **SOLD** — aaj hi becha hai, ab kal **mandatory chhutti** (cooldown), kuch nahi khareed sakte.
-- **REST** — tumhare paas share nahi hai aur tum free ho (cooldown bhi nahi) — aaj khareed sakte ho.
+**What Azure Monitor autoscale for Azure VM Scale Sets is:** Azure Monitor autoscale watches metrics like CPU, queue length, or custom signals and automatically changes the instance count of an Azure VM Scale Set. It is meant to keep enough capacity online for demand without leaving extra VMs running when traffic drops. Each evaluation is like one trading day: the controller decides whether to keep capacity allocated, release it, or stay idle.
 
-Har din ka mood kal ke mood pe depend karta hai — yeh ek **state machine** hai. "Aaj HOLD me hoon" do tareeke se ho sakta hai: ya kal bhi HOLD tha (pakde rakha), ya kal REST tha aur aaj khareed liya. Bas har state ke liye best profit track karte chalo, din-ba-din. Ant me **bina share ke** (SOLD ya REST) wala state hi max profit dega — share haath me pakde reh jaana to loss hai.
+**What autoscale cooldown is, and why it's used:** Autoscale rules include a cooldown period after a scaling action so Azure has time to provision or remove instances and let metrics settle before making another decision. Without cooldown, a scale set can flap — scaling in, immediately scaling out, then scaling in again — because the next metric sample may still reflect the previous state. The cooldown exists to enforce a temporary "no immediate re-entry" rule after releasing capacity.
+
+**The mapping:** Buying/holding stock is like having VM capacity allocated, selling is like scaling in and realizing savings, and the cooldown state is the forced waiting period before capacity can be allocated again. The DP keeps separate values for holding, just-sold/cooling-down, and resting because the best future action depends on which operational state Azure is in, not just on the current profit number. The key insight is that selling creates profit but also creates a constraint, so the algorithm must model state transitions explicitly instead of greedily buying right after every sale.
 
 ## Approach
 

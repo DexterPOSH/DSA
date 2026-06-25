@@ -149,8 +149,8 @@
   <div class="subtitle">Watch binary search work even on a rotated array by always trusting the half that's still sorted.</div>
 
   <div class="analogy">
-    <h3>Real-world analogy</h3>
-    <p>Ek <b>circular ghadi</b> ke sorted numbers ko kisi ne ghuma diya. Phir bhi kisi bhi <code>lo…hi</code> window me <b>ek aadha hamesha properly sorted</b> hota hai. Wo sorted half dekho — target uski range me hai to udhar jao, warna doosre half me. Har step pe aadha kaat do.</p>
+    <h3>🔄 Analogy: Azure Cosmos DB rotated partition ring</h3>
+    <p>An <b>Azure Cosmos DB hash-partition ring</b> is sorted around the ring, but a view that starts in the middle appears rotated. In any <code>lo…hi</code> window one side of <code>mid</code> is still sorted, so check whether the target partition key belongs there and halve the remaining ranges.</p>
   </div>
 
   <div class="problem">

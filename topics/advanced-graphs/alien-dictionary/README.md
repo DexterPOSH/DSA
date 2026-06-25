@@ -17,9 +17,11 @@ words = ["z","x","z"]                      ->  ""      # invalid (cycle)
 
 ## Real-World Analogy
 
-Socho tumhe ek alien dictionary mila jisme shabd to dikh rahe hain par alphabet ka order nahi pata. Lekin shabd **sorted** hain, to do **lagatar (adjacent)** words ko compare karke ek clue milta hai. Jaise `"wrt"` phir `"wrf"`: dono `"wr"` tak same, phir `t` vs `f` — matlab is language me **`t` aata hai `f` se pehle**. Har aisa clue ek **arrow** `t → f` graph me banata hai.
+**What Azure Resource Manager is:** Azure Resource Manager (ARM) is Azure's control plane for deploying and managing resources from declarative ARM or Bicep templates. You describe the VNets, subnets, NICs, VMs, and other resources you want, and ARM figures out the safest order to create or update them. That orchestration matters because many Azure resources cannot exist until their prerequisites exist.
 
-Ab yeh ek "kaun pehle, kaun baad" wala dependency graph hai — bilkul course-prerequisites jaisa. **Topological sort** se ek valid linear order nikaal lo. Agar koi **cycle** ban gaya (A→B aur B→A type contradiction), to koi valid order possible hi nahi → `""`.
+**What `dependsOn` is, and why it's used:** In ARM/Bicep, dependencies are usually inferred from references, and `dependsOn` can make a prerequisite explicit when the relationship is not obvious. A subnet must exist before a NIC can attach to it, and a NIC must exist before a VM can use it; independent resources can deploy in parallel. ARM uses this dependency graph to avoid race conditions, and a cycle means there is no valid deployment order.
+
+**The mapping:** Each alien letter is an Azure resource, and the first differing character between adjacent words creates a `dependsOn`-style edge: `c1` must come before `c2`. Kahn's topological sort is ARM's deployment scheduler: start with in-degree-zero letters/resources, append/deploy them, then reduce the prerequisites of anything that depended on them. If a prefix violation or cycle prevents all letters from being scheduled, return `""`; the key insight is that local precedence clues form a global dependency graph.
 
 ## Approach — build precedence graph + topological sort (Kahn's BFS)
 

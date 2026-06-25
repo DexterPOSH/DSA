@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Partition Equal Subset Sum — boolean knapsack reachability</title>
+<title>Partition Equal Subset Sum — Azure capacity reachability</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -122,12 +122,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Partition Equal <span>Subset Sum</span> — boolean knapsack reachability</h1>
-  <p class="subtitle">Reduce to: can any subset sum to total/2? dp[s] = is sum s reachable?</p>
+  <h1>Partition Equal <span>Subset Sum</span> — Azure capacity reachability</h1>
+  <p class="subtitle">Azure capacity balancing: can one region receive exactly total/2? dp[s] = is capacity s reachable?</p>
 
   <div class="analogy">
-    <h3>⚖️ Splitting the bag</h3>
-    <p>Sawaal ek hi hai: <b>"kya kisi subset ka sum exactly total/2 ban sakta hai?"</b> — baaki apne aap barabar ban jaayega. Har item ya lo ya chhodo (0/1 knapsack). dp[s] = "kya sum s achievable hai?". dp[0] = True (kuch mat lo).</p>
+    <h3>⚖️ Real-world analogy</h3>
+    <p>Azure Resource Manager can balance capacity reservations across two paired regions by asking whether one side can reach half the total. The boolean cache <code>dp[s]</code> records reachable capacities and updates backward so each reservation is used once.</p>
   </div>
 
   <div class="problem">
@@ -149,7 +149,7 @@
       <span><i class="dot" style="outline:2px dashed var(--purple);background:transparent"></i>target</span>
     </div>
 
-    <div class="caption" id="cap">Press <b>Next</b>. dp[0] = True (the empty subset sums to 0). Everything else starts False.</div>
+    <div class="caption" id="cap">Press <b>Next</b>. dp[0] = True (zero Azure capacity is always reachable). Everything else starts False.</div>
 
     <div class="controls">
       <button class="ghost" id="prev" disabled>‹ Prev</button>
@@ -160,7 +160,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>For each number, scan sums <b>high → low</b> and turn on <code>dp[s]</code> whenever <code>dp[s-num]</code> is already True. Reverse order ensures each item is used at most once. If <code>dp[target]</code> lights up → True.</p>
+    <p>For each Azure capacity reservation, scan sums <b>high → low</b> and turn on <code>dp[s]</code> whenever <code>dp[s-num]</code> is already True. Reverse order ensures each reservation is used at most once. If <code>dp[target]</code> lights up → True.</p>
   </div>
 </div>
 
@@ -174,7 +174,7 @@ const dp = new Array(target + 1).fill(false);
 dp[0] = true;
 steps.push({
   dp: dp.slice(), itemIdx: null, num: null, s: null, src: null, justSet: null,
-  cap: 'Base: dp[0] = True (pick nothing → sum 0). target = 11 is dashed; we want it to become True.'
+  cap: 'Base: dp[0] = True (assign no reservation → capacity 0). target = 11 is dashed; we want it to become True.'
 });
 
 let solved = false;
@@ -182,7 +182,7 @@ for (let k = 0; k < nums.length && !solved; k++) {
   const num = nums[k];
   steps.push({
     dp: dp.slice(), itemIdx: k, num, s: null, src: null, justSet: null, intro: true,
-    cap: `Add item ${num}. Scan s from ${target} down to ${num}; if dp[s-${num}] is True, set dp[s] = True.`
+    cap: `Add Azure reservation ${num}. Scan s from ${target} down to ${num}; if dp[s-${num}] is True, set dp[s] = True.`
   });
   for (let s = target; s >= num; s--) {
     const src = s - num;
@@ -194,9 +194,9 @@ for (let k = 0; k < nums.length && !solved; k++) {
       justSet: canSet ? s : null,
       cap: dp[src]
         ? (canSet
-            ? `s=${s}: dp[${src}] is True → with item ${num} we reach ${s}. <b class="up">Set dp[${s}] = True</b>.`
+            ? `s=${s}: dp[${src}] is True → with reservation ${num} we reach capacity ${s}. <b class="up">Set dp[${s}] = True</b>.`
             : `s=${s}: dp[${src}] is True, but dp[${s}] was already True. No change.`)
-        : `s=${s}: dp[${src}] is False → sum ${s} not reachable via this item here. Skip.`
+        : `s=${s}: dp[${src}] is False → sum ${s} not reachable via this reservation here. Skip.`
     });
     if (dp[target]) { solved = true; break; }
   }
@@ -204,8 +204,8 @@ for (let k = 0; k < nums.length && !solved; k++) {
 steps.push({
   dp: dp.slice(), itemIdx: null, num: null, s: null, src: null, justSet: null, done: true,
   cap: dp[target]
-    ? `<b class="up">dp[11] = True</b> → a subset sums to 11, so the array splits into two equal halves. Return True.`
-    : `dp[11] = False → no equal partition. Return False.`
+    ? `<b class="up">dp[11] = True</b> → one Azure region can reach capacity 11, so the reservations split evenly. Return True.`
+    : `dp[11] = False → no equal Azure capacity split. Return False.`
 });
 
 const $ = id => document.getElementById(id);

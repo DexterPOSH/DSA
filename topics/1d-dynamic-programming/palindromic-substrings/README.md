@@ -14,9 +14,11 @@ Given a string `s`, return the **total number of palindromic substrings** in it.
 
 ## Real-World Analogy
 
-Bilkul wahi **mirror wala scene** jaisa Longest Palindromic Substring me tha — do log center se dono taraf bahar chalte hain jab tak chehre match karte hain. Farak sirf itna: yahan hume sabse lamba palindrome nahi chahiye, hume **ginti** chahiye ki kitne palindromes ban-te hain. 
+**What Azure Stream Analytics is:** Azure Stream Analytics is a real-time stream-processing service that evaluates queries over ordered telemetry events. It can detect patterns inside sliding or bounded windows and count matches as events flow through the pipeline. Here, the pattern is a symmetric window in a character stream.
 
-Socho har baar jab tum center se ek step bahar nikalte ho aur dono characters match karte hain, to ek naya valid palindrome "ban gaya" — ek **counter +1** kar do. Bas. Center se jitne steps successfully bahar nikle, utne palindromes us center ne contribute kiye.
+**What symmetric-window expansion is, and why it's used:** Once a smaller window is confirmed symmetric, the next larger window only needs one new comparison: its left and right boundary characters. This mechanism exists because counting every substring by rebuilding it would be expensive, while expanding from centers reuses the verified inner state. Every successful expansion is immediately a counted match.
+
+**The mapping:** Each character position, and each gap between characters, is an Azure Stream Analytics-style center to inspect. The algorithm expands while the boundary characters match and increments the count for every valid window it discovers. The key insight is that palindromic substrings are counted by successful expansions, not by generating all substrings first.
 
 ## Approach
 

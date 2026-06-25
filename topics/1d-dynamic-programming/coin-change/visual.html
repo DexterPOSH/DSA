@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Coin Change — Bottom-Up DP Table Fill</title>
+<title>Coin Change — Azure budget-denomination DP</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -103,16 +103,14 @@
 </head>
 <body>
 
-  <h1>Coin Change &mdash; <span>Bottom-Up DP Table Fill</span></h1>
+  <h1>Coin Change &mdash; <span>Azure Budget-Denomination DP</span></h1>
 
   <div class="analogy">
-    <div class="ic">🪙</div>
+    <div class="ic">💳</div>
     <div>
       <div class="label">Real-world analogy</div>
       <div class="analogy-text">
-        A <strong>cashier making change with the fewest coins</strong>, with an unlimited supply of
-        each denomination. Solve small amounts first and write them down — then
-        <code class="inline">dp[a] = 1 + min(dp[a − coin])</code> over every coin reuses those answers.
+        Azure Cost Management can model an exact budget using repeatable billed resource-unit denominations. For each subtotal, cache the fewest units needed; <code class="inline">dp[a]</code> reuses <code class="inline">dp[a − coin]</code> instead of recomputing lower subtotals.
       </div>
     </div>
   </div>
@@ -124,16 +122,16 @@
     </div>
 
     <div>
-      <div class="section-label">Coins (unlimited supply each)</div>
+      <div class="section-label">Azure billed unit denominations (repeatable)</div>
       <div class="coins-row" id="coinsRow"></div>
     </div>
 
     <div>
-      <div class="section-label">dp[a] = fewest coins to make amount a &nbsp;<span style="color:#5a6a90">(∞ = not yet reachable)</span></div>
+      <div class="section-label">dp[a] = fewest Azure units to reach subtotal a &nbsp;<span style="color:#5a6a90">(∞ = not yet reachable)</span></div>
       <div class="dp-wrap"><div class="dp-table" id="dpTable"></div></div>
     </div>
 
-    <div class="recur" id="recurBox">dp[0] = 0 &nbsp;(zero coins make amount 0 — the base case)</div>
+    <div class="recur" id="recurBox">dp[0] = 0 &nbsp;(zero Azure units reach subtotal 0 — the base case)</div>
 
     <div class="legend">
       <span><span class="swatch" style="background:#10b981"></span> base case dp[0]</span>
@@ -154,11 +152,7 @@
     <div class="ic">💡</div>
     <div>
       <div class="label">Key Takeaway</div>
-      <p>
-        <strong>Unbounded knapsack:</strong> each coin can be reused because <code class="inline">dp[a]</code>
-        pulls from <code class="inline">dp[a−coin]</code>, which may itself use the same coin. Greedy fails;
-        DP guarantees the minimum. <strong>O(amount × coins) time, O(amount) space.</strong>
-      </p>
+      <p><strong>Unbounded denomination DP:</strong> each Azure billed unit can be reused because <code class="inline">dp[a]</code> pulls from <code class="inline">dp[a−coin]</code>, which may itself use the same unit. Greedy can fail; cached DP guarantees the minimum. <strong>O(amount × coins) time, O(amount) space.</strong></p>
     </div>
   </div>
 
@@ -175,7 +169,7 @@
     dp[0] = 0;
     steps.push({
       type: 'base', dp: dp.slice(), active: 0, source: null, coin: null,
-      desc: `<b>Base case.</b> <code class="inline">dp[0] = 0</code> — making amount 0 needs zero coins. All other dp[a] start at ∞ (unknown).`,
+      desc: `<b>Base case.</b> <code class="inline">dp[0] = 0</code> — Azure subtotal 0 needs zero billed units. All other dp[a] start at ∞ (unknown).`,
       descClass: 'ok',
       recur: `dp[0] = <span class="r">0</span>  (base case)`
     });
@@ -184,7 +178,7 @@
       // announce starting this amount
       steps.push({
         type: 'start', dp: dp.slice(), active: a, source: null, coin: null,
-        desc: `<b>Solve dp[${a}].</b> Try every coin c ≤ ${a}; the best is <code class="inline">1 + min(dp[${a}−c])</code>.`,
+        desc: `<b>Solve dp[${a}].</b> Try every Azure unit c ≤ ${a}; the best is <code class="inline">1 + min(dp[${a}−c])</code>.`,
         descClass: 'try',
         recur: `dp[${a}] = 1 + min( dp[${a}−c] for c in coins, c ≤ ${a} )`
       });
@@ -195,9 +189,9 @@
         if (c > a) {
           steps.push({
             type: 'skip', dp: dp.slice(), active: a, source: null, coin: c,
-            desc: `Coin <b>${c}</b> &gt; ${a} → too big, skip.`,
+            desc: `Azure unit <b>${c}</b> &gt; subtotal ${a} → too large, skip.`,
             descClass: 'try',
-            recur: `coin ${c} &gt; ${a} → skip`
+            recur: `unit ${c} &gt; ${a} → skip`
           });
           continue;
         }
@@ -208,13 +202,13 @@
         steps.push({
           type: 'try', dp: dp.slice(), active: a, source: a - c, coin: c,
           curBest: best,
-          desc: `Try coin <b>${c}</b>: <code class="inline">dp[${a-c}]</code> = ${sub === INF ? '∞' : sub}, ` +
+          desc: `Try Azure unit <b>${c}</b>: <code class="inline">dp[${a-c}]</code> = ${sub === INF ? '∞' : sub}, ` +
                 (sub === INF
                   ? `so this path is unreachable.`
                   : `so candidate = 1 + ${sub} = <b>${cand}</b>.`) +
                 (improved ? ` ✔ New best for dp[${a}] → ${best}.` : ` Not better than current best (${best === INF ? '∞' : best}).`),
           descClass: improved ? 'ok' : 'try',
-          recur: `coin ${c}: 1 + dp[${a-c}](=${sub === INF ? '∞' : sub}) = ${cand === INF ? '∞' : cand}` + (improved ? `  ← best` : '')
+          recur: `unit ${c}: 1 + dp[${a-c}](=${sub === INF ? '∞' : sub}) = ${cand === INF ? '∞' : cand}` + (improved ? `  ← best` : '')
         });
       }
       dp[a] = best;
@@ -222,7 +216,7 @@
         type: 'commit', dp: dp.slice(), active: a, source: bestCoin != null ? a - bestCoin : null, coin: bestCoin,
         desc: best === INF
           ? `<b>dp[${a}] = ∞</b> — amount ${a} can't be made with these coins (for now).`
-          : `<b>dp[${a}] = ${best}</b> — best is to use coin <b>${bestCoin}</b> plus dp[${a-bestCoin}].`,
+          : `<b>dp[${a}] = ${best}</b> — best is to use Azure unit <b>${bestCoin}</b> plus dp[${a-bestCoin}].`,
         descClass: best === INF ? 'bad' : 'ok',
         recur: `dp[${a}] = <span class="${best===INF?'x':'r'}">${best === INF ? '∞' : best}</span>`
       });
@@ -232,7 +226,7 @@
       type: 'done', dp: dp.slice(), active: amount, source: null, coin: null,
       desc: dp[amount] === INF
         ? `✅ <b>Done.</b> dp[${amount}] = ∞ → return <b>−1</b> (amount ${amount} is impossible).`
-        : `✅ <b>Done.</b> dp[${amount}] = <b>${dp[amount]}</b> → fewest coins to make ${amount} is <b>${dp[amount]}</b>.`,
+        : `✅ <b>Done.</b> dp[${amount}] = <b>${dp[amount]}</b> → fewest Azure units to reach subtotal ${amount} is <b>${dp[amount]}</b>.`,
       descClass: dp[amount] === INF ? 'bad' : 'ok',
       recur: `Answer = dp[${amount}] = <span class="${dp[amount]===INF?'x':'r'}">${dp[amount]===INF?'−1':dp[amount]}</span>`,
       done: true
@@ -284,7 +278,7 @@
       if (cur < 0) {
         stepDesc.innerHTML = 'Press "Next". We solve <code class="inline">coins = [1, 2, 5], amount = 6</code> by filling dp[0..6].';
         stepDesc.className = 'step-desc';
-        recurBox.innerHTML = 'dp[0] = 0 &nbsp;(zero coins make amount 0 — the base case)';
+        recurBox.innerHTML = 'dp[0] = 0 &nbsp;(zero Azure units reach subtotal 0 — the base case)';
         prevBtn.disabled = true; nextBtn.disabled = false;
         return;
       }

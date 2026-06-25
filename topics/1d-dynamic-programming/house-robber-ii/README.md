@@ -15,9 +15,11 @@ nums = [1, 2, 3]        ->  3     # take house 2
 
 ## Real-World Analogy
 
-Yeh wahi chor wali gali hai, par ab gali ek **gol chakkar (circle)** me hai — pehla aur aakhri ghar bhi ek doosre ke bagal me hain, unke alarm bhi jude hain. Ab dikkat: agar tumne pehla ghar loota, to aakhri ghar nahi loot sakte; aur agar aakhri loota, to pehla nahi.
+**What Azure Update Manager is:** Azure Update Manager coordinates patching and maintenance for Azure, hybrid, and multicloud machines. It lets teams define recurring schedules so updates happen predictably while compliance stays visible. In a recurring calendar, the first and last slots can be neighbors because the schedule wraps around.
 
-Trick bahut sundar hai: ek circle ko do **straight lines** me tod do. Ya to **pehla ghar loot lo to aakhri chhodna padega** → toh sirf houses `0 .. n-2` consider karo. Ya **aakhri ghar ke liye jagah rakho, pehla chhod do** → houses `1 .. n-1` consider karo. Dono cases me yeh **plain House Robber** ban jaata hai (koi circle nahi). Dono ka answer nikaalo, **bada chuno**. Pehla aur aakhri kabhi saath nahi aate — circle ka constraint khud-ba-khud handle ho gaya.
+**What circular maintenance-calendar conflict handling is, and why it's used:** A circular maintenance plan must treat the end of one cycle as adjacent to the start of the next. That rule exists because choosing both edge windows could still update dependent systems too close together, even though they appear far apart in a flat list. The clean way to enforce the conflict is to solve two safe linear schedules: one excluding the first window and one excluding the last.
+
+**The mapping:** The circular street is Azure Update Manager's recurring calendar, and each maintenance window has a value. Run the normal non-adjacent DP once on windows `0..n-2` and once on `1..n-1`, then take the better cached schedule. The key insight is that breaking the first/last conflict converts the circle into two ordinary House Robber problems.
 
 ## Approach
 

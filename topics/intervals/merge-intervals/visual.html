@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Merge Intervals — sort then sweep on a timeline</title>
+<title>Merge Intervals — Azure maintenance window consolidation</title>
 <style>
   :root{
     --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
@@ -62,12 +62,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Merge Intervals — <span>sort</span>, then sweep</h1>
-  <p class="subtitle">Combine all overlapping ranges into the fewest non-overlapping ones. The whole trick is sorting by start first.</p>
+  <h1>Merge Intervals — Azure maintenance <span>consolidation</span></h1>
+  <p class="subtitle">Combine overlapping Azure maintenance windows into the fewest continuous windows. The whole trick is sorting by start first.</p>
 
   <div class="analogy">
-    <h3>🖍️ The highlighter analogy</h3>
-    <p>Timeline pe overlapping highlighter strokes ko ek lambe stroke me jodo. Pehle strokes ko <b>start ke order me line up</b> karo. Phir left→right: agla stroke current ko touch/overlap kare (<code>start ≤ current.end</code>) → end ko <code>max</code> tak stretch karo; warna current band karo aur naya shuru.</p>
+    <h3>🛠️ Azure Update Manager analogy</h3>
+    <p>Multiple teams may submit Azure maintenance windows for the same VM fleet. Sort the windows by start time, then sweep left to right: overlapping windows are consolidated by extending the end to <code>max</code>, while a gap starts a separate announced window.</p>
   </div>
 
   <div class="problem">
@@ -98,7 +98,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>After sorting by start, each interval only has to be checked against the <i>last</i> merged block. Overlap → stretch the end with <code>max</code>; gap → start a fresh block. O(n log n).</p>
+    <p>After sorting Azure maintenance windows by start, compare each window only with the <i>last</i> consolidated block. Overlap → extend the end with <code>max</code>; gap → announce a fresh window. O(n log n).</p>
   </div>
 </div>
 
@@ -125,12 +125,12 @@ function buildSteps(){
     activeChip:o.activeChip??-1
   });
 
-  steps.push(snap({caption:`Input is <b>unsorted</b>: [[2,6],[1,3],[15,18],[8,10]]. Step 1 is always to <b>sort by start</b>.`}));
-  steps.push(snap({sorted:true,caption:`Sorted by start → <b>[[1,3],[2,6],[8,10],[15,18]]</b>. Now sweep left→right, merging into the last block.`}));
+  steps.push(snap({caption:`Azure maintenance windows are <b>unsorted</b>: [[2,6],[1,3],[15,18],[8,10]]. Step 1 is always to <b>sort by start</b>.`}));
+  steps.push(snap({sorted:true,caption:`Sorted by start → <b>[[1,3],[2,6],[8,10],[15,18]]</b>. Now sweep left→right, consolidating into the last Azure window.`}));
 
   // current block = sorted[0]
   let block=[...sorted[0]];
-  steps.push(snap({sorted:true,current:0,block,caption:`Open the first merged block with <b>[1,3]</b> (blue = current block).`}));
+  steps.push(snap({sorted:true,current:0,block,caption:`Open the first consolidated Azure window with <b>[1,3]</b> (blue = current block).`}));
 
   for(let i=1;i<sorted.length;i++){
     const [s,e]=sorted[i];

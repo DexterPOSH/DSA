@@ -17,14 +17,11 @@ Otherwise return `False`.
 
 ## Real-World Analogy
 
-Socho do log ek hi sentence ko padh rahe hain — ek **shuruaat se** (left), ek
-**aakhir se** (right). Dono ek-ek letter aage badhte hain aur beech me milte hain.
-Har step pe wo apna-apna letter compare karte hain: agar kabhi bhi do letters
-match nahi karte, to sentence palindrome nahi hai — bas wahi ruk jao. Lekin ek
-twist hai: dono readers spaces, commas aur capital/small ka farak ignore karte
-hain — sirf "real" letters aur digits matter karte hain. Isiliye agar koi pointer
-pe junk character (space, punctuation) aaye, to wo bina compare kiye usse skip
-kar deta hai.
+**What Azure Storage geo-redundant storage (GRS) is:** Azure Storage GRS keeps data durable by asynchronously replicating a storage account's data from a primary region to a paired secondary region. It is used for disaster recovery and regional resilience so blobs, metadata, and other storage data remain protected even if a region has problems. Conceptually, you can think of it as maintaining a faithful secondary copy of the primary blob's logical contents.
+
+**What manifest mirror verification is, and why it's used:** A blob manifest or block list describes the logical pieces that make up a blob, while metadata and checksums help systems reason about integrity. In this analogy, a verifier canonicalizes the primary and mirrored manifests by ignoring separators, punctuation-like markers, and casing differences, then compares the meaningful tokens from the outside inward. The point of that verification is to catch the first real mismatch cheaply while ignoring formatting noise that does not change the stored data.
+
+**The mapping:** The string is the Azure Storage manifest text, non-alphanumeric characters are manifest separators to skip, and `.lower()` is the normalization step before comparing tokens. Pointer `l` reads from the primary-side start, pointer `r` reads from the mirrored-side end, and every matching pair proves one more symmetric layer is consistent. The key insight is to canonicalize while scanning with two pointers, so you verify symmetry in O(1) extra space instead of building a cleaned copy first.
 
 ## Approach
 

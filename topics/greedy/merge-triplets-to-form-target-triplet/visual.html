@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Merge Triplets — Filter &amp; Per-Axis Cover</title>
+<title>Merge Triplets — Azure SKU Target Cover</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -111,17 +111,14 @@
 </head>
 <body>
 
-  <h1>Merge Triplets to Form Target &mdash; <span>Filter &amp; Per-Axis Cover</span></h1>
+  <h1>Merge Triplets to Form Target &mdash; <span>Azure SKU Target Cover</span></h1>
 
   <div class="analogy">
-    <div class="ic">🎯</div>
+    <div class="ic">🧱</div>
     <div>
       <div class="label">Real-world analogy</div>
       <div class="analogy-text">
-        3 skill scores ka exact hire-bar match karna hai. Merge = team up, har skill me
-        <strong>best-of-the-two</strong>. Koi candidate kisi skill me target se
-        <strong>zyada</strong>? Wo us axis ko overshoot kara dega — <em>skip</em>. Bache
-        safe candidates me se kya har axis pe koi exactly target tak pahunchta hai?
+        Azure Advisor and VM SKU recommendations can be combined only if none exceeds the target CPU/memory/disk profile. Greedily skip over-target options, then record which safe recommendations hit each dimension exactly; if all axes are covered, the target is reachable.
       </div>
     </div>
   </div>
@@ -129,7 +126,7 @@
   <div class="card">
     <div>
       <div class="section-label">What's happening</div>
-      <div class="step-desc" id="stepDesc">Press "Next". <code class="inline">target = [2,7,5]</code>. We scan each triplet: reject if any value &gt; target, else record which axes it matches exactly.</div>
+      <div class="step-desc" id="stepDesc">Press "Next". <code class="inline">target = [2,7,5]</code>. We scan Azure profile candidates: reject any value &gt; target, else record which axes it matches exactly.</div>
     </div>
 
     <div>
@@ -169,7 +166,7 @@
     <div class="ic">💡</div>
     <div>
       <div class="label">Key takeaway</div>
-      <p>Max-merge never shrinks any axis, so <strong>drop every over-target triplet</strong> and ask only: does some valid triplet hit <code class="inline">target</code> on each of the 3 axes? Cover all 3 → <strong>True</strong>.</p>
+      <p>Max-merge never shrinks any Azure profile dimension, so <strong>drop every over-target option</strong> and ask only whether safe recommendations hit <code class="inline">target</code> on all 3 axes. Cover all 3 → <strong>True</strong>.</p>
     </div>
   </div>
 
@@ -181,13 +178,13 @@ const axisNames = ['a','b','c'];
 function buildSteps() {
   const steps = [];
   let hit = new Set();
-  steps.push({ desc:`Goal: cover all 3 axes of target [${target.join(', ')}]. Scan triplets, skip any that exceed target on any axis.`, cur:-1, hit:new Set(), status:'init' });
+  steps.push({ desc:`Goal: cover all 3 Azure profile axes of target [${target.join(', ')}]. Scan candidates, skip any that exceed target on any axis.`, cur:-1, hit:new Set(), status:'init' });
 
   triplets.forEach((t,i) => {
     const [a,b,c] = t;
     const over = a>target[0] || b>target[1] || c>target[2];
     if (over) {
-      steps.push({ desc:`Triplet ${i} = [${t.join(', ')}]: some value exceeds target (over-target). Merging it would overshoot forever → reject, skip.`, cur:i, hit:new Set(hit), status:'reject' });
+      steps.push({ desc:`Candidate ${i} = [${t.join(', ')}]: some value exceeds target (over-target). Merging it would overshoot forever → reject, skip.`, cur:i, hit:new Set(hit), status:'reject' });
     } else {
       const newHits = [];
       if (a===target[0]) newHits.push(0);
@@ -195,13 +192,13 @@ function buildSteps() {
       if (c===target[2]) newHits.push(2);
       newHits.forEach(p=>hit.add(p));
       const matchTxt = newHits.length ? `matches axis ${newHits.map(p=>axisNames[p]).join(', ')} exactly` : `valid but matches no axis exactly`;
-      steps.push({ desc:`Triplet ${i} = [${t.join(', ')}]: all ≤ target ✓ — ${matchTxt}. hit = {${[...hit].sort().join(', ')}}.`, cur:i, hit:new Set(hit), status:'valid', newHits });
+      steps.push({ desc:`Candidate ${i} = [${t.join(', ')}]: all ≤ target ✓ — ${matchTxt}. hit = {${[...hit].sort().join(', ')}}.`, cur:i, hit:new Set(hit), status:'valid', newHits });
     }
   });
 
   const ok = hit.size === 3;
   steps.push({ desc: ok
-      ? `All 3 axes covered (hit = {0,1,2}). Merge those matching valid triplets → target is reachable. Return True ✓`
+      ? `All 3 Azure axes covered (hit = {0,1,2}). Merge those matching valid candidates → target is reachable. Return True ✓`
       : `Only axes {${[...hit].sort().join(', ')}} covered — not all 3. Return False ✗`,
     cur:-1, hit:new Set(hit), status: ok?'success':'fail' });
   return steps;

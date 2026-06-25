@@ -19,17 +19,11 @@ height = [1, 1]                        ->  1
 
 ## Real-World Analogy
 
-Socho deewar pe alag-alag height ke planks lage hain aur tum unke beech paani
-bharna chahte ho. Paani sirf **chhote wale plank** ki height tak hi ruk sakta hai
-(zyada bhar do to overflow). Aur jitne door do planks honge, utna **chaudai
-(width)** zyada.
+**What Azure Blob Storage is:** Azure Blob Storage is Azure's object-storage service for massive unstructured data such as logs, backups, media, and data-lake files. Large blobs are commonly moved as byte ranges or blocks, and Azure Storage metrics help teams reason about throughput, latency, and safe transfer sizing. When you choose a transfer window, you care about both how wide the range is and which side becomes the bottleneck.
 
-Ab trick: do log sabse bahar wale planks pe khade hain (`l` leftmost, `r`
-rightmost) — max width se shuruaat. Area chhote plank se limited hai. To sochо —
-agar tum **lambe** wale plank ko andar khisko, to width to kam hogi hi, aur height
-bhi chhote plank se hi capped rahegi — koi faayda nahi. Lekin agar **chhote** wale
-plank ko andar khisko, to shaayad uske peeche koi lamba plank mile jo zyada paani
-roke. Isiliye hamesha **chhota wala pointer move karo**.
+**What a blob transfer window is, and why it's used:** A transfer window is a chosen span between two blob offsets that a client treats as one candidate chunk of work. The useful throughput across that span is limited by the weaker boundary capacity, not the stronger one, because the slow endpoint throttles the whole window. Starting with the widest possible window gives maximum distance first; if one side is already the bottleneck, moving the stronger side inward only shrinks the window while the same weaker side still caps it.
+
+**The mapping:** `l` and `r` are the Azure Blob Storage boundary offsets, `r - l` is the transfer-window width, and `min(height[l], height[r])` is the lower boundary capacity that limits the transfer. Each area calculation is "width × bottleneck capacity." Move the lower-capacity boundary inward because only finding a stronger limiter can improve the product; the key insight is that every skipped window using the same shorter side would be narrower and no taller.
 
 ## Approach
 

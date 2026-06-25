@@ -21,7 +21,11 @@ sum = 100           ->   0 -> 0 -> 1
 
 ## Real-World Analogy
 
-Yaad karo **school me column addition** — do numbers ek ke neeche ek likho, **rightmost column se** jodna shuru karo. Har column me do digits jodo; agar sum 10 ya zyada hua to ek **carry** agle (left waale) column me le jaao. Bas yahan lists reverse me hain, to "rightmost column" hi **head** hai — tum bilkul natural left-to-right list traversal karte ho, jo asli addition me right-to-left jod ke barabar hai. Carry ko ek chhoti si jeb (variable) me sambhaal kar rakho.
+**What Azure Service Bus is:** Azure Service Bus is a managed messaging broker for decoupling producers and consumers across cloud apps. It stores messages durably in queues or topics so a worker, such as an Azure Function, can process them reliably even if the sender and receiver run at different times. In this analogy, each Service Bus session is one ordered stream of digit messages.
+
+**What Service Bus session ordering is, and why it's used:** A session groups related messages under a session ID and lets a receiver process that group in FIFO order while holding a session lock. This exists for workflows where order matters, like all events for one order or customer, instead of treating every message as independent. The receiver can keep a small carry value while it walks the two sessions because addition only needs the current pair of digits plus overflow from the previous pair.
+
+**The mapping:** The two linked lists are the two Azure Service Bus sessions; each node is the current digit message, and `next` is reading the next message in that session. The algorithm adds the two current payloads plus `carry`, emits `sum % 10` as the next result message, and moves the carry `sum // 10` forward. Because the lists store least-significant digits first, the streaming order matches arithmetic order exactly; the dummy head is the already-open output stream, so every new digit appends the same way, and the key insight is to process one digit and one carry at a time.
 
 ## Approach
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>House Robber II — break the circle into two linear DP passes</title>
+<title>House Robber II — Azure circular maintenance-window DP</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -139,29 +139,29 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>House Robber II — break the <span>circle</span> into two linear passes</h1>
-  <p class="subtitle">Circular street <code>nums = [2, 7, 9, 3, 1]</code> — first &amp; last houses are adjacent.</p>
+  <h1>House Robber II — split a <span>circular Azure maintenance calendar</span></h1>
+  <p class="subtitle">Recurring Azure maintenance calendar <code>nums = [2, 7, 9, 3, 1]</code> — first and last slots conflict.</p>
 
   <div class="analogy">
     <h3>🔁 Real-world analogy</h3>
-    <p>Gali ab gol hai — pehla aur aakhri ghar bhi bagal me. Toh ya <b>pehla loota (aakhri chhoda)</b> → houses <code>0..n-2</code>, ya <b>aakhri loota (pehla chhoda)</b> → houses <code>1..n-1</code>. Dono plain House Robber ban jaate hain. Dono ka max lo.</p>
+    <p>Azure Update Manager on a recurring calendar has first and last maintenance windows adjacent. Break the circle into two cached linear schedules—exclude first or exclude last—and take the better result.</p>
   </div>
 
   <div class="card">
     <div class="section-label">Step description</div>
-    <div class="step-desc" id="stepDesc">Press <b>Next →</b> to see how we break the circle.</div>
+    <div class="step-desc" id="stepDesc">Press <b>Next →</b> to see how the Azure calendar is split.</div>
 
-    <div class="section-label">The circular street</div>
+    <div class="section-label">The circular Azure calendar</div>
     <div class="ring" id="ring"></div>
 
     <div class="section-label">Two linear DP passes</div>
     <div class="dp-block">
-      <div class="pass-title a" id="titleA">Pass A — exclude last house (houses 0 … n-2)</div>
+      <div class="pass-title a" id="titleA">Pass A — exclude last slot (slots 0 … n-2)</div>
       <div class="dp-row" id="dpRowA"></div>
       <div class="pass-result" id="resA"></div>
     </div>
     <div class="dp-block" style="margin-top:22px;">
-      <div class="pass-title b" id="titleB">Pass B — exclude first house (houses 1 … n-1)</div>
+      <div class="pass-title b" id="titleB">Pass B — exclude first slot (slots 1 … n-1)</div>
       <div class="dp-row" id="dpRowB"></div>
       <div class="pass-result" id="resB"></div>
     </div>
@@ -190,7 +190,7 @@
 
   <div class="takeaway">
     <h3>💡 Key takeaway</h3>
-    <p>Circular constraint ko do linear House Robber subproblems me todo — ek first ko allow kare, doosra last ko. Pehla aur aakhri kabhi saath nahi aate, aur max le lo. <b>O(n) time, O(1) space.</b></p>
+    <p>Break the circular Azure maintenance constraint into two linear cached schedules: one allows the first slot and excludes the last, the other allows the last slot and excludes the first. The first and last slots never appear together, so take the larger cached result. <b>O(n) time, O(1) space.</b></p>
   </div>
 </div>
 
@@ -332,13 +332,13 @@
     }
 
     if (!active || active.kind === 'intro') {
-      stepDesc.innerHTML = 'A circular street: house <code>0</code> and house <code>'+(n-1)+'</code> are neighbours too. We cut the circle by trying each as excluded, turning it into two ordinary House Robber lines.';
+      stepDesc.innerHTML = 'A recurring Azure maintenance calendar: slot <code>0</code> and slot <code>'+(n-1)+'</code> conflict too. We cut the circle by trying each as excluded, turning it into two ordinary non-adjacent schedules.';
     } else if (active.kind === 'passStart') {
       const p = active.pass;
       markPassRing(p);
       stepDesc.innerHTML = p === 'A'
-        ? '<b>Pass A:</b> assume we <i>could</i> rob the first house, so we <b>exclude the last</b>. Run plain House Robber on houses <code>0 … '+(n-2)+'</code>.'
-        : '<b>Pass B:</b> assume we <i>could</i> rob the last house, so we <b>exclude the first</b>. Run plain House Robber on houses <code>1 … '+(n-1)+'</code>.';
+        ? '<b>Pass A:</b> allow the first Azure slot, so <b>exclude the last</b>. Run the linear maintenance-window DP on slots <code>0 … '+(n-2)+'</code>.'
+        : '<b>Pass B:</b> allow the last Azure slot, so <b>exclude the first</b>. Run the linear maintenance-window DP on slots <code>1 … '+(n-1)+'</code>.';
     } else if (active.kind === 'compute') {
       const p = active.pass;
       markPassRing(p);
@@ -353,7 +353,7 @@
       $(rowId+'-'+gi).parentElement.classList.add('is-active');
       $('ringH-'+gi).classList.add('robbed');
       if (i === 0) {
-        stepDesc.innerHTML = `<b>${p}: dp[${gi}] = nums[${gi}] = ${arr[0]}</b>. First house of this line.`;
+        stepDesc.innerHTML = `<b>${p}: dp[${gi}] = nums[${gi}] = ${arr[0]}</b>. First maintenance slot in this line.`;
         calcLine.innerHTML = `dp[${gi}] = <span class="res">${dp[0]}</span>`;
       } else if (i === 1) {
         stepDesc.innerHTML = `<b>${p}: dp[${gi}] = max(${arr[0]}, ${arr[1]}) = ${dp[1]}</b>.`;

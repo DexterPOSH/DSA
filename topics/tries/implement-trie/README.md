@@ -23,16 +23,11 @@ trie.search("app")       -> True
 
 ## Real-World Analogy
 
-Socho ek **dictionary ka shelf-of-shelves** hai. Top shelf pe 26 dabbe — `a` se
-`z`. Tum "apple" rakhne jaate ho: pehle `a` wala dabba kholo, uske andar phir 26
-chhote dabbe, unme se `p` kholo, phir `p`, phir `l`, phir `e`. Jis dabbe pe word
-khatam hua, uspe ek **chhota flag laga do — "yahan ek poora word khatam hota
-hai"**.
+**What Azure Cognitive Search is:** Azure Cognitive Search is a managed search service for building searchable indexes over app data, documents, product catalogs, logs, and other text-heavy content. It stores analyzed terms in an index so applications can answer search, filtering, and typeahead queries quickly instead of scanning every record. For autocomplete-style UX, Azure needs to recognize partial prefixes while a user is still typing.
 
-Ab koi `startsWith("app")` puchhe to bas `a → p → p` ka raasta follow karo — agar
-raasta exist karta hai, prefix mil gaya, chahe aage word khatam ho ya na ho. Aur
-`search("app")` me wahi raasta follow karo **plus** end pe flag check karo — flag
-laga hai tabhi `True`. Yahi difference hai prefix aur poore word me.
+**What a suggester is, and why it's used:** A suggester is the Azure Cognitive Search feature that enables autocomplete and search suggestions on selected fields in an index. It precomputes searchable term paths so a prefix like `app` can quickly surface completions such as `app`, `apple`, or `application` without checking every indexed word from scratch. The important detail is that a valid prefix path is not always a complete term, so the index must know both "this prefix exists" and "a word ends here."
+
+**The mapping:** `insert(word)` is like adding a term to the Azure suggester: characters become shared edges, so `app`, `apple`, and `apt` reuse `a → p` before branching. `startsWith(prefix)` only asks whether the prefix path exists, which is enough for Azure to produce typeahead candidates. `search(word)` follows the same path but also checks `is_end`, because `app` as a complete indexed term is different from `app` merely being the beginning of `apple`; the key insight is that tries separate prefix existence from full-word membership.
 
 ## Approach
 

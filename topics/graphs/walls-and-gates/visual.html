@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Walls and Gates — Multi-Source BFS Distance Fill</title>
+<title>Walls and Gates — Azure gateway distance BFS</title>
 <style>
   :root {
     --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a; --text: #e0e0e0;
@@ -134,16 +134,14 @@
 </head>
 <body>
 
-  <h1>Walls and Gates &mdash; <span>Multi-Source BFS Distance Fill</span></h1>
+  <h1>Walls and Gates &mdash; <span>Azure Gateway Distance BFS</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">🚪</div>
+    <div class="analogy-icon">🧱</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Har <strong>gate</strong> ek saath chillata hai "main yahan hoon, 0 steps!" Yeh awaaz
-        ripple karke spread hoti hai. Jo pehli wave kisi room ko chhuye, wahi uska
-        <strong>nearest-gate distance</strong> hai. <strong>Walls</strong> ripple ko rok dete hain.
+        Azure Application Gateway or Azure Firewall instances are the gates, while NSG/route-table blocks are walls. Multi-source BFS starts all gateways at distance <strong>0</strong>; the first wave reaching a subnet gives its nearest-gateway hop count.
       </div>
     </div>
   </div>
@@ -151,17 +149,17 @@
   <div class="card">
     <div>
       <div class="section-label">Step description</div>
-      <div class="step-description" id="stepDesc">Press "Next". We seed every gate at distance 0, then ripple outward — each wave is distance +1.</div>
+      <div class="step-description" id="stepDesc">Press "Next". We seed every Azure gateway at distance 0, then BFS outward — each wave is one more network hop.</div>
     </div>
 
     <div class="layout">
       <div class="grid-box">
         <div class="grid" id="grid"></div>
         <div class="legend">
-          <span><span class="sw g"></span>gate (0)</span>
-          <span><span class="sw w"></span>wall (-1)</span>
-          <span><span class="sw d"></span>filled dist</span>
-          <span><span class="sw i"></span>INF room</span>
+          <span><span class="sw g"></span>Azure gateway (0)</span>
+          <span><span class="sw w"></span>NSG/route block (-1)</span>
+          <span><span class="sw d"></span>gateway distance</span>
+          <span><span class="sw i"></span>unlabeled subnet</span>
         </div>
       </div>
       <div class="side">
@@ -187,11 +185,7 @@
     <div class="takeaway-icon">💡</div>
     <div>
       <div class="takeaway-label">Key Takeaway</div>
-      <p>
-        Seed <strong>all gates</strong> into one queue, BFS outward. The first time a room is reached,
-        that hop-count <em>is</em> the nearest-gate distance — BFS layers never need correcting.
-        Only fill cells still marked <code>INF</code>. <strong>O(m·n) time and space.</strong>
-      </p>
+      <p>Seed <strong>all Azure gateways</strong> into one queue and BFS outward. The first time a subnet is reached, that hop count is its nearest-gateway distance; blocked routes never propagate. <strong>O(m·n) time and space.</strong></p>
     </div>
   </div>
 
@@ -216,8 +210,8 @@
         if (grid[r][c] === G) q.push([r,c]);
 
     steps.push({
-      desc: 'Scan the grid: seed <strong>every gate</strong> (value 0) into the queue. They are already ' +
-            'distance <code>0</code>. Walls (<code>-1</code>) block the ripple; rooms start as <code>INF</code>.',
+      desc: 'Scan the grid: seed <strong>every Azure gateway</strong> (value 0) into the queue. They are already ' +
+            'distance <code>0</code>. NSG/route blocks (<code>-1</code>) stop propagation; subnets start as <code>INF</code>.',
       grid: grid.map(r=>r.slice()), dist: 0, frontier: q.map(p=>p.join(',')), justFilled: [], cls: ''
     });
 
@@ -238,9 +232,9 @@
       dist++;
       if (justFilled.length === 0) break;   // no new rooms reached this wave
       steps.push({
-        desc: '<strong>Wave at distance ' + dist + ':</strong> every gate/room in the queue labels its ' +
+        desc: '<strong>Wave at distance ' + dist + ':</strong> every gateway/subnet in the queue labels its ' +
               '<code>INF</code> neighbours as <code>' + dist + '</code> and pushes them. ' +
-              '<code>' + justFilled.length + '</code> room(s) filled this wave.',
+              '<code>' + justFilled.length + '</code> subnet(s) labeled this wave.',
         grid: grid.map(r=>r.slice()), dist, frontier: nextQ.map(p=>p.join(',')), justFilled, cls: 'wave'
       });
       q = nextQ;
@@ -253,9 +247,9 @@
         if (grid[r][c] === INF) stranded++;
 
     steps.push({
-      desc: 'Queue drained — every reachable room now holds its nearest-gate distance. ' +
-            (stranded ? '<code>' + stranded + '</code> room(s) stay <code>INF</code> (no gate can reach them). '
-                      : 'All rooms reached. ') + 'Done. ✅',
+      desc: 'Queue drained — every reachable subnet now holds its nearest-gateway distance. ' +
+            (stranded ? '<code>' + stranded + '</code> subnet(s) stay <code>INF</code> (no gateway can reach them). '
+                      : 'All subnets reached. ') + 'Done. ✅',
       grid: grid.map(r=>r.slice()), dist, frontier: [], justFilled: [], cls: 'wave', done: true
     });
     return steps;

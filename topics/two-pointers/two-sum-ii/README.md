@@ -18,17 +18,11 @@ numbers = [-1, 0],         target = -1  ->  [1, 2]
 
 ## Real-World Analogy
 
-Socho ek **taraazu (balance scale)** hai. Tum sabse halke item ko left palde me
-rakhte ho aur sabse bhaari ko right palde me. Ab sum dekho:
+**What Azure Data Explorer (Kusto) is:** Azure Data Explorer is Azure's analytics engine for querying large volumes of logs, metrics, and telemetry with KQL. It is designed for fast scans and filters over numeric columns, especially when the data has been ordered for analysis. A sorted result lets you reason about which direction a value must move without checking every pair.
 
-- **Bahut zyada hai** (target se upar)? To right side se ek halka item lo — sabse
-  bhaari ko hata kar uske just-chhote se replace karo. `r -= 1`.
-- **Bahut kam hai**? To left side se ek bhaari item lo — sabse halke ko hata kar
-  uske just-bade se replace karo. `l += 1`.
+**What a bounded range scan is, and why it's used:** A bounded range scan keeps a lower cursor at the smallest candidate and an upper cursor at the largest candidate. If their sum is above the target threshold, the upper value is too large for the current lower bound, and any value to its right would only be worse; if the sum is below the target, the lower value is too small, and any value to its left would only be worse. This is used to exploit sorted order and find the pair in one pass without building a separate hash index.
 
-Kyunki array **sorted** hai, tumhe pata hai har taraf "halka" aur "bhaari" kahaan
-milega — bina poora dhundhe. Jab sum bilkul target ke barabar ho jaaye, mil gaya
-jodaa.
+**The mapping:** `numbers` is the sorted Azure Data Explorer numeric result, `l` and `r` are the Kusto range cursors, and `numbers[l] + numbers[r]` is the threshold check. Too high means lower the upper bound with `r -= 1`; too low means raise the lower bound with `l += 1`; equality returns the 1-indexed positions. The key insight is that sorted order makes each pointer move safe because it predictably decreases or increases the sum.
 
 ## Approach
 

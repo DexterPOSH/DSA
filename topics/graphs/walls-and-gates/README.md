@@ -25,7 +25,12 @@ INF  -1 INF  -1              1  -1   2  -1
 
 ## Real-World Analogy
 
-Socho ek building ka floor plan hai jisme kuch **exit gates** hain, kuch **walls**, aur baaki khaali rooms. Har room me ek sign lagana hai: "nearest exit kitne steps door hai?" Agar tum **har gate se ek saath** "main yahan hoon, 0 steps" announce karwao aur ye message ripple karke spread ho — pehla ripple jo kisi room tak pahunche, wahi uska nearest-gate distance hai. Kyunki saare gates ek saath chillate hain (**multi-source**), pehli wave jo room ko chhuye guaranteed shortest hai. Walls ripple ko rok dete hain.
+**What Azure Virtual Network is:** Azure Virtual Network (VNet) is Azure's private networking service for subnets, routes, and controlled entry or egress points. In this analogy, Azure Application Gateway or Azure Firewall acts like a gate, while NSG rules or route-table blocks act like walls. Every reachable subnet may need to know how many network hops it is from the nearest approved gateway.
+
+**What nearest-gateway distance calculation is, and why it's used:** Nearest-gateway distance calculation assigns each Azure subnet the shortest hop count to any allowed ingress or egress point. It is used for routing design, troubleshooting, and policy reasoning because the closest gateway often determines the preferred path and expected inspection point. Starting from all gateways at once is essential: each subnet should be claimed by the nearest source, not by whichever gateway you happened to process first.
+
+**The mapping:** Gates are Azure Application Gateway or Azure Firewall cells with distance `0`, walls are blocked NSG/route cells, and empty rooms are subnets waiting for a distance. Multi-source BFS expands from every gate in waves, writing a distance the first time it reaches a subnet because BFS visits nodes in increasing hop count. The key insight is that the first visit is guaranteed to be the nearest Azure gateway distance, and walls simply stop the wave.
+
 
 ## Approach
 

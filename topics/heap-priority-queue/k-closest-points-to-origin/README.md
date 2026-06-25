@@ -15,7 +15,11 @@ dist²:     10     8      89    1
 
 ## Real-World Analogy
 
-Socho tum ek **food-delivery dispatcher** ho aur tumhe ek order ke liye **2 sabse paas wale delivery riders** chahiye. Har rider ki distance aati rehti hai. Tum ek board pe sirf 2 "current closest" riders rakhte ho — board pe sabse **door wala** rider top pe dikhta hai (taaki turant kick out kar sako). Naya rider aaye: agar wo board ke sabse-door wale se bhi paas hai, to door wale ko hatao aur isse rakho. Wo "sabse door top pe" wala board ek **max-heap of size k** hai.
+**What Azure Maps is:** Azure Maps is Azure's geospatial service for rendering maps, geocoding addresses, routing vehicles, and building location-aware applications. A dispatch or logistics app can use Azure Maps data to reason about where depots, drivers, devices, or responders are relative to a request location. The practical question is often not "sort every place on earth," but "which k candidates are closest to this point?"
+
+**What nearest-resource selection is, and why it's used:** Nearest-resource selection ranks candidate locations by distance from a target location so an app can pick the best few resources quickly. When the candidate set is large and `k` is small, fully sorting every distance wastes work, because far-away candidates only matter if they are close enough to enter the current top-k. A bounded max-heap keeps only the best k candidates and exposes the current farthest accepted one as the easiest item to evict.
+
+**The mapping:** Each point is an Azure Maps-style candidate location, and `x² + y²` is its distance score from the request at the origin. The heap stores the current k closest points, while the root is the farthest point still allowed in that accepted set. When a new point is closer than the root, replace the root; otherwise ignore it. The key insight is that top-k closeness only needs a moving boundary, not a full sorted ranking of every point.
 
 ## Approach
 

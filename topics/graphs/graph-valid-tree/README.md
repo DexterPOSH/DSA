@@ -19,9 +19,12 @@ n = 4, edges = [[0,1], [2,3]]   ->  False   # no cycle, but two components (disc
 
 ## Real-World Analogy
 
-Socho ek company ka **org chart** banana hai jisme har employee ek hi boss-chain se ultimately CEO tak jude — koi alag-thalag (disconnected) na ho, aur koi **circular reporting** (A reports to B, B to C, C back to A — cycle) bhi na ho. Wahi do conditions ek valid tree banati hain: **sab connected** + **koi loop nahi**.
+**What Azure Virtual Network is:** Azure Virtual Network (VNet) is Azure's private network container for subnets, IP ranges, gateways, and connected workloads. VNets can be linked with VNet peering so resources in separate networks communicate over Azure's backbone. Looking at all VNets and peerings together gives you a topology graph.
 
-Ek pyaara shortcut bhi hai: ek tree me hamesha **exactly `n-1` edges** hote hain. To pehle hi `len(edges) != n-1` ho to seedha `False` — ya to extra edge (cycle) hoga ya kam edge (disconnected).
+**What VNet peering topology validation is, and why it's used:** A tree-shaped peering topology means every VNet is reachable, but there is exactly one simple path between any two VNets. Teams may enforce that shape for labs, controlled landing zones, or simplified governance because it rules out isolated VNets and redundant loops. The validation checks both requirements: `n - 1` peering links for `n` VNets, and no link that connects two VNets already connected through another path.
+
+**The mapping:** Each graph node is an Azure VNet and each edge is a peering link. Union-Find processes peerings one by one: if two endpoints already share a root, adding that peering would create a cycle; otherwise it merges their components. The key insight is that a valid tree is exactly connected plus acyclic, and the `n - 1` edge count lets those two properties meet in one clean test.
+
 
 ## Approach — Union-Find (cycle + connectivity in one pass)
 

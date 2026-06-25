@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Maximum Product Subarray — tracking max & min together</title>
+<title>Maximum Product Subarray — Azure stream extremes DP</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -162,12 +162,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Maximum Product <span>Subarray</span> — why we track max <em>and</em> min</h1>
-  <p class="subtitle">A negative number flips the order: today's smallest product can become tomorrow's largest.</p>
+  <h1>Maximum Product <span>Subarray</span> — Azure stream extremes DP</h1>
+  <p class="subtitle">In an Azure metric stream, a negative multiplier can flip the cached minimum into the next maximum.</p>
 
   <div class="analogy">
-    <h3>📈 The trader's flip</h3>
-    <p>Do <b>bure (negative)</b> din milke ek <b>bada gain</b> ban sakte hain. Isliye sirf "best so far" yaad rakhna kaafi nahi — sabse <b>chhota (most negative)</b> product bhi carry karo, kyunki agla negative use palat ke sabse bada bana sakta hai.</p>
+    <h3>📊 Real-world analogy</h3>
+    <p>Azure Stream Analytics keeps running max and min products for a metric window because a negative multiplier can flip the smallest value into the largest. Each event reuses those cached extremes to update the result.</p>
   </div>
 
   <div class="problem">
@@ -185,7 +185,7 @@
     <div class="candidates" id="cands">
       <div class="lbl">Press <b>Next</b> to start the walkthrough.</div>
     </div>
-    <div class="caption" id="cap">We track both extremes because multiplication by a negative swaps them.</div>
+    <div class="caption" id="cap">We track both Azure stream extremes because a negative multiplier swaps them.</div>
 
     <div class="controls">
       <button class="ghost" id="prev" disabled>‹ Prev</button>
@@ -196,7 +196,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Carry <b>both</b> the running max and min product. At each element the new max is the best of <code>n</code>, <code>cur_max·n</code>, <code>cur_min·n</code> — O(n) time, O(1) space.</p>
+    <p>Azure Stream Analytics must carry <b>both</b> cached extremes for the current window. At each metric the new max is the best of <code>n</code>, <code>cur_max·n</code>, and <code>cur_min·n</code> — O(n) time, O(1) space.</p>
   </div>
 </div>
 
@@ -239,7 +239,7 @@ const steps = [];
   steps.push({
     i: nums.length - 1, n: nums[nums.length-1],
     curMax, curMin, result, done: true, cands: null,
-    cap: `Done. Largest product over any contiguous subarray = ${result}.`
+    cap: `Done. Largest Azure stream product over any contiguous window = ${result}.`
   });
 })();
 

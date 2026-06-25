@@ -160,8 +160,8 @@
   <p class="subtitle">Har step me search window aadhi kat jaati hai — O(log n).</p>
 
   <div class="analogy">
-    <h3>📖 Analogy: dictionary me word dhoondna</h3>
-    <p>Page 1 se nahi palatte — <b>beech me kholo</b>. Word aage hai? Left half bhul jao. Peeche hai? Right half bhul jao. Har baar aadha kaat do. 1000 pages → ~10 jumps.</p>
+    <h3>🔎 Analogy: Azure Cosmos DB range index seek</h3>
+    <p>An <b>Azure Cosmos DB range index</b> keeps keys ordered, so a point lookup probes the middle of the remaining index range. Each comparison discards the lower or upper half, matching binary search on a sorted array.</p>
   </div>
 
   <div class="problem">
@@ -185,7 +185,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Sorted data pe, beech ka element dekh kar ek aadha discard karte raho — `mid` se compare, window shrink, O(log n) me answer.</p>
+    <p>On sorted data, compare <code>mid</code> with the target and keep only the half that can still contain it — O(log n), O(1) space.</p>
   </div>
 </div>
 
@@ -198,20 +198,20 @@ function buildSteps() {
   const steps = [];
   let lo = 0, hi = nums.length - 1;
   steps.push({ lo, hi, mid: null, kind: 'init',
-    text: `Start: window = entire array. <code>lo = 0</code>, <code>hi = ${hi}</code>. Dono ends pe pointers.` });
+    text: `Start: window = entire array. <code>lo = 0</code>, <code>hi = ${hi}</code>. Pointers begin at both ends.` });
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
     if (nums[mid] === target) {
       steps.push({ lo, hi, mid, kind: 'found',
-        text: `<code>mid = ${mid}</code>, <code>nums[${mid}] = ${nums[mid]}</code> === target. <b>Mil gaya!</b> return ${mid}. ✅` });
+        text: `<code>mid = ${mid}</code>, <code>nums[${mid}] = ${nums[mid]}</code> === target. <b>Found it!</b> return ${mid}. ✅` });
       break;
     } else if (nums[mid] < target) {
       steps.push({ lo, hi, mid, kind: 'right',
-        text: `<code>mid = ${mid}</code>, <code>nums[${mid}] = ${nums[mid]} &lt; ${target}</code>. Target <b>right half</b> me. Discard left → <code>lo = mid + 1 = ${mid+1}</code>.` });
+        text: `<code>mid = ${mid}</code>, <code>nums[${mid}] = ${nums[mid]} &lt; ${target}</code>. Target is in the <b>right half</b>. Discard left → <code>lo = mid + 1 = ${mid+1}</code>.` });
       lo = mid + 1;
     } else {
       steps.push({ lo, hi, mid, kind: 'left',
-        text: `<code>mid = ${mid}</code>, <code>nums[${mid}] = ${nums[mid]} &gt; ${target}</code>. Target <b>left half</b> me. Discard right → <code>hi = mid - 1 = ${mid-1}</code>.` });
+        text: `<code>mid = ${mid}</code>, <code>nums[${mid}] = ${nums[mid]} &gt; ${target}</code>. Target is in the <b>left half</b>. Discard right → <code>hi = mid - 1 = ${mid-1}</code>.` });
       hi = mid - 1;
     }
   }

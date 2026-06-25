@@ -122,8 +122,8 @@
   <p class="subtitle">Longest strictly-increasing walk through a grid, moving only up/down/left/right.</p>
 
   <div class="analogy">
-    <h3>⛰️ Analogy: uphill-only hiking</h3>
-    <p>Grid ek height-map hai, har cell ki value altitude. Hiker sirf <b>strictly upar</b> ja sakta hai (4 padosi cells). "Is cell se aage longest uphill trail" fixed hai aur koi cycle possible nahi — to har cell ka answer ek baar nikaal ke <b>memo</b> me likh do. Green badge = memoized length.</p>
+    <h3>🛰️ Analogy: Azure regional failover scores</h3>
+    <p>Imagine neighboring Azure regions with increasing readiness scores; a route can only move to a higher-scored region. Cache each cell's best onward chain so every incoming route reuses it instead of recomputing DFS.</p>
   </div>
 
   <div class="problem">
@@ -189,7 +189,7 @@ const steps = [
   { memo:{}, cur:[2,1], path:[[2,1]], neigh:null,
     cap:`Start a DFS from the smallest cell <span class="eq">(2,1)=1</span> (bottom middle). <code>best=1</code> for the cell itself; now scan its higher neighbors.` },
   { memo:{}, cur:[2,1], path:[[2,1]], neigh:[2,0],
-    cap:`Left neighbor <span class="hi">(2,0)=2</span> &gt; 1 ✓ — a valid uphill step. Recurse into it.` },
+    cap:`Left neighbor <span class="hi">(2,0)=2</span> &gt; 1 ✓ — a valid higher-readiness hop. Recurse into it.` },
   { memo:{}, cur:[2,0], path:[[2,1],[2,0]], neigh:[1,0],
     cap:`At <span class="eq">(2,0)=2</span>. Its only higher neighbor is up <span class="hi">(1,0)=6</span> &gt; 2 ✓. Recurse.` },
   { memo:{}, cur:[1,0], path:[[2,1],[2,0],[1,0]], neigh:[0,0],

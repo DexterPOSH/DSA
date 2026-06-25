@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Maximum Subarray — Kadane's Running Total Visualized</title>
+<title>Maximum Subarray — Azure Cost Window Visualized</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -143,12 +143,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Maximum Subarray — <span>Kadane's</span> running total</h1>
-  <p class="subtitle">Walk the array once, keeping a <b>cur</b> running sum and the <b>best</b> ever seen.</p>
+  <h1>Maximum Subarray — Azure <span>cost window</span></h1>
+  <p class="subtitle">Walk the array once like an Azure cost dashboard, keeping a <b>cur</b> running window and the <b>best</b> ever seen.</p>
 
   <div class="analogy">
-    <h3>🚗 Real-world analogy: the road-trip profit</h3>
-    <p>Har stretch pe paisa kamao (+) ya kharch karo (−). Ek <b>running profit</b> rakho — jaise hi wo negative ho jaaye, use carry mat karo, <b>wahin se fresh start</b> lo. Saath me ab tak ka <b>best profit</b> diary me note karte raho.</p>
+    <h3>📊 Azure analogy: Cost Management rolling window</h3>
+    <p>Azure Cost Management and Azure Monitor can scan hourly net value for a workload. Kadane's keeps the current cost-benefit window only while it helps; once the window is negative, dropping that prefix is the locally best choice, while <code>best</code> records the strongest window seen.</p>
   </div>
 
   <div class="card">
@@ -190,7 +190,7 @@
 
   <div class="takeaway">
     <h3>💡 Key takeaway</h3>
-    <p>A negative running prefix can only hurt future sums — so the moment <code>cur</code> would do better restarting at <b>x</b> alone, restart. One O(n) pass, O(1) space, and <code>best</code> captures any subarray that peaks mid-stream.</p>
+    <p>A negative Azure cost-benefit window can only hurt future totals, so restart the window when <code>cur + x &lt; x</code>. One O(n) pass keeps the local best ending here and the global best window seen so far.</p>
   </div>
 </div>
 
@@ -227,7 +227,7 @@ const trace = [];
     }
     const desc = decision === 'extend'
       ? `<code>nums[${i}] = ${x}</code>: <b>extend</b> — <code>cur+x = ${cur} ≥ ${x}</code>, so keep the running subarray. ${bestUpdated ? `New <b>best = ${best}</b>! ✅` : `best stays <b>${best}</b>.`}`
-      : `<code>nums[${i}] = ${x}</code>: <b>fresh start</b> — old <code>cur</code> was a drag (<code>cur+x &lt; ${x}</code>), so drop it and restart at ${x}. ${bestUpdated ? `New <b>best = ${best}</b>! ✅` : `best stays <b>${best}</b>.`}`;
+      : `<code>nums[${i}] = ${x}</code>: <b>fresh start</b> — the prior Azure value window is negative (<code>cur+x &lt; ${x}</code>), so drop it and restart at ${x}. ${bestUpdated ? `New <b>best = ${best}</b>! ✅` : `best stays <b>${best}</b>.`}`;
     trace.push({ i, cur, best, winStart, winEnd, bestStart, bestEnd, decision, desc, bestUpdated });
   }
 }
@@ -280,7 +280,7 @@ function render() {
   } else if (s.decision === 'extend') {
     $('decision').innerHTML = `<span class="extend">EXTEND</span>: cur + x ≥ x → attach <code>nums[${s.i}]</code> to the running subarray. cur = <b>${s.cur}</b>.`;
   } else {
-    $('decision').innerHTML = `<span class="reset">FRESH START</span>: the old prefix was negative baggage → restart at <code>nums[${s.i}] = ${nums[s.i]}</code>. cur = <b>${s.cur}</b>.`;
+    $('decision').innerHTML = `<span class="reset">FRESH START</span>: the prior Azure window hurts future value → restart at <code>nums[${s.i}] = ${nums[s.i]}</code>. cur = <b>${s.cur}</b>.`;
   }
 }
 

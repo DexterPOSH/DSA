@@ -16,9 +16,11 @@ Let `N` = total number of nodes across all lists.
 
 ## Real-World Analogy
 
-Socho `k` alag-alag **vending machine queues** hain, har queue apne aap me sorted (sabse chhota aage). Tumhe ek single sorted line banani hai. Har baar tum saari queues ke **front (sabse aage wale) bande** ko dekho aur unme se **sabse chhota** uthao — usse final line me daal do, aur uss queue ka agla banda front pe aa jaata hai.
+**What Azure Event Hubs is:** Azure Event Hubs is Azure's high-throughput event ingestion service for logs, telemetry, clicks, and other streaming data. It accepts events from producers and stores them in partitions so many consumers can read at scale. Each partition is an ordered append-only stream, but Event Hubs does not automatically give you one globally sorted stream across all partitions.
 
-Har step pe "k fronts me se minimum" baar-baar chahiye — yeh exactly **min-heap (priority queue)** ka kaam hai. Heap har baar O(log k) me sabse chhota nikaal deta hai, poori queue scan kiye bina.
+**What partitioned ordering is, and why it's used:** Partitions let Event Hubs scale by spreading traffic across multiple ordered lanes; ordering is guaranteed within a partition, not across partitions. This design avoids forcing every producer through one bottleneck while still preserving local order for events with the same partition key. If an application needs a single timeline across partitions, it must merge the partition heads itself using a timestamp or sequence key.
+
+**The mapping:** Each sorted linked list is one Azure Event Hubs partition, and each list head is the next unread event from that partition. The min-heap holds the current front event from every partition, emits the smallest key, then advances only that partition by following its `next` pointer and pushing the new head. The key insight is that you never need all events in the heap, only one candidate per partition, so merging `k` sorted streams costs logarithmic work per emitted node.
 
 ## Approach
 

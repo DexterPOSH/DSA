@@ -15,7 +15,11 @@ Given an `m x n` matrix, return **all elements in spiral order** — start at th
 
 ## Real-World Analogy
 
-Socho tum ek maze ki **deewaron ke saath-saath** chal rahe ho, hamesha apna right haath deewar pe rakhe hue. Tum top edge pe right chalte ho jab tak deewar (boundary) aaye, phir neeche, phir left, phir upar — aur har baar jo lane tum cover kar lete ho usko **"deewar utha do"** (boundary shrink). Andar-andar ghoomte raho jab tak beech me kuch bacha hi na ho. Bilkul ek roomba ki tarah jo room ko outer ring se inner ring tak clean karta hai.
+**What Azure AI Vision is:** Azure AI Vision is Azure's image-understanding service, and Azure Machine Learning commonly prepares image tensors before model inference or training. Large tensors are often processed through views or windows so a pipeline can read the needed pixels without copying the whole image. Spiral traversal is a boundary-window way to consume that matrix.
+
+**What a shrinking crop window is, and why it's used:** A crop window tracks top, bottom, left, and right bounds around the active part of an Azure image tensor. After a boundary is processed, the window shrinks inward so the next pass works only on unvisited pixels. This exists to stream structured data in a predictable order while keeping just a few pieces of metadata instead of a visited set.
+
+**The mapping:** The matrix is the Azure image tensor and the four variables are the crop-window metadata. Read the top row left-to-right, the right column top-to-bottom, the bottom row right-to-left if it still exists, and the left column bottom-to-top if it still exists; then tighten the bounds. The key insight is that moving boundaries encode what remains, so each cell is emitted once without extra storage.
 
 ## Approach
 

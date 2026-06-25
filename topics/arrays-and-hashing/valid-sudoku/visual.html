@@ -117,14 +117,12 @@
   <h1>Valid Sudoku &mdash; <span>Row / Column / Box Sets</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">📋</div>
+    <div class="analogy-icon">🛡️</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Invigilator har student ka roll number teen registers me check karta hai —
-        <strong style="color:#93c5fd">row</strong>, <strong style="color:#86efac">column</strong>,
-        <strong style="color:#d8b4fe">3×3 box</strong>. Kisi bhi register me already dikha → invalid, turant pakdo.
-        Har register ek hash set. Ek hi scan, har cell pe teen O(1) lookups.
+        Azure Policy/RBAC validation checks uniqueness inside independent scopes.
+        Treat each row, column, and 3×3 box as a scope-specific set; any repeated digit in one scope invalidates the board.
       </div>
     </div>
   </div>

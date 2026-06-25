@@ -17,8 +17,11 @@ The array `[0,1,2,4,5,6,7]` rotated at pivot index 4 becomes `[4,5,6,7,0,1,2]`.
 
 ## Real-World Analogy
 
-Socho ek **circular ghadi (clock)** hai jisme numbers sorted hain, but kisi ne usse ghuma diya — ab "12" top pe nahi, kahin beech me hai. Tumhe ek particular number dhoondhna hai. Trick ye hai: bhale hi poora array rotated ho, koi bhi do points (`lo` aur `hi`) ke beech mid lo to **kam se kam ek aadha (half) hamesha properly sorted hota hai**. Wo sorted half dekho — agar target uski range me aata hai, udhar jao; warna doosre (potentially messy) half me jao. Har step pe aadha array kaat do. Bas yahi hai poora khel.
+**What Azure Cosmos DB is:** Azure Cosmos DB is a distributed NoSQL database that routes data by hashing a partition key into an ordered key-range space. Those key ranges are assigned to physical partitions so the service can scale and split partitions over time. Conceptually, the ordered hash space wraps around like a ring, even if a displayed range list starts from the middle.
 
+**What a partition hash ring is, and why it's used:** A partition hash ring gives the router a stable way to decide which range owns a target hash, even as ranges split or move. It exists so Cosmos DB can distribute load while still finding the correct partition without scanning every range. If you list the ring from an arbitrary starting point, the list is sorted except for one wrap where the largest hashes roll over to the smallest hashes.
+
+**The mapping:** The rotated `nums` array is that Azure Cosmos DB hash-ring list, `target` is the hash range you are trying to find, and `lo`, `mid`, and `hi` bound the visible window. At every step, either `lo…mid` or `mid…hi` is still normally sorted; if the target falls inside that sorted side, keep it, otherwise keep the other side that contains the wrap. The key insight is that even in a rotated structure, one half remains trustworthy enough to eliminate the other half.
 ## Approach
 
 Standard binary search ka twist: pehle decide karo ki `mid` ke kis side wala half sorted hai, phir decide karo target us sorted half me hai ya nahi.

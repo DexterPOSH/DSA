@@ -21,15 +21,11 @@ s = "mississippi", p = "mis*is*p*."  ->  False
 
 ## Real-World Analogy
 
-Socho ek **strict immigration officer** ek passport (`s`) ko ek rulebook (`p`) ke
-against verify kar raha hai, character-by-character. `.` matlab "is slot pe koi bhi
-ek character chalega". Aur `*` sabse tricky hai — yeh *pichle* rule pe lagta hai aur
-kehta hai "yeh rule zero ya jitni baar bhi repeat ho sakta hai".
+**What Azure Web Application Firewall is:** Azure Web Application Firewall protects web apps by inspecting HTTP requests at services such as Azure Application Gateway or Azure Front Door. It applies managed and custom rules before traffic reaches the application, blocking or allowing requests based on paths, headers, query strings, and other fields. In this analogy, the request path is checked against a regex-like custom policy.
 
-Officer har step pe do raaste explore kar sakta hai jab `*` aaye: **rule ko skip kar
-do** (zero occurrences), ya **ek character consume karke wahi rule dobara** apply
-karo. Yeh branching exactly DP table me cache hoti hai — taaki same `(s-position,
-p-position)` baar-baar na solve karna pade.
+**What regex-style custom rule matching is, and why it's used:** Custom WAF rules let teams express compact traffic policies instead of writing application code for every path variation. A wildcard-like `.` can accept any single character, while `*` means the previous token may repeat zero or more times. That flexibility is powerful but creates branches, because the matcher must consider both "use this repetition" and "skip it entirely."
+
+**The mapping:** The Azure request path is `s`, the WAF-style policy is `p`, and `dp[i][j]` records whether the first `i` path characters match the first `j` pattern characters. A literal or `.` advances diagonally when the current character is accepted, while `*` checks zero occurrences from two pattern columns back or one more occurrence from the row above. The key insight is that regex matching is a grid of repeated text-pattern states, so caching each state avoids re-exploring the same WAF rule branch again and again.
 
 ## Approach
 

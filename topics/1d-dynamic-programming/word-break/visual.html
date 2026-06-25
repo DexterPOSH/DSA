@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Word Break — boolean reachability DP over string positions</title>
+<title>Word Break — Azure config-token reachability DP</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -128,16 +128,16 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Word <span>Break</span> — reachable positions, one boundary at a time</h1>
-  <p class="subtitle">A position is reachable if some earlier reachable boundary jumps to it via a dictionary word.</p>
+  <h1>Word <span>Break</span> — Azure config-token reachability</h1>
+  <p class="subtitle">An Azure config boundary is reachable if an earlier cached boundary jumps to it via a known token.</p>
 
   <div class="analogy">
-    <h3>🪨 Stepping stones</h3>
-    <p>Position <code>i</code> reachable hai agar koi pichhla reachable point <code>j</code> ho <b>aur</b> <code>s[j:i]</code> dictionary me ho. Start (boundary 0) hamesha reachable. Agar <b>last boundary</b> tak pahunch gaye → answer <b>True</b>.</p>
+    <h3>⚙️ Real-world analogy</h3>
+    <p>Azure App Configuration validates a connection string by splitting it into known tokens. A boundary is reachable only if a previous cached boundary is reachable and the current slice is in the token catalog.</p>
   </div>
 
   <div class="problem">
-    <b>Problem.</b> <code>s = "leetcode"</code>, dictionary <code>["leet", "code"]</code>.
+    <b>Problem.</b> <code>s = "leetcode"</code>, Azure token catalog <code>["leet", "code"]</code>.
     <span class="arrow">→</span> Answer: <code>True</code> &nbsp;("leet" + "code")
   </div>
 
@@ -145,7 +145,7 @@
     <div class="secLabel">String with boundary flags &nbsp;(<span style="color:var(--green)">●</span> = dp True / reachable)</div>
     <div class="strrow" id="strrow"></div>
 
-    <div class="secLabel" style="margin-top:14px;">Dictionary</div>
+    <div class="secLabel" style="margin-top:14px;">Azure token catalog</div>
     <div class="dict" id="dict"></div>
 
     <div class="caption" id="cap">Press <b>Next</b> to start. dp[0] = True because the empty prefix is always reachable.</div>
@@ -159,7 +159,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Fill <code>dp[i]</code> left to right: True if any split point <code>j</code> has <code>dp[j]</code> True and <code>s[j:i]</code> in the dictionary. The answer is <code>dp[len(s)]</code>.</p>
+    <p>Fill <code>dp[i]</code> left to right for the Azure config stream: True if any split point <code>j</code> has <code>dp[j]</code> True and <code>s[j:i]</code> is a known token. The answer is <code>dp[len(s)]</code>.</p>
   </div>
 </div>
 
@@ -175,7 +175,7 @@ const dp = new Array(n + 1).fill(false);
 dp[0] = true;
 steps.push({
   dp: dp.slice(), i: null, j: null, win: null, hit: false,
-  cap: 'Base case: dp[0] = True. The empty prefix is trivially segmentable.'
+  cap: 'Base case: dp[0] = True. The empty prefix is trivially tokenizable.'
 });
 for (let i = 1; i <= n; i++) {
   let became = false;
@@ -189,9 +189,9 @@ for (let i = 1; i <= n; i++) {
       reachableNow: reachable, dpj: dp[j],
       hit: reachable,
       cap: reachable
-        ? `i=${i}, j=${j}: dp[${j}] is True AND "<b>${sub}</b>" is in the dictionary → set <b class="t">dp[${i}] = True</b>. Stop scanning this i.`
+        ? `i=${i}, j=${j}: dp[${j}] is True AND "<b>${sub}</b>" is in the Azure token catalog → set <b class="t">dp[${i}] = True</b>. Stop scanning this i.`
         : (dp[j]
-            ? `i=${i}, j=${j}: dp[${j}] True, but "<b>${sub}</b>" is <b class="f">not</b> a dictionary word. Try next j.`
+            ? `i=${i}, j=${j}: dp[${j}] True, but "<b>${sub}</b>" is <b class="f">not</b> a Azure token. Try next j.`
             : `i=${i}, j=${j}: dp[${j}] is False (boundary ${j} not reachable) → skip.`)
     });
     if (reachable) { became = true; break; }   // matches the `break` in code
@@ -206,8 +206,8 @@ for (let i = 1; i <= n; i++) {
 steps.push({
   dp: dp.slice(), i: n, j: null, win: null, hit: dp[n],
   cap: dp[n]
-    ? `Reached the end: <b class="t">dp[${n}] = True</b> → "${s}" can be segmented. Return True.`
-    : `dp[${n}] = False → cannot segment. Return False.`
+    ? `Reached the end: <b class="t">dp[${n}] = True</b> → "${s}" can be tokenized. Return True.`
+    : `dp[${n}] = False → cannot be tokenized. Return False.`
 });
 
 const $ = id => document.getElementById(id);

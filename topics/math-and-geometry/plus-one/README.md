@@ -19,13 +19,11 @@ You're given a non-negative integer represented as an array of digits `digits`, 
 
 ## Real-World Analogy
 
-Socho tum ek **car ka odometer** ho. Number badhana hai by one. Tum sabse right wale
-digit (ones place) se shuru karte ho. Agar wo `9` se kam hai — easy, bas usse `+1` kar do,
-kaam khatam. Lekin agar wo `9` hai, to wo `0` ho jaata hai aur ek **carry** left me chala
-jaata hai (`...9` → `...0` plus "ek aur seedhe left wale ko"). Yeh carry tab tak left
-travel karta hai jab tak koi non-9 digit nahi mil jaata. Aur agar **saare hi 9 the**
-(jaise `999`), to carry poore number se bahar nikal jaata hai aur ek naya leading `1` lag
-jaata hai — odometer `999 → 1000`. Bas yahi puri kahani hai.
+**What Azure Blob Storage is:** Azure Blob Storage is Azure's object storage service for large files and byte streams. Clients working through a blob by byte ranges often track progress as a large offset or sequence counter. That counter may be represented in chunks or digits when it needs to be portable or larger than a convenient machine-sized integer.
+
+**What carry propagation in a chunked counter is, and why it's used:** When an Azure range cursor advances by one, only the least significant chunk normally changes. If that chunk is already at its maximum value, it wraps to zero and pushes a carry into the next chunk to the left. This exists so a fixed-width representation can roll over cleanly without recomputing the whole counter.
+
+**The mapping:** The `digits` array is the Azure client's chunked counter. Start at the last digit; if it is less than `9`, increment it and stop because no earlier digit changes. If it is `9`, set it to `0` and keep carrying left; if every digit was `9`, prepend `1`, and the key insight is that plus-one is local work except when rollover forces a carry chain.
 
 ## Approach
 

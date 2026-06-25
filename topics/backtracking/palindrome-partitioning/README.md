@@ -19,13 +19,11 @@ s = "aba"  ->  [ ["a","b","a"], ["aba"] ]
 
 ## Real-World Analogy
 
-Socho tumhare paas ek **ribbon** (string) hai aur tumhe usme **cuts** lagane hain.
-Har cut ke baad jo tukda banta hai woh **palindrome** hona chahiye (aage se padho
-ya peeche se, same). Tum left end se shuru karte ho: pehla cut kahan lagaun? Har
-possible cut position try karo — agar pehla tukda palindrome hai, to use "fix"
-karke baaki ribbon pe recurse karo. Jab poori ribbon kat jaye to ek valid set of
-cuts mila → save karo. Fir **last cut wapas kholo (backtrack)** aur agla cut
-position try karo. Saari cut-combinations explore ho jaati hain.
+**What Azure Policy is:** Azure Policy is the governance service that evaluates Azure resources against rules such as required tags, allowed locations, naming conventions, or security settings. It can audit noncompliant resources or block deployments before they drift from organization standards. In this analogy, the policy rule is intentionally simple: a proposed resource-name segment must be a palindrome.
+
+**What resource-name segment validation is, and why it's used:** Segment validation checks each proposed piece of a resource name before it becomes part of the deployment path. Azure teams use naming rules because names often encode ownership, environment, region, and purpose, and bad names make operations and compliance harder. Rejecting a bad segment immediately prevents the planner from spending time extending a deployment prefix that can never be compliant.
+
+**The mapping:** At index `start`, the algorithm tries every possible next name segment and runs the Azure Policy-style palindrome gate on it. Valid segments are appended to the current path and recursed on; invalid segments are pruned, and completed paths are recorded when the whole string has been consumed. The key insight is to validate each local choice before going deeper, then undo it so the next segment length can be tried.
 
 ## Approach — backtracking with palindrome prefix check
 

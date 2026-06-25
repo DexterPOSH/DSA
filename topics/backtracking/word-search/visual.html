@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Word Search — Grid DFS Backtracking</title>
+<title>Word Search — Azure AI Search DFS Backtracking</title>
 <style>
   :root {
     --bg: #1a1a2e; --panel: #16213e; --panel2: #1e293b;
@@ -71,16 +71,13 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Word Search &mdash; <span>Grid DFS Backtracking</span></h1>
+  <h1>Word Search &mdash; <span>Azure AI Search DFS Backtracking</span></h1>
 
   <div class="analogy">
-    <div class="icon">✏️</div>
+    <div class="icon">🔎</div>
     <div>
       <div class="label">Real-world analogy</div>
-      <p>Trace a word in a newspaper puzzle with a pencil. Mark each cell
-      <strong>used</strong> as you step onto it. Hit a dead end? <strong>Lift the
-      pencil, un-mark, and try another direction.</strong> That undo <em>is</em>
-      backtracking.</p>
+      <p>Azure AI Search can walk an indexed graph of token positions to prove a query path exists. Match the next token, mark that position as used, prune mismatches immediately, then unmark and back up when all neighbors fail.</p>
     </div>
   </div>
 
@@ -114,10 +111,7 @@
     <div class="icon">💡</div>
     <div>
       <div class="label">Key takeaway</div>
-      <p>DFS extends the path one adjacent cell at a time, matching
-      <code>word[i]</code>. A cell is marked <code>#</code> while it's on the
-      current path so it can't be reused; on a dead end we
-      <strong>restore it and back off</strong> to try a different neighbor.</p>
+      <p>DFS extends the Azure AI Search path one adjacent token at a time, matching <code>word[i]</code>. A cell is marked while it is on the current path; on a dead end we <strong>restore it and back off</strong> to try another neighbor.</p>
     </div>
   </div>
 </div>

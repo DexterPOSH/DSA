@@ -15,9 +15,11 @@ Given a string `s`, return the **longest contiguous substring** of `s` that is a
 
 ## Real-World Analogy
 
-Socho ek shaadi me do log **back-to-back khade hain mirror ke saamne**. Tum ek center point pakad ke dono taraf ek saath bahar ki taraf chalte ho — left wala aur right wala. Jab tak dono ke "chehre match" karte hain (same character), palindrome failta jaata hai aur tum aur baahar nikalte ho. Jaise hi mismatch hua, ya deewar (string ka end) aa gayi — ruk jao, utni hi door tak ka hissa palindrome tha.
+**What Azure Stream Analytics is:** Azure Stream Analytics processes high-volume event streams in real time and can evaluate windowed rules over telemetry. It is commonly used to detect patterns, anomalies, or quality signals before data lands in a dashboard or storage system. A symmetry check is like a data-quality rule over a bounded sequence of markers.
 
-Har possible center pe yeh "expand karo dono taraf" wala kaam karo, aur jo sabse lamba palindrome mila usse yaad rakho. Bas yahi hai **expand around center**.
+**What center-based window expansion is, and why it's used:** For a symmetric telemetry window, once the inner window is known to match, the job only needs to compare the next left and right boundary markers to decide whether the larger window also matches. This mechanism exists because recomputing every candidate window from scratch would waste work; the confirmed inner window is the reusable state. Scanning every possible center covers both odd-length and even-length symmetry.
+
+**The mapping:** Each possible center in the string is a candidate Azure Stream Analytics window center. The algorithm expands outward while `s[left] == s[right]`, updates the longest confirmed window, and stops as soon as the boundary check fails. The key insight is that a palindrome grows from its center, so previously verified symmetry lets you test the next larger substring with one comparison.
 
 ## Approach
 

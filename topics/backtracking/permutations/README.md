@@ -19,12 +19,11 @@ ordering). Order of the permutations in the output doesn't matter.
 
 ## Real-World Analogy
 
-Socho ek race me 3 dhaavak hain — A, B, C — aur tumhe **podium ke saare possible orders**
-(gold-silver-bronze) likhne hain. Gold ke liye 3 me se koi bhi → maan lo A. Ab silver ke liye
-sirf bache hue do (B ya C) → maan lo B. Bronze automatically C. Ek arrangement complete.
-Phir tum **wapas jaate ho (backtrack)**: silver pe B hata ke C try karo, aur aise hi gold
-badal ke poora dobara. Har bar tum ek "used" set rakhte ho taaki ek hi dhaavak do positions
-pe na aa jaaye.
+**What Azure Update Manager is:** Azure Update Manager helps assess and patch Windows and Linux machines across Azure, on-premises, and other cloud environments. It lets teams schedule maintenance windows, coordinate update runs, and track which machines have been patched. For critical fleets, the order of machines in a runbook can matter because teams may want to limit blast radius.
+
+**What maintenance ordering is, and why it's used:** Maintenance ordering assigns each VM to exactly one slot in a patch sequence. It exists because a schedule like `VM-A, VM-B, VM-C` is different from `VM-C, VM-B, VM-A` when risk, dependencies, or canary rollout order matters, but the same VM should not occupy two slots in one plan. A `used` marker enforces that single-assignment rule while still allowing the planner to try every possible order.
+
+**The mapping:** Each number is an Azure VM, and the current path is the patch order being built. The recursion chooses one unused VM for the next slot, marks it used, continues until the path length matches the fleet size, then records that complete schedule. The key insight is that permutations are all possible ordered maintenance plans where every VM appears once and backtracking frees it for a different slot in the next plan.
 
 ## Approach — pick-an-unused-element backtracking
 

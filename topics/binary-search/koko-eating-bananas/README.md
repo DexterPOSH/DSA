@@ -16,8 +16,11 @@ At `k = 4`: pile 3 → 1hr, pile 6 → 2hr, pile 7 → 2hr, pile 11 → 3hr = 8 
 
 ## Real-World Analogy
 
-Yeh ek **"answer pe binary search"** problem hai — array me kuch nahi dhoond rahe, hum *speed `k`* dhoond rahe hain. Socho ek shower ka **temperature knob**: bahut dheere (low `k`) ghumao to time zyada lagega, bahut tez (high `k`) sab jaldi ho jaayega. Ek **threshold** hota hai — usse upar ki har speed "kaam ho jaata in time" (feasible), usse neeche ki har speed "time nikal gaya" (infeasible). Yeh monotonic flip — `false false false TRUE TRUE TRUE` — exactly binary search ke liye bana hai. Hum **smallest feasible speed** dhoond rahe.
+**What Azure Cosmos DB is:** Azure Cosmos DB is a globally distributed NoSQL database where you provision throughput in request units per second (RU/s). Every read, write, and query consumes RUs, so the RU/s setting controls how much work the database can handle each second. More RU/s gives the workload more capacity, but it also costs more, so teams want the smallest setting that still meets their SLA.
 
+**What provisioned throughput is, and why it's used:** Provisioned throughput reserves a chosen RU/s capacity for a container or database so performance is predictable. If the setting is too low for a workload, requests can be throttled or take too long; if it is high enough, the workload finishes within the target window. That creates a monotonic feasibility curve: low RU/s values fail, and after some threshold, all higher RU/s values pass.
+
+**The mapping:** Koko's eating speed `k` is the Azure Cosmos DB RU/s candidate, each banana pile is a batch of work that needs capacity, and `ceil(pile / k)` is how many time slices that batch consumes at that capacity. The `feasible(k)` check sums those slices and asks whether the workload finishes within `h`; if it passes, binary search keeps `k` but tries cheaper lower capacity, and if it fails, it searches higher. The key insight is to binary-search the monotonic threshold for the minimum feasible capacity, not to simulate every possible speed.
 ## Approach
 
 Pattern: **binary search on the answer**. Speed range `[1, max(piles)]` hai — max se zyada speed ka koi faayda nahi (ek pile ek hour me hi khatam). Har candidate `k` ke liye check karo: kitne hours lagenge?

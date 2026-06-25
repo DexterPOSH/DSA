@@ -21,7 +21,11 @@ Note: it's not always the literal right-edge chain. If the right subtree is shal
 
 ## Real-World Analogy
 
-Socho tum ek building ke **bilkul daayein khade ho** aur har floor pe sirf ek hi khidki dikhti hai — us floor pe sabse right wala banda. Tum upar se neeche tak nazar daalte ho: har floor ka rightmost insaan hi tumhe dikhega, beech wale uske peeche chhup jaate hain. Toh tum bas har level ka **aakhri (rightmost) node** chunte ho. BFS me ek level ko left-se-right scan karte ho, aur us level ka **last** wala hi tumhara "right side view" me jaata hai.
+**What Azure Portal's Resource Manager tree is:** The Azure portal visualizes Resource Manager scopes as a navigable hierarchy so operators can browse Management Groups, Subscriptions, Resource Groups, and Resources. The underlying parent/child relationships do not depend on screen position, but the UI still renders siblings in a visible left-to-right order. That display order lets us talk about what would be visible from one side of the tree.
+
+**What right-edge visibility is, and why it's used:** A right-side view is like a compact Azure portal summary that keeps only the rightmost visible scope at each depth. Instead of listing every resource at a tier, it records the item that would not be hidden by siblings when looking from the right edge. This kind of per-level representative is useful when the shape matters but the full tier list is more detail than you need.
+
+**The mapping:** BFS processes one Azure tier at a time from left to right. For each level, keep overwriting the visible candidate as nodes are popped, or simply record the last node processed for that level. The key insight is that the queue already groups nodes by depth, so the final item in each level is exactly the right-side view.
 
 ## Approach
 

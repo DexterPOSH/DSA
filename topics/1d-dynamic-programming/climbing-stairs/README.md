@@ -15,9 +15,11 @@ n = 5  ->  8
 
 ## Real-World Analogy
 
-Socho tum ek seedhi ke sabse upar (step `n`) pe khade ho aur peeche mudke soch rahe ho: "Main yahan tak pahuncha kaise?" Sirf do hi tareeke the — ya to main step `n-1` pe tha aur ek chhoti chhalaang (1 step) maari, ya main step `n-2` pe tha aur badi chhalaang (2 step) maari. Bas. Koi teesra raasta hai hi nahi.
+**What Azure Virtual Machine Scale Sets is:** Azure Virtual Machine Scale Sets lets you deploy and manage a fleet of identical VMs as one scalable resource. It is used when an application needs capacity to grow or shrink without hand-managing every instance. A scale operation can add instances in controlled increments until the set reaches a target capacity.
 
-Toh `n` tak pahunchne ke total tareeke = (`n-1` tak pahunchne ke tareeke) + (`n-2` tak pahunchne ke tareeke). Yeh seedha-saadha Fibonacci hai — har step apne pichhle do steps ka jod hai. DP ki poori jaan yahi soch hai: bada sawaal apne se chhote sawaalon ke jawaab par tika hota hai.
+**What Durable Functions checkpointing for scale orchestration is, and why it's used:** Azure Durable Functions can coordinate a long-running scale runbook and persist its orchestration history after each step. That checkpointing exists because cloud operations can pause, retry, or resume after worker restarts; the workflow should reuse the state it already reached instead of starting from zero. For a capacity target, each saved checkpoint becomes a reusable answer for "how many workflows reach this capacity?"
+
+**The mapping:** Reaching stair `i` is like reaching VM capacity `i`: the last scale action could have added 1 instance from `i-1`, or 2 instances from `i-2`. The cached checkpoint for `i` is therefore the sum of the cached checkpoints for those two prior capacities, `dp[i] = dp[i-1] + dp[i-2]`. The key insight is that each capacity is an overlapping subproblem, so compute it once and let later capacities build on it.
 
 ## Approach
 

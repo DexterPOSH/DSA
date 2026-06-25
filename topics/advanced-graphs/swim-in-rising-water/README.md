@@ -20,9 +20,11 @@ grid = [[0,1,2,3,4],
 
 ## Real-World Analogy
 
-Socho tum ek baadh (flood) me phase ho aur ek door ke darwaze tak pahunchna hai. Har cell ki ek height hai; tum tabhi us cell me ja sakte ho jab paani us height tak chadh jaaye. Tum chahte ho **kam se kam waqt** me pahunchna — matlab aisa raasta jiska **sabse uncha cell jitna kam ho sake utna kam** ho.
+**What Azure Virtual WAN is:** Azure Virtual WAN is Azure's managed wide-area networking service for connecting branches, users, VNets, and regions through Microsoft-managed virtual hubs. It centralizes routing, security integration, and hub-to-hub connectivity so distributed networks behave like one cloud WAN. Operators use it when they want predictable connectivity across many Azure and on-premises locations without hand-building every transit path.
 
-Dijkstra ka twist: normal Dijkstra path ke edges ka **sum** minimize karta hai. Yahaan har cell ka "cost to be here" = us raaste pe ab tak ka **max elevation** hai. Min-heap se hamesha sabse kam "max-so-far" wala cell pop karo, uske neighbours ka naya max-so-far = `max(current, neighbour_height)` push karo. Jaise hi end cell pop hota hai — wahi answer.
+**What bottleneck-aware hub routing is, and why it's used:** On a multi-hop WAN path, the user experience is often constrained by the worst segment, not by the sum of all segments. One overloaded hub, weak circuit, or high-latency hop can make an otherwise short path unacceptable. Bottleneck-aware routing asks for the route whose worst required threshold is as small as possible, which is why the path cost is `max(current_bottleneck, next_hop_cost)` instead of addition.
+
+**The mapping:** Each grid cell is an Azure hub or segment that becomes usable only when the network “water level” reaches its elevation-like threshold. The min-heap stores the best bottleneck seen so far for each candidate cell, and moving to a neighbor updates the route cost with `max(t, grid[nr][nc])`. When the destination is popped, Azure has found the path whose worst hop is minimal; the key insight is to minimize the maximum obstacle on the route, not the total distance traveled.
 
 ## Approach — Dijkstra on "max along path" (minimax)
 

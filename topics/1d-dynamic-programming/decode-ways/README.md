@@ -15,12 +15,11 @@ A message of digits is encoded with the mapping `'A' -> "1"`, `'B' -> "2"`, ...,
 
 ## Real-World Analogy
 
-Socho ek lambi sadak hai jisme har step pe tum **ya to 1 ghar aage jaa sakte ho ya 2 ghar** (jaise climbing stairs). Lekin ek twist: kuch jumps **blocked** hain. 
+**What Azure App Configuration is:** Azure App Configuration is a managed store for application settings and feature flags. It gives services one central place to load environment-specific configuration instead of scattering settings through code or deployment scripts. Clients often need to interpret compact configuration values according to a known schema.
 
-- Ek single digit tabhi valid hai jab wo `1-9` ho (`'0'` akela koi letter nahi banta).
-- Do digits ka jump tabhi valid hai jab wo `"10"-"26"` ke beech ho (`"27"` ya `"05"` invalid).
+**What schema-based token parsing with checkpointed prefixes is, and why it's used:** A parser for a compact settings stream may allow tokens of different widths, such as one-character and two-character codes. At each boundary, it must decide which token sizes are valid and remember how many valid parses reached that boundary; this is the same reuse idea as Azure Durable Functions checkpointing, where completed workflow state is persisted so later steps do not repeat earlier work. The mechanism exists because overlapping prefixes would otherwise be re-parsed many times.
 
-Tumhe sadak ke end tak pahunchne ke total raaste ginne hain. Kisi position pe pahunchne ke raaste = pichhli position se aane wale raaste (agar single-step valid) + uss-se-pehli position se aane wale raaste (agar two-step valid). Yeh **Fibonacci-jaisa** recurrence hai, bas validity checks ke saath.
+**The mapping:** Index `i` is a configuration boundary, a valid one-character token contributes `dp[i-1]`, and a valid two-character token contributes `dp[i-2]`. Invalid tokens, especially ones starting with `0`, contribute nothing because no App Configuration schema entry can start there. The key insight is that the number of decodings for a prefix is just the sum of the valid ways to reach its last split point.
 
 ## Approach
 

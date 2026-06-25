@@ -15,9 +15,11 @@ Given an integer array `nums`, find the contiguous subarray (containing at least
 
 ## Real-World Analogy
 
-Socho tum ek trader ho jo har din ka **multiplier** dekh raha hai — kuch din profit double karte hain (`>1`), kuch flat (`0`), aur kuch din loss me **negative** swing dete hain. Ab twist ye hai: do bure (negative) din ek saath aa jaayein to unka product **positive** ho jaata hai — do losses milke ek bada gain ban sakte hain!
+**What Azure Stream Analytics is:** Azure Stream Analytics is Azure's managed service for running real-time queries over streaming telemetry. It can maintain running aggregates as each event arrives and emit updated health or business signals. That fits a metric stream where each event multiplies the current signal up or down.
 
-Isliye tumhe sirf "abhi tak ka best" yaad rakhna kaafi nahi. Tumhe **sabse chhota (most negative) product bhi** yaad rakhna padega, kyunki agla negative number aaya to wahi chhota wala palat ke sabse bada ban sakta hai. Best aur worst — dono ko saath chalao.
+**What dual-extreme state tracking is, and why it's used:** A multiplier stream with negative values cannot be summarized by only the current maximum product. A negative multiplier can turn the smallest running product into the largest one, so the job must keep both extremes for the subarray ending at the current event. This mechanism exists to preserve the information needed for sign flips without replaying older events.
+
+**The mapping:** At each number, Azure Stream Analytics-style state carries `cur_max` and `cur_min` for products ending at this event, plus `result` for the best product seen anywhere. The next value is computed from the new number alone, the number times `cur_max`, and the number times `cur_min`, then the global best is updated. The key insight is that the worst-so-far can become the best-so-far after a negative multiplier.
 
 ## Approach
 

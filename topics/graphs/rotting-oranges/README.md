@@ -25,7 +25,12 @@ Every minute, any fresh orange that is **4-directionally adjacent** (up/down/lef
 
 ## Real-World Analogy
 
-Socho ek crate me oranges rakhe hain aur kuch already sad chuke hain. Sadan ek hi orange se shuru nahi hota — **jitne bhi rotten oranges hain, sab ek saath apne padosiyon ko infect karte hain**. Pehle minute me har rotten orange apne 4 touching neighbours ko rot karta hai. Agle minute me wo naye-rotten oranges aage spread karte hain. Yeh ek "fire spreading from many sources at once" wala scene hai — isliye hum **single source nahi, multi-source BFS** chalate hain. BFS ki har " wave" = ek minute.
+**What Azure availability-zone and scale-set architecture is:** Azure availability-zone and Virtual Machine Scale Set architecture combines physically separate datacenter zones with groups of identical VM instances for scalable workloads. During an Azure incident, unhealthy zones, instances, or dependent services can affect nearby nodes through traffic, dependencies, or shared infrastructure. The important detail is that there may be many unhealthy sources at the same time.
+
+**What multi-source incident propagation is, and why it's used:** Multi-source propagation models the blast radius from all initial Azure failures simultaneously instead of pretending there is only one starting point. It is used to estimate time-to-impact: after one minute, every healthy node one hop away from any current failure is affected; after two minutes, the next layer is affected. Processing all current failures together prevents one source from unfairly getting a head start over another.
+
+**The mapping:** Rotten oranges are initially unhealthy Azure zones or scale-set nodes, fresh oranges are still-healthy nodes, and empty cells are missing or unreachable space. Multi-source BFS seeds every unhealthy node at minute `0`, expands level by level to adjacent healthy nodes, and the last BFS layer gives the total minutes. The key insight is that time equals BFS depth from the nearest initial failure, and any fresh node never reached is isolated from the incident wave.
+
 
 ## Approach
 

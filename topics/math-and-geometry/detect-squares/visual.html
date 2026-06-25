@@ -146,8 +146,8 @@
   <p class="subtitle">Count axis-aligned squares with a query corner by scanning the same column and multiplying corner counts.</p>
 
   <div class="analogy">
-    <h3>📌 Graph-paper analogy</h3>
-    <p>Query pin <code>(qx,qy)</code> ke saath, har <b class="pur">same-column</b> point ko ek vertical side ka top maano. Side length <code>|py − qy|</code>. Square left ya right dono taraf ban sakta — baaki teen corners apne-aap fix ho jaate. Unke add-counts <b>multiply</b> karo.</p>
+    <h3>🗺️ Azure Maps analogy</h3>
+    <p>Azure Maps can store location events in a coordinate hash. For query <code>(qx,qy)</code>, scan same-column points to choose a side length, then hash-check the two forced corners and <b>multiply</b> their stored counts.</p>
   </div>
 
   <div class="problem">

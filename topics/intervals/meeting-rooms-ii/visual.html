@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Meeting Rooms II — min-heap of end times</title>
+<title>Meeting Rooms II — Azure Batch capacity via min-heap</title>
 <style>
   :root{
     --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
@@ -70,30 +70,30 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Meeting Rooms II — <span>min-heap</span> of end times</h1>
-  <p class="subtitle">How many rooms do you need? = the peak number of meetings happening at once. Reuse a room whenever its earliest-ending meeting is over.</p>
+  <h1>Meeting Rooms II — Azure Batch <span>capacity heap</span></h1>
+  <p class="subtitle">How many Azure Batch VM slots are needed? = peak overlapping reservations. Reuse a VM slot whenever the earliest-ending reservation is over.</p>
 
   <div class="analogy">
-    <h3>🏢 The office-manager analogy</h3>
-    <p>Meetings start-order me aati hain. Har nayi meeting ke liye poochho: kya koi room free ho gaya? — yaani heap ka <b>sabse jaldi khatam</b> hone wala end <code>≤ nayi.start</code>? Haan → woh room <b>pop</b> (reuse) karo. Phir nayi meeting ka end <b>push</b> karo. Heap ka size = rooms in use; peak size = answer.</p>
+    <h3>⚙️ Azure Batch analogy</h3>
+    <p>Azure Batch reservations arrive sorted by start time, and each active reservation occupies a VM slot. Keep a min-heap of reservation end times: if the earliest end is <code>≤ start</code>, pop and reuse that VM slot; after pushing the new end, the heap size is live demand and its peak is the required pool size.</p>
   </div>
 
   <div class="problem">
     <b>Input.</b> <code>[[0,30],[5,10],[15,20]]</code>
-    <span class="arrow">→</span> <code>2</code> rooms
+    <span class="arrow">→</span> <code>2</code> VM slots
   </div>
 
   <div class="legend">
     <span><i class="dot" style="background:#586387"></i>pending</span>
     <span><i class="dot" style="background:var(--amber)"></i>processing now</span>
-    <span><i class="dot" style="background:var(--blue)"></i>occupying a room</span>
+    <span><i class="dot" style="background:var(--blue)"></i>occupying a VM slot</span>
     <span><i class="dot" style="background:var(--green)"></i>finished</span>
   </div>
 
   <div class="stage">
     <div>
       <div class="timeline" id="timeline"></div>
-      <p style="color:var(--muted);font-size:.8rem;margin:8px 2px 0;">Meetings sorted by start, processed left→right.</p>
+      <p style="color:var(--muted);font-size:.8rem;margin:8px 2px 0;">Azure Batch reservations sorted by start, processed left→right.</p>
     </div>
     <div class="side">
       <div class="panel-box">
@@ -102,12 +102,12 @@
       </div>
       <div class="panel-box roomcount">
         <div class="num" id="rooms">0</div>
-        <div class="peak">rooms in use (= heap size)</div>
+        <div class="peak">VM slots in use (= heap size)</div>
       </div>
     </div>
   </div>
 
-  <div class="caption" id="caption">Press <b>Next</b> to process meetings in start order.</div>
+  <div class="caption" id="caption">Press <b>Next</b> to process Azure Batch reservations in start order.</div>
   <div class="controls">
     <button id="prev" class="ghost">‹ Prev</button>
     <button id="next">Next ›</button>
@@ -117,7 +117,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>A min-heap keyed on end times hands you the earliest-freeing room in O(log n). Pop if it's free (<code>top ≤ start</code>), always push the new end — the heap's size is the live room count, and its peak is the answer.</p>
+    <p>A min-heap keyed on reservation end times gives the earliest-freeing Azure Batch VM slot in O(log n). Pop when <code>top ≤ start</code>, push the new end, and the heap's peak size is the pool capacity needed.</p>
   </div>
 </div>
 
@@ -141,11 +141,11 @@ function buildSteps(){
     caption:o.caption
   });
 
-  steps.push(snap({caption:`Sorted by start → <b>[[0,30],[5,10],[15,20]]</b>. Heap starts empty. Process each meeting in order.`}));
+  steps.push(snap({caption:`Sorted by start → <b>[[0,30],[5,10],[15,20]]</b>. Heap starts empty. Process each Azure Batch reservation in order.`}));
 
   sorted.forEach((iv,idx)=>{
     const [s,e]=iv;
-    steps.push(snap({active:idx,caption:`Meeting <b>[${s},${e}]</b>. First ask: is the earliest-ending room free? Look at heap top.`}));
+    steps.push(snap({active:idx,caption:`Reservation <b>[${s},${e}]</b>. First ask: is the earliest-ending VM slot free? Look at heap top.`}));
     if(heap.length && heap[0] <= s){
       const popped=heap[0];
       heap=heap.slice(1);
@@ -153,19 +153,19 @@ function buildSteps(){
       let owner=-1;
       occupying.forEach(k=>{ if(sorted[k][1]===popped && owner===-1) owner=k; });
       if(owner!==-1){ occupying.delete(owner); finished.add(owner); }
-      steps.push(snap({active:idx,poppedVal:popped,caption:`Heap top = <b>${popped} ≤ ${s}</b> → that room is free. <b>Pop ${popped}</b> and reuse the room.`}));
+      steps.push(snap({active:idx,poppedVal:popped,caption:`Heap top = <b>${popped} ≤ ${s}</b> → that VM slot is free. <b>Pop ${popped}</b> and reuse the slot.`}));
     } else if(heap.length){
-      steps.push(snap({active:idx,caption:`Heap top = <b>${heap[0]} &gt; ${s}</b> → no room free yet. We'll need a new room.`}));
+      steps.push(snap({active:idx,caption:`Heap top = <b>${heap[0]} &gt; ${s}</b> → no VM slot is free yet. The pool needs another slot.`}));
     } else {
-      steps.push(snap({active:idx,caption:`Heap empty → take the first room.`}));
+      steps.push(snap({active:idx,caption:`Heap empty → allocate the first VM slot.`}));
     }
     heap=[...heap,e].sort((a,b)=>a-b);
     occupying.add(idx);
     peak=Math.max(peak,heap.length);
-    steps.push(snap({active:idx,justPushed:e,caption:`<b>Push end = ${e}</b> (this meeting occupies a room). Rooms in use now = <b>${heap.length}</b>.`}));
+    steps.push(snap({active:idx,justPushed:e,caption:`<b>Push end = ${e}</b> (this reservation occupies a VM slot). VM slots in use now = <b>${heap.length}</b>.`}));
   });
 
-  steps.push(snap({caption:`All meetings placed. The peak heap size we ever hit = <b>${peak}</b> rooms. Answer = <b>${peak}</b>. ✅`}));
+  steps.push(snap({caption:`All reservations placed. The peak heap size we ever hit = <b>${peak}</b> Azure Batch VM slots. Answer = <b>${peak}</b>. ✅`}));
   return steps;
 }
 const steps=buildSteps();

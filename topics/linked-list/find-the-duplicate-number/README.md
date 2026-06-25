@@ -17,9 +17,11 @@ Given an array `nums` of `n + 1` integers where every value is in the range `[1,
 
 ## Real-World Analogy
 
-Array ko ek **chhupi hui linked list** ki tarah socho. Har index ek node hai, aur node `i` ka "next" pointer hai `nums[i]` (yaani value tumhe agle index par bhej deti hai). Index `0` se chalna shuru karo: `0 -> nums[0] -> nums[nums[0]] -> ...`.
+**What Azure Route Server is:** Azure Route Server is a networking service that lets network virtual appliances exchange routes with an Azure Virtual Network using BGP. It helps VNets learn and advertise routes dynamically instead of relying only on manually maintained route tables. In the analogy, each learned route points to a next hop, giving you a chain to follow.
 
-Ab kyunki ek value **repeat** hoti hai, do alag index **same node** par point karte hain — yaani is "list" me ek **cycle** ban jaata hai, aur **cycle ka entry point hi duplicate number hai**. Ab problem reduce ho gaya: "linked list me cycle ka start dhoondo" — exactly **Floyd's Tortoise & Hare** (Linked List Cycle II). Koi extra memory nahi, array bhi untouched.
+**What BGP next-hop routing is, and why it's used:** A route's next hop tells traffic where to go next on its way to a destination, and dynamic routing exists so paths can change as appliances or networks change. If route entries are misconfigured so two entries funnel into the same next hop and the path eventually points back to itself, packets can loop instead of terminating. Diagnostics often trace the path hop by hop to find the loop entry.
+
+**The mapping:** Treat each array index as an Azure Route Server route entry and `nums[i]` as the next hop; because values are in the index range, following `nums[i]` is guaranteed to stay inside the routing table. The duplicate value is the shared next hop that creates the cycle, and Floyd's slow and fast probes are two diagnostics walking that path at different speeds until they meet. Resetting one probe to the start makes both probes converge on the loop entry, so the key insight is that the duplicate number is the cycle entrance.
 
 ## Approach
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Task Scheduler — max-heap + cooldown queue ticking a clock</title>
+<title>Task Scheduler — Azure Batch max-heap with cooldown queue</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -164,12 +164,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Task Scheduler — <span>max-heap + cooldown queue</span> ticking a clock</h1>
-  <p class="subtitle">Har tick pe sabse frequent available task chalao; cooldown wale tasks queue me wait karte hain.</p>
+  <h1>Task Scheduler — <span>Azure Batch max-heap</span> with cooldown queue</h1>
+  <p class="subtitle">At each tick, run the most frequent available task; tasks in cooldown wait in a queue.</p>
 
   <div class="analogy">
-    <h3>🏋️ Analogy: gym instructor with rest days</h3>
-    <p>Same muscle ko back-to-back train nahi karte — <b>n din rest</b> chahiye. Instructor roz <b>sabse zyada reps-bachi exercise</b> pick karta hai (max-heap). Cooldown wali exercises <b>wait queue</b> me baithti hain; ready hone par wapas. Koi available nahi → <b>rest day (idle)</b>.</p>
+    <h3>⚙️ Analogy: Azure Batch with cooldown</h3>
+    <p>Azure Batch can dispatch the task type with the largest remaining backlog while a cooldown queue protects repeated work on the same constrained resource. The max-heap picks the most-pending available task; the queue returns it only when its cooldown time arrives.</p>
   </div>
 
   <div class="problem">
@@ -206,7 +206,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Greedy "most-frequent-first" via a max-heap, with a queue holding tasks until their cooldown expires, schedules everything in the fewest intervals — idle slots appear only when nothing is ready.</p>
+    <p>Like Azure Batch dispatch, greedy "most-pending-first" via a max-heap plus a cooldown queue schedules everything in the fewest intervals — idle slots appear only when nothing is ready.</p>
   </div>
 </div>
 

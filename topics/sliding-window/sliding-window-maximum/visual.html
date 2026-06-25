@@ -72,15 +72,11 @@
   <h1>Sliding Window Maximum &mdash; <span>Monotonic Deque</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">🏆</div>
+    <div class="analogy-icon">📈</div>
     <div class="analogy-body">
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Ek leaderboard jisme sirf "abhi relevant + abhi sabse strong" players ki queue
-        hai, strongest <strong style="color:#10b981">front</strong> pe. Naya strong player
-        weaker players ko <strong style="color:#ef4444">back</strong> se nikaal deta;
-        time-out hua player <strong style="color:#f59e0b">front</strong> se hat-ta. Front
-        = current window ka max.
+        Azure Stream Analytics computes a max over the active sliding window; a monotonic deque is the efficient local state for that. Evict stale events from the front, remove smaller candidates from the back, and read the max at the front.
       </div>
     </div>
   </div>

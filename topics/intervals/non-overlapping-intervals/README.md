@@ -19,14 +19,11 @@ remove** to make the rest non-overlapping.
 
 ## Real-World Analogy
 
-Socho ek **single conference room** hai aur bahut saari talks propose hui hain, har
-ek ka start aur end time. Sab to nahi ho sakti (kuch overlap karti hain) — tumhe
-**maximum talks schedule** karni hain. Classic greedy: hamesha woh talk pick karo jo
-**sabse jaldi khatam** ho rahi hai. Jaldi khatam hone wali talk room ko sabse early
-free karti hai, isliye aage zyada talks ke liye jagah bachti hai. Yeh **activity
-selection** problem hai — interval scheduling ka dada.
+**What Azure Batch is:** Azure Batch is Azure's service for scheduling compute-intensive jobs across a pool of VM nodes. When a pool slice is constrained, only one reservation can use that slice at a time, so overlapping reservations represent more promised capacity than the pool can actually provide.
 
-Jo talks remove karni padti hain, wahi answer.
+**What a capacity reservation window is, and why it's used:** A capacity reservation window is an operational promise that a Batch pool slice will be available to a job for a specific start/end period. If too many requests overlap, the scheduler must reject some windows to keep the accepted plan feasible. Sorting by earliest end time is used because accepting the reservation that frees the pool first leaves the most remaining timeline for later Azure Batch jobs.
+
+**The mapping:** Each interval is an Azure Batch reservation request for the same constrained pool slice. Sort requests by end time, accept a request only when its start is at or after the last accepted end, and count every overlapping request as one that must be removed. The key insight is that choosing the earliest-ending Azure reservation is the greedy move that maximizes kept windows, so rejected windows are the minimum removals.
 
 ## Approach
 

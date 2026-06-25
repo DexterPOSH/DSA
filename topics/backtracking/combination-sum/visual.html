@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Combination Sum — Recursion Tree with Reuse</title>
+<title>Combination Sum — Azure SKU Quota Tree</title>
 <style>
   :root {
     --bg: #1a1a2e; --panel: #16213e; --panel2: #232342;
@@ -75,12 +75,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Combination Sum — <span>recursion tree</span> with reuse</h1>
-  <p class="subtitle">Unlimited coins. Pick, subtract from <code>remain</code>, recurse. Hit 0 → record. Go negative → backtrack.</p>
+  <h1>Combination Sum — <span>Azure SKU quota</span> tree</h1>
+  <p class="subtitle">Reusable VM SKU options. Pick one, subtract from <code>remain</code>, recurse. Hit 0 → record. Go negative → backtrack.</p>
 
   <div class="analogy">
-    <h3>🪙 Real-world analogy: unlimited coins</h3>
-    <p>Coins <code>[2,3,6,7]</code>, banao <b>exactly 7</b>. Ek coin uthao, remaining ghatao, recurse. Same coin dobara use kar sakte ho. <b>start</b> pointer aage hi badhta taaki <code>[2,3]</code> aur <code>[3,2]</code> double na ho.</p>
+    <h3>☁️ Real-world analogy: Azure VM SKU quota planning</h3>
+    <p>Azure VM SKU planning asks which reusable SKU sizes can exactly consume a regional vCPU quota. Pick a SKU option, subtract its vCPUs, recurse, and roll it back if the branch overshoots; <code>start = i</code> keeps equivalent orderings from being counted twice.</p>
   </div>
 
   <div class="panel">
@@ -89,7 +89,7 @@
   </div>
 
   <div class="panel">
-    <h2>Recursion tree — each edge picks a coin <code>≥ start</code>, subtracting from <code>remain</code></h2>
+    <h2>Recursion tree — each edge picks a SKU option <code>≥ start</code>, subtracting from <code>remain</code></h2>
     <div class="treewrap"><svg id="tree" width="900" height="380" viewBox="0 0 900 380"></svg></div>
   </div>
 
@@ -114,7 +114,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Recurse with <code>start = i</code> (not <code>i+1</code>) to <b>reuse</b> a coin; loop from <code>start</code> to dodge duplicate orderings. <code>remain==0</code> records, <code>remain&lt;0</code> prunes.</p>
+    <p>Recurse with <code>start = i</code> to <b>reuse</b> a VM SKU option; loop from <code>start</code> to avoid duplicate orderings. <code>remain==0</code> records an exact quota plan, and <code>remain&lt;0</code> prunes.</p>
   </div>
 </div>
 
@@ -248,17 +248,17 @@ function render(){
 
   const cap=$('caption'); cap.className='caption';
   if (st.type==='visit')
-    cap.innerHTML = `At a node with <b class="bl">remain=${st.remain}</b>. Try each coin from <code>start</code> onward.`;
+    cap.innerHTML = `At a node with <b class="bl">remain=${st.remain}</b>. Try each SKU option from <code>start</code> onward.`;
   else if (st.type==='pick')
-    cap.innerHTML = `<b class="g">PICK</b> coin <code>${st.pick}</code> → push to path, new remain <b class="bl">${st.remain}</b>. Recurse (reuse allowed: <code>start=i</code>).`;
+    cap.innerHTML = `<b class="g">PICK</b> SKU option <code>${st.pick}</code> → push to path, new remain <b class="bl">${st.remain}</b>. Recurse (reuse allowed: <code>start=i</code>).`;
   else if (st.type==='hit'){ cap.classList.add('hit');
-    cap.innerHTML = `<b class="g">remain == 0</b> 🎯 — the path sums to the target exactly!`; }
+    cap.innerHTML = `<b class="g">remain == 0</b> 🎯 — the SKU plan uses the quota exactly!`; }
   else if (st.type==='record'){ cap.classList.add('hit');
     cap.innerHTML = `<b class="a">Record</b> a copy: <b class="a">[${st.recorded.join(',')}]</b>. ✅`; }
   else if (st.type==='over'){ cap.classList.add('over');
-    cap.innerHTML = `<b class="r">remain &lt; 0</b> — overshot the target. <b class="r">Prune</b> this branch, return.`; }
+    cap.innerHTML = `<b class="r">remain &lt; 0</b> — over the Azure quota. <b class="r">Prune</b> this branch, return.`; }
   else if (st.type==='back'){ cap.classList.add('back');
-    cap.innerHTML = `<b class="a">BACKTRACK</b> — <code>path.pop()</code> removes <code>${st.pick}</code>. Try the next coin at this level.`; }
+    cap.innerHTML = `<b class="a">BACKTRACK</b> — <code>path.pop()</code> removes SKU option <code>${st.pick}</code>. Try the next option at this level.`; }
 
   $('counter').textContent = `step ${cur+1} / ${steps.length}`;
   $('prevBtn').disabled = cur===0;

@@ -17,9 +17,11 @@ src = 0, dst = 3, k = 1
 
 ## Real-World Analogy
 
-Socho tum sasti se sasti flight dhoondh rahe ho `src` se `dst` tak, lekin ek rule hai: **zyada se zyada `k` layovers**. Bellman-Ford ka tareeka aise socho — har **round** me tum ek aur flight (ek aur hop) lene ki ijaazat dete ho. Round 1: sirf direct flights se jo prices milte hain wo note karo. Round 2: pichhle round ke best prices ko base maan ke ek aur flight aage badho. Aise `k + 1` rounds chalao (kyunki `k` stops = `k + 1` flights). Har round me prices sasti hote jaate hain par hops limited rehte hain.
+**What Azure Traffic Manager is:** Azure Traffic Manager is Azure's DNS-based global traffic-routing service. It does not proxy the application traffic itself; it answers a DNS lookup with the endpoint that best matches a routing method such as priority, weighted, geographic, or performance. Teams use it to steer users toward healthy Azure endpoints while controlling cost, latency, and failover behavior.
 
-Yahaan **trick** yeh hai ki har round me sab updates ek **snapshot (pichhle round ki copy)** se karo — taaki ek hi round me do hops na ho jaayein.
+**What hop-limited route evaluation is, and why it's used:** Traffic Manager designs can be layered with nested profiles or regional endpoint choices, but architects still want a bounded decision path so routing stays predictable and does not wander through too many handoffs. Each candidate endpoint or regional hop may have a cost, latency, or policy preference, and the best-looking route is invalid if it exceeds the allowed number of transfers. The hop limit exists to enforce an operational constraint, not just to find the cheapest theoretical path.
+
+**The mapping:** Cities are Azure regions or endpoint groups, flights are directed Traffic Manager candidate handoffs with prices, and `k + 1` Bellman-Ford rounds mean “allow one more link in the routing chain.” The snapshot array is the previous DNS-routing budget: updates in this round may use exactly one additional hop, but they cannot chain again until the next round. The key insight is that cheapest cost and valid hop count must be optimized together, so the answer is the lowest destination cost still reachable within the Azure route budget.
 
 ## Approach — Bellman-Ford, capped at k+1 relaxations
 

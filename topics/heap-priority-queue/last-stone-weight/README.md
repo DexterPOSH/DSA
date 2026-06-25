@@ -22,7 +22,11 @@ smash 1,1 -> 0   => [1]
 
 ## Real-World Analogy
 
-Socho ek **gladiator arena** hai. Har round me hum do **sabse strong** baache hue gladiators ko aamne-saamne khada karte hain. Equal strength wale? Dono mar jaate hain. Warna chhota mar jaata hai aur bada thak ke `(bada - chhota)` strength ke saath bach jaata hai aur wapas pool me daal diya jaata hai. Hum baar-baar **top-2 strongest** chahte hain — yahi **max-heap** ka kaam hai: har baar sabse bada turant nikaalo.
+**What Azure Batch is:** Azure Batch is Azure's service for running many compute tasks across a managed pool of machines. You can think of it as maintaining a pool of pending work items and repeatedly dispatching the most important work according to a scheduling policy. In this analogy, the "weight" of a stone is the amount of demand or backlog a work item represents.
+
+**What priority-based workload dispatch is, and why it's used:** Priority-based dispatch always selects the largest or most urgent pending work first so the scheduler focuses on the biggest bottlenecks. After two large workloads interact, they may cancel each other out completely, or the larger one may leave a smaller remainder that still needs future processing. Requeueing that remainder is essential because the pool changes dynamically after every dispatch.
+
+**The mapping:** The max-heap is the Azure Batch-style priority queue of pending workload weights. Each loop pops the two heaviest items, just like a scheduler pulling the two largest current demands; equal weights disappear, and an unequal pair pushes `y - x` back as leftover demand. The key insight is that every step depends on the current two extremes, so a heap gives exactly the operation the simulation needs: pop top two, then reinsert any remainder.
 
 ## Approach
 

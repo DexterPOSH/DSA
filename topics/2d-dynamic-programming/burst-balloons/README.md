@@ -24,16 +24,11 @@ nums = [3, 1, 5, 8]   ->  167
 
 ## Real-World Analogy
 
-Socho ek **fireworks finale** chal raha hai. Agar tum poochho "pehle kaunsa balloon
-phodun?" to fas jaaoge — kyunki har balloon ka reward uske *padosiyon* pe depend
-karta hai, aur padosi badalte rehte hain. Trick yeh hai: ulta socho. Ek interval
-`(left, right)` ke andar poocho — **"is range ka *aakhri* balloon kaunsa phoota?"**
+**What Azure Virtual WAN is:** Azure Virtual WAN is Microsoft's managed wide-area networking service for connecting branches, VNets, users, and security services through Azure hubs. It gives you centrally managed routing across a large network instead of hand-building every connection. In this analogy, traffic moves through a chain of network appliances between two fixed hub gateways.
 
-Jab balloon `k` is range ka last balloon ho, to uske dono taraf ke saare balloons
-pehle hi gaayab ho chuke hain — matlab `k` ke padosi bilkul `left` aur `right`
-boundaries hi honge (jo abhi tak zinda hain). Isse problem do clean independent
-sub-intervals me toot jaati hai: `(left, k)` aur `(k, right)`. Yahi interval DP ka
-core insight hai.
+**What service chaining with Network Virtual Appliances is, and why it's used:** A service chain sends traffic through required Network Virtual Appliances, such as firewalls or inspection devices, before it reaches the other side. Azure networking teams use this pattern to apply security, filtering, or traffic controls in a predictable order. The tricky part is that if you remove an appliance from the middle, its neighbors change, so evaluating the "first" removal makes every later decision depend on a moving boundary.
+
+**The mapping:** The fixed left and right gateways are the sentinel balloons, each appliance is a balloon, and choosing appliance `k` as the last one removed inside an interval gives stable neighbors: the left and right boundaries. That lets the value for `k` combine cleanly with the best already-computed left subchain and right subchain, just like `nums[left] * nums[k] * nums[right] + dp[left][k] + dp[k][right]`. The key insight is to reason about the last action in a segment, because fixed boundaries turn a tangled chain into two independent cached intervals.
 
 ## Approach
 

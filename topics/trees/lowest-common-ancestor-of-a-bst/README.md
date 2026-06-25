@@ -23,7 +23,11 @@ LCA(3, 5)  ->  4
 
 ## Real-World Analogy
 
-Socho ek **company org chart** hai aur tum do employees `p` aur `q` ka "sabse chhota common boss" dhoondh rahe ho. BST me ek magic property hai: har manager ke left wale sab usse **chhote**, right wale sab **bade**. To tum root (CEO) se start karte ho. Agar `p` aur `q` dono CEO se bade hain → dono right department me hain, right chale jao. Dono chhote → left. Aur jis pal CEO ke value ke **dono taraf** bant gaye (ek chhota, ek bada, ya koi ek bilkul wahi node) — bas, yahi wo split-point hai jahan unke raaste alag hote hain. Yahi LCA hai.
+**What Azure Policy is:** Azure Policy is Azure's governance service for defining rules, auditing compliance, and enforcing standards across Azure resources. Policies can be assigned at different scopes such as Management Groups, Subscriptions, or Resource Groups. Child scopes inherit applicable governance from their nearest relevant ancestors.
+
+**What policy scope inheritance is, and why it's used:** Inheritance lets Azure teams define a rule once at a shared scope instead of duplicating it on every resource. When two resources need a common governance context, the important scope is the lowest place in the hierarchy that still contains both of them. In a BST analogy, ordered values let us find that split point without searching both full paths blindly.
+
+**The mapping:** Starting at the root, compare both target values to the current node. If both are smaller, the common Azure-like scope must be in the left branch; if both are larger, it must be in the right branch. The key insight is that the first node where the targets split — or one target equals the node — is the lowest common ancestor.
 
 ## Approach
 

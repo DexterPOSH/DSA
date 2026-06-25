@@ -14,7 +14,11 @@ m = 3, n = 2   ->  3
 
 ## Real-World Analogy
 
-Socho ek city ka grid hai — sirf **right ya down** chal sakte ho (one-way streets). Tumhe top-left se bottom-right pahunchna hai. Ab kisi bhi intersection pe khade ho ke socho: "is corner tak main kitne tareeke se aa sakta hoon?" Jawaab simple hai — main yahan ya to **upar wale block se neeche aaya**, ya **left wale block se right aaya**. Aur koi raasta hai hi nahi. To is corner ke paths = (upar wale corner ke paths) + (left wale corner ke paths). Bas yahi recurrence hai. Har cell apne **do padosiyon** (top + left) ka sum hai.
+**What Azure Virtual WAN is:** Azure Virtual WAN is a managed networking service that connects branches, VNets, and cloud networks through Microsoft-managed hubs. It centralizes routing so teams can reason about large Azure network topologies without configuring every path manually. In this analogy, the topology is simplified into a rectangular grid of Azure regions and data centers.
+
+**What compliance-constrained route planning is, and why it's used:** Network teams often restrict which regions traffic may traverse to satisfy data residency, security, or operational policies. Here, the allowed policy is intentionally simple: traffic may only move east or south, never back north or west. That one-way constraint prevents loops and means every route to a cell must enter from exactly one of two approved neighbors.
+
+**The mapping:** Each grid cell is an Azure network location, moving right or down is an allowed Virtual WAN route hop, and the DP cell stores how many compliant routes reach that location. The first row and first column each have one path because traffic can only keep moving in a straight line, while every interior cell adds the cached counts from the north and west neighbors. The key insight is that a global route count emerges from local dependencies, so the bottom-right cell gives all valid end-to-end paths after each cell is computed once.
 
 ## Approach
 

@@ -149,8 +149,8 @@
   <p class="subtitle">Grade-school long multiplication on digit arrays, where every product lands at index <code>i+j+1</code>.</p>
 
   <div class="analogy">
-    <h3>✖️ Multiplication-grid analogy</h3>
-    <p>Har digit pair <code>num1[i] × num2[j]</code> ka product result array me <b>position <code>i+j+1</code></b> (low digit) pe girta hai, carry <code>i+j</code> pe. Koi manual shifting nahi — har product apni sahi jagah khud dhoondh leta hai.</p>
+    <h3>🧮 Azure Blob analogy</h3>
+    <p>Azure Blob byte-range math treats a huge value as ordered chunks. Each digit-pair product lands at accumulator offset <b><code>i+j+1</code></b>, with carry to <code>i+j</code>, composing the full result without converting the whole blob-sized number.</p>
   </div>
 
   <div class="problem">

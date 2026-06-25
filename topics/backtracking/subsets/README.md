@@ -18,11 +18,11 @@ The solution set must not contain duplicate subsets; order doesn't matter.
 
 ## Real-World Analogy
 
-Socho tum ghar pe pizza order kar rahe ho aur teen toppings available hain: mushroom,
-olive, capsicum. Har topping ke liye ek hi sawaal — **"isko daalun ya na daalun?"**
-Mushroom haan/na × olive haan/na × capsicum haan/na = 8 possible pizzas. Plain cheese
-(koi topping nahi) bhi ek valid pizza hai — wahi `[]` empty subset hai. Subsets generate
-karna basically har element pe yeh **include / exclude** decision lena hai, recursively.
+**What Azure Resource Manager and Bicep deployments are:** Azure Resource Manager is Azure's deployment and management control plane, and Bicep is a declarative language that compiles into ARM templates. Landing-zone deployments use them to create baseline infrastructure such as networks, monitoring, Key Vault, Private DNS, and Bastion. A template can include mandatory resources plus optional modules that vary by environment.
+
+**What optional module include/exclude switching is, and why it's used:** Optional modules are controlled by parameters or conditions so teams can deploy only the Azure components an environment needs. A dev environment might skip Bastion or extra monitoring, while production includes them for security and operations. Each optional module is a binary choice, and the planner must consider both including it and leaving it out.
+
+**The mapping:** Each item is an optional Azure landing-zone module, and each recursion level decides include or exclude. The algorithm appends a module for the include branch, explores the remaining modules, then pops it to explore the exclude path; every leaf is one possible deployment footprint, including the empty footprint. The key insight is that the power set is just all binary deployment decisions written out as backtracking paths.
 
 ## Approach — include/exclude decision tree
 

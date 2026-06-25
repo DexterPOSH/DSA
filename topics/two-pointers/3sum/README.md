@@ -17,14 +17,11 @@ that `a + b + c == 0`. The solution set must **not contain duplicate triplets**
 
 ## Real-World Analogy
 
-Yeh basically **Two Sum II ka bada bhai** hai. Socho tum ek number ko "anchor"
-(`a`) bana ke fix karte ho, aur fir poochte ho: "baaki array me do aise numbers
-hain jinka sum `-a` ho?" — kyunki `a + b + c = 0` matlab `b + c = -a`.
+**What Azure Data Explorer (Kusto) is:** Azure Data Explorer is Azure's fast analytics service for high-volume telemetry, logs, and time-series data, queried with KQL. Teams use it to investigate numeric deltas such as capacity changes, error-rate movement, or cost adjustments across huge datasets. Sorting or ordering a result set gives the query a structure that simple scans can exploit.
 
-Pehle array ko **sorted** kar lo (line me khada kar do, chhote se bade). Ab har
-anchor ke aage wale hisse pe wahi **taraazu wala two-pointer** chalao jo Two Sum II
-me tha. Sorted hone se ek aur bonus milta hai: duplicate triplets ko skip karna
-trivial ho jaata — same value lagataar aaye to use chhod do.
+**What a sorted range scan is, and why it's used:** In a sorted Kusto-style scan, moving the left cursor increases the candidate value and moving the right cursor decreases it. For a balanced triplet, you can pin one telemetry delta as the anchor `a`, then search the remaining sorted range for two deltas whose sum is `-a`. Sorting exists here for two reasons: it makes the pointer movements predictable, and it places equal deltas next to each other so duplicate anchors and duplicate pairs can be skipped cleanly.
+
+**The mapping:** The sorted `nums` array is an ordered Azure Data Explorer telemetry column, `i` is the fixed Kusto predicate/anchor, and `l`/`r` are the lower and upper range cursors searching for the complement. If the sum is too small, move `l` to a larger delta; if it is too large, move `r` to a smaller delta; on a match, record it and skip adjacent duplicates. The key insight is that sorting turns a cubic search into repeated linear complement scans while also making deduplication local.
 
 ## Approach
 

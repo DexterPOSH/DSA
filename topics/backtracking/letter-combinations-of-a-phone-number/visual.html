@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Letter Combinations — Keypad Decision Tree</title>
+<title>Letter Combinations — Azure Option Fan-Out Tree</title>
 <style>
   :root {
     --bg: #1a1a2e; --panel: #16213e; --panel2: #1e293b;
@@ -76,16 +76,13 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Letter Combinations &mdash; <span>Keypad Decision Tree</span></h1>
+  <h1>Letter Combinations &mdash; <span>Azure Option Fan-Out Tree</span></h1>
 
   <div class="analogy">
-    <div class="icon">📱</div>
+    <div class="icon">☁️</div>
     <div>
       <div class="label">Real-world analogy</div>
-      <p>Old T9 keypad: <code>2</code> = a/b/c, <code>3</code> = d/e/f. Each digit
-      is a wheel of letters. Fix one letter on wheel 1, spin through all of wheel
-      2, then <strong>come back and change wheel 1</strong>. Every root-to-leaf
-      path through this tree is one combination.</p>
+      <p>An Azure Resource Manager (ARM) parameter sweep fans out across allowed values for each deployment-name position. Append one allowed value, recurse to the next position, then pop it to try the next; every root-to-leaf path is one candidate string.</p>
     </div>
   </div>
 
@@ -130,10 +127,7 @@
     <div class="icon">💡</div>
     <div>
       <div class="label">Key takeaway</div>
-      <p>At level <code>idx</code> we loop over the letters of
-      <code>digits[idx]</code>: append → recurse to the next digit → pop. Reaching
-      the last level emits one combination. It's a pure Cartesian product —
-      <code>3 × 3 = 9</code> leaves for <code>"23"</code>.</p>
+      <p>At level <code>idx</code>, loop over the allowed option values for that position: append → recurse → pop. For the sample, the Azure-style option sweep is still a Cartesian product with <code>3 × 3 = 9</code> leaves.</p>
     </div>
   </div>
 </div>

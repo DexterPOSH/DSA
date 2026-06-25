@@ -21,17 +21,11 @@ the inputs directly to an integer.
 
 ## Real-World Analogy
 
-Yaad hai school me **long multiplication** kaise karte the? `123 × 456`: pehle `123 × 6`,
-phir `123 × 5` (ek jagah left shift), phir `123 × 4` (do jagah left shift), aur sab ko jod
-do. Hum bilkul wahi kar rahe hain — par ek clean trick ke saath.
+**What Azure Blob Storage is:** Azure Blob Storage is Azure's object store for massive unstructured data like logs, backups, images, and data lake files. Blobs can be much larger than what a client wants to load into memory, so clients often upload, download, or validate them in ranges or blocks. The service still exposes one blob, but the client composes it from positioned pieces.
 
-Socho ek **multiplication grid** banate ho. `num1` ke har digit `i` ko `num2` ke har digit
-`j` se multiply karte ho. Yahan magic insight hai: **digit `i` aur digit `j` ka product hamesha
-result ke position `i + j` (aur carry `i + j + 1`) pe jaata hai** — agar dono numbers ke
-digits right se number kiye jaayein... actually hum left-indexed strings use karenge to position
-`i + j + 1` (low) aur `i + j` (carry). Yeh "position = sum of indices" wali baat hi pura
-bookkeeping simple kar deti hai — koi alag shifting handle nahi karni, sab ek flat array me
-sahi jagah gir jaata hai.
+**What byte-range chunking with offsets is, and why it's used:** Azure Blob Storage supports range reads and block-style transfers so clients can process a huge blob one chunk at a time. Each chunk is tied to an offset or block position, and validation metadata such as checksums can be associated with pieces before the full object is assembled. This exists to avoid turning one enormous payload into one in-memory value while still preserving exact order.
+
+**The mapping:** Each digit-pair product `num1[i] * num2[j]` is a small Azure Blob chunk contribution. Decimal place value routes that product into accumulator slot `i + j + 1`, with carry flowing into `i + j`; after all pairs land at their offsets, carry cleanup and leading-zero trimming produce the final string. The key insight is that fixed positional offsets let many small products compose one big number, just like Blob chunks compose one object, without converting the inputs to native integers.
 
 ## Approach
 

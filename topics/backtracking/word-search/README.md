@@ -22,13 +22,11 @@ word = "ABCB"     ->  False    # 'B' at (0,1) can't be reused
 
 ## Real-World Analogy
 
-Socho ek **word-search puzzle** newspaper me chhapa hai aur tum pencil se ek
-word trace kar rahe ho. Tum pehle letter pe pencil rakhte ho, fir uske
-**adjacent** (upar/neeche/left/right) cells me agla letter dhoondte ho. Jis cell
-pe pencil rakha usko mann me "used" mark kar lete ho — kyunki ek hi cell ko do
-baar use nahi kar sakte. Agar aage ka raasta dead-end ho jaye (next letter kahin
-adjacent me nahi mila), to **pencil utha lo, woh cell un-mark karo, aur dusra
-direction try karo**. Yahi backtracking hai — try, fail, undo, retry.
+**What Azure AI Search is:** Azure AI Search is a managed search service that ingests documents, analyzes text into tokens, and builds indexes so applications can query content quickly. Instead of scanning every document for every request, Azure AI Search uses its index to jump to likely matches and verify them. That makes it a good analogy for proving a specific sequence exists in a structured space.
+
+**What token-position traversal is, and why it's used:** Search indexes can keep positional information about where tokens occur, which helps phrase or proximity queries verify that terms appear in the required order and closeness. This exists because a simple bag of matching tokens can produce false positives: the words may be present but not connected the way the query requires. A traversal abandons a candidate as soon as the next required token is missing, reused, or not in a valid neighboring position.
+
+**The mapping:** Each board cell is an Azure AI Search token position, and each character in the word is the next query token to prove. DFS moves to an adjacent matching cell, marks it visited so the same position is not reused in the path, and backtracks by clearing the mark when the branch dead-ends. The key insight is to carry just enough path state to prevent illegal reuse, then undo that state so other query paths can be tested.
 
 ## Approach — grid DFS with backtracking
 

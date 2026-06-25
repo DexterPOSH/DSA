@@ -29,7 +29,11 @@ The catch: it's the *whole subtree*, not just the immediate children.
 
 ## Real-World Analogy
 
-Socho ek **office building** hai jisme har floor pe ek room-number range allot hai. Reception (root) bolta hai: "mere left wing me jo bhi rooms hain, sab mere number se chhote, aur right wing me sab bade." Lekin yeh rule **transitive** hai — left wing ke andar ka koi bhi room, building ke top-level "max allowed" se bhi neeche hona chahiye, sirf apne immediate parent se nahi. Har node ke paas ek `(min, max)` allowed range hoti hai jo upar se neeche narrow hoti jaati hai. Koi room apni range se bahar nikla → building invalid.
+**What Azure Cosmos DB and Azure Cognitive Search indexing is:** Azure Cosmos DB and Azure Cognitive Search are Azure services that use indexes to avoid scanning every stored item for ordered queries. Cosmos DB indexes document properties for filters and ranges, while Azure Cognitive Search builds searchable indexes over content and fields. In both cases, ordered index behavior depends on values staying within the correct ranges.
+
+**What inherited range-bound validation is, and why it's used:** A local comparison is not enough for an ordered index, because a value can be less than its parent but still violate a higher ancestor's allowed range. Query engines rely on the guarantee that an entire left partition is below the current key and an entire right partition is above it. Passing inherited low/high bounds preserves that global Azure index invariant at every level.
+
+**The mapping:** Validate the BST by carrying the allowed `(low, high)` range into each node. The left child receives `(low, node.val)`, the right child receives `(node.val, high)`, and any value outside its inherited range fails immediately. The key insight is that a BST is globally ordered, not just parent-child ordered, so every node must satisfy all ancestor constraints.
 
 ## Approach
 

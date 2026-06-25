@@ -21,7 +21,11 @@ Note: a path can also be a single node, and it can "turn" at one node (go up the
 
 ## Real-World Analogy
 
-Socho ek **trekking trail network** hai pahaadon me, jaha har point pe ek altitude-score (positive ya negative) hai. Tumhe ek aisa continuous trail chahiye jisme **total score maximum** ho. Har junction (node) pe do choice hai: us junction se **ek hi taraf** neeche jaake aage ek bade trail ka hissa ban-na (taaki parent tumhe use kar sake), **ya** us junction pe hi left aur right dono dips ko jod ke ek "peak path" complete kar dena. Negative-score wale detour ko skip karo — usse `0` maan lo, kyunki usme jaane ka koi faayda nahi. Best peak har junction pe yaad rakho.
+**What Azure Cost Management is:** Azure Cost Management helps teams monitor, analyze, and optimize cloud spend across Azure scopes such as Resources, Resource Groups, Subscriptions, and Management Groups. Costs can be viewed at a leaf resource or rolled up through parent scopes for budgets and chargeback. That makes the Azure estate feel like a tree of financial contributions.
+
+**What cost rollup with branch gains is, and why it's used:** A rollup needs to know which child branches add value to a specific report and which ones should be ignored because they reduce the total, such as credits, discounts, or negative adjustments in this analogy. When reporting upward, a scope can continue through only one child branch because the parent path is a single chain. Separately, the best estate-wide path might bend at a scope and include both child branches plus the current scope.
+
+**The mapping:** The DFS returns one Azure branch gain upward: `node.val + max(left_gain, right_gain)`, with negative gains clamped to zero so harmful branches are skipped. At every node, it also tests the full path that bends there: `node.val + left_gain + right_gain`, updating the global maximum. The key insight is that "best path through me" and "best extendable gain to my parent" are different values, so we track both.
 
 ## Approach
 

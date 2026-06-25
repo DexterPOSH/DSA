@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Palindromic Substrings — Count by Expanding Centers</title>
+<title>Palindromic Substrings — Azure stream symmetry count</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -106,16 +106,14 @@
 </head>
 <body>
 
-  <h1>Palindromic Substrings &mdash; <span>Count by Expanding Centers</span></h1>
+  <h1>Palindromic Substrings &mdash; <span>Azure Stream Symmetry Count</span></h1>
 
   <div class="analogy">
-    <div class="ic">🔢</div>
+    <div class="ic">📡</div>
     <div>
       <div class="label">Real-world analogy</div>
       <div class="analogy-text">
-        Same <strong>mirror trick</strong> as longest-palindrome — but here we don't want the longest,
-        we want a <strong>count</strong>. Every time both pointers match while expanding from a center,
-        a brand-new palindrome was just formed → bump the counter <code class="inline">+1</code>.
+        Azure Stream Analytics counts symmetric telemetry windows by expanding around each center. Once the inner window matches, only the next boundary pair is checked; every successful expansion emits one count.
       </div>
     </div>
   </div>
@@ -123,7 +121,7 @@
   <div class="card">
     <div>
       <div class="section-label">What's happening</div>
-      <div class="step-desc" id="stepDesc">Press "Next" to begin. We expand from every center in <code class="inline">s = "aba"</code> and count each match.</div>
+      <div class="step-desc" id="stepDesc">Press "Next" to begin. The Azure stream scan expands from every center in <code class="inline">s = "aba"</code> and counts each match.</div>
     </div>
 
     <div>
@@ -158,11 +156,7 @@
     <div class="ic">💡</div>
     <div>
       <div class="label">Key Takeaway</div>
-      <p>
-        Identical engine to <strong>Longest Palindromic Substring</strong> — the only change is
-        <code class="inline">count += 1</code> on <em>every</em> successful match instead of tracking the
-        longest. <strong>O(n²) time, O(1) space.</strong>
-      </p>
+      <p>This uses the same Azure stream symmetry scan as longest-palindrome, but it emits <code class="inline">count += 1</code> on <em>every</em> successful expansion instead of only tracking the longest window. <strong>O(n²) time, O(1) space.</strong></p>
     </div>
   </div>
 
@@ -257,7 +251,7 @@
       counter.textContent = `Step ${cur + 1} / ${steps.length}`;
 
       if (cur < 0) {
-        stepDesc.innerHTML = 'Press "Next" to begin. We expand from every center in <code class="inline">s = "aba"</code> and count each match.';
+        stepDesc.innerHTML = 'Press "Next" to begin. The Azure stream scan expands from every center in <code class="inline">s = "aba"</code> and counts each match.';
         stepDesc.className = 'step-desc';
         centerNote.innerHTML = '';
         countVal.textContent = '0';

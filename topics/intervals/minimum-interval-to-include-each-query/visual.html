@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Minimum Interval to Include Each Query — offline sweep + size heap</title>
+<title>Minimum Interval to Include Each Query — Azure Service Health sweep</title>
 <style>
   :root{
     --bg:#1a1a2e; --panel:#16213e; --panel2:#22325a; --text:#e0e0e0; --muted:#9aa3c0;
@@ -75,12 +75,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Minimum Interval to Include Each Query — <span>offline sweep</span> + size heap</h1>
-  <p class="subtitle">For each query point, find the smallest interval covering it. Sort queries, add reachable intervals to a size-min-heap, lazily drop ended ones.</p>
+  <h1>Minimum Interval to Include Each Query — Azure Service Health <span>sweep</span> + size heap</h1>
+  <p class="subtitle">For each alert timestamp, find the smallest Azure Service Health maintenance window covering it. Sort timestamps, add started windows to a size-min-heap, lazily drop ended ones.</p>
 
   <div class="analogy">
-    <h3>🛏️ The smallest-blanket analogy</h3>
-    <p>Har query ek <b>point</b> hai; har interval ek <b>blanket</b>. Queries ko chote→bade process karo. Jaise point aage badhe, jin blankets ka <code>left ≤ q</code> ho gaya unhe <b>size-heap</b> me daalo. Jo blankets point se <b>pehle khatam</b> ho gaye (<code>right &lt; q</code>) unhe top se nikaalo. Bacha sabse chhota blanket = answer.</p>
+    <h3>📡 Azure Service Health analogy</h3>
+    <p>Azure Service Health planned-maintenance events have start/end times and durations, while each query is an alert timestamp. Process timestamps in sorted order, push every started event into a duration min-heap, pop ended events, and the heap top is the smallest active Azure window covering that timestamp.</p>
   </div>
 
   <div class="problem">
@@ -98,7 +98,7 @@
   <div class="stage">
     <div>
       <div class="timeline" id="timeline"></div>
-      <p style="color:var(--muted);font-size:.78rem;margin:6px 2px 0;">Amber flag = current query point. Bars = intervals (size = r−l+1).</p>
+      <p style="color:var(--muted);font-size:.78rem;margin:6px 2px 0;">Amber flag = current alert timestamp. Bars = Azure windows (size = r−l+1).</p>
     </div>
     <div class="side">
       <div class="panel-box">
@@ -122,7 +122,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Process queries in sorted order so each interval is pushed once; a size-min-heap gives the smallest candidate, and lazy deletion of <code>right &lt; q</code> entries keeps it valid. O((n+m) log n) total.</p>
+    <p>Process alert timestamps in sorted order so each Azure maintenance window is pushed once; a size-min-heap gives the smallest active candidate, and lazy deletion of <code>right &lt; q</code> keeps it valid. O((n+m) log n) total.</p>
   </div>
 </div>
 
@@ -151,30 +151,30 @@ function buildSteps(){
     answers:{...answers}, caption:o.caption
   });
 
-  steps.push(snap({caption:`Sort intervals by left → <b>[[1,4],[2,4],[3,6],[4,4]]</b>. Sort queries → <b>[2,3,4,5]</b>. Heap (by interval size) starts empty.`}));
+  steps.push(snap({caption:`Sort Azure windows by start → <b>[[1,4],[2,4],[3,6],[4,4]]</b>. Sort alert timestamps → <b>[2,3,4,5]</b>. Heap (by window size) starts empty.`}));
 
   qSorted.forEach((q,qi)=>{
-    steps.push(snap({q,qIdx:qi,caption:`Query <b>q = ${q}</b>. Step 1: add every interval whose <code>left ≤ ${q}</code> (now reachable).`}));
+    steps.push(snap({q,qIdx:qi,caption:`Alert timestamp <b>q = ${q}</b>. Step 1: add every Azure window whose <code>left ≤ ${q}</code> (now active candidate).`}));
     while(i<sortedIv.length && sortedIv[i][0] <= q){
       const iv=sortedIv[i];
       heap.push({iv:[...iv],size:size(iv),right:iv[1],idx:i});
       inHeapIdx.add(i); resort();
-      steps.push(snap({q,qIdx:qi,caption:`<code>left ${iv[0]} ≤ ${q}</code> → push <b>[${iv[0]},${iv[1]}]</b> (size ${size(iv)}, right ${iv[1]}) into the heap.`}));
+      steps.push(snap({q,qIdx:qi,caption:`<code>left ${iv[0]} ≤ ${q}</code> → push Azure window <b>[${iv[0]},${iv[1]}]</b> (size ${size(iv)}, right ${iv[1]}) into the heap.`}));
       i++;
     }
     // lazy delete stale (right < q)
     while(heap.length && heap[0].right < q){
       const stale=heap[0];
-      steps.push(snap({q,qIdx:qi,staleIdx:stale.idx,caption:`Heap top <b>[${stale.iv[0]},${stale.iv[1]}]</b> has <code>right ${stale.right} &lt; ${q}</code> → it already ended. <b>Pop</b> (lazy delete).`}));
+      steps.push(snap({q,qIdx:qi,staleIdx:stale.idx,caption:`Heap top Azure window <b>[${stale.iv[0]},${stale.iv[1]}]</b> has <code>right ${stale.right} &lt; ${q}</code> → it already ended. <b>Pop</b> (lazy delete).`}));
       heap=heap.slice(1); inHeapIdx.delete(stale.idx); dropped.add(stale.idx);
     }
     if(heap.length){
       const best=heap[0];
       answers[q]=best.size;
-      steps.push(snap({q,qIdx:qi,bestIdx:best.idx,caption:`Heap top is valid: <b>[${best.iv[0]},${best.iv[1]}]</b> covers ${q}, size <b>${best.size}</b>. So <code>answer[${q}] = ${best.size}</code>. ✓`}));
+      steps.push(snap({q,qIdx:qi,bestIdx:best.idx,caption:`Heap top is valid: Azure window <b>[${best.iv[0]},${best.iv[1]}]</b> covers ${q}, size <b>${best.size}</b>. So <code>answer[${q}] = ${best.size}</code>. ✓`}));
     }else{
       answers[q]=-1;
-      steps.push(snap({q,qIdx:qi,caption:`Heap empty → no interval covers ${q}. <code>answer[${q}] = -1</code>.`}));
+      steps.push(snap({q,qIdx:qi,caption:`Heap empty → no Azure window covers ${q}. <code>answer[${q}] = -1</code>.`}));
     }
   });
 

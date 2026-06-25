@@ -14,11 +14,14 @@ nums = [3, 2, 4],       target = 6   ->  [1, 2]   # 2 + 4 == 6
 
 ## Real-World Analogy
 
-Socho tum ek shop pe ho aur tumhare paas exactly ₹9 ka discount coupon hai jo tabhi chalega jab do items ka total exactly ₹9 ho. Naive tareeka — har item utha ke baaki sab se compare karo, thaka dene wala. Smart cashier kya karta hai? Har item dekhte waqt wo sochta hai: *"is item ki price ₹2 hai, mujhe ₹9 banane ke liye ₹7 wala item chahiye"* — aur turant apni mental note (ek diary jisme "kaunsi price kahan dikhi") me check karta hai ki ₹7 pehle aa chuka hai ya nahi. Wo diary hi hamara **hash map** hai: har number ke saath uska **complement** yaad rakho, aur ek hi pass me jodi mil jaati hai.
+**What Azure Cache for Redis is:** Azure Cache for Redis is Azure's managed Redis service for low-latency key-value lookups. Services put small pieces of data in Redis when they need to answer "do we already have this exact key?" in milliseconds. In Two Sum, the useful key is a number we've already passed in the stream.
 
+**What key-value GET/SET lookup is, and why it's used:** Redis `GET` retrieves the value stored for an exact key, and `SET` records a key for future requests. That model exists so callers can jump straight to the record they need instead of scanning every previous record. Storing `number -> index` in Azure Cache for Redis would let a telemetry processor instantly ask whether the complement it needs has already arrived.
+
+**The mapping:** For each value `x`, compute `target - x` and do a Redis-style lookup for that complement. If it exists, the stored value is the earlier index and the pair is complete; otherwise store `x -> current index` so a later number can find it. The key insight is to cache the past in a hash map, so each new number needs one Azure-style lookup instead of comparing against everything before it.
 ## Approach
 
-**Brute force** — har pair try karo (O(n²)):
+**Brute force** — try every pair (O(n²)):
 
 ```python
 for i in range(len(nums)):
@@ -29,7 +32,7 @@ for i in range(len(nums)):
 
 **Optimal — hash map (one pass)** (O(n)):
 
-Idea simple hai — har number `n` ke liye hume `target - n` (complement) chahiye. Array pe chalte chalte ek dictionary `seen` maintain karo jo *value -> index* map karti hai. Har number pe pehle check karo ki uska complement already `seen` me hai kya; agar hai to jodi mil gayi, indices return karo. Nahi to current number ko `seen` me daal do aur aage badho.
+The idea is simple — for each number `n`, we need `target - n` (the complement). As we scan the array, maintain a dictionary `seen` that maps *value -> index*. For each number, first check whether its complement is already in `seen`; if it is, we found the pair, so return the indices. Otherwise, store the current number in `seen` and keep going.
 
 ```python
 def two_sum(nums, target):
@@ -42,23 +45,23 @@ def two_sum(nums, target):
     return []                      # problem guarantees a pair, par safe rahna
 ```
 
-Pattern: **hash map for complement lookup** — ek hi pass, har lookup O(1).
+Pattern: **hash map for complement lookup** — one pass, with each lookup taking O(1).
 
 ## Complexity
 
-- **Time:** O(n) — array ko sirf ek baar scan karte hain, har dictionary lookup/insert O(1) average.
-- **Space:** O(n) — worst case me poora array `seen` me chala jaata hai (jodi last me milti hai).
+- **Time:** O(n) — scan the array once, with each dictionary lookup/insert taking O(1) on average.
+- **Space:** O(n) — in the worst case, the entire array is stored in `seen` before the pair is found.
 
 ## Common Pitfalls
 
-- **Same element do baar use kar dena** — `complement in seen` ko *current* number add karne se **pehle** check karna zaroori hai. Tabhi tum apne aap se add nahi karoge (e.g. `target = 2*n`).
-- **Values vs indices** — problem indices maangta hai, values nahi. Dictionary me value -> index store karo, ulta nahi.
-- **Duplicate values** — agar `nums` me same value do baar hai (jaise `[3, 3]`, target `6`), to value -> index map sahi kaam karta hai kyunki tum complement ko pehle dekhe gaye index se match karte ho.
-- **Sorting karke two-pointer** — chalega aur O(1) extra space deta hai, par sort ke baad original indices kho jaate hain (alag se track karne padte hain). Jab indices chahiye, hash map cleaner hai.
+- **Using the same element twice** — you must check `complement in seen` **before** adding the current number. That prevents pairing a number with itself (e.g. `target = 2*n`).
+- **Values vs indices** — the problem asks for indices, not values. Store value -> index in the dictionary, not the reverse.
+- **Duplicate values** — if `nums` contains the same value twice (such as `[3, 3]`, target `6`), the value -> index map still works because the complement matches a previously seen index.
+- **Sorting with two pointers** — this works and gives O(1) extra space, but sorting loses the original indices unless you track them separately. When indices are required, a hash map is cleaner.
 
 ## When to Use This Pattern
 
-Jab dikhe *"do (ya k) elements dhoondho jinka koi relation/sum/diff target ke barabar hai"* — turant socho **hash map of complements**. "Pair that sums to X", "do numbers ka difference k hai", "kya koi a aisa hai ki target-a maujood ho" — ye sab one-pass hash lookup se O(n) me hote hain, O(n²) nested loop ki zaroorat nahi.
+When you see *"find two (or k) elements whose relation/sum/difference equals a target"* — immediately think **hash map of complements**. "Pair that sums to X", "two numbers have difference k", and "does some `a` exist such that `target - a` is present" can all be solved with one-pass hash lookups in O(n), without an O(n²) nested loop.
 
 ## Visual
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Redundant Connection — Union-Find finds the cycle edge</title>
+<title>Redundant Connection — Azure VNet peering loop</title>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -134,12 +134,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Redundant Connection — <span>Union-Find</span> spots the cycle edge</h1>
-  <p class="subtitle">Process edges one by one. The first edge whose two endpoints are <i>already connected</i> is the redundant one.</p>
+  <h1>Redundant Connection — Azure VNet <span>peering loop</span></h1>
+  <p class="subtitle">Process peering links one by one. The first link whose endpoints are already connected is the redundant VNet peering.</p>
 
   <div class="analogy">
-    <h3>🔧 Real-world analogy: the plumbing network</h3>
-    <p>Naya pipe sirf tab daalo jab dono junctions <b>alag clusters</b> me ho. Agar dono ka <b>mukhiya (root)</b> already same hai, to ye pipe ek loop bana dega — wahi redundant edge hai.</p>
+    <h3>🔁 Azure VNet redundant peering</h3>
+    <p>Add Azure VNet peering links only when they connect two previously separate topology groups. If Union-Find says both endpoints already share a root, that peering closes a loop and is redundant.</p>
   </div>
 
   <div class="panel">
@@ -152,14 +152,14 @@
         <svg id="graph" viewBox="0 0 420 340" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
       <div class="side">
-        <h4>parent[] — each node's leader</h4>
+        <h4>parent[] — each VNet's leader</h4>
         <div class="dsu-row" id="dsuRow"></div>
-        <h4>Connected components</h4>
+        <h4>Connected VNet components</h4>
         <div class="comps" id="comps"></div>
       </div>
     </div>
 
-    <div class="caption" id="caption">Press <b>Next</b> to add edges one at a time.</div>
+    <div class="caption" id="caption">Press <b>Next</b> to add Azure peering links one at a time.</div>
 
     <div class="controls">
       <button class="ghost" id="prevBtn">‹ Prev</button>
@@ -171,7 +171,7 @@
 
   <div class="takeaway">
     <h3>Key takeaway</h3>
-    <p>Add edges incrementally with Union-Find; the first edge connecting two nodes that already share a root closes the cycle — that's the redundant connection, in <b>O(n·α(n)) ≈ O(n)</b>.</p>
+    <p>Add Azure peering links incrementally with Union-Find; the first link connecting two VNets that already share a root closes the loop — that is the redundant connection, in <b>O(n·α(n)) ≈ O(n)</b>.</p>
   </div>
 </div>
 
@@ -196,7 +196,7 @@ function buildSteps() {
   // step 0: initial
   steps.push({
     idx: -1, parent: [...parent], addedEdges: [], cycle: false,
-    cap: 'Each node is its own leader. <code>parent[i] = i</code>. No edges yet.'
+    cap: 'Each VNet is its own leader. <code>parent[i] = i</code>. No peering links yet.'
   });
   for (let i = 0; i < edges.length; i++) {
     const [u, v] = edges[i];
@@ -206,7 +206,7 @@ function buildSteps() {
       steps.push({
         idx: i, parent: [...parent], addedEdges: steps[steps.length-1].addedEdges.slice(),
         touch: [u, v], roots: [ru, rv], cycle: true, redundant: [u, v],
-        cap: `Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=${ru}</code>, <code>find(${v})=${rv}</code> — <b class="r">same root!</b> These were already connected, so this edge closes a cycle. <b class="r">Return [${u},${v}]</b>.`
+        cap: `Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=${ru}</code>, <code>find(${v})=${rv}</code> — <b class="r">same root!</b> These VNets were already connected, so this peering link closes a loop. <b class="r">Return [${u},${v}]</b>.`
       });
       break;
     } else {
@@ -216,7 +216,7 @@ function buildSteps() {
       steps.push({
         idx: i, parent: [...parent], addedEdges: added,
         touch: [u, v], roots: [ru, rv], cycle: false,
-        cap: `Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=${ru}</code> ≠ <code>find(${v})=${rv}</code> — different clusters. <b class="g">union</b> them: <code>parent[${ru}] = ${rv}</code>.`
+        cap: `Edge <b class="u">[${u},${v}]</b>: <code>find(${u})=${ru}</code> ≠ <code>find(${v})=${rv}</code> — different VNet clusters. <b class="g">union</b> them: <code>parent[${ru}] = ${rv}</code>.`
       });
     }
   }

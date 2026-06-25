@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Rotting Oranges — Multi-Source BFS, Minute by Minute</title>
+<title>Rotting Oranges — Azure zone propagation BFS</title>
 <style>
   :root {
     --bg: #1a1a2e; --panel: #16213e; --panel2: #0f172a; --text: #e0e0e0;
@@ -138,16 +138,14 @@
 </head>
 <body>
 
-  <h1>Rotting Oranges &mdash; <span>Multi-Source BFS, Minute by Minute</span></h1>
+  <h1>Rotting Oranges &mdash; <span>Azure Zone Propagation BFS</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">🍊</div>
+    <div class="analogy-icon">⚠️</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Sadan ek orange se nahi — <strong>saare rotten oranges ek saath</strong> apne 4 padosiyon ko
-        infect karte hain. Har minute = ek BFS "wave". Isliye saare rotten ko <strong>level 0</strong>
-        me seed karke wave-by-wave spread chalate hain.
+        Imagine multiple Azure availability zones or scale-set nodes are already unhealthy. Multi-source BFS seeds all failing nodes at <strong>time 0</strong>, then each wave spreads one network hop to connected healthy nodes.
       </div>
     </div>
   </div>
@@ -155,25 +153,25 @@
   <div class="card">
     <div>
       <div class="section-label">Step description</div>
-      <div class="step-description" id="stepDesc">Press "Next". We seed every rotten orange into the queue, then spread one minute at a time.</div>
+      <div class="step-description" id="stepDesc">Press "Next". We seed every impacted Azure node into the queue, then propagate one time step at a time.</div>
     </div>
 
     <div class="layout">
       <div class="grid-box">
         <div class="grid" id="grid"></div>
         <div class="legend">
-          <span><span class="sw f"></span>fresh (1)</span>
-          <span><span class="sw r"></span>rotten (2)</span>
-          <span><span class="sw e"></span>empty (0)</span>
+          <span><span class="sw f"></span>healthy node (1)</span>
+          <span><span class="sw r"></span>impacted source (2)</span>
+          <span><span class="sw e"></span>no link (0)</span>
         </div>
       </div>
       <div class="side">
         <div class="stat-box">
-          <div class="stat-row"><span class="k">minutes elapsed</span><span class="v minutes" id="minVal">0</span></div>
-          <div class="stat-row"><span class="k">fresh remaining</span><span class="v fresh" id="freshVal">6</span></div>
+          <div class="stat-row"><span class="k">time steps elapsed</span><span class="v minutes" id="minVal">0</span></div>
+          <div class="stat-row"><span class="k">healthy remaining</span><span class="v fresh" id="freshVal">6</span></div>
         </div>
         <div class="stat-box">
-          <div class="section-label">queue (this minute's rotten)</div>
+          <div class="section-label">queue (this step's impacted nodes)</div>
           <div class="queue-row" id="queueRow"><span class="empty-hint">empty</span></div>
         </div>
       </div>
@@ -191,12 +189,7 @@
     <div class="takeaway-icon">💡</div>
     <div>
       <div class="takeaway-label">Key Takeaway</div>
-      <p>
-        Seed <strong>all</strong> rotten oranges at level 0, then BFS wave-by-wave —
-        each full wave is one minute. Snapshot <code>len(queue)</code> per minute.
-        At the end, <code>fresh &gt; 0</code> means some orange was unreachable → return <code>-1</code>.
-        <strong>O(m·n) time and space.</strong>
-      </p>
+      <p>Seed <strong>all</strong> impacted Azure zones/nodes at level 0, then run BFS wave by wave — each full wave is one time step. If healthy nodes remain unreachable at the end, return <code>-1</code>. <strong>O(m·n) time and space.</strong></p>
     </div>
   </div>
 
@@ -227,8 +220,8 @@
 
     // Step 0 of trace = seeding
     steps.push({
-      desc: 'Scan the grid: seed <strong>every rotten orange</strong> (value 2) into the queue at ' +
-            '<strong>minute 0</strong>. Count the <code>' + fresh + '</code> fresh oranges we must reach.',
+      desc: 'Scan the grid: seed <strong>every impacted Azure node</strong> (value 2) into the queue at ' +
+            '<strong>minute 0</strong>. Count the <code>' + fresh + '</code> healthy nodes we must reach.',
       grid: grid.map(r=>r.slice()), rotTime: {...rotTime}, minutes: 0, fresh,
       frontier: q.map(p=>p.join(',')), justRotted: [], cls: ''
     });
@@ -251,10 +244,10 @@
       minutes++;
       const allRotted = fresh === 0;
       steps.push({
-        desc: '<strong>Minute ' + minutes + ':</strong> every orange in the queue rots its fresh ' +
-              'neighbours. <code>' + justRotted.length + '</code> orange(s) just turned rotten → ' +
-              'they form the <strong>next wave</strong>. Fresh remaining: <code>' + fresh + '</code>.' +
-              (allRotted ? ' All fresh oranges are gone! ✅' : ''),
+        desc: '<strong>Minute ' + minutes + ':</strong> every impacted node in the queue reaches its healthy ' +
+              'neighbours. <code>' + justRotted.length + '</code> node(s) just became impacted → ' +
+              'they form the <strong>next wave</strong>. Healthy remaining: <code>' + fresh + '</code>.' +
+              (allRotted ? ' All reachable healthy nodes are impacted. ✅' : ''),
         grid: grid.map(r=>r.slice()), rotTime: {...rotTime}, minutes, fresh,
         frontier: nextQ.map(p=>p.join(',')), justRotted, cls: 'minute'
       });
@@ -265,7 +258,7 @@
     if (fresh === 0) {
       steps.push({
         desc: 'Queue drained and <code>fresh == 0</code> → answer is <strong>' + minutes +
-              ' minutes</strong>. (If any fresh orange had been unreachable, we would return <code>-1</code>.)',
+              ' minutes</strong>. (If any healthy node had been unreachable, we would return <code>-1</code>.)',
         grid: grid.map(r=>r.slice()), rotTime: {...rotTime}, minutes, fresh,
         frontier: [], justRotted: [], cls: 'minute', done: true
       });

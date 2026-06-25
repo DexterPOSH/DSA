@@ -19,17 +19,11 @@ pow(3.0, 0)    ->  1.0        # anything^0 = 1
 
 ## Real-World Analogy
 
-Socho tumhe `x` ko **64 baar** khud se multiply karna hai (`x^64`). Ek tareeka: 64 baar
-loop chala ke ek-ek karke multiply karo — 63 multiplications, thaka dene wala. Smart
-tareeka: **squaring ki seedhi (ladder)** chadho. Pehle `x²` nikalo (1 multiply). Phir
-usko square karo → `x⁴` (1 aur). Phir → `x⁸`, `x¹⁶`, `x³²`, `x⁶⁴`. Sirf **6 squarings**
-me pahunch gaye! Har step pe exponent **double** ho raha hai, isliye n tak pahunchne me
-sirf **log₂(n)** steps lagte hain.
+**What Azure VM Scale Sets is:** Azure VM Scale Sets is Azure's service for deploying and managing a fleet of identical virtual machines. It can grow or shrink capacity using autoscale rules, and teams often reason about capacity in tiers instead of mentally adding one VM at a time. The service is about managing repeated compute units efficiently.
 
-Aur jab exponent perfect power-of-2 na ho (jaise `x¹³`)? `13 = 1101` in binary = `8 + 4 + 1`,
-to `x¹³ = x⁸ · x⁴ · x¹`. Matlab: ladder chadhte jao, aur **jahan binary me `1` ho wahan
-current value ko answer me multiply kar lo**. Binary representation hi bata deti hai kaunse
-rungs uthane hain.
+**What powers-of-two capacity tiering is, and why it's used:** In planning around Azure VM Scale Sets, a doubling tier represents many repeated units in one bucket: 1, 2, 4, 8, and so on. Checking tiers lets you combine only the buckets you need instead of simulating every single unit. This exists because repeated multiplication or repeated capacity increments become expensive when the count is large.
+
+**The mapping:** Fast exponentiation treats `x` as the current Azure capacity tier and `n`'s binary bits as the plan. Squaring the base moves from `x^(2^k)` to `x^(2^(k+1))`, halving the exponent shifts to the next bit, and a `1` bit means the current tier contributes to the answer; for negative `n`, invert `x` first and use `|n|`. The key insight is that the exponent's binary representation tells you which doubled tiers to keep, turning O(n) repeated multiplication into O(log n) work.
 
 ## Approach
 

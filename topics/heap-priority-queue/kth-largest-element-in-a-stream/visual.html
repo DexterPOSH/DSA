@@ -119,12 +119,12 @@
   <h1>Kth Largest in a Stream &mdash; <span>Min-Heap of Size k</span></h1>
 
   <div class="analogy">
-    <div class="label">Real-world analogy</div>
-    <p>Ek <b>VIP lounge me sirf top-3 spenders ki seats</b> hain. Naya customer aata hai — agar uska bill lounge ke <b>sabse chhote member</b> se bada hai, andar aa jaata hai aur sabse chhota nikal diya jaata hai. Kth largest ka jawab? Lounge ka sabse chhota member — wahi <b>min-heap ka root</b> hai.</p>
+    <div class="label">📊 Azure analogy</div>
+    <p>Azure Monitor metrics flowing through Stream Analytics can power a live top-k dashboard. A size-k min-heap keeps the largest k metric values; its root is the threshold value, so it is always the kth largest after each update.</p>
   </div>
 
   <div class="problem">
-    <b>k = 3</b>, initial <code>nums = [4, 5, 8, 2]</code>, then stream <code>add(3), add(5), add(10), add(9), add(4)</code>. Har add ke baad 3rd largest return karo.
+    <b>k = 3</b>, initial <code>nums = [4, 5, 8, 2]</code>, then stream <code>add(3), add(5), add(10), add(9), add(4)</code>. Return the 3rd largest after each add.
   </div>
 
   <div class="card">
@@ -168,7 +168,7 @@
 
   <div class="takeaway">
     <div class="label">Key takeaway</div>
-    <p>Keep <b>only the top-k</b> elements in a min-heap. Its root is always the <b>kth largest</b>. Each <code style="font-family:monospace">add</code> is just push + maybe pop — <b>O(log k)</b>, no full sort, no growing memory.</p>
+    <p>For a live Azure Monitor top-k stream, keep <b>only the top-k</b> values in a min-heap. Its root is always the <b>kth largest</b>, so each <code style="font-family:monospace">add</code> is push plus maybe pop in <b>O(log k)</b>.</p>
   </div>
 </div>
 

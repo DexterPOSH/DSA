@@ -16,26 +16,23 @@ answer        = [ 1,  1,  4,  2,  1,  1,  0,  0]
 
 Day 0 (73) → next warmer is day 1 (74), wait 1 day.
 Day 2 (75) → next warmer is day 6 (76), wait 4 days.
-Day 6 (76) → koi din aage warmer nahi → 0.
+Day 6 (76) → no later day is warmer → 0.
 
 ## Real-World Analogy
 
-Socho tum ek line me khade logon ka **height comparison** kar rahe ho — har banda
-puchh raha hai "mere aage pehla banda kaun hai jo mujhse **lamba** hai, aur wo
-kitni jagah door hai?" Ab brute-force me har banda apne aage poori line scan kare
-to bahut time lagega. Smarter tareeka: ek **stack me un logon ko pakad ke rakho
-jinhe abhi tak apna 'taller person' nahi mila**. Jaise hi koi naya, taller banda
-aata hai, wo stack ke top wale chhote logon ka jawab ban jaata hai — pop karke
-unhe answer de do. Stack hamesha **decreasing height** me rehta hai (top pe sabse
-chhota jo abhi tak wait kar raha hai). Yahi monotonic stack ka core hai.
+**What Azure Monitor autoscale is:** Azure Monitor collects metrics and logs from Azure resources, and its autoscale feature uses those metrics to adjust capacity for services such as Virtual Machine Scale Sets and App Service plans. Instead of guessing capacity manually, you define rules like "if CPU stays high, add instances" or "if load drops, remove instances." The service keeps watching the metric stream and reacts when future samples prove a rule should fire.
+
+**What threshold evaluation is, and why it's used:** An autoscale rule compares metric samples, often aggregated over a time window, against a configured threshold. The threshold exists to turn a noisy time series into a clear operational decision: do not scale on every random blip, but do scale when a later sample/window crosses the line. In this analogy, each earlier temperature is a pending threshold asking, "when will a future Azure metric sample be higher than me?"
+
+**The mapping:** Each day is one Azure Monitor metric sample, and the answer array is the wait time until that sample is exceeded. The monotonic stack stores unresolved sample indices in decreasing temperature order, so cooler pending samples sit on top. When a warmer sample arrives, it pops every cooler sample it surpasses and records `current_index - previous_index`; anything left on the stack never saw a higher future metric, so it stays `0`. The key insight is that each sample waits on the stack exactly until the first later sample that beats it.
 
 ## Approach
 
-Hum **indices** ko stack me rakhenge (values nahi), taaki distance `i - prev`
-nikal saken. Stack ko **strictly decreasing temperature** me maintain karenge.
+Store **indices** in the stack (not values) so we can compute the distance `i - prev`.
+Maintain the stack in **strictly decreasing temperature** order.
 
-Brute force pehle samajh lo (taaki appreciate ho optimal): har `i` ke liye aage
-`j` chala ke pehla warmer dhoondo → O(n²).
+Understand the brute force first to appreciate the optimal solution: for each `i`,
+scan forward with `j` until you find the first warmer day → O(n²).
 
 **Optimal — monotonic decreasing stack** (O(n)):
 
@@ -52,40 +49,41 @@ def daily_temperatures(temperatures):
     return answer
 ```
 
-Har din ko stack pe push karo. Naya din jab aata hai aur wo stack-top wale din se
-**warmer** hai, to top wale din ka intazaar khatam — pop karo aur `i - prev`
-distance likh do. Jo din stack me reh gaye (end tak), unke aage koi warmer nahi
-mila → unka answer `0` rehta hai (already initialized).
+Push each day onto the stack. When a new day arrives and is **warmer** than the
+day at the stack top, that older day's wait is over — pop it and write the
+distance `i - prev`. Days still left on the stack at the end never found a warmer
+future day, so their answer remains `0` (already initialized).
 
 ## Complexity
 
 | Approach | Time | Space | Why |
 |----------|------|-------|-----|
-| Brute force | O(n²) | O(1) | Har day apne aage poora scan karta |
-| **Monotonic stack** | **O(n)** | **O(n)** | Har index **exactly ek baar** push, ek baar pop |
+| Brute force | O(n²) | O(1) | Each day scans everything ahead of it |
+| **Monotonic stack** | **O(n)** | **O(n)** | Each index is pushed **exactly once** and popped once |
 
-- **Time:** O(n) — bhale `while` loop dikhta hai, har index lifetime me sirf
-  ek baar push aur ek baar pop hota hai. Amortized total work linear hai.
-- **Space:** O(n) — worst case (strictly decreasing temps, jaise `[80,70,60]`)
-  saare indices stack pe ek saath baith jaate hain.
+- **Time:** O(n) — even though there is a `while` loop, each index is pushed once
+  and popped once during its lifetime. The amortized total work is linear.
+- **Space:** O(n) — in the worst case (strictly decreasing temperatures, such as
+  `[80,70,60]`), all indices sit on the stack at the same time.
 
 ## Common Pitfalls
 
-- **Values push karna instead of indices** — distance `i - prev` nikalne ke liye
-  index chahiye. Sirf value rakhoge to "kitne din" calculate nahi hoga.
-- **`>=` vs `>`** — strictly warmer chahiye, isliye `temp > temperatures[stack[-1]]`.
-  `>=` lagaoge to equal temperature ko galti se "warmer" maan loge.
-- **`while` ke bajaye `if`** — ek naya warmer din stack ke **kayi** purane dino ka
-  jawab ho sakta hai. `if` sirf top ek ko pop karega → galat answers.
-- **Stack me bache indices ko zero set karna bhulna** — agar `answer` ko `0` se
-  initialize nahi kiya, to leftover dino ka answer garbage reh jaayega.
+- **Pushing values instead of indices** — you need the index to compute the distance
+  `i - prev`. If you store only values, you cannot calculate "how many days."
+- **`>=` vs `>`** — the problem asks for strictly warmer days, so use
+  `temp > temperatures[stack[-1]]`. If you use `>=`, you incorrectly treat equal
+  temperatures as "warmer."
+- **Using `if` instead of `while`** — one new warmer day can answer **many** previous
+  days on the stack. `if` pops only the top one → incorrect answers.
+- **Forgetting to leave remaining stack indices as zero** — if `answer` is not
+  initialized with `0`, leftover days will keep garbage values.
 
 ## When to Use This Pattern
 
-"Har element ke liye **next greater / next smaller / previous greater** element
-(ya uski distance) dhoondo" → ye classic **monotonic stack** signal hai. Jab brute
-force O(n²) lage aur tum "next bigger thing to the right" type relationship dhoondh
-rahe ho, to stack me un elements ko pakdo jinka jawab abhi pending hai. Cousins:
+"For each element, find the **next greater / next smaller / previous greater** element
+(or its distance)" → this is a classic **monotonic stack** signal. When brute force
+looks like O(n²) and you are searching for a "next bigger thing to the right"
+relationship, keep the elements whose answer is still pending on the stack. Cousins:
 Next Greater Element, Stock Span, Largest Rectangle in Histogram.
 
 ## Practice

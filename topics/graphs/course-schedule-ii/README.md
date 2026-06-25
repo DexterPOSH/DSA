@@ -17,7 +17,12 @@ Course Schedule I poochta tha "kya finish kar sakte ho?" (boolean). Yahan tumhe 
 
 ## Real-World Analogy
 
-Socho ek recipe me steps hain: "dough banao", "phir bake karo", "phir ice karo". Tumhe ek **aisi sequence** chahiye jisme har step se pehle uske saare prerequisites already done ho. Course Schedule II basically yahi maangta hai — ek aisi line me sab courses lagao ki koi bhi course tab hi aaye jab uske saare prereqs uske aage already aa chuke ho. Agar do steps ek doosre pe circularly depend karein (cycle), to koi valid line ban hi nahi sakti → khaali list.
+**What Azure Resource Manager is:** Azure Resource Manager (ARM) is Azure's deployment engine, and Bicep is a concise way to author the resource graph ARM will execute. Templates may contain resources that can be deployed in parallel and resources that must wait for dependencies. The deployment planner's job is to turn that graph into a safe sequence.
+
+**What deployment ordering from `dependsOn` is, and why it's used:** `dependsOn` lists the Azure resources that must already exist before another resource can be created or updated. ARM uses this ordering so dependent resources never start too early—for example, a VM should not be created before its subnet and NIC are ready. If a cycle remains, there is no safe first resource in that cycle, so no valid deployment order exists.
+
+**The mapping:** Courses are Azure resources, prerequisites are `dependsOn` edges, and the answer is the ARM-style deployment order. Kahn's algorithm repeatedly selects resources with zero pending dependencies, appends them to the order, and then reduces the dependency count of anything they unlock. The key insight is that topological sort is not just detecting whether deployment is possible; it is producing the exact safe order, and an unfinished graph means a cycle forced the result to be empty.
+
 
 ## Approach
 

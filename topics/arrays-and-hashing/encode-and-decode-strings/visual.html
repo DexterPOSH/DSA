@@ -187,13 +187,12 @@
   <h1>Encode &amp; Decode Strings &mdash; <span>Length-Prefix Framing</span></h1>
 
   <div class="analogy">
-    <div class="analogy-icon">📦</div>
+    <div class="analogy-icon">📨</div>
     <div>
       <div class="analogy-label">Real-world analogy</div>
       <div class="analogy-text">
-        Har parcel se pehle ek label chipka do: <strong>"agla parcel exactly 4 chars ka hai"</strong>.
-        Receiver label padhta hai, exactly utne characters ginta hai — chahe andar
-        <code>#</code> ho ya kuch bhi, length kabhi jhooth nahi bolti.
+        Azure Event Hubs AMQP frames carry a length header before each payload.
+        Decode the same way: read <code>length</code>, then exactly that many characters, even when the payload contains <code>#</code>.
       </div>
     </div>
   </div>
@@ -385,7 +384,7 @@ function advanceEncode() {
       renderWords(-1, words.length);
       $('stepDesc').className = 'step-desc done';
       $('stepDesc').innerHTML = `Done! Encoded string: <code style="color:#86efac">${encoded.replace(/#/g,'#')}</code>. ` +
-        `Ek hi flat string me poori list — ab decode kar sakte ho.`;
+        `One flat string now holds the entire list — you can decode it next.`;
       $('nextBtn').disabled = true;
     });
   }

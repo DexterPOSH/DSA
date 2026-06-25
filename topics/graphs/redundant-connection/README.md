@@ -14,9 +14,12 @@ edges = [[1,2], [1,3], [2,3]]   ->  [2,3]
 
 ## Real-World Analogy
 
-Socho tum ek **plumbing network** bana rahe ho — har pipe do junctions ko jodti hai. Rule simple hai: koi bhi naya pipe sirf tab daalo jab uske dono ends **abhi tak alag-alag clusters** me ho. Agar dono ends pehle se hi (kisi ghoom-fir ke raste se) **same cluster** me connected hain, to ye pipe redundant hai — paani ko ek loop mil gaya. Wahi pipe hamara answer hai.
+**What Azure Virtual Network is:** Azure Virtual Network (VNet) is Azure's private networking service for placing cloud workloads into subnets and connecting networks with peering, gateways, and routes. VNet peering links two VNets over Azure's backbone so resources can communicate privately. As peerings accumulate, the set of VNets and peering links forms a graph.
 
-Har junction ke paas ek **"mukhiya" (leader/root)** hota hai jo poore cluster ko represent karta hai. Naya pipe daalne se pehle dono ends ke mukhiya p@ check karo — agar same mukhiya hai, cycle ban gaya.
+**What redundant VNet peering detection is, and why it's used:** A new peering is redundant for a tree-shaped topology if its two VNets are already connected through existing peerings. Detecting that matters when a team wants a controlled network graph with one managed path between segments, because an extra link creates a loop in the topology model and expands the paths traffic or dependencies may follow. The check should be done as links are added so the first edge that closes a cycle can be identified.
+
+**The mapping:** Each node is an Azure VNet and each edge is a peering being added in order. Union-Find checks the root group of both endpoints before accepting the edge; different roots mean the peering connects two separate groups, while the same root means the two VNets were already connected. The key insight is that the redundant connection is exactly the first Azure peering whose endpoints already share a component root.
+
 
 ## Approach — Union-Find (Disjoint Set Union)
 

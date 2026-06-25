@@ -15,10 +15,11 @@ You are given an integer array `nums` (length `n`). You start at index `0`. Each
 
 ## Real-World Analogy
 
-Socho ek bus route hai. Index `0` ek bus-stop hai, aur wahan se tum ek single jump me kuch stops tak ja sakte ho — yeh tumhara "**level 1 reachable zone**" hai (1 jump me jahan-jahan pahunch sakte ho). Ab us poore zone ke andar khade har stop se aage dekho — un sab ki combined reach tumhara "**level 2 zone**" banati hai (2 jumps me reachable). Phir level 3, aur aise hi.
+**What Azure Monitor autoscale for Virtual Machine Scale Sets is:** Azure Monitor autoscale adjusts an Azure Virtual Machine Scale Set's instance count when metric rules say the workload needs more or less capacity. It works with configured minimum, maximum, and default capacities so scaling stays controlled instead of chaotic. For this analogy, each scale-out action is a wave that can extend the amount of capacity Azure can safely reach.
 
-Yeh bilkul **BFS level-by-level expansion** jaisa hai: har "jump" ek BFS level hai. Tum individually har stop ko visit nahi karte — bas current level ka **right boundary** (`cur_end`) aur us level se reachable **farthest** point (`farthest`) track karte ho. Jab tum current level ke boundary pe pahunch jaate ho, ek jump count badha do aur next level me chale jao. Destination jis level me pehli baar aata hai, wahi minimum jumps hai.
+**What scale-out wave planning is, and why it's used:** A scale-out action often has to be reasoned about in stages: all capacities reachable with the current number of actions form one band, and only after that band is exhausted do you need another action. This is like a compressed breadth-first search over capacity levels. Tracking the current band boundary and the farthest next boundary avoids storing every possible path while still proving the minimum number of scale-out actions.
 
+**The mapping:** Each index is an Azure VMSS capacity checkpoint, `nums[i]` is how far one more scale-out wave could extend from there, `cur_end` is the end of the current action band, and `farthest` is the best next band discovered while scanning. When the scan reaches `cur_end`, Azure must spend one more scale-out action and move the boundary to `farthest`. The first band whose boundary covers the target gives the answer — the key insight is that minimum jumps are BFS levels compressed into two greedy boundaries.
 ## Approach
 
 **BFS (explicit)** se bhi solve hota hai — har level ke indices ko queue me daalo — but O(n) space. Greedy isi BFS ko **two pointers** se O(1) space me kar deta hai.
